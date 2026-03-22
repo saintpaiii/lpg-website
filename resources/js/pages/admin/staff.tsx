@@ -2,18 +2,20 @@ import { Head, router, useForm } from '@inertiajs/react';
 import {
     Archive,
     Eye,
-    Filter,
-    Pencil,
     Plus,
     RotateCcw,
     Search,
+    Shield,
     Trash2,
-    Truck,
     UserCheck,
+    UserCog,
     UserX,
     Users,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { PasswordInput } from '@/components/ui/password-input';
+import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
+import { useState } from 'react';
+import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -37,8 +39,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { toast } from 'sonner';
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+
+const POSITION_LABELS: Record<string, string> = {
+    manager:       'Manager',
+    moderator:     'Moderator',
+    support_staff: 'Support Staff',
+    accountant:    'Accountant',
+};
+
+const POSITION_STYLES: Record<string, string> = {
+    manager:       'bg-purple-100 text-purple-700',
+    moderator:     'bg-blue-100 text-blue-700',
+    support_staff: 'bg-teal-100 text-teal-700',
+    accountant:    'bg-amber-100 text-amber-700',
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,11 +66,11 @@ type StaffMember = {
     name: string;
     email: string;
     phone: string | null;
-    role: string;
+    sub_role: string | null;
     is_active: boolean;
     created_at: string;
     deleted_at: string | null;
-    today_deliveries: number;
+    permission_count: number;
 };
 
 type Paginated<T> = {
@@ -68,33 +87,22 @@ type Props = {
     staff: Paginated<StaffMember>;
     tab: string;
     archivedCount: number;
-    filters: { role?: string; search?: string; tab?: string };
+    filters: { search?: string; tab?: string };
 };
 
-// ── Constants ──────────────────────────────────────────────────────────────────
+// ── Page constants ─────────────────────────────────────────────────────────────
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Staff Management', href: '/admin/staff' }];
-
-const ROLE_LABELS: Record<string, string> = {
-    manager:   'Manager',
-    cashier:   'Cashier',
-    warehouse: 'Warehouse',
-    rider:     'Rider',
-};
-
-const ROLE_STYLES: Record<string, string> = {
-    manager:   'bg-purple-100 text-purple-700',
-    cashier:   'bg-emerald-100 text-emerald-700',
-    warehouse: 'bg-amber-100 text-amber-700',
-    rider:     'bg-blue-100 text-blue-700',
-};
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Platform Staff', href: '/admin/staff' }];
 
 // ── Small components ───────────────────────────────────────────────────────────
 
-function RoleBadge({ role }: { role: string }) {
+function PositionBadge({ subRole }: { subRole: string | null }) {
+    if (!subRole) {
+        return <span className="text-xs text-gray-400">—</span>;
+    }
     return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${ROLE_STYLES[role] ?? 'bg-gray-100 text-gray-600'}`}>
-            {ROLE_LABELS[role] ?? role}
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${POSITION_STYLES[subRole] ?? 'bg-gray-100 text-gray-600'}`}>
+            {POSITION_LABELS[subRole] ?? subRole}
         </span>
     );
 }
@@ -155,29 +163,28 @@ function StaffFormDialog({
         email: string;
         password: string;
         phone: string;
-        role: string;
+        sub_role: string;
     }>({
-        name:     editTarget?.name  ?? '',
-        email:    editTarget?.email ?? '',
+        name:     editTarget?.name     ?? '',
+        email:    editTarget?.email    ?? '',
         password: '',
-        phone:    editTarget?.phone ?? '',
-        role:     editTarget?.role  ?? 'rider',
+        phone:    editTarget?.phone    ?? '',
+        sub_role: editTarget?.sub_role ?? '',
     });
 
-    // Sync when edit target changes
     if (isEdit && data.name !== editTarget.name && data.email !== editTarget.email) {
-        setData({ name: editTarget.name, email: editTarget.email, password: '', phone: editTarget.phone ?? '', role: editTarget.role });
+        setData({ name: editTarget.name, email: editTarget.email, password: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
     }
 
-    function handleSubmit(e: FormEvent) {
+    function handleSubmit(e: { preventDefault(): void }) {
         e.preventDefault();
         if (isEdit) {
-            put(`/admin/staff/${editTarget!.id}`, {
+            put(`/admin/staff/${editTarget?.id}`, {
                 onSuccess: () => { reset(); onClose(); toast.success('Staff account updated.'); },
             });
         } else {
             post('/admin/staff', {
-                onSuccess: () => { reset(); onClose(); toast.success('Staff account created.'); },
+                onSuccess: () => { reset(); onClose(); toast.success('Platform staff account created.'); },
             });
         }
     }
@@ -192,14 +199,14 @@ function StaffFormDialog({
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        {isEdit ? <Pencil className="h-4 w-4 text-blue-600" /> : <Plus className="h-4 w-4 text-blue-600" />}
-                        {isEdit ? 'Edit Staff Account' : 'Add Staff Account'}
+                        <Shield className="h-4 w-4 text-blue-600" />
+                        {isEdit ? 'Edit Staff Account' : 'Add Platform Staff'}
                     </DialogTitle>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     <div className="grid gap-1.5">
-                        <Label>Full Name *</Label>
+                        <Label>Full Name <span className="text-red-500">*</span></Label>
                         <Input
                             value={data.name}
                             onChange={(e) => setData('name', e.target.value)}
@@ -209,7 +216,7 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>Email *</Label>
+                        <Label>Email <span className="text-red-500">*</span></Label>
                         <Input
                             type="email"
                             value={data.email}
@@ -220,15 +227,15 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>{isEdit ? 'New Password (leave blank to keep current)' : 'Password *'}</Label>
-                        <Input
-                            type="password"
+                        <Label>{isEdit ? 'New Password (leave blank to keep current)' : <>Password <span className="text-red-500">*</span></>}</Label>
+                        <PasswordInput
                             value={data.password}
                             onChange={(e) => setData('password', e.target.value)}
                             placeholder={isEdit ? '••••••••' : 'Minimum 8 characters'}
                             autoComplete="new-password"
                         />
                         {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
+                        <PasswordStrengthIndicator password={data.password} />
                     </div>
 
                     <div className="grid gap-1.5">
@@ -242,25 +249,25 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>Role *</Label>
-                        <Select value={data.role} onValueChange={(v) => setData('role', v)}>
+                        <Label>Position <span className="text-red-500">*</span></Label>
+                        <Select value={data.sub_role} onValueChange={(v) => setData('sub_role', v)}>
                             <SelectTrigger>
-                                <SelectValue />
+                                <SelectValue placeholder="Select position…" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="manager">Manager</SelectItem>
-                                <SelectItem value="cashier">Cashier</SelectItem>
-                                <SelectItem value="warehouse">Warehouse</SelectItem>
-                                <SelectItem value="rider">Rider</SelectItem>
+                                <SelectItem value="moderator">Moderator</SelectItem>
+                                <SelectItem value="support_staff">Support Staff</SelectItem>
+                                <SelectItem value="accountant">Accountant</SelectItem>
                             </SelectContent>
                         </Select>
-                        {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
+                        {errors.sub_role && <p className="text-xs text-red-500">{errors.sub_role}</p>}
+                        <p className="text-xs text-muted-foreground">This is a display label only — actual access is controlled by the permission checkboxes.</p>
                     </div>
 
                     {!isEdit && (
                         <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                            The staff member will use these credentials to log in to the system.
-                            Please share them securely.
+                            After creating, you'll be taken to their profile to set permissions.
                         </div>
                     )}
 
@@ -271,6 +278,7 @@ function StaffFormDialog({
                             disabled={processing}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Account')}
                         </Button>
                     </DialogFooter>
@@ -280,7 +288,7 @@ function StaffFormDialog({
     );
 }
 
-// ── Delete / Archive Dialog ────────────────────────────────────────────────────
+// ── Archive Dialog ─────────────────────────────────────────────────────────────
 
 function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClose: () => void }) {
     const { delete: destroy, processing } = useForm();
@@ -299,7 +307,7 @@ function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClos
                     <AlertDialogTitle>Archive Staff Account?</AlertDialogTitle>
                     <AlertDialogDescription>
                         Archive <span className="font-semibold">{target?.name}</span>? Their account will be deactivated
-                        and they will no longer be able to log in. You can restore it later.
+                        and they will lose admin panel access. You can restore it later.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -336,7 +344,7 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
                     <AlertDialogTitle>Permanently Delete?</AlertDialogTitle>
                     <AlertDialogDescription>
                         Permanently delete <span className="font-semibold">{target?.name}</span>?
-                        All their data will be erased. This cannot be undone.
+                        All their data and permissions will be erased. This cannot be undone.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -363,7 +371,6 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
     const [forceTarget, setForceTarget]     = useState<StaffMember | null>(null);
 
     const [search, setSearch] = useState(filters.search ?? '');
-    const [role, setRole]     = useState(filters.role ?? '');
 
     const isArchived = tab === 'archived';
 
@@ -371,13 +378,8 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
         router.get('/admin/staff', { tab: newTab }, { preserveState: false });
     }
 
-    function applyFilters() {
-        router.get('/admin/staff', { tab, search: search || undefined, role: role || undefined }, { preserveState: true, replace: true });
-    }
-
-    function clearFilters() {
-        setSearch(''); setRole('');
-        router.get('/admin/staff', { tab }, { preserveState: false });
+    function applySearch() {
+        router.get('/admin/staff', { tab, search: search || undefined }, { preserveState: true, replace: true });
     }
 
     function openAdd() {
@@ -404,21 +406,18 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
         });
     }
 
-    const hasFilters = search || role;
-    const onDutyCount = staff.data.filter((s) => s.today_deliveries > 0).length;
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Staff Management" />
+            <Head title="Platform Staff" />
 
             <div className="flex flex-1 flex-col gap-6 p-6">
 
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">Platform Staff</h1>
                         <p className="mt-0.5 text-sm text-gray-500">
-                            Manage staff accounts, roles, and permissions.
+                            Manage admin panel access for platform staff members.
                         </p>
                     </div>
                     {!isArchived && (
@@ -429,27 +428,17 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                     )}
                 </div>
 
-                {/* Summary cards — active tab only */}
+                {/* Summary cards */}
                 {!isArchived && (
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-                                <Users className="h-4 w-4 text-muted-foreground" />
+                                <UserCog className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-2xl font-bold">{staff.total}</div>
-                                <p className="text-xs text-muted-foreground">registered accounts</p>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">On Duty Today</CardTitle>
-                                <Truck className="h-4 w-4 text-blue-500" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-blue-600">{onDutyCount}</div>
-                                <p className="text-xs text-muted-foreground">with active deliveries</p>
+                                <p className="text-xs text-muted-foreground">platform staff accounts</p>
                             </CardContent>
                         </Card>
                         <Card>
@@ -492,7 +481,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                     </nav>
                 </div>
 
-                {/* Filters */}
+                {/* Search */}
                 <Card>
                     <CardContent className="pt-4 pb-4">
                         <div className="flex flex-wrap items-center gap-3">
@@ -500,29 +489,17 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
                                 <Input
                                     className="pl-8"
-                                    placeholder="Search by name, email, phone…"
+                                    placeholder="Search by name or email…"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                                    onKeyDown={(e) => e.key === 'Enter' && applySearch()}
                                 />
                             </div>
-                            <Select value={role || 'all'} onValueChange={(v) => setRole(v === 'all' ? '' : v)}>
-                                <SelectTrigger className="w-36">
-                                    <SelectValue placeholder="All roles" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All roles</SelectItem>
-                                    <SelectItem value="manager">Manager</SelectItem>
-                                    <SelectItem value="cashier">Cashier</SelectItem>
-                                    <SelectItem value="warehouse">Warehouse</SelectItem>
-                                    <SelectItem value="rider">Rider</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button size="sm" onClick={applyFilters} className="bg-blue-600 hover:bg-blue-700 text-white">
-                                <Filter className="mr-1.5 h-3.5 w-3.5" /> Apply
+                            <Button size="sm" onClick={applySearch} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                Search
                             </Button>
-                            {hasFilters && (
-                                <Button size="sm" variant="ghost" onClick={clearFilters} className="text-gray-500">
+                            {search && (
+                                <Button size="sm" variant="ghost" onClick={() => { setSearch(''); router.get('/admin/staff', { tab }); }} className="text-gray-500">
                                     Clear
                                 </Button>
                             )}
@@ -544,9 +521,9 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                     <CardContent className="p-0">
                         {staff.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-                                <Users className="mb-3 h-10 w-10" />
+                                <UserCog className="mb-3 h-10 w-10" />
                                 <p className="font-medium">
-                                    {isArchived ? 'No archived staff' : 'No staff members yet'}
+                                    {isArchived ? 'No archived staff' : 'No platform staff yet'}
                                 </p>
                                 {!isArchived && (
                                     <p className="mt-1 text-sm">Click "Add Staff" to create the first account.</p>
@@ -558,10 +535,9 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                     <thead>
                                         <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                                             <th className="px-4 py-3">Name</th>
-                                            <th className="px-4 py-3">Role</th>
-                                            <th className="px-4 py-3">Phone</th>
+                                            <th className="px-4 py-3">Position</th>
                                             <th className="px-4 py-3">Status</th>
-                                            {!isArchived && <th className="px-4 py-3 text-center">Today's Deliveries</th>}
+                                            <th className="px-4 py-3 text-center">Permissions</th>
                                             <th className="px-4 py-3">Joined</th>
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
@@ -581,10 +557,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <RoleBadge role={s.role} />
-                                                </td>
-                                                <td className="px-4 py-3 text-sm text-gray-500">
-                                                    {s.phone ?? '—'}
+                                                    <PositionBadge subRole={s.sub_role} />
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {isArchived ? (
@@ -593,19 +566,17 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                         <StatusBadge active={s.is_active} />
                                                     )}
                                                 </td>
-                                                {!isArchived && (
-                                                    <td className="px-4 py-3 text-center">
-                                                        {s.today_deliveries > 0 ? (
-                                                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-                                                                <Truck className="h-3 w-3" />
-                                                                {s.today_deliveries}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-300">—</span>
-                                                        )}
-                                                    </td>
-                                                )}
-                                                <td className="px-4 py-3 text-xs text-gray-500">{s.created_at}</td>
+                                                <td className="px-4 py-3 text-center">
+                                                    {s.permission_count > 0 ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                                                            <Shield className="h-3 w-3" />
+                                                            {s.permission_count}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-300">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(s.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
                                                         {isArchived ? (
@@ -641,9 +612,9 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => openEdit(s)}
                                                                     className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                                                                    title="Edit"
+                                                                    title="Edit account"
                                                                 >
-                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                    <Shield className="h-3.5 w-3.5" />
                                                                 </Button>
                                                                 <Button
                                                                     size="sm" variant="ghost"

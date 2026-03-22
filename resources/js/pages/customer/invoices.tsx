@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { Receipt, Printer } from 'lucide-react';
+import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
@@ -87,7 +88,7 @@ export default function Invoices({ invoices }: Props) {
                                             <td className="px-4 py-3 text-xs font-mono text-gray-500">
                                                 {inv.order_number ?? '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{inv.created_at}</td>
+                                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(inv.created_at)}</td>
                                             <td className="px-4 py-3 text-right font-semibold tabular-nums">
                                                 ₱{inv.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>

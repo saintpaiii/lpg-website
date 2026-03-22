@@ -13,8 +13,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function DeleteUser() {
     const passwordInput = useRef<HTMLInputElement>(null);
@@ -62,9 +62,8 @@ export default function DeleteUser() {
                         <form onSubmit={handleSubmit} className="space-y-6">
                             <div className="grid gap-2">
                                 <Label htmlFor="password" className="sr-only">Password</Label>
-                                <Input
+                                <PasswordInput
                                     id="password"
-                                    type="password"
                                     name="password"
                                     ref={passwordInput}
                                     placeholder="Password"

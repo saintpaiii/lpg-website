@@ -2,6 +2,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ArchiveRestore, Edit2, Search, Trash2, Users } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -165,7 +166,8 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
     function handleArchive() {
         if (!archiveTarget) return;
         router.delete(`/admin/customers/${archiveTarget.id}`, {
-            onSuccess: () => setArchiveTarget(null),
+            onSuccess: () => { setArchiveTarget(null); toast.success('Customer archived.'); },
+            onError: () => toast.error('Failed to archive customer.'),
         });
     }
 
@@ -182,7 +184,8 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
     function handleForceDelete() {
         if (!forceTarget) return;
         router.delete(`/admin/customers/${forceTarget.id}/force`, {
-            onSuccess: () => setForceTarget(null),
+            onSuccess: () => { setForceTarget(null); toast.success('Customer permanently deleted.'); },
+            onError: () => toast.error('Failed to delete customer.'),
         });
     }
 
@@ -417,7 +420,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                     <form onSubmit={handleSubmit} className="grid gap-4">
                         {/* Name */}
                         <div className="grid gap-1.5">
-                            <Label htmlFor="name">Name *</Label>
+                            <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
                             <Input
                                 id="name"
                                 value={data.name}
@@ -428,7 +431,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
 
                         {/* Type */}
                         <div className="grid gap-1.5">
-                            <Label>Customer Type *</Label>
+                            <Label>Customer Type <span className="text-red-500">*</span></Label>
                             <Select
                                 value={data.customer_type}
                                 onValueChange={(v) => setData('customer_type', v as CustomerType)}
@@ -525,6 +528,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                 disabled={processing}
                                 className="bg-blue-600 hover:bg-blue-700 text-white"
                             >
+                                {processing && <Spinner className="mr-1.5" />}
                                 {processing ? 'Saving…' : 'Save Changes'}
                             </Button>
                         </DialogFooter>

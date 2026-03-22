@@ -2,16 +2,31 @@
 
 use App\Http\Controllers\InvoicePrintController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\OtpController;
+use App\Http\Controllers\SellerRegistrationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+
+// OTP email verification — auth required, verified NOT required (to avoid redirect loop)
+Route::middleware('auth')->group(function () {
+    Route::get('/verify-otp',        [OtpController::class, 'show'])->name('otp.show');
+    Route::post('/verify-otp',       [OtpController::class, 'verify'])->name('otp.verify');
+    Route::post('/verify-otp/resend',[OtpController::class, 'resend'])->name('otp.resend');
+});
 
 // Shared printable invoice — accessible by authenticated staff or the owning customer
 Route::get('/invoices/{invoice}/print', [InvoicePrintController::class, 'show'])
     ->middleware(['auth', 'verified'])
     ->name('invoices.print');
 
+// ── Seller Registration & Pending (accessible without seller middleware) ─────
+Route::get('/seller/register', [SellerRegistrationController::class, 'create'])->name('seller.register');
+Route::post('/seller/register', [SellerRegistrationController::class, 'store'])->name('seller.register.store');
+Route::get('/seller/pending', fn () => inertia('auth/seller-pending'))->name('seller.pending');
+
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';
 require __DIR__.'/rider.php';
 require __DIR__.'/customer.php';
+require __DIR__.'/seller.php';

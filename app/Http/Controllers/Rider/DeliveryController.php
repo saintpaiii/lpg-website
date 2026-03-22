@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Rider;
 
 use App\Http\Controllers\Controller;
 use App\Models\Delivery;
+use App\Models\DeliveryProof;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -96,6 +98,60 @@ class DeliveryController extends Controller
         ]);
     }
 
+    // ── Delivery History (completed) ──────────────────────────────────────────
+
+    public function history(Request $request): Response
+    {
+        $user = auth()->user();
+
+        $deliveries = Delivery::with(['order.customer', 'proofs'])
+            ->where('rider_id', $user->id)
+            ->whereIn('status', ['delivered', 'failed'])
+            ->latest('delivered_at')
+            ->paginate(20)
+            ->withQueryString()
+            ->through(fn ($d) => [
+                'id'           => $d->id,
+                'status'       => $d->status,
+                'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
+                'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
+                'notes'        => $d->notes,
+                'order' => $d->order ? [
+                    'id'           => $d->order->id,
+                    'order_number' => $d->order->order_number,
+                    'total_amount' => (float) $d->order->total_amount,
+                    'customer'     => $d->order->customer ? [
+                        'name'     => $d->order->customer->name,
+                        'address'  => $d->order->customer->address,
+                        'barangay' => $d->order->customer->barangay,
+                        'city'     => $d->order->customer->city,
+                    ] : null,
+                ] : null,
+                'proofs' => $d->proofs->map(fn ($p) => [
+                    'status'        => $p->status,
+                    'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,
+                    'notes'         => $p->notes,
+                    'location_note' => $p->location_note,
+                    'created_at'    => $p->created_at->format('M d, Y g:i A'),
+                ])->values()->all(),
+            ]);
+
+        $totals = Delivery::where('rider_id', $user->id)
+            ->selectRaw("
+                SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
+                SUM(CASE WHEN status = 'failed'    THEN 1 ELSE 0 END) as failed_count
+            ")
+            ->first();
+
+        return Inertia::render('rider/history', [
+            'deliveries' => $deliveries,
+            'totals'     => [
+                'delivered' => (int) ($totals->delivered_count ?? 0),
+                'failed'    => (int) ($totals->failed_count    ?? 0),
+            ],
+        ]);
+    }
+
     // ── Update Status ─────────────────────────────────────────────────────────
 
     public function updateStatus(Request $request, Delivery $delivery): RedirectResponse
@@ -105,9 +161,13 @@ class DeliveryController extends Controller
             abort(403, 'Unauthorized.');
         }
 
+        $needsPhoto = in_array($request->input('status'), ['picked_up', 'delivered', 'failed']);
+
         $data = $request->validate([
-            'status' => 'required|in:picked_up,in_transit,delivered,failed',
-            'notes'  => 'nullable|string|max:500',
+            'status'        => 'required|in:picked_up,in_transit,delivered,failed',
+            'notes'         => 'nullable|string|max:500',
+            'location_note' => 'nullable|string|max:255',
+            'photo'         => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg|max:5120',
         ]);
 
         $newStatus = $data['status'];
@@ -131,7 +191,7 @@ class DeliveryController extends Controller
             return back()->with('error', "Cannot move from {$delivery->status} to {$newStatus}.");
         }
 
-        DB::transaction(function () use ($delivery, $newStatus, $data) {
+        DB::transaction(function () use ($delivery, $newStatus, $data, $request) {
             $updates = ['status' => $newStatus];
 
             if (! empty($data['notes'])) {
@@ -151,6 +211,21 @@ class DeliveryController extends Controller
             }
 
             $delivery->update($updates);
+
+            // Store proof record
+            $photoPath = null;
+            if ($request->hasFile('photo')) {
+                $photoPath = $request->file('photo')->store('delivery_proofs', 'public');
+            }
+
+            DeliveryProof::create([
+                'delivery_id'   => $delivery->id,
+                'user_id'       => auth()->id(),
+                'status'        => $newStatus,
+                'photo_path'    => $photoPath,
+                'notes'         => $data['notes'] ?? null,
+                'location_note' => $data['location_note'] ?? null,
+            ]);
         });
 
         $label = ucfirst(str_replace('_', ' ', $newStatus));

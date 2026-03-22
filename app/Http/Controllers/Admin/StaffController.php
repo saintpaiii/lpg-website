@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Delivery;
+use App\Models\AccountAction;
 use App\Models\Permission;
-use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -19,139 +16,97 @@ use Inertia\Response;
 
 class StaffController extends Controller
 {
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private function formatUser(User $u, array $todayDeliveries = []): array
-    {
-        return [
-            'id'         => $u->id,
-            'name'       => $u->name,
-            'email'      => $u->email,
-            'phone'      => $u->phone,
-            'role'       => $u->role,
-            'is_active'  => (bool) $u->is_active,
-            'created_at' => $u->created_at->format('M d, Y'),
-            'deleted_at' => $u->deleted_at?->format('M d, Y g:i A'),
-            'today_deliveries' => $todayDeliveries[$u->id] ?? 0,
-        ];
-    }
-
     // ── Index ─────────────────────────────────────────────────────────────────
 
     public function index(Request $request): Response
     {
         $tab = $request->input('tab', 'active');
 
-        // Show only staff roles — never admins or customers
-        $query = User::whereIn('role', ['manager', 'cashier', 'warehouse', 'rider'])
-            ->where('is_admin', false);
+        $query = User::withTrashed()
+            ->where('is_platform_staff', true)
+            ->where('is_admin', false)
+            ->whereNotIn('role', ['admin', 'platform_admin'])
+            ->withCount(['userPermissions as permission_count' => fn ($q) => $q->where('granted', true)]);
 
         if ($tab === 'archived') {
             $query->onlyTrashed();
-        }
-
-        if ($role = $request->input('role')) {
-            $query->where('role', $role);
+        } else {
+            $query->whereNull('deleted_at');
         }
 
         if ($search = $request->input('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%");
-            });
+            $query->where(fn ($q) => $q
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('email', 'like', "%{$search}%")
+            );
         }
 
-        $staff = $query->orderBy('name')->paginate(20)->withQueryString();
-
-        // Today's delivery counts per rider
-        $todayDeliveries = Delivery::select('rider_id', DB::raw('COUNT(*) as cnt'))
-            ->whereIn('rider_id', $staff->pluck('id'))
-            ->whereIn('status', ['assigned', 'picked_up', 'in_transit'])
-            ->whereDate('assigned_at', today())
-            ->groupBy('rider_id')
-            ->pluck('cnt', 'rider_id')
-            ->toArray();
-
-        $paginated = $staff->through(fn ($u) => $this->formatUser($u, $todayDeliveries));
+        $staff = $query->orderBy('name')->paginate(20)->withQueryString()
+            ->through(fn ($u) => [
+                'id'               => $u->id,
+                'name'             => $u->name,
+                'email'            => $u->email,
+                'phone'            => $u->phone,
+                'sub_role'         => $u->sub_role,
+                'is_active'        => (bool) $u->is_active,
+                'created_at'       => $u->created_at->format('M d, Y'),
+                'deleted_at'       => $u->deleted_at?->format('M d, Y'),
+                'permission_count' => (int) $u->permission_count,
+            ]);
 
         $archivedCount = User::onlyTrashed()
-            ->whereIn('role', ['manager', 'cashier', 'warehouse', 'rider'])
+            ->where('is_platform_staff', true)
             ->where('is_admin', false)
             ->count();
 
         return Inertia::render('admin/staff', [
-            'staff'         => $paginated,
+            'staff'         => $staff,
             'tab'           => $tab,
             'archivedCount' => $archivedCount,
-            'filters'       => $request->only('role', 'search', 'tab'),
+            'filters'       => $request->only('search', 'tab'),
         ]);
     }
 
-    // ── Show (staff detail + delivery history) ────────────────────────────────
+    // ── Store (create platform staff account) ─────────────────────────────────
+
+    public function store(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'phone'    => 'nullable|string|max:20',
+            'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
+        ]);
+
+        $user = User::create([
+            'name'              => $data['name'],
+            'email'             => $data['email'],
+            'password'          => Hash::make($data['password']),
+            'phone'             => $data['phone'] ?? null,
+            'sub_role'          => $data['sub_role'],
+            'role'              => 'platform_staff',
+            'is_platform_staff' => true,
+            'is_active'         => true,
+            'is_admin'          => false,
+            'email_verified_at' => now(),
+        ]);
+
+        // Redirect to their profile so admin can set permissions immediately
+        return redirect()->route('admin.staff.show', $user->id)
+            ->with('success', "Platform staff account for {$user->name} created. Set their permissions below.");
+    }
+
+    // ── Show ──────────────────────────────────────────────────────────────────
 
     public function show(User $user): Response
     {
-        // Overall delivery stats
-        $stats = Delivery::where('rider_id', $user->id)
-            ->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered,
-                SUM(CASE WHEN status = 'failed'    THEN 1 ELSE 0 END) as failed,
-                SUM(CASE WHEN status IN ('assigned','picked_up','in_transit') THEN 1 ELSE 0 END) as active
-            ")
-            ->first();
+        // Admin-relevant permission groups only
+        $adminGroups = ['Dashboard', 'Stores', 'Verifications', 'Invoices', 'Reports', 'DSS', 'User Management', 'Settings'];
 
-        $total        = (int) ($stats->total ?? 0);
-        $delivered    = (int) ($stats->delivered ?? 0);
-        $failed       = (int) ($stats->failed ?? 0);
-        $active       = (int) ($stats->active ?? 0);
-        $successRate  = $total > 0 ? round(($delivered / $total) * 100, 1) : 0;
-
-        // This month
-        $thisMonth = Delivery::where('rider_id', $user->id)
-            ->whereYear('assigned_at',  now()->year)
-            ->whereMonth('assigned_at', now()->month)
-            ->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered
-            ")
-            ->first();
-
-        // Recent deliveries (paginated)
-        $deliveries = Delivery::with(['order.customer'])
-            ->where('rider_id', $user->id)
-            ->latest('assigned_at')
-            ->paginate(15)
-            ->through(fn ($d) => [
-                'id'           => $d->id,
-                'status'       => $d->status,
-                'notes'        => $d->notes,
-                'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
-                'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
-                'order' => $d->order ? [
-                    'id'           => $d->order->id,
-                    'order_number' => $d->order->order_number,
-                    'total_amount' => (float) $d->order->total_amount,
-                    'customer'     => $d->order->customer?->name,
-                ] : null,
-            ]);
-
-        // Monthly delivery counts for the last 6 months (chart)
-        $monthlyData = Delivery::where('rider_id', $user->id)
-            ->where('assigned_at', '>=', now()->subMonths(6)->startOfMonth())
-            ->selectRaw("DATE_FORMAT(assigned_at, '%Y-%m') as ym, COUNT(*) as total, SUM(CASE WHEN status='delivered' THEN 1 ELSE 0 END) as delivered")
-            ->groupBy('ym')
-            ->orderBy('ym')
+        $allPermissions = Permission::orderBy('group')->orderBy('name')
+            ->whereIn('group', $adminGroups)
             ->get()
-            ->map(fn ($r) => [
-                'month'     => Carbon::createFromFormat('Y-m', $r->ym)->format('M Y'),
-                'total'     => (int) $r->total,
-                'delivered' => (int) $r->delivered,
-            ]);
-
-        // All permissions grouped for the permission manager
-        $allPermissions = Permission::orderBy('group')->orderBy('name')->get()
             ->groupBy('group')
             ->map(fn ($perms) => $perms->map(fn ($p) => [
                 'id'          => $p->id,
@@ -160,68 +115,53 @@ class StaffController extends Controller
             ])->values())
             ->toArray();
 
-        // Role default permissions (names)
-        $roleDefaults = RolePermission::where('role', $user->role)
+        // Platform staff have no role-based defaults — all permissions are explicit grants
+        $roleDefaults = [];
+
+        $userOverrides = UserPermission::where('user_id', $user->id)
             ->with('permission')
             ->get()
-            ->pluck('permission.name')
-            ->filter()
-            ->values()
-            ->toArray();
-
-        // User-specific overrides
-        $userOverrides = $user->userPermissions()->with('permission')->get()
             ->map(fn ($up) => [
                 'permission' => $up->permission?->name,
-                'granted'    => $up->granted,
+                'granted'    => (bool) $up->granted,
             ])
             ->filter(fn ($o) => $o['permission'] !== null)
             ->values()
             ->toArray();
 
+        $history = AccountAction::where('target_type', 'user')
+            ->where('target_id', $user->id)
+            ->with('performer:id,name')
+            ->orderByDesc('created_at')
+            ->limit(30)
+            ->get()
+            ->map(fn ($a) => [
+                'id'           => $a->id,
+                'action'       => $a->action,
+                'reason'       => $a->reason,
+                'notes'        => $a->notes,
+                'performed_by' => $a->performer?->name ?? '—',
+                'created_at'   => $a->created_at->format('M d, Y g:i A'),
+            ]);
+
         return Inertia::render('admin/staff-show', [
-            'staff' => $this->formatUser($user),
-            'stats' => [
-                'total'        => $total,
-                'delivered'    => $delivered,
-                'failed'       => $failed,
-                'active'       => $active,
-                'success_rate' => $successRate,
-                'this_month'   => (int) ($thisMonth->total ?? 0),
-                'this_month_delivered' => (int) ($thisMonth->delivered ?? 0),
+            'staff' => [
+                'id'                  => $user->id,
+                'name'                => $user->name,
+                'email'               => $user->email,
+                'phone'               => $user->phone,
+                'sub_role'            => $user->sub_role,
+                'is_active'           => (bool) $user->is_active,
+                'deactivation_reason' => $user->deactivation_reason,
+                'deactivation_notes'  => $user->deactivation_notes,
+                'deactivated_at'      => $user->deactivated_at?->format('M d, Y g:i A'),
+                'created_at'          => $user->created_at->format('M d, Y'),
             ],
-            'deliveries'     => $deliveries,
-            'monthlyData'    => $monthlyData,
-            'allPermissions' => $allPermissions,
+            'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
             'userOverrides'  => $userOverrides,
+            'history'        => $history,
         ]);
-    }
-
-    // ── Store ─────────────────────────────────────────────────────────────────
-
-    public function store(Request $request): RedirectResponse
-    {
-        $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => ['required', 'string', Password::min(8)],
-            'phone'    => 'nullable|string|max:20',
-            'role'     => 'required|in:manager,cashier,warehouse,rider',
-        ]);
-
-        $user = User::create([
-            'name'              => $data['name'],
-            'email'             => $data['email'],
-            'password'          => Hash::make($data['password']),
-            'phone'             => $data['phone'] ?? null,
-            'role'              => $data['role'],
-            'is_active'         => true,
-            'is_admin'          => false,
-            'email_verified_at' => now(), // Admin-created accounts are pre-verified
-        ]);
-
-        return back()->with('success', "Staff account for {$user->name} created.");
     }
 
     // ── Update ────────────────────────────────────────────────────────────────
@@ -231,16 +171,16 @@ class StaffController extends Controller
         $data = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => "required|email|unique:users,email,{$user->id}",
-            'password' => ['nullable', 'string', Password::min(8)],
+            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
             'phone'    => 'nullable|string|max:20',
-            'role'     => 'required|in:manager,cashier,warehouse,rider',
+            'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
         $updates = [
-            'name'  => $data['name'],
-            'email' => $data['email'],
-            'phone' => $data['phone'] ?? null,
-            'role'  => $data['role'],
+            'name'     => $data['name'],
+            'email'    => $data['email'],
+            'phone'    => $data['phone'] ?? null,
+            'sub_role' => $data['sub_role'],
         ];
 
         if (! empty($data['password'])) {
@@ -252,44 +192,178 @@ class StaffController extends Controller
         return back()->with('success', "{$user->name}'s profile updated.");
     }
 
+    // ── Update Position ───────────────────────────────────────────────────────
+
+    public function updatePosition(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
+        ]);
+
+        $user->update(['sub_role' => $data['sub_role']]);
+
+        return back()->with('success', "{$user->name}'s position updated.");
+    }
+
+    // ── Update Permissions ────────────────────────────────────────────────────
+
+    /**
+     * Save per-user permission overrides.
+     * Expects: { permissions: { 'dashboard.view': true|false|null } }
+     * null = remove override (clear explicit grant)
+     */
+    public function updatePermissions(Request $request, User $user): RedirectResponse
+    {
+        $data = $request->validate([
+            'permissions'   => 'present|array',
+            'permissions.*' => 'nullable|boolean',
+        ]);
+
+        foreach ($data['permissions'] as $permName => $granted) {
+            $perm = Permission::where('name', $permName)->first();
+            if (! $perm) continue;
+
+            if ($granted === null) {
+                UserPermission::withTrashed()
+                    ->where('user_id', $user->id)
+                    ->where('permission_id', $perm->id)
+                    ->forceDelete();
+            } else {
+                $existing = UserPermission::withTrashed()
+                    ->where('user_id', $user->id)
+                    ->where('permission_id', $perm->id)
+                    ->first();
+
+                if ($existing) {
+                    $existing->granted    = $granted;
+                    $existing->deleted_at = null;
+                    $existing->save();
+                } else {
+                    UserPermission::create([
+                        'user_id'       => $user->id,
+                        'permission_id' => $perm->id,
+                        'granted'       => $granted,
+                    ]);
+                }
+            }
+        }
+
+        return back()->with('success', "Permissions updated for {$user->name}.");
+    }
+
+    // ── Reset Permissions ─────────────────────────────────────────────────────
+
+    public function resetPermissions(User $user): RedirectResponse
+    {
+        UserPermission::withTrashed()->where('user_id', $user->id)->forceDelete();
+
+        return back()->with('success', "All permissions cleared for {$user->name}.");
+    }
+
     // ── Toggle Active ─────────────────────────────────────────────────────────
 
-    public function toggle(User $user): RedirectResponse
+    public function toggle(Request $request, User $user): RedirectResponse
     {
-        $user->update(['is_active' => ! $user->is_active]);
+        if ($user->is_active) {
+            // Deactivating — reason required
+            $request->validate([
+                'reason' => ['required', 'string', 'max:255'],
+                'notes'  => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $status = $user->is_active ? 'activated' : 'deactivated';
-        return back()->with('success', "{$user->name} has been {$status}.");
+            $user->update([
+                'is_active'           => false,
+                'deactivation_reason' => $request->reason,
+                'deactivation_notes'  => $request->notes,
+                'deactivated_at'      => now(),
+                'deactivated_by'      => $request->user()->id,
+            ]);
+
+            AccountAction::create([
+                'target_type'  => 'user',
+                'target_id'    => $user->id,
+                'action'       => 'deactivate',
+                'reason'       => $request->reason,
+                'notes'        => $request->notes,
+                'performed_by' => $request->user()->id,
+            ]);
+
+            return back()->with('success', "{$user->name} has been deactivated.");
+        }
+
+        // Activating — no reason needed, clear deactivation fields
+        $user->update([
+            'is_active'           => true,
+            'deactivation_reason' => null,
+            'deactivation_notes'  => null,
+            'deactivated_at'      => null,
+            'deactivated_by'      => null,
+        ]);
+
+        AccountAction::create([
+            'target_type'  => 'user',
+            'target_id'    => $user->id,
+            'action'       => 'activate',
+            'reason'       => null,
+            'notes'        => null,
+            'performed_by' => $request->user()->id,
+        ]);
+
+        return back()->with('success', "{$user->name} has been activated.");
     }
 
     // ── Destroy (soft delete) ─────────────────────────────────────────────────
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
-        // Block if staff has active deliveries
-        $activeDeliveries = Delivery::where('rider_id', $user->id)
-            ->whereIn('status', ['assigned', 'picked_up', 'in_transit'])
-            ->count();
+        $request->validate([
+            'reason' => ['required', 'string', 'max:255'],
+            'notes'  => ['nullable', 'string', 'max:1000'],
+        ]);
 
-        if ($activeDeliveries > 0) {
-            return back()->with('error',
-                "Cannot archive {$user->name} — they have {$activeDeliveries} active delivery(ies) in progress."
-            );
-        }
+        $user->update([
+            'is_active'           => false,
+            'deactivation_reason' => $request->reason,
+            'deactivation_notes'  => $request->notes,
+            'deactivated_at'      => now(),
+            'deactivated_by'      => $request->user()->id,
+        ]);
 
-        // Deactivate first so they can't keep working, then soft-delete
-        $user->update(['is_active' => false]);
+        AccountAction::create([
+            'target_type'  => 'user',
+            'target_id'    => $user->id,
+            'action'       => 'archive',
+            'reason'       => $request->reason,
+            'notes'        => $request->notes,
+            'performed_by' => $request->user()->id,
+        ]);
+
         $user->delete();
 
-        return back()->with('success', "{$user->name}'s account has been archived.");
+        return redirect()->route('admin.staff')->with('success', "{$user->name}'s account has been archived.");
     }
 
     // ── Restore ───────────────────────────────────────────────────────────────
 
-    public function restore(User $user): RedirectResponse
+    public function restore(Request $request, User $user): RedirectResponse
     {
         $user->restore();
-        $user->update(['is_active' => true]);
+        $user->update([
+            'is_active'           => true,
+            'deactivation_reason' => null,
+            'deactivation_notes'  => null,
+            'deactivated_at'      => null,
+            'deactivated_by'      => null,
+        ]);
+
+        AccountAction::create([
+            'target_type'  => 'user',
+            'target_id'    => $user->id,
+            'action'       => 'restore',
+            'reason'       => null,
+            'notes'        => $request->input('notes'),
+            'performed_by' => $request->user()->id,
+        ]);
 
         return back()->with('success', "{$user->name}'s account has been restored.");
     }
@@ -299,52 +373,9 @@ class StaffController extends Controller
     public function forceDestroy(User $user): RedirectResponse
     {
         $name = $user->name;
+        UserPermission::withTrashed()->where('user_id', $user->id)->forceDelete();
         $user->forceDelete();
 
         return back()->with('success', "{$name}'s account has been permanently deleted.");
-    }
-
-    // ── Permission Management ─────────────────────────────────────────────────
-
-    /**
-     * Save per-user permission overrides.
-     * Expects: { permissions: { 'orders.create': true|false|null } }
-     * null = remove override (fall back to role default)
-     */
-    public function updatePermissions(Request $request, User $user): RedirectResponse
-    {
-        $data = $request->validate([
-            'permissions'   => 'required|array',
-            'permissions.*' => 'nullable|boolean',
-        ]);
-
-        foreach ($data['permissions'] as $permName => $granted) {
-            $perm = Permission::where('name', $permName)->first();
-            if (! $perm) continue;
-
-            if ($granted === null) {
-                // Remove override — user falls back to role default
-                UserPermission::where('user_id', $user->id)
-                    ->where('permission_id', $perm->id)
-                    ->delete();
-            } else {
-                UserPermission::updateOrCreate(
-                    ['user_id' => $user->id, 'permission_id' => $perm->id],
-                    ['granted' => $granted]
-                );
-            }
-        }
-
-        return back()->with('success', "Permissions updated for {$user->name}.");
-    }
-
-    /**
-     * Reset all user-specific overrides; revert to role defaults.
-     */
-    public function resetPermissions(User $user): RedirectResponse
-    {
-        UserPermission::where('user_id', $user->id)->delete();
-
-        return back()->with('success', "Permissions reset to role defaults for {$user->name}.");
     }
 }

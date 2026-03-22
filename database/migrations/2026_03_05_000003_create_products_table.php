@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('brand')->nullable();
-            $table->decimal('weight_kg', 8, 2);
+            $table->decimal('weight_kg', 8, 2)->nullable();
             $table->decimal('selling_price', 10, 2);
             $table->decimal('cost_price', 10, 2);
             $table->text('description')->nullable();

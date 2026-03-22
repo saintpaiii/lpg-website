@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Printer } from 'lucide-react';
+import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
@@ -81,18 +82,18 @@ export default function InvoiceShow({ invoice }: Props) {
                             )}
                             <div>
                                 <p className="text-gray-500 text-xs">Date Issued</p>
-                                <p className="font-medium">{invoice.created_at}</p>
+                                <p className="font-medium">{fmtDate(invoice.created_at)}</p>
                             </div>
                             {invoice.due_date && (
                                 <div>
                                     <p className="text-gray-500 text-xs">Due Date</p>
-                                    <p className="font-medium">{invoice.due_date}</p>
+                                    <p className="font-medium">{fmtDate(invoice.due_date)}</p>
                                 </div>
                             )}
                             {invoice.paid_at && (
                                 <div>
                                     <p className="text-gray-500 text-xs">Paid At</p>
-                                    <p className="font-medium">{invoice.paid_at}</p>
+                                    <p className="font-medium">{fmtDate(invoice.paid_at)}</p>
                                 </div>
                             )}
                             {invoice.payment_method && (

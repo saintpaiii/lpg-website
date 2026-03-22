@@ -1,5 +1,6 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import React from 'react';
+import { Head, useForm } from '@inertiajs/react';
+import { Spinner } from '@/components/ui/spinner';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
-import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle, PhilippinePeso, Store, Truck } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ interface Settings {
     company_email: string;
     default_reorder_level: string;
     lead_time_days: string;
+    default_commission_rate: string;
+    default_delivery_fee: string;
 }
 
 interface Props {
@@ -27,19 +30,18 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdminSettings({ settings }: Props) {
-    const { props } = usePage<{ flash?: { success?: string; error?: string } }>();
-    const flash = props.flash;
-
     const { data, setData, post, processing, errors, recentlySuccessful } = useForm<Settings>({
-        company_name:          settings.company_name,
-        company_address:       settings.company_address,
-        company_phone:         settings.company_phone,
-        company_email:         settings.company_email,
-        default_reorder_level: settings.default_reorder_level,
-        lead_time_days:        settings.lead_time_days,
+        company_name:             settings.company_name,
+        company_address:          settings.company_address,
+        company_phone:            settings.company_phone,
+        company_email:            settings.company_email,
+        default_reorder_level:    settings.default_reorder_level,
+        lead_time_days:           settings.lead_time_days,
+        default_commission_rate:  settings.default_commission_rate,
+        default_delivery_fee:     settings.default_delivery_fee,
     });
 
-    const submit: FormEventHandler = (e) => {
+    const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
         e.preventDefault();
         post('/admin/settings', { preserveScroll: true });
     };
@@ -56,19 +58,6 @@ export default function AdminSettings({ settings }: Props) {
                         Manage company information and system defaults used across invoices and DSS calculations.
                     </p>
                 </div>
-
-                {/* Flash messages */}
-                {flash?.success && (
-                    <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                        <CheckCircle className="h-4 w-4 shrink-0" />
-                        {flash.success}
-                    </div>
-                )}
-                {flash?.error && (
-                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-                        {flash.error}
-                    </div>
-                )}
 
                 <form onSubmit={submit} className="space-y-6">
                     {/* ── Company Information ─────────────────────────────── */}
@@ -228,11 +217,77 @@ export default function AdminSettings({ settings }: Props) {
                         </CardContent>
                     </Card>
 
+                    {/* ── Platform Settings ───────────────────────────────── */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Store className="h-4 w-4 text-blue-600" />
+                                Platform Settings
+                            </CardTitle>
+                            <CardDescription>
+                                Marketplace-wide defaults applied to store onboarding and commission.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                {/* Default Commission Rate */}
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="default_commission_rate">
+                                        Commission Rate (%) <span className="text-red-500">*</span>
+                                    </Label>
+                                    <div className="relative">
+                                        <PhilippinePeso className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            id="default_commission_rate"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            className="pl-9"
+                                            value={data.default_commission_rate}
+                                            onChange={(e) => setData('default_commission_rate', e.target.value)}
+                                            placeholder="5.00"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Default % of order total earned by the platform. Can be overridden per store.
+                                    </p>
+                                    <InputError message={errors.default_commission_rate} />
+                                </div>
+
+                                {/* Default Delivery Fee */}
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="default_delivery_fee">
+                                        Delivery Fee (₱) <span className="text-red-500">*</span>
+                                    </Label>
+                                    <div className="relative">
+                                        <Truck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            id="default_delivery_fee"
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            className="pl-9"
+                                            value={data.default_delivery_fee}
+                                            onChange={(e) => setData('default_delivery_fee', e.target.value)}
+                                            placeholder="0.00"
+                                        />
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Default delivery fee per order (0 = free).
+                                    </p>
+                                    <InputError message={errors.default_delivery_fee} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Separator />
 
                     {/* Save */}
                     <div className="flex items-center gap-4">
                         <Button type="submit" disabled={processing} className="px-6">
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? 'Saving…' : 'Save settings'}
                         </Button>
                         {recentlySuccessful && (

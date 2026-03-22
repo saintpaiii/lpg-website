@@ -1,25 +1,25 @@
 import { Head, router } from '@inertiajs/react';
 import {
-    BarChart,
     Bar,
+    BarChart,
+    CartesianGrid,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
     XAxis,
     YAxis,
-    CartesianGrid,
-    Tooltip,
     Legend,
-    ResponsiveContainer,
-    Cell,
 } from 'recharts';
 import { useState } from 'react';
 import {
     BarChart2,
     Filter,
-    Package,
+    PhilippinePeso,
     ShoppingCart,
-    Truck,
+    Star,
+    Store,
     Users,
-    Warehouse,
-    AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,775 +27,92 @@ import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Reports', href: '/admin/reports' }];
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type SalesRow    = { date: string; orders_count: number; revenue: number };
-type ProductRow  = { product_id: number; name: string; brand: string; units_sold: number; revenue: number; profit: number };
-type CustomerRow = { customer_id: number; name: string; phone: string; orders_count: number; total_spent: number; last_order_at: string };
-type DeliveryRow = { rider_id: number; name: string; total_deliveries: number; delivered: number; failed: number; success_rate: number };
-type InventoryRow = { product_id: number; name: string; brand: string; current_stock: number; reorder_level: number; stock_in: number; stock_out: number; low_stock: boolean };
+type StoreBreakdown = {
+    store_id: number; store_name: string; city: string;
+    commission_rate: number; orders: number; gmv: number; commission: number;
+};
+type CommissionData = {
+    total_commission: number; total_gmv: number;
+    monthly_chart: { month: string; commission: number }[];
+    store_breakdown: StoreBreakdown[];
+};
 
-type SalesData = {
-    chart: SalesRow[];
-    total_revenue: number;
+type UsersData = {
+    total_users: number; total_buyers: number; total_sellers: number;
+    new_in_range: number; verified_users: number;
+    weekly_chart: { week: string; buyers: number; sellers: number }[];
+    by_role: { role: string; count: number }[];
+};
+
+type TopStore = {
+    id: number; store_name: string; city: string; status: string;
+    orders_count: number; gmv: number; rank: number;
+};
+type StoresData = {
+    total: number; approved: number; pending: number; rejected: number; suspended: number;
+    top_stores: TopStore[];
+    status_chart: { name: string; value: number; color: string }[];
+};
+
+type OrdersData = {
     total_orders: number;
-    avg_order: number;
+    status_chart: { name: string; value: number; color: string }[];
+    payment_chart: { method: string; count: number }[];
+    daily_trend: { date: string; orders: number; gmv: number }[];
 };
 
-type ProductData  = { table: ProductRow[];  chart: { name: string; units_sold: number; revenue: number }[] };
-type CustomerData = { table: CustomerRow[]; chart: { name: string; total_spent: number }[] };
-type DeliveryData = {
-    table: DeliveryRow[];
-    chart: { name: string; delivered: number; failed: number }[];
-    total_deliveries: number;
-    total_delivered: number;
-    success_rate: number;
+type TopRatedStore = {
+    id: number; store_name: string; city: string;
+    avg_rating: number; review_count: number; rank: number;
 };
-type InventoryData = { table: InventoryRow[]; chart: { name: string; current_stock: number; reorder_level: number }[] };
+type RatingsData = {
+    platform_avg: number;
+    total_reviews: number;
+    breakdown: Record<number, number>;
+    top_rated: TopRatedStore[];
+    monthly_chart: { month: string; count: number }[];
+};
 
 type Props = {
     tab: string;
-    date_from: string;
-    date_to: string;
-    sales?: SalesData;
-    products?: ProductData;
-    customers?: CustomerData;
-    delivery?: DeliveryData;
-    inventory?: InventoryData;
+    date_from: string; date_from_raw: string;
+    date_to: string;   date_to_raw: string;
+    commission?: CommissionData;
+    users?: UsersData;
+    stores?: StoresData;
+    orders?: OrdersData;
+    ratings?: RatingsData;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Reports', href: '/admin/reports' }];
-
 const TABS = [
-    { key: 'sales',     label: 'Sales',     icon: ShoppingCart },
-    { key: 'products',  label: 'Products',  icon: Package },
-    { key: 'customers', label: 'Customers', icon: Users },
-    { key: 'delivery',  label: 'Delivery',  icon: Truck },
-    { key: 'inventory', label: 'Inventory', icon: Warehouse },
+    { key: 'commission', label: 'Commission', icon: PhilippinePeso },
+    { key: 'users',      label: 'Users',      icon: Users          },
+    { key: 'stores',     label: 'Stores',     icon: Store          },
+    { key: 'orders',     label: 'Orders',     icon: ShoppingCart   },
+    { key: 'ratings',    label: 'Ratings',    icon: Star           },
 ] as const;
 
-const CHART_COLORS = {
-    blue:   '#2563eb',
-    green:  '#10b981',
-    red:    '#ef4444',
-    amber:  '#f59e0b',
-    purple: '#8b5cf6',
-    slate:  '#94a3b8',
-};
-
-const BAR_COLORS = [
-    '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-    '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#6366f1',
-];
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function peso(n: number) {
+function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function pTick(v: number) {
-    if (v >= 1_000_000) return `₱${(v / 1_000_000).toFixed(1)}M`;
-    if (v >= 1_000)     return `₱${(v / 1_000).toFixed(1)}K`;
-    return `₱${v}`;
-}
-
-function nTick(v: number) {
-    if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
-    return `${v}`;
-}
-
-// ── Custom Tooltip ─────────────────────────────────────────────────────────────
-
-function MoneyTooltip({ active, payload, label }: any) {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-            <p className="mb-1.5 font-semibold text-gray-700">{label}</p>
-            {payload.map((p: any) => (
-                <p key={p.dataKey} style={{ color: p.color }} className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: p.color }} />
-                    {p.name}: {typeof p.value === 'number' && p.name?.toLowerCase().includes('revenue') || p.name?.toLowerCase().includes('spent') || p.name?.toLowerCase().includes('₱')
-                        ? peso(p.value)
-                        : p.value
-                    }
-                </p>
-            ))}
-        </div>
-    );
-}
-
-function RevenueTooltip({ active, payload, label }: any) {
-    if (!active || !payload?.length) return null;
-    return (
-        <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-            <p className="mb-1.5 font-semibold text-gray-700">{label}</p>
-            {payload.map((p: any) => (
-                <p key={p.dataKey} style={{ color: p.color }}>
-                    {p.name}: {p.name === 'Revenue' ? peso(p.value) : p.value}
-                </p>
-            ))}
-        </div>
-    );
-}
-
-// ── Summary Card ──────────────────────────────────────────────────────────────
-
-function SummaryCard({ title, value, sub, color = 'blue' }: {
-    title: string;
-    value: string | number;
-    sub?: string;
-    color?: 'blue' | 'green' | 'red' | 'amber';
-}) {
-    const colors = {
-        blue:  'text-blue-600',
-        green: 'text-emerald-600',
-        red:   'text-red-600',
-        amber: 'text-amber-600',
-    };
+function StatCard({ label, value, sub, color = 'text-gray-900' }: { label: string; value: string | number; sub?: string; color?: string }) {
     return (
         <Card>
-            <CardContent className="pt-5">
-                <p className="text-sm text-gray-500">{title}</p>
-                <p className={`mt-1 text-2xl font-bold tabular-nums ${colors[color]}`}>{value}</p>
-                {sub && <p className="mt-0.5 text-xs text-gray-400">{sub}</p>}
+            <CardContent className="pt-5 pb-4">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+                {sub && <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>}
             </CardContent>
         </Card>
     );
 }
-
-// ── Date Range Bar ────────────────────────────────────────────────────────────
-
-function DateRangeBar({
-    dateFrom,
-    dateTo,
-    tab,
-}: {
-    dateFrom: string;
-    dateTo: string;
-    tab: string;
-}) {
-    const [from, setFrom] = useState(dateFrom);
-    const [to, setTo]     = useState(dateTo);
-
-    function apply() {
-        router.get('/admin/reports', { tab, date_from: from, date_to: to }, { preserveState: false });
-    }
-
-    function thisMonth() {
-        const now  = new Date();
-        const f    = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-        const t    = new Date().toISOString().slice(0, 10);
-        setFrom(f); setTo(t);
-        router.get('/admin/reports', { tab, date_from: f, date_to: t }, { preserveState: false });
-    }
-
-    function last30() {
-        const t = new Date().toISOString().slice(0, 10);
-        const f = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
-        setFrom(f); setTo(t);
-        router.get('/admin/reports', { tab, date_from: f, date_to: t }, { preserveState: false });
-    }
-
-    function thisYear() {
-        const now = new Date();
-        const f   = `${now.getFullYear()}-01-01`;
-        const t   = new Date().toISOString().slice(0, 10);
-        setFrom(f); setTo(t);
-        router.get('/admin/reports', { tab, date_from: f, date_to: t }, { preserveState: false });
-    }
-
-    return (
-        <Card>
-            <CardContent className="pt-4 pb-4">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-gray-500">Date Range:</span>
-                    <Input
-                        type="date"
-                        value={from}
-                        onChange={(e) => setFrom(e.target.value)}
-                        className="w-36 h-8 text-sm"
-                    />
-                    <span className="text-gray-400 text-sm">to</span>
-                    <Input
-                        type="date"
-                        value={to}
-                        onChange={(e) => setTo(e.target.value)}
-                        className="w-36 h-8 text-sm"
-                    />
-                    <Button size="sm" onClick={apply} className="bg-blue-600 hover:bg-blue-700 text-white h-8">
-                        <Filter className="mr-1.5 h-3.5 w-3.5" /> Apply
-                    </Button>
-                    <div className="ml-2 flex gap-1">
-                        {[
-                            { label: 'This Month', fn: thisMonth },
-                            { label: 'Last 30 Days', fn: last30 },
-                            { label: 'This Year', fn: thisYear },
-                        ].map(({ label, fn }) => (
-                            <button
-                                key={label}
-                                onClick={fn}
-                                className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-                            >
-                                {label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-// ── Tab 1: Sales ──────────────────────────────────────────────────────────────
-
-function SalesTab({ data }: { data: SalesData }) {
-    return (
-        <div className="space-y-6">
-            {/* Summary */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                <SummaryCard
-                    title="Total Revenue"
-                    value={peso(data.total_revenue)}
-                    sub="from non-cancelled orders"
-                    color="blue"
-                />
-                <SummaryCard
-                    title="Total Orders"
-                    value={data.total_orders.toLocaleString()}
-                    sub="confirmed & completed"
-                    color="green"
-                />
-                <SummaryCard
-                    title="Avg Order Value"
-                    value={peso(data.avg_order)}
-                    sub="revenue per order"
-                    color="amber"
-                />
-            </div>
-
-            {/* Bar chart */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <BarChart2 className="h-4 w-4 text-blue-600" />
-                        Daily Revenue
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {data.chart.length === 0 ? (
-                        <EmptyChart message="No sales data for this period." />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={data.chart} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis
-                                    dataKey="date"
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(v) => {
-                                        const d = new Date(v);
-                                        return `${d.getMonth() + 1}/${d.getDate()}`;
-                                    }}
-                                />
-                                <YAxis
-                                    yAxisId="revenue"
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={pTick}
-                                    width={70}
-                                />
-                                <YAxis
-                                    yAxisId="count"
-                                    orientation="right"
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={nTick}
-                                    width={40}
-                                />
-                                <Tooltip content={<RevenueTooltip />} />
-                                <Legend />
-                                <Bar yAxisId="revenue" dataKey="revenue" name="Revenue" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
-                                <Bar yAxisId="count" dataKey="orders_count" name="Orders" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Table */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Daily Breakdown</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {data.chart.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        <th className="px-4 py-3">Date</th>
-                                        <th className="px-4 py-3 text-right">Orders</th>
-                                        <th className="px-4 py-3 text-right">Revenue</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {data.chart.map((row) => (
-                                        <tr key={row.date} className="hover:bg-gray-50/60">
-                                            <td className="px-4 py-2.5 text-gray-700">{row.date}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{row.orders_count}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums font-medium text-blue-700">{peso(row.revenue)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot>
-                                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                                        <td className="px-4 py-2.5">Total</td>
-                                        <td className="px-4 py-2.5 text-right tabular-nums">{data.total_orders}</td>
-                                        <td className="px-4 py-2.5 text-right tabular-nums text-blue-700">{peso(data.total_revenue)}</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
-
-// ── Tab 2: Products ───────────────────────────────────────────────────────────
-
-function ProductsTab({ data }: { data: ProductData }) {
-    return (
-        <div className="space-y-6">
-            {/* Horizontal bar chart — top products by units sold */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <BarChart2 className="h-4 w-4 text-blue-600" />
-                        Top Products by Units Sold
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {data.chart.length === 0 ? (
-                        <EmptyChart message="No product sales data for this period." />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={Math.max(200, data.chart.length * 48)}>
-                            <BarChart
-                                data={data.chart}
-                                layout="vertical"
-                                margin={{ top: 5, right: 80, left: 10, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={nTick} />
-                                <YAxis
-                                    type="category"
-                                    dataKey="name"
-                                    tick={{ fontSize: 11 }}
-                                    width={140}
-                                    tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 20) + '…' : v}
-                                />
-                                <Tooltip
-                                    content={({ active, payload, label }) => {
-                                        if (!active || !payload?.length) return null;
-                                        return (
-                                            <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-                                                <p className="mb-1 font-semibold text-gray-700">{label}</p>
-                                                <p className="text-blue-600">Units sold: {payload[0]?.value}</p>
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Bar dataKey="units_sold" name="Units Sold" radius={[0, 4, 4, 0]}>
-                                    {data.chart.map((_, i) => (
-                                        <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Table */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base">All Products</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {data.table.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        <th className="px-4 py-3">Product</th>
-                                        <th className="px-4 py-3 text-right">Units Sold</th>
-                                        <th className="px-4 py-3 text-right">Revenue</th>
-                                        <th className="px-4 py-3 text-right">Profit</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {data.table.map((row) => (
-                                        <tr key={row.product_id} className="hover:bg-gray-50/60">
-                                            <td className="px-4 py-2.5">
-                                                <p className="font-medium text-gray-900">{row.name}</p>
-                                                {row.brand && <p className="text-xs text-gray-400">{row.brand}</p>}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{row.units_sold}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums font-medium text-blue-700">{peso(row.revenue)}</td>
-                                            <td className={`px-4 py-2.5 text-right tabular-nums font-medium ${row.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                                                {peso(row.profit)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
-
-// ── Tab 3: Customers ──────────────────────────────────────────────────────────
-
-function CustomersTab({ data }: { data: CustomerData }) {
-    return (
-        <div className="space-y-6">
-            {/* Horizontal bar chart */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <BarChart2 className="h-4 w-4 text-blue-600" />
-                        Top 10 Customers by Spending
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {data.chart.length === 0 ? (
-                        <EmptyChart message="No customer data for this period." />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={Math.max(200, data.chart.length * 48)}>
-                            <BarChart
-                                data={data.chart}
-                                layout="vertical"
-                                margin={{ top: 5, right: 80, left: 10, bottom: 5 }}
-                            >
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={pTick} />
-                                <YAxis
-                                    type="category"
-                                    dataKey="name"
-                                    tick={{ fontSize: 11 }}
-                                    width={130}
-                                    tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 18) + '…' : v}
-                                />
-                                <Tooltip
-                                    content={({ active, payload, label }) => {
-                                        if (!active || !payload?.length) return null;
-                                        return (
-                                            <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-                                                <p className="mb-1 font-semibold text-gray-700">{label}</p>
-                                                <p className="text-blue-600">Total spent: {peso(payload[0]?.value as number)}</p>
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Bar dataKey="total_spent" name="Total Spent" radius={[0, 4, 4, 0]}>
-                                    {data.chart.map((_, i) => (
-                                        <Cell key={i} fill={BAR_COLORS[i % BAR_COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Table */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Top 10 Customers</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {data.table.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        <th className="px-4 py-3">#</th>
-                                        <th className="px-4 py-3">Customer</th>
-                                        <th className="px-4 py-3 text-right">Orders</th>
-                                        <th className="px-4 py-3 text-right">Total Spent</th>
-                                        <th className="px-4 py-3">Last Order</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {data.table.map((row, i) => (
-                                        <tr key={row.customer_id} className="hover:bg-gray-50/60">
-                                            <td className="px-4 py-2.5 text-gray-400 font-mono text-xs">{i + 1}</td>
-                                            <td className="px-4 py-2.5">
-                                                <p className="font-medium text-gray-900">{row.name}</p>
-                                                {row.phone && <p className="text-xs text-gray-400">{row.phone}</p>}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{row.orders_count}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-blue-700">{peso(row.total_spent)}</td>
-                                            <td className="px-4 py-2.5 text-sm text-gray-500">{row.last_order_at}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
-
-// ── Tab 4: Delivery ───────────────────────────────────────────────────────────
-
-function DeliveryTab({ data }: { data: DeliveryData }) {
-    return (
-        <div className="space-y-6">
-            {/* Summary */}
-            <div className="grid gap-4 sm:grid-cols-3">
-                <SummaryCard
-                    title="Total Deliveries"
-                    value={data.total_deliveries.toLocaleString()}
-                    color="blue"
-                />
-                <SummaryCard
-                    title="Successfully Delivered"
-                    value={data.total_delivered.toLocaleString()}
-                    color="green"
-                />
-                <SummaryCard
-                    title="Success Rate"
-                    value={`${data.success_rate}%`}
-                    color={data.success_rate >= 80 ? 'green' : data.success_rate >= 60 ? 'amber' : 'red'}
-                />
-            </div>
-
-            {/* Grouped bar chart */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <BarChart2 className="h-4 w-4 text-blue-600" />
-                        Deliveries per Rider
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {data.chart.length === 0 ? (
-                        <EmptyChart message="No delivery data for this period." />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={data.chart} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis
-                                    dataKey="name"
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(v: string) => v.split(' ')[0]}
-                                />
-                                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <Tooltip
-                                    content={({ active, payload, label }) => {
-                                        if (!active || !payload?.length) return null;
-                                        return (
-                                            <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-                                                <p className="mb-1.5 font-semibold text-gray-700">{label}</p>
-                                                {payload.map((p: any) => (
-                                                    <p key={p.dataKey} style={{ color: p.color }}>
-                                                        {p.name}: {p.value}
-                                                    </p>
-                                                ))}
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Legend />
-                                <Bar dataKey="delivered" name="Delivered" fill={CHART_COLORS.green} radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="failed" name="Failed" fill={CHART_COLORS.red} radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Table */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Rider Performance</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {data.table.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        <th className="px-4 py-3">Rider</th>
-                                        <th className="px-4 py-3 text-right">Total</th>
-                                        <th className="px-4 py-3 text-right">Delivered</th>
-                                        <th className="px-4 py-3 text-right">Failed</th>
-                                        <th className="px-4 py-3 text-right">Success Rate</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {data.table.map((row) => (
-                                        <tr key={row.rider_id} className="hover:bg-gray-50/60">
-                                            <td className="px-4 py-2.5 font-medium text-gray-900">{row.name}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{row.total_deliveries}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{row.delivered}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-red-500">{row.failed}</td>
-                                            <td className="px-4 py-2.5 text-right">
-                                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                                                    row.success_rate >= 80 ? 'bg-emerald-100 text-emerald-700' :
-                                                    row.success_rate >= 60 ? 'bg-amber-100 text-amber-700' :
-                                                    'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {row.success_rate}%
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
-
-// ── Tab 5: Inventory ──────────────────────────────────────────────────────────
-
-function InventoryTab({ data }: { data: InventoryData }) {
-    const lowStockCount = data.table.filter((r) => r.low_stock).length;
-
-    return (
-        <div className="space-y-6">
-            {lowStockCount > 0 && (
-                <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    {lowStockCount} product{lowStockCount !== 1 ? 's are' : ' is'} at or below reorder level.
-                </div>
-            )}
-
-            {/* Bar chart: current stock */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <BarChart2 className="h-4 w-4 text-blue-600" />
-                        Current Stock Levels
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {data.chart.length === 0 ? (
-                        <EmptyChart message="No inventory data." />
-                    ) : (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={data.chart} margin={{ top: 5, right: 10, left: 10, bottom: 60 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis
-                                    dataKey="name"
-                                    tick={{ fontSize: 10 }}
-                                    angle={-35}
-                                    textAnchor="end"
-                                    interval={0}
-                                    tickFormatter={(v: string) => v.length > 16 ? v.slice(0, 16) + '…' : v}
-                                />
-                                <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                                <Tooltip
-                                    content={({ active, payload, label }) => {
-                                        if (!active || !payload?.length) return null;
-                                        return (
-                                            <div className="rounded-lg border bg-white p-3 shadow-lg text-sm">
-                                                <p className="mb-1.5 font-semibold text-gray-700">{label}</p>
-                                                {payload.map((p: any) => (
-                                                    <p key={p.dataKey} style={{ color: p.color }}>
-                                                        {p.name}: {p.value}
-                                                    </p>
-                                                ))}
-                                            </div>
-                                        );
-                                    }}
-                                />
-                                <Legend verticalAlign="top" />
-                                <Bar dataKey="current_stock" name="Current Stock" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="reorder_level" name="Reorder Level" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* Table */}
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Stock Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                    {data.table.length === 0 ? (
-                        <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                        <th className="px-4 py-3">Product</th>
-                                        <th className="px-4 py-3 text-right">Stock In</th>
-                                        <th className="px-4 py-3 text-right">Stock Out</th>
-                                        <th className="px-4 py-3 text-right">Current Stock</th>
-                                        <th className="px-4 py-3 text-right">Reorder Level</th>
-                                        <th className="px-4 py-3">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {data.table.map((row) => (
-                                        <tr key={row.product_id} className={`hover:bg-gray-50/60 ${row.low_stock ? 'bg-amber-50/40' : ''}`}>
-                                            <td className="px-4 py-2.5">
-                                                <p className="font-medium text-gray-900">{row.name}</p>
-                                                {row.brand && <p className="text-xs text-gray-400">{row.brand}</p>}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{row.stock_in}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-red-500">{row.stock_out}</td>
-                                            <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${row.low_stock ? 'text-amber-600' : 'text-gray-900'}`}>
-                                                {row.current_stock}
-                                            </td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{row.reorder_level}</td>
-                                            <td className="px-4 py-2.5">
-                                                {row.low_stock ? (
-                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                                                        <AlertTriangle className="h-3 w-3" /> Low
-                                                    </span>
-                                                ) : (
-                                                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                                                        OK
-                                                    </span>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-        </div>
-    );
-}
-
-// ── Empty chart placeholder ───────────────────────────────────────────────────
 
 function EmptyChart({ message }: { message: string }) {
     return (
@@ -808,21 +125,472 @@ function EmptyChart({ message }: { message: string }) {
     );
 }
 
+// ── Tab 1: Commission ──────────────────────────────────────────────────────────
+
+function CommissionTab({ data }: { data: CommissionData }) {
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+                <StatCard label="Total Commission Earned" value={fmt(data.total_commission)} color="text-amber-600" />
+                <StatCard label="Total GMV (Gross Merchandise Value)" value={fmt(data.total_gmv)} color="text-emerald-600" />
+            </div>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <PhilippinePeso className="h-4 w-4 text-amber-600" />
+                        Commission by Month — Last 12 Months
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {data.monthly_chart.every(r => r.commission === 0) ? (
+                        <EmptyChart message="No commission data yet." />
+                    ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <YAxis tick={{ fontSize: 11 }} />
+                                <Tooltip formatter={(v: number) => [fmt(v), 'Commission']} contentStyle={{ fontSize: 12 }} />
+                                <Bar dataKey="commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Store Commission Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {data.store_breakdown.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-muted-foreground">No store sales in this period.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3 text-right">Orders</th>
+                                        <th className="px-4 py-3 text-right">GMV</th>
+                                        <th className="px-4 py-3 text-right">Rate</th>
+                                        <th className="px-4 py-3 text-right">Commission</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {data.store_breakdown.map((row) => (
+                                        <tr key={row.store_id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-2.5">
+                                                <p className="font-medium">{row.store_name}</p>
+                                                {row.city && <p className="text-xs text-muted-foreground">{row.city}</p>}
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.gmv)}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{row.commission_rate}%</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-amber-600">{fmt(row.commission)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// ── Tab 2: Users ───────────────────────────────────────────────────────────────
+
+function UsersTab({ data }: { data: UsersData }) {
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Total Users"    value={data.total_users.toLocaleString()}   color="text-blue-600" />
+                <StatCard label="Buyers"          value={data.total_buyers.toLocaleString()}   color="text-blue-600" />
+                <StatCard label="Sellers"          value={data.total_sellers.toLocaleString()}  color="text-emerald-600" />
+                <StatCard label="ID Verified"     value={data.verified_users.toLocaleString()} color="text-violet-600"
+                    sub={`${data.new_in_range} registered in period`} />
+            </div>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Users className="h-4 w-4 text-blue-600" />
+                        New Registrations — Last 12 Weeks
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ResponsiveContainer width="100%" height={240}>
+                        <BarChart data={data.weekly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                            <XAxis dataKey="week" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                            <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                            <Tooltip contentStyle={{ fontSize: 12 }} />
+                            <Legend verticalAlign="top" />
+                            <Bar dataKey="buyers"  name="Buyers"  fill="#3b82f6" radius={[4, 4, 0, 0]} stackId="a" />
+                            <Bar dataKey="sellers" name="Sellers" fill="#10b981" radius={[4, 4, 0, 0]} stackId="a" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Users by Role</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-3">
+                        {data.by_role.map((r) => {
+                            const pct = data.total_users > 0 ? Math.round((r.count / data.total_users) * 100) : 0;
+                            return (
+                                <div key={r.role}>
+                                    <div className="flex items-center justify-between text-sm mb-1">
+                                        <span className="capitalize font-medium">{r.role.replace('_', ' ')}</span>
+                                        <span className="text-muted-foreground">{r.count.toLocaleString()} ({pct}%)</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// ── Tab 3: Stores ──────────────────────────────────────────────────────────────
+
+function StoresTab({ data }: { data: StoresData }) {
+    const statusConfig: Record<string, string> = {
+        approved:  'bg-emerald-100 text-emerald-700',
+        pending:   'bg-yellow-100 text-yellow-700',
+        rejected:  'bg-red-100 text-red-700',
+        suspended: 'bg-gray-100 text-gray-600',
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Total Stores"    value={data.total}     />
+                <StatCard label="Approved"         value={data.approved}  color="text-emerald-600" />
+                <StatCard label="Pending Approval" value={data.pending}   color="text-amber-600" />
+                <StatCard label="Rejected / Suspended" value={data.rejected + data.suspended} color="text-red-600" />
+            </div>
+
+            {/* Status breakdown visual */}
+            {data.total > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Store Status Distribution</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {data.status_chart.filter(s => s.value > 0).map((s) => {
+                                const pct = Math.round((s.value / data.total) * 100);
+                                return (
+                                    <div key={s.name}>
+                                        <div className="flex items-center justify-between text-sm mb-1">
+                                            <span className="font-medium">{s.name}</span>
+                                            <span className="text-muted-foreground">{s.value} ({pct}%)</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: s.color }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top Stores by Order Volume</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {data.top_stores.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-muted-foreground">No store data available.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-3">#</th>
+                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3 text-right">Orders</th>
+                                        <th className="px-4 py-3 text-right">GMV</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {data.top_stores.map((s) => (
+                                        <tr key={s.id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{s.rank}</td>
+                                            <td className="px-4 py-2.5">
+                                                <p className="font-medium">{s.store_name}</p>
+                                                {s.city && <p className="text-xs text-muted-foreground">{s.city}</p>}
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                    {s.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{s.orders_count.toLocaleString()}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{fmt(s.gmv)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// ── Tab 4: Orders ──────────────────────────────────────────────────────────────
+
+function OrdersTab({ data }: { data: OrdersData }) {
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-1">
+                <StatCard label="Total Orders in Period" value={data.total_orders.toLocaleString()} color="text-violet-600" />
+            </div>
+
+            {/* Order status breakdown */}
+            {data.status_chart.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Orders by Status</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {data.status_chart.map((s) => {
+                                const pct = data.total_orders > 0 ? Math.round((s.value / data.total_orders) * 100) : 0;
+                                return (
+                                    <div key={s.name}>
+                                        <div className="flex items-center justify-between text-sm mb-1">
+                                            <span className="font-medium capitalize">{s.name}</span>
+                                            <span className="text-muted-foreground">{s.value.toLocaleString()} ({pct}%)</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-muted overflow-hidden">
+                                            <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: s.color }} />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Payment method breakdown */}
+            {data.payment_chart.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Orders by Payment Method</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                            <BarChart
+                                data={data.payment_chart}
+                                layout="vertical"
+                                margin={{ top: 4, right: 40, left: 60, bottom: 0 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <YAxis dataKey="method" type="category" tick={{ fontSize: 12 }} />
+                                <Tooltip formatter={(v: number) => [v, 'Orders']} contentStyle={{ fontSize: 12 }} />
+                                <Bar dataKey="count" name="Orders" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Daily trend */}
+            {data.daily_trend.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <BarChart2 className="h-4 w-4 text-violet-600" />
+                            Daily Order Trend
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={220}>
+                            <LineChart data={data.daily_trend} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip formatter={(v: number) => [v, 'Orders']} contentStyle={{ fontSize: 12 }} />
+                                <Line dataKey="orders" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}
+
+// ── Tab 5: Ratings ─────────────────────────────────────────────────────────────
+
+function RatingsTab({ data }: { data: RatingsData }) {
+    const total = data.total_reviews;
+
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+                <Card>
+                    <CardContent className="pt-5 pb-4">
+                        <p className="text-sm text-muted-foreground">Platform Average Rating</p>
+                        {total > 0 ? (
+                            <>
+                                <div className="flex items-baseline gap-2 mt-1">
+                                    <span className="text-3xl font-bold text-amber-500">{data.platform_avg.toFixed(2)}</span>
+                                    <span className="text-muted-foreground text-sm">/ 5</span>
+                                </div>
+                                <div className="flex gap-px mt-1">
+                                    {[1,2,3,4,5].map((i) => (
+                                        <span key={i} className={`text-sm ${i <= Math.round(data.platform_avg) ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">{total.toLocaleString()} review{total !== 1 ? 's' : ''}</p>
+                            </>
+                        ) : (
+                            <p className="text-muted-foreground text-sm italic mt-1">No reviews yet</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Rating Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1.5">
+                        {[5, 4, 3, 2, 1].map((star) => {
+                            const count = data.breakdown[star] ?? 0;
+                            const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
+                            return (
+                                <div key={star} className="flex items-center gap-2 text-sm">
+                                    <span className="w-4 text-right text-amber-500 font-semibold">{star}</span>
+                                    <span className="text-amber-400 text-xs">★</span>
+                                    <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
+                                        <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="w-8 text-right text-xs text-muted-foreground">{count}</span>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Monthly review volume */}
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Star className="h-4 w-4 text-amber-500" />
+                        Review Volume — Last 12 Months
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {data.monthly_chart.every(r => r.count === 0) ? (
+                        <EmptyChart message="No reviews submitted yet." />
+                    ) : (
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                <Tooltip formatter={(v: number) => [v, 'Reviews']} contentStyle={{ fontSize: 12 }} />
+                                <Bar dataKey="count" name="Reviews" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Top-rated stores */}
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top Rated Stores</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {data.top_rated.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                            No stores have 5 or more reviews yet.
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-3">#</th>
+                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3">Rating</th>
+                                        <th className="px-4 py-3 text-right">Reviews</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {data.top_rated.map((s) => (
+                                        <tr key={s.id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-2.5 text-muted-foreground font-mono text-xs">{s.rank}</td>
+                                            <td className="px-4 py-2.5">
+                                                <p className="font-medium">{s.store_name}</p>
+                                                {s.city && <p className="text-xs text-muted-foreground">{s.city}</p>}
+                                            </td>
+                                            <td className="px-4 py-2.5">
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-amber-400 text-sm">★</span>
+                                                    <span className="font-semibold tabular-nums">{s.avg_rating.toFixed(2)}</span>
+                                                    {s.avg_rating >= 4.5 && (
+                                                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">Top Rated</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{s.review_count.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage({
     tab,
-    date_from,
-    date_to,
-    sales,
-    products,
-    customers,
-    delivery,
-    inventory,
+    date_from_raw,
+    date_to_raw,
+    commission,
+    users,
+    stores,
+    orders,
+    ratings,
 }: Props) {
+    const [fromVal, setFromVal] = useState(date_from_raw);
+    const [toVal,   setToVal]   = useState(date_to_raw);
 
     function switchTab(newTab: string) {
-        router.get('/admin/reports', { tab: newTab, date_from, date_to }, { preserveState: false });
+        router.get('/admin/reports', { tab: newTab, date_from: fromVal, date_to: toVal }, { preserveState: false });
+    }
+
+    function applyDates() {
+        router.get('/admin/reports', { tab, date_from: fromVal, date_to: toVal }, { preserveState: false });
     }
 
     return (
@@ -830,29 +598,44 @@ export default function ReportsPage({
             <Head title="Reports" />
 
             <div className="flex flex-1 flex-col gap-6 p-6">
-
                 {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-                    <p className="mt-0.5 text-sm text-gray-500">
-                        Analytics and insights for {date_from} → {date_to}
-                    </p>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+                        <p className="text-muted-foreground text-sm mt-0.5">Platform-wide analytics</p>
+                    </div>
+
+                    {/* Date range filter */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Filter className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="date"
+                            value={fromVal}
+                            onChange={(e) => setFromVal(e.target.value)}
+                            className="w-36 text-sm"
+                        />
+                        <span className="text-muted-foreground text-sm">to</span>
+                        <Input
+                            type="date"
+                            value={toVal}
+                            onChange={(e) => setToVal(e.target.value)}
+                            className="w-36 text-sm"
+                        />
+                        <Button size="sm" onClick={applyDates}>Apply</Button>
+                    </div>
                 </div>
 
-                {/* Date range */}
-                <DateRangeBar dateFrom={date_from} dateTo={date_to} tab={tab} />
-
                 {/* Tabs */}
-                <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex gap-1 overflow-x-auto">
+                <div className="border-b">
+                    <nav className="flex gap-1">
                         {TABS.map(({ key, label, icon: Icon }) => (
                             <button
                                 key={key}
                                 onClick={() => switchTab(key)}
-                                className={`flex shrink-0 items-center gap-1.5 border-b-2 px-4 pb-3 text-sm font-medium transition-colors ${
+                                className={`inline-flex items-center gap-1.5 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors ${
                                     tab === key
-                                        ? 'border-blue-600 text-blue-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
                                 }`}
                             >
                                 <Icon className="h-4 w-4" />
@@ -863,12 +646,11 @@ export default function ReportsPage({
                 </div>
 
                 {/* Tab content */}
-                {tab === 'sales'     && sales     && <SalesTab     data={sales} />}
-                {tab === 'products'  && products  && <ProductsTab  data={products} />}
-                {tab === 'customers' && customers && <CustomersTab data={customers} />}
-                {tab === 'delivery'  && delivery  && <DeliveryTab  data={delivery} />}
-                {tab === 'inventory' && inventory && <InventoryTab data={inventory} />}
-
+                {tab === 'commission' && commission && <CommissionTab data={commission} />}
+                {tab === 'users'      && users      && <UsersTab      data={users}      />}
+                {tab === 'stores'     && stores     && <StoresTab     data={stores}     />}
+                {tab === 'orders'     && orders     && <OrdersTab     data={orders}     />}
+                {tab === 'ratings'    && ratings    && <RatingsTab    data={ratings}    />}
             </div>
         </AppLayout>
     );

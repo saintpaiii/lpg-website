@@ -14,11 +14,14 @@ class Order extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'store_id',
         'order_number',
         'customer_id',
         'transaction_type',
         'status',
         'total_amount',
+        'shipping_fee',
+        'platform_fee',
         'payment_method',
         'payment_status',
         'notes',
@@ -31,9 +34,16 @@ class Order extends Model
     {
         return [
             'total_amount' => 'decimal:2',
+            'shipping_fee' => 'decimal:2',
+            'platform_fee' => 'decimal:2',
             'ordered_at'   => 'datetime',
             'delivered_at' => 'datetime',
         ];
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 
     public function customer(): BelongsTo

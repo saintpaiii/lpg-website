@@ -4,12 +4,13 @@ import {
     ArchiveRestore,
     ChevronDown,
     Filter,
-    Plus,
     Printer,
     ShoppingCart,
+    Store,
     Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -39,6 +40,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -76,6 +78,9 @@ type Order = {
     has_invoice: boolean;
     invoice_number: string | null;
     invoice_id: number | null;
+    store_name: string | null;
+    store_id: number | null;
+    commission_amount: number | null;
 };
 
 type Paginated<T> = {
@@ -251,6 +256,7 @@ function UpdatePaymentDialog({ order, onClose }: { order: Order | null; onClose:
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
                         <Button type="submit" disabled={processing} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? 'Saving…' : 'Update'}
                         </Button>
                     </DialogFooter>
@@ -402,17 +408,8 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                 <div className="flex items-start justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">Create and manage customer orders.</p>
+                        <p className="mt-0.5 text-sm text-gray-500">Marketplace-wide order overview across all stores.</p>
                     </div>
-                    {isAdmin && (
-                        <Button
-                            onClick={() => router.visit('/admin/orders/create')}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Order
-                        </Button>
-                    )}
                 </div>
 
                 {/* Tabs */}
@@ -513,7 +510,7 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                 <ShoppingCart className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No orders found</p>
                                 <p className="mt-1 text-sm">
-                                    {tab === 'archived' ? 'No archived orders.' : 'Try adjusting filters or create a new order.'}
+                                    {tab === 'archived' ? 'No archived orders.' : 'No orders found. Try adjusting your filters.'}
                                 </p>
                             </div>
                         ) : (
@@ -522,10 +519,12 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                     <thead>
                                         <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                                             <th className="px-4 py-3">Order #</th>
+                                            <th className="px-4 py-3">Store</th>
                                             <th className="px-4 py-3">Customer</th>
                                             <th className="px-4 py-3">Type</th>
                                             <th className="px-4 py-3">Items</th>
                                             <th className="px-4 py-3 text-right">Total</th>
+                                            <th className="px-4 py-3 text-right hidden lg:table-cell">Commission</th>
                                             <th className="px-4 py-3">Payment</th>
                                             <th className="px-4 py-3">Status</th>
                                             <th className="px-4 py-3">Date</th>
@@ -554,6 +553,16 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
+                                                    {order.store_name ? (
+                                                        <div className="flex items-center gap-1 text-xs">
+                                                            <Store className="h-3 w-3 text-gray-400 shrink-0" />
+                                                            <span className="font-medium text-gray-800">{order.store_name}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">—</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
                                                     <p className="font-medium text-gray-900">{order.customer?.name ?? '—'}</p>
                                                     {order.customer?.phone && (
                                                         <p className="text-xs text-gray-400">{order.customer.phone}</p>
@@ -567,6 +576,11 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums">
                                                     ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-xs text-amber-700 tabular-nums hidden lg:table-cell">
+                                                    {order.commission_amount != null
+                                                        ? '₱' + order.commission_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })
+                                                        : '—'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex flex-col gap-0.5">
@@ -602,7 +616,7 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                                     )}
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                                                    {order.ordered_at ?? order.created_at}
+                                                    {fmtDate(order.ordered_at ?? order.created_at)}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">

@@ -1,5 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { Flame, Printer } from 'lucide-react';
+import { fmtDate } from '@/lib/utils';
 
 type InvoiceItem = {
     quantity: number;
@@ -100,9 +101,9 @@ export default function InvoicePrint({ invoice, company }: Props) {
                         <div className="text-right">
                             <h2 className="text-2xl font-black text-gray-900 uppercase tracking-wide">Official Receipt</h2>
                             <p className="text-sm font-mono font-semibold text-blue-700 mt-1">{invoice.invoice_number}</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Date: {invoice.created_at}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">Date: {fmtDate(invoice.created_at)}</p>
                             {invoice.due_date && (
-                                <p className="text-xs text-gray-500">Due: {invoice.due_date}</p>
+                                <p className="text-xs text-gray-500">Due: {fmtDate(invoice.due_date)}</p>
                             )}
                         </div>
                     </div>
@@ -142,13 +143,13 @@ export default function InvoicePrint({ invoice, company }: Props) {
                                     {invoice.order.ordered_at && (
                                         <div className="flex justify-between gap-4">
                                             <span className="text-gray-500">Ordered</span>
-                                            <span className="font-medium">{invoice.order.ordered_at}</span>
+                                            <span className="font-medium">{fmtDate(invoice.order.ordered_at)}</span>
                                         </div>
                                     )}
                                     {invoice.order.delivered_at && (
                                         <div className="flex justify-between gap-4">
                                             <span className="text-gray-500">Delivered</span>
-                                            <span className="font-medium">{invoice.order.delivered_at}</span>
+                                            <span className="font-medium">{fmtDate(invoice.order.delivered_at)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between gap-4">
@@ -225,7 +226,7 @@ export default function InvoicePrint({ invoice, company }: Props) {
                                 <p><span className="font-medium">Payment Method:</span> {invoice.payment_method.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}</p>
                             )}
                             {invoice.paid_at && (
-                                <p><span className="font-medium">Paid on:</span> {invoice.paid_at}</p>
+                                <p><span className="font-medium">Paid on:</span> {fmtDate(invoice.paid_at)}</p>
                             )}
                         </div>
 

@@ -16,8 +16,9 @@ class CreateNewUser implements CreatesNewUsers
 
     /**
      * Validate and create a newly registered user (customer role).
+     * Triggers email verification via MustVerifyEmail.
      *
-     * @param  array<string, string>  $input
+     * @param  array<string, mixed>  $input
      */
     public function create(array $input): User
     {
@@ -32,12 +33,12 @@ class CreateNewUser implements CreatesNewUsers
 
         return DB::transaction(function () use ($input) {
             $user = User::create([
-                'name'     => $input['name'],
-                'email'    => $input['email'],
-                'password' => $input['password'],
-                'phone'    => $input['phone'],
-                'role'     => 'customer',
-                'is_active'=> true,
+                'name'      => $input['name'],
+                'email'     => $input['email'],
+                'password'  => $input['password'],
+                'phone'     => $input['phone'],
+                'role'      => 'customer',
+                'is_active' => true,
             ]);
 
             Customer::create([

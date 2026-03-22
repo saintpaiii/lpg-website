@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -143,10 +144,9 @@ export default function Profile() {
                         {/* Current password */}
                         <div className="grid gap-1.5">
                             <Label htmlFor="current_password">Current password</Label>
-                            <Input
+                            <PasswordInput
                                 id="current_password"
                                 ref={currentPassInput}
-                                type="password"
                                 value={passForm.data.current_password}
                                 onChange={(e) => passForm.setData('current_password', e.target.value)}
                                 autoComplete="current-password"
@@ -158,10 +158,9 @@ export default function Profile() {
                         {/* New password */}
                         <div className="grid gap-1.5">
                             <Label htmlFor="password">New password</Label>
-                            <Input
+                            <PasswordInput
                                 id="password"
                                 ref={passwordInput}
-                                type="password"
                                 value={passForm.data.password}
                                 onChange={(e) => passForm.setData('password', e.target.value)}
                                 autoComplete="new-password"
@@ -173,9 +172,8 @@ export default function Profile() {
                         {/* Confirm password */}
                         <div className="grid gap-1.5">
                             <Label htmlFor="password_confirmation">Confirm new password</Label>
-                            <Input
+                            <PasswordInput
                                 id="password_confirmation"
-                                type="password"
                                 value={passForm.data.password_confirmation}
                                 onChange={(e) => passForm.setData('password_confirmation', e.target.value)}
                                 autoComplete="new-password"

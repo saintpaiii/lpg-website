@@ -7,8 +7,5 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'rider'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('deliveries', [RiderDeliveryController::class, 'index'])->name('deliveries');
     Route::patch('deliveries/{delivery}/status', [RiderDeliveryController::class, 'updateStatus'])->name('deliveries.status');
-    Route::inertia('history', 'rider/history')->name('history');
-    Route::inertia('orders', 'rider/orders')->name('orders');
-    Route::get('customers', [RiderCustomerController::class, 'index'])->name('customers');
-    Route::get('customers/{customer}/orders', [RiderCustomerController::class, 'orders'])->name('customers.orders');
+    Route::get('history', [RiderDeliveryController::class, 'history'])->name('history');
 });

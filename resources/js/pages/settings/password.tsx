@@ -1,11 +1,13 @@
 import { Transition } from '@headlessui/react';
 import { Head, useForm } from '@inertiajs/react';
 import { useRef } from 'react';
+import { toast } from 'sonner';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
+import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import type { BreadcrumbItem } from '@/types';
@@ -29,7 +31,7 @@ export default function Password() {
         e.preventDefault();
         put('/settings/password', {
             preserveScroll: true,
-            onSuccess: () => reset(),
+            onSuccess: () => { reset(); toast.success('Password changed successfully.'); },
             onError: (errs) => {
                 if (errs.password) {
                     reset('password', 'password_confirmation');
@@ -59,11 +61,10 @@ export default function Password() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="grid gap-2">
                             <Label htmlFor="current_password">Current password</Label>
-                            <Input
+                            <PasswordInput
                                 id="current_password"
                                 ref={currentPasswordInput}
                                 name="current_password"
-                                type="password"
                                 className="mt-1 block w-full"
                                 autoComplete="current-password"
                                 placeholder="Current password"
@@ -75,11 +76,10 @@ export default function Password() {
 
                         <div className="grid gap-2">
                             <Label htmlFor="password">New password</Label>
-                            <Input
+                            <PasswordInput
                                 id="password"
                                 ref={passwordInput}
                                 name="password"
-                                type="password"
                                 className="mt-1 block w-full"
                                 autoComplete="new-password"
                                 placeholder="New password"
@@ -87,14 +87,14 @@ export default function Password() {
                                 onChange={(e) => setData('password', e.target.value)}
                             />
                             <InputError message={errors.password} />
+                            <PasswordStrengthIndicator password={data.password} />
                         </div>
 
                         <div className="grid gap-2">
                             <Label htmlFor="password_confirmation">Confirm password</Label>
-                            <Input
+                            <PasswordInput
                                 id="password_confirmation"
                                 name="password_confirmation"
-                                type="password"
                                 className="mt-1 block w-full"
                                 autoComplete="new-password"
                                 placeholder="Confirm password"

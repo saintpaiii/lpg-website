@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Delivery extends Model
@@ -12,6 +13,7 @@ class Delivery extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'store_id',
         'order_id',
         'rider_id',
         'status',
@@ -28,6 +30,11 @@ class Delivery extends Model
         ];
     }
 
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
+    }
+
     public function order(): BelongsTo
     {
         return $this->belongsTo(Order::class);
@@ -36,5 +43,10 @@ class Delivery extends Model
     public function rider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rider_id');
+    }
+
+    public function proofs(): HasMany
+    {
+        return $this->hasMany(DeliveryProof::class)->orderBy('created_at');
     }
 }

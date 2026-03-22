@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Setting;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -16,17 +15,21 @@ class InvoiceController extends Controller
 
     private function formatInvoice(Invoice $inv): array
     {
-        $total   = (float) $inv->total_amount;
-        $paid    = (float) $inv->paid_amount;
-        $balance = max(0, $total - $paid);
+        $total      = (float) $inv->total_amount;
+        $paid       = (float) $inv->paid_amount;
+        $balance    = max(0, $total - $paid);
+        $commission = (float) $inv->platform_commission;
+        $netAmount  = max(0, $total - $commission);
 
         return [
-            'id'             => $inv->id,
-            'invoice_number' => $inv->invoice_number,
-            'payment_status' => $inv->payment_status,
-            'total_amount'   => $total,
-            'paid_amount'    => $paid,
-            'balance'        => $balance,
+            'id'                  => $inv->id,
+            'invoice_number'      => $inv->invoice_number,
+            'payment_status'      => $inv->payment_status,
+            'total_amount'        => $total,
+            'paid_amount'         => $paid,
+            'balance'             => $balance,
+            'platform_commission' => $commission,
+            'net_amount'          => $netAmount,
             'payment_method' => $inv->payment_method,
             'paid_at'        => $inv->paid_at?->format('M d, Y g:i A'),
             'due_date'       => $inv->due_date?->format('M d, Y'),
@@ -66,17 +69,11 @@ class InvoiceController extends Controller
         ];
     }
 
-    // ── Index ─────────────────────────────────────────────────────────────────
+    // ── Index (read-only, platform monitoring) ───────────────────────────────
 
     public function index(Request $request): Response
     {
-        $tab = $request->input('tab', 'active');
-
-        $query = Invoice::with(['customer', 'order.items.product']);
-
-        if ($tab === 'archived') {
-            $query->onlyTrashed();
-        }
+        $query = Invoice::with(['customer', 'order']);
 
         if ($payStatus = $request->input('payment_status')) {
             $query->where('payment_status', $payStatus);
@@ -104,32 +101,24 @@ class InvoiceController extends Controller
             ->withQueryString()
             ->through(fn ($inv) => $this->formatInvoice($inv));
 
-        $archivedCount = Invoice::onlyTrashed()->count();
+        $raw = Invoice::selectRaw("
+            COUNT(*) as total_count,
+            SUM(total_amount) as total_billed,
+            SUM(paid_amount) as total_collected,
+            SUM(total_amount - paid_amount) as total_outstanding
+        ")->first();
 
-        // Summary totals for active tab
-        $summary = null;
-        if ($tab === 'active') {
-            $raw = Invoice::selectRaw("
-                COUNT(*) as total_count,
-                SUM(total_amount) as total_billed,
-                SUM(paid_amount) as total_collected,
-                SUM(total_amount - paid_amount) as total_outstanding
-            ")->first();
-
-            $summary = [
-                'total_count'       => (int) ($raw->total_count ?? 0),
-                'total_billed'      => (float) ($raw->total_billed ?? 0),
-                'total_collected'   => (float) ($raw->total_collected ?? 0),
-                'total_outstanding' => (float) ($raw->total_outstanding ?? 0),
-            ];
-        }
+        $summary = [
+            'total_count'       => (int) ($raw->total_count ?? 0),
+            'total_billed'      => (float) ($raw->total_billed ?? 0),
+            'total_collected'   => (float) ($raw->total_collected ?? 0),
+            'total_outstanding' => (float) ($raw->total_outstanding ?? 0),
+        ];
 
         return Inertia::render('admin/invoices', [
-            'invoices'      => $invoices,
-            'tab'           => $tab,
-            'archivedCount' => $archivedCount,
-            'summary'       => $summary,
-            'filters'       => $request->only('payment_status', 'date_from', 'date_to', 'search', 'tab'),
+            'invoices' => $invoices,
+            'summary'  => $summary,
+            'filters'  => $request->only('payment_status', 'date_from', 'date_to', 'search'),
         ]);
     }
 
@@ -152,66 +141,4 @@ class InvoiceController extends Controller
         ]);
     }
 
-    // ── Record Payment ────────────────────────────────────────────────────────
-
-    public function recordPayment(Request $request, Invoice $invoice): RedirectResponse
-    {
-        $total   = (float) $invoice->total_amount;
-        $already = (float) $invoice->paid_amount;
-        $maxPay  = $total - $already;
-
-        $data = $request->validate([
-            'amount'         => "required|numeric|min:0.01|max:{$maxPay}",
-            'payment_method' => 'required|in:cash,gcash,bank_transfer,maya',
-            'notes'          => 'nullable|string|max:500',
-        ]);
-
-        $newPaid = $already + (float) $data['amount'];
-        $status  = $newPaid >= $total ? 'paid' : 'partial';
-
-        $invoice->update([
-            'paid_amount'    => $newPaid,
-            'payment_status' => $status,
-            'payment_method' => $data['payment_method'],
-            'paid_at'        => $status === 'paid' ? ($invoice->paid_at ?? now()) : $invoice->paid_at,
-        ]);
-
-        // Sync order payment status
-        if ($invoice->order) {
-            $invoice->order->update([
-                'payment_status' => $status,
-                'payment_method' => $data['payment_method'],
-            ]);
-        }
-
-        return back()->with('success', "Payment of ₱" . number_format($data['amount'], 2) . " recorded for {$invoice->invoice_number}.");
-    }
-
-    // ── Destroy (soft delete) ─────────────────────────────────────────────────
-
-    public function destroy(Invoice $invoice): RedirectResponse
-    {
-        $invoice->delete();
-
-        return back()->with('success', "{$invoice->invoice_number} archived.");
-    }
-
-    // ── Restore ───────────────────────────────────────────────────────────────
-
-    public function restore(Invoice $invoice): RedirectResponse
-    {
-        $invoice->restore();
-
-        return back()->with('success', "{$invoice->invoice_number} restored.");
-    }
-
-    // ── Force Delete ──────────────────────────────────────────────────────────
-
-    public function forceDestroy(Invoice $invoice): RedirectResponse
-    {
-        $num = $invoice->invoice_number;
-        $invoice->forceDelete();
-
-        return back()->with('success', "{$num} permanently deleted.");
-    }
 }

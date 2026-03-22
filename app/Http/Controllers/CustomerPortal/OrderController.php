@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Order;
+use Illuminate\Support\Facades\Storage;
 use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
+use App\Models\Rating;
 use App\Services\PayMongoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -43,6 +45,20 @@ class OrderController extends Controller
     public function index(Request $request): Response
     {
         $customer = $this->getCustomer($request);
+
+        // Auto-verify all pending payments when returning from PayMongo success URL
+        if ($request->query('payment') === 'success' && $customer) {
+            $pendingOrders = Order::where('customer_id', $customer->id)
+                ->where('payment_status', 'unpaid')
+                ->with(['payments', 'invoice'])
+                ->get();
+
+            foreach ($pendingOrders as $pendingOrder) {
+                if ($pendingOrder->payments->where('status', 'pending')->isNotEmpty()) {
+                    $this->attemptVerifyPayment($pendingOrder);
+                }
+            }
+        }
 
         $orders = collect();
         if ($customer) {
@@ -292,14 +308,14 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['items.product', 'delivery.rider', 'invoice', 'payments']);
+        $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments']);
 
         // Auto-verify when returning from PayMongo success URL
         if ($request->query('payment') === 'success' && $order->payment_status !== 'paid') {
             $this->attemptVerifyPayment($order);
             // Refresh model so the response reflects any updates just made
             $order->refresh();
-            $order->load(['items.product', 'delivery.rider', 'invoice', 'payments']);
+            $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments']);
         }
 
         return Inertia::render('customer/order-show', [
@@ -317,6 +333,7 @@ class OrderController extends Controller
                 'created_at'       => $order->created_at->format('M d, Y g:i A'),
                 'items'            => $order->items->map(fn ($i) => [
                     'id'         => $i->id,
+                    'product_id' => $i->product_id,
                     'quantity'   => $i->quantity,
                     'unit_price' => (float) $i->unit_price,
                     'subtotal'   => (float) $i->subtotal,
@@ -325,10 +342,21 @@ class OrderController extends Controller
                         'brand' => $i->product->brand,
                     ] : null,
                 ])->values()->all(),
+                'rated_product_ids' => Rating::where('order_id', $order->id)
+                    ->where('user_id', $request->user()->id)
+                    ->pluck('product_id')
+                    ->toArray(),
                 'delivery' => $order->delivery ? [
                     'status'      => $order->delivery->status,
                     'rider_name'  => $order->delivery->rider?->name,
                     'assigned_at' => $order->delivery->assigned_at?->format('M d, Y g:i A'),
+                    'proofs'      => $order->delivery->proofs->map(fn ($p) => [
+                        'status'        => $p->status,
+                        'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,
+                        'notes'         => $p->notes,
+                        'location_note' => $p->location_note,
+                        'created_at'    => $p->created_at->format('M d, Y g:i A'),
+                    ])->values()->all(),
                 ] : null,
                 'invoice' => $order->invoice ? [
                     'id'             => $order->invoice->id,

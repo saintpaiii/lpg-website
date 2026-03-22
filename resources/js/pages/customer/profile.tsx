@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import CustomerLayout from '@/layouts/customer-layout';
 import type { FormEvent } from 'react';
 
@@ -76,7 +77,7 @@ export default function CustomerProfile({ profile }: Props) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="name" className="text-sm font-medium">Full name</Label>
+                                    <Label htmlFor="name" className="text-sm font-medium">Full name <span className="text-red-500">*</span></Label>
                                     <Input
                                         id="name"
                                         value={profileForm.data.name}
@@ -88,7 +89,7 @@ export default function CustomerProfile({ profile }: Props) {
                                 </div>
 
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="phone" className="text-sm font-medium">Phone number</Label>
+                                    <Label htmlFor="phone" className="text-sm font-medium">Phone number <span className="text-red-500">*</span></Label>
                                     <Input
                                         id="phone"
                                         type="tel"
@@ -102,7 +103,7 @@ export default function CustomerProfile({ profile }: Props) {
                             </div>
 
                             <div className="grid gap-1.5">
-                                <Label htmlFor="address" className="text-sm font-medium">Street address</Label>
+                                <Label htmlFor="address" className="text-sm font-medium">Street address <span className="text-red-500">*</span></Label>
                                 <Input
                                     id="address"
                                     value={profileForm.data.address}
@@ -115,7 +116,7 @@ export default function CustomerProfile({ profile }: Props) {
 
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="city" className="text-sm font-medium">City / Municipality</Label>
+                                    <Label htmlFor="city" className="text-sm font-medium">City / Municipality <span className="text-red-500">*</span></Label>
                                     <Input
                                         id="city"
                                         value={profileForm.data.city}
@@ -162,9 +163,8 @@ export default function CustomerProfile({ profile }: Props) {
                         <form onSubmit={handlePasswordSubmit} className="space-y-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="current_password" className="text-sm font-medium">Current password</Label>
-                                <Input
+                                <PasswordInput
                                     id="current_password"
-                                    type="password"
                                     autoComplete="current-password"
                                     value={passwordForm.data.current_password}
                                     onChange={(e) => passwordForm.setData('current_password', e.target.value)}
@@ -177,9 +177,8 @@ export default function CustomerProfile({ profile }: Props) {
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="new_password" className="text-sm font-medium">New password</Label>
-                                    <Input
+                                    <PasswordInput
                                         id="new_password"
-                                        type="password"
                                         autoComplete="new-password"
                                         value={passwordForm.data.password}
                                         onChange={(e) => passwordForm.setData('password', e.target.value)}
@@ -191,9 +190,8 @@ export default function CustomerProfile({ profile }: Props) {
 
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="password_confirmation" className="text-sm font-medium">Confirm new password</Label>
-                                    <Input
+                                    <PasswordInput
                                         id="password_confirmation"
-                                        type="password"
                                         autoComplete="new-password"
                                         value={passwordForm.data.password_confirmation}
                                         onChange={(e) => passwordForm.setData('password_confirmation', e.target.value)}

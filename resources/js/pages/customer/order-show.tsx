@@ -1,9 +1,17 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Printer, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, MapPin, Printer, RefreshCw, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { fmtDate } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
 
 type Payment = {
@@ -27,8 +35,10 @@ type Order = {
     ordered_at: string | null;
     delivered_at: string | null;
     created_at: string;
+    rated_product_ids: number[];
     items: {
         id: number;
+        product_id: number | null;
         quantity: number;
         unit_price: number;
         subtotal: number;
@@ -38,6 +48,13 @@ type Order = {
         status: string;
         rider_name: string | null;
         assigned_at: string | null;
+        proofs: {
+            status: string;
+            photo_url: string | null;
+            notes: string | null;
+            location_note: string | null;
+            created_at: string;
+        }[];
     } | null;
     invoice: {
         id: number;
@@ -62,8 +79,8 @@ const ORDER_STEPS = [
 const STATUS_STYLES: Record<string, string> = {
     pending:          'bg-yellow-100 text-yellow-800',
     confirmed:        'bg-blue-100 text-blue-800',
-    preparing:        'bg-indigo-100 text-indigo-800',
-    out_for_delivery: 'bg-purple-100 text-purple-800',
+    preparing:        'bg-purple-100 text-purple-800',
+    out_for_delivery: 'bg-orange-100 text-orange-800',
     delivered:        'bg-emerald-100 text-emerald-800',
     cancelled:        'bg-gray-100 text-gray-600',
 };
@@ -73,6 +90,82 @@ const PAY_STYLES: Record<string, string> = {
     paid:    'bg-emerald-100 text-emerald-700',
     partial: 'bg-amber-100 text-amber-700',
 };
+
+const PROOF_STATUS_COLORS: Record<string, string> = {
+    picked_up:  'bg-indigo-500',
+    in_transit: 'bg-purple-500',
+    delivered:  'bg-emerald-500',
+    failed:     'bg-red-500',
+};
+
+const PROOF_STATUS_LABELS: Record<string, string> = {
+    picked_up:  'Picked Up',
+    in_transit: 'In Transit',
+    delivered:  'Delivered',
+    failed:     'Failed',
+};
+
+function DeliveryTimeline({ proofs }: { proofs: NonNullable<Order['delivery']>['proofs'] }) {
+    const [lightbox, setLightbox] = useState<string | null>(null);
+
+    if (proofs.length === 0) return null;
+
+    return (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Delivery Updates</p>
+            <ol className="relative border-l border-gray-200 pl-5 space-y-4">
+                {proofs.map((p, i) => (
+                    <li key={i} className="relative">
+                        <span className={`absolute -left-[1.3125rem] flex h-3.5 w-3.5 items-center justify-center rounded-full ring-2 ring-white ${PROOF_STATUS_COLORS[p.status] ?? 'bg-blue-500'}`} />
+                        <div className="grid gap-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {PROOF_STATUS_LABELS[p.status] ?? p.status}
+                                </span>
+                                <span className="text-xs text-gray-400">{p.created_at}</span>
+                            </div>
+                            {p.location_note && (
+                                <p className="flex items-center gap-1 text-xs text-gray-500">
+                                    <MapPin className="h-3 w-3 shrink-0" />
+                                    {p.location_note}
+                                </p>
+                            )}
+                            {p.notes && (
+                                <p className="text-xs text-gray-500 italic">"{p.notes}"</p>
+                            )}
+                            {p.photo_url && (
+                                <button
+                                    type="button"
+                                    onClick={() => setLightbox(p.photo_url!)}
+                                    className="group relative mt-1 w-24 h-16 overflow-hidden rounded-md border hover:opacity-90 transition-opacity"
+                                >
+                                    <img src={p.photo_url} alt="Delivery proof" className="h-full w-full object-cover" />
+                                    <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors">
+                                        <Camera className="h-4 w-4 text-white opacity-0 group-hover:opacity-100" />
+                                    </span>
+                                </button>
+                            )}
+                        </div>
+                    </li>
+                ))}
+            </ol>
+
+            {lightbox && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+                    onClick={() => setLightbox(null)}
+                >
+                    <img
+                        src={lightbox}
+                        alt="Delivery proof"
+                        className="max-h-[90vh] max-w-full rounded-lg object-contain"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
+        </div>
+    );
+}
 
 function StatusStepper({ status }: { status: string }) {
     const isCancelled = status === 'cancelled';
@@ -123,10 +216,74 @@ function StatusStepper({ status }: { status: string }) {
     );
 }
 
+// ── Star selector (interactive, used in rating dialog) ──────────────────────
+
+function StarSelector({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+    const [hovered, setHovered] = useState(0);
+    return (
+        <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                    key={star}
+                    type="button"
+                    onClick={() => onChange(star)}
+                    onMouseEnter={() => setHovered(star)}
+                    onMouseLeave={() => setHovered(0)}
+                    className={`text-2xl leading-none transition-transform hover:scale-110 ${
+                        (hovered || value) >= star ? 'text-amber-400' : 'text-gray-300'
+                    }`}
+                >
+                    ★
+                </button>
+            ))}
+        </div>
+    );
+}
+
 export default function OrderShow({ order }: Props) {
     const canPrint  = order.invoice && ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
     const [paying, setPaying]     = useState(false);
     const [verifying, setVerifying] = useState(false);
+
+    // Rating state
+    const [rateOpen, setRateOpen] = useState(false);
+    const [ratingSubmitting, setRatingSubmitting] = useState(false);
+    const [ratings, setRatings] = useState<Record<number, { rating: number; review: string }>>({});
+
+    const unratedItems = order.items.filter(
+        (i) => i.product_id !== null && !order.rated_product_ids.includes(i.product_id!)
+    );
+    const canRate = order.status === 'delivered' && unratedItems.length > 0;
+
+    function openRateDialog() {
+        const initial: Record<number, { rating: number; review: string }> = {};
+        unratedItems.forEach((item) => {
+            if (item.product_id) initial[item.product_id] = { rating: 0, review: '' };
+        });
+        setRatings(initial);
+        setRateOpen(true);
+    }
+
+    function submitRatings() {
+        const payload = Object.entries(ratings)
+            .filter(([, v]) => v.rating > 0)
+            .map(([productId, v]) => ({
+                product_id: parseInt(productId),
+                rating: v.rating,
+                review: v.review || undefined,
+            }));
+
+        if (payload.length === 0) {
+            toast.error('Please rate at least one product.');
+            return;
+        }
+
+        setRatingSubmitting(true);
+        router.post(`/customer/orders/${order.id}/rate`, { ratings: payload }, {
+            onSuccess: () => { setRateOpen(false); setRatingSubmitting(false); },
+            onError:   () => { setRatingSubmitting(false); },
+        });
+    }
 
     function getCsrfToken(): string {
         const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
@@ -261,6 +418,17 @@ export default function OrderShow({ order }: Props) {
                                 Verify Payment
                             </Button>
                         )}
+                        {canRate && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                onClick={openRateDialog}
+                            >
+                                <Star className="h-4 w-4" />
+                                Rate Products
+                            </Button>
+                        )}
                         {canPrint && (
                             <a href={`/invoices/${order.invoice!.id}/print`} target="_blank" rel="noopener noreferrer">
                                 <Button variant="outline" size="sm" className="gap-1.5">
@@ -280,20 +448,23 @@ export default function OrderShow({ order }: Props) {
                     <CardContent>
                         <StatusStepper status={order.status} />
                         {order.delivery && (
-                            <div className="mt-4 pt-4 border-t border-gray-100 grid gap-2 sm:grid-cols-2 text-sm">
-                                {order.delivery.rider_name && (
-                                    <div>
-                                        <span className="text-gray-500">Rider:</span>{' '}
-                                        <span className="font-medium">{order.delivery.rider_name}</span>
-                                    </div>
-                                )}
-                                {order.delivery.assigned_at && (
-                                    <div>
-                                        <span className="text-gray-500">Assigned:</span>{' '}
-                                        <span className="font-medium">{order.delivery.assigned_at}</span>
-                                    </div>
-                                )}
-                            </div>
+                            <>
+                                <div className="mt-4 pt-4 border-t border-gray-100 grid gap-2 sm:grid-cols-2 text-sm">
+                                    {order.delivery.rider_name && (
+                                        <div>
+                                            <span className="text-gray-500">Rider:</span>{' '}
+                                            <span className="font-medium">{order.delivery.rider_name}</span>
+                                        </div>
+                                    )}
+                                    {order.delivery.assigned_at && (
+                                        <div>
+                                            <span className="text-gray-500">Assigned:</span>{' '}
+                                            <span className="font-medium">{order.delivery.assigned_at}</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <DeliveryTimeline proofs={order.delivery.proofs} />
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -361,12 +532,12 @@ export default function OrderShow({ order }: Props) {
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Ordered</span>
-                                    <span className="font-medium">{order.ordered_at ?? order.created_at}</span>
+                                    <span className="font-medium">{fmtDate(order.ordered_at ?? order.created_at)}</span>
                                 </div>
                                 {order.delivered_at && (
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Delivered</span>
-                                        <span className="font-medium">{order.delivered_at}</span>
+                                        <span className="font-medium">{fmtDate(order.delivered_at)}</span>
                                     </div>
                                 )}
                                 {order.notes && (
@@ -446,6 +617,56 @@ export default function OrderShow({ order }: Props) {
                     </div>
                 </div>
             </div>
+            {/* Rate Products dialog */}
+            <Dialog open={rateOpen} onOpenChange={(o) => !o && setRateOpen(false)}>
+                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-amber-400" />
+                            Rate Your Products
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-5 py-2">
+                        {unratedItems.map((item) => {
+                            const pid = item.product_id!;
+                            const state = ratings[pid] ?? { rating: 0, review: '' };
+                            return (
+                                <div key={item.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                                    <div>
+                                        <p className="font-medium text-gray-900 dark:text-white text-sm">
+                                            {item.product?.name ?? `Product #${pid}`}
+                                        </p>
+                                        {item.product?.brand && (
+                                            <p className="text-xs text-gray-500">{item.product.brand}</p>
+                                        )}
+                                    </div>
+                                    <StarSelector
+                                        value={state.rating}
+                                        onChange={(v) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], rating: v } }))}
+                                    />
+                                    <textarea
+                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                                        rows={2}
+                                        placeholder="Write a review (optional)…"
+                                        value={state.review}
+                                        onChange={(e) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], review: e.target.value } }))}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRateOpen(false)}>Cancel</Button>
+                        <Button
+                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                            disabled={ratingSubmitting || Object.values(ratings).every((v) => v.rating === 0)}
+                            onClick={submitRatings}
+                        >
+                            {ratingSubmitting ? 'Submitting…' : 'Submit Review'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </CustomerLayout>
     );
 }

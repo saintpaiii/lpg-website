@@ -9,6 +9,8 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Customer;
+use App\Models\Setting;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -78,6 +80,9 @@ class OrderController extends Controller
             'has_invoice'   => $o->invoice()->exists(),
             'invoice_number'=> $o->invoice?->invoice_number,
             'invoice_id'    => $o->invoice?->id,
+            'store_name'       => $o->store?->store_name,
+            'store_id'         => $o->store_id,
+            'commission_amount'=> $o->invoice ? (float) $o->invoice->platform_commission : null,
         ];
     }
 
@@ -87,7 +92,7 @@ class OrderController extends Controller
     {
         $tab = $request->input('tab', 'active');
 
-        $query = Order::with(['customer', 'items.product', 'createdBy', 'invoice']);
+        $query = Order::with(['customer', 'items.product', 'createdBy', 'invoice', 'store']);
 
         if ($tab === 'archived') {
             $query->onlyTrashed();
@@ -229,7 +234,15 @@ class OrderController extends Controller
 
     public function show(Order $order): Response
     {
-        $order->load(['customer', 'items.product', 'createdBy', 'invoice', 'delivery.rider']);
+        $order->load(['customer', 'items.product', 'createdBy', 'invoice', 'delivery.rider', 'store']);
+
+        $riders = User::where('role', 'rider')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'phone'])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone])
+            ->values()
+            ->all();
 
         return Inertia::render('admin/order-show', [
             'order'    => $this->formatOrder($order) + [
@@ -243,6 +256,7 @@ class OrderController extends Controller
                     'delivered_at' => $order->delivery->delivered_at?->format('M d, Y g:i A'),
                 ] : null,
             ],
+            'riders'   => $riders,
             'userRole' => 'admin',
         ]);
     }
@@ -335,6 +349,16 @@ class OrderController extends Controller
 
             if ($newStatus === 'delivered' && ! $order->delivered_at) {
                 $updates['delivered_at'] = now();
+
+                // Calculate and save platform commission to invoice
+                $order->loadMissing(['store', 'invoice']);
+                if ($order->invoice) {
+                    $rate       = $order->store
+                        ? (float) $order->store->commission_rate
+                        : (float) Setting::get('default_commission_rate', 5);
+                    $commission = round((float) $order->total_amount * $rate / 100, 2);
+                    $order->invoice->update(['platform_commission' => $commission]);
+                }
             }
 
             $order->update($updates);

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { toast } from 'sonner';
+import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -46,6 +47,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -272,7 +274,7 @@ function AssignDeliveryDialog({
                 <form onSubmit={handleSubmit} className="grid gap-4">
                     {/* Order */}
                     <div className="grid gap-1.5">
-                        <Label>Order *</Label>
+                        <Label>Order <span className="text-red-500">*</span></Label>
                         {pendingOrders.length === 0 ? (
                             <div className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
                                 No orders waiting for delivery
@@ -321,7 +323,7 @@ function AssignDeliveryDialog({
 
                     {/* Rider */}
                     <div className="grid gap-1.5">
-                        <Label>Rider *</Label>
+                        <Label>Rider <span className="text-red-500">*</span></Label>
                         {riders.length === 0 ? (
                             <div className="rounded-md border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
                                 No active riders available
@@ -364,6 +366,7 @@ function AssignDeliveryDialog({
                             disabled={processing || !data.order_id || !data.rider_id || pendingOrders.length === 0}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? 'Assigning…' : 'Assign Delivery'}
                         </Button>
                     </DialogFooter>
@@ -430,7 +433,7 @@ function UpdateStatusDialog({
                     </p>
 
                     <div className="grid gap-1.5">
-                        <Label>{isFailed ? 'Reason *' : 'Notes'}</Label>
+                        <Label>{isFailed ? <>Reason <span className="text-red-500">*</span></> : 'Notes'}</Label>
                         <textarea
                             value={data.notes}
                             onChange={(e) => setData('notes', e.target.value)}
@@ -449,6 +452,7 @@ function UpdateStatusDialog({
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? 'Updating…' : 'Confirm'}
                         </Button>
                     </DialogFooter>
@@ -825,9 +829,9 @@ export default function DeliveriesPage({
                                                     )}
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                                                    {d.assigned_at ?? '—'}
+                                                    {d.assigned_at ? fmtDate(d.assigned_at) : '—'}
                                                     {d.delivered_at && (
-                                                        <p className="text-emerald-600">↳ {d.delivered_at}</p>
+                                                        <p className="text-emerald-600">↳ {fmtDate(d.delivered_at)}</p>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">

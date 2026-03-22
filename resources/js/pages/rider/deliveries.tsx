@@ -1,14 +1,16 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Camera,
     CheckCircle,
     ChevronDown,
     MapPin,
     Package,
     Phone,
     Truck,
+    X,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -27,6 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -177,6 +180,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
 
 // ── Update Status Dialog ───────────────────────────────────────────────────────
 
+const PROOF_STATUSES: DeliveryStatus[] = ['picked_up', 'delivered', 'failed'];
+
 function UpdateStatusDialog({
     delivery,
     targetStatus,
@@ -186,36 +191,68 @@ function UpdateStatusDialog({
     targetStatus: DeliveryStatus | null;
     onClose: () => void;
 }) {
-    const { data, setData, patch, processing, errors, reset } = useForm<{
+    const { data, setData, post, processing, errors, reset, transform } = useForm<{
         status: string;
         notes: string;
+        location_note: string;
+        photo: File | null;
     }>({
         status: targetStatus ?? '',
         notes: '',
+        location_note: '',
+        photo: null,
     });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [preview, setPreview] = useState<string | null>(null);
 
     if (data.status !== (targetStatus ?? '')) {
         setData('status', targetStatus ?? '');
     }
 
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0] ?? null;
+        setData('photo', file);
+        if (file) {
+            const url = URL.createObjectURL(file);
+            setPreview(url);
+        } else {
+            setPreview(null);
+        }
+    }
+
+    function clearPhoto() {
+        setData('photo', null);
+        setPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
         if (!delivery) return;
-        patch(`/rider/deliveries/${delivery.id}/status`, {
-            onSuccess: () => { reset(); onClose(); },
+        transform((d) => ({ ...d, _method: 'PATCH' }));
+        post(`/rider/deliveries/${delivery.id}/status`, {
+            forceFormData: true,
+            onSuccess: () => {
+                reset();
+                setPreview(null);
+                onClose();
+            },
         });
     }
 
     function handleClose() {
         reset();
+        setPreview(null);
         onClose();
     }
 
-    const isFailed = targetStatus === 'failed';
+    const isFailed    = targetStatus === 'failed';
+    const needsPhoto  = targetStatus !== null && PROOF_STATUSES.includes(targetStatus);
 
     return (
         <Dialog open={!!delivery && !!targetStatus} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle className={`flex items-center gap-2 ${isFailed ? 'text-red-600' : ''}`}>
                         {isFailed
@@ -233,27 +270,79 @@ function UpdateStatusDialog({
                         }
                     </p>
 
+                    {/* Photo proof — hidden for in_transit */}
+                    {targetStatus !== 'in_transit' && (
+                        <div className="grid gap-1.5">
+                            <Label className="flex items-center gap-1">
+                                <Camera className="h-3.5 w-3.5" />
+                                Photo Proof{needsPhoto ? ' *' : ' (optional)'}
+                            </Label>
+                            {preview ? (
+                                <div className="relative">
+                                    <img src={preview} alt="Preview" className="w-full rounded-md object-cover max-h-48 border" />
+                                    <button
+                                        type="button"
+                                        onClick={clearPhoto}
+                                        className="absolute right-1.5 top-1.5 rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-200 p-4 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                                    <Camera className="h-6 w-6" />
+                                    <span>Tap to take or upload a photo</span>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/jpg"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                </label>
+                            )}
+                            {errors.photo && <p className="text-xs text-red-500">{errors.photo}</p>}
+                        </div>
+                    )}
+
+                    {/* Notes */}
                     <div className="grid gap-1.5">
                         <Label>{isFailed ? 'Reason *' : 'Notes (optional)'}</Label>
                         <textarea
                             value={data.notes}
                             onChange={(e) => setData('notes', e.target.value)}
                             placeholder={isFailed ? 'e.g. Customer not home, wrong address…' : 'Any delivery notes…'}
-                            rows={3}
+                            rows={2}
                             className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         />
                         {errors.notes && <p className="text-xs text-red-500">{errors.notes}</p>}
+                    </div>
+
+                    {/* Location note */}
+                    <div className="grid gap-1.5">
+                        <Label className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            Location Note (optional)
+                        </Label>
+                        <input
+                            type="text"
+                            value={data.location_note}
+                            onChange={(e) => setData('location_note', e.target.value)}
+                            placeholder="e.g. In front of gate, left with guard…"
+                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        {errors.location_note && <p className="text-xs text-red-500">{errors.location_note}</p>}
                     </div>
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
                             type="submit"
-                            disabled={processing || (isFailed && !data.notes.trim())}
+                            disabled={processing || (isFailed && !data.notes.trim()) || (needsPhoto && !data.photo)}
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >
-                            {processing ? 'Updating…' : 'Confirm'}
+                            {processing ? 'Uploading…' : 'Confirm'}
                         </Button>
                     </DialogFooter>
                 </form>
@@ -502,7 +591,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
                                         <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
                                             <span>Assigned: {d.assigned_at ?? '—'}</span>
                                             {d.delivered_at && (
-                                                <span className="text-emerald-600">Delivered: {d.delivered_at}</span>
+                                                <span className="text-emerald-600">Delivered: {fmtDate(d.delivered_at)}</span>
                                             )}
                                         </div>
                                         {d.notes && d.status === 'failed' && (

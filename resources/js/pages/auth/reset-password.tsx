@@ -3,6 +3,7 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PasswordInput } from '@/components/ui/password-input';
 import { Spinner } from '@/components/ui/spinner';
 import AuthLayout from '@/layouts/auth-layout';
 import type { FormEvent } from 'react';
@@ -52,9 +53,8 @@ export default function ResetPassword({ token, email }: Props) {
 
                     <div className="grid gap-2">
                         <Label htmlFor="password">Password</Label>
-                        <Input
+                        <PasswordInput
                             id="password"
-                            type="password"
                             name="password"
                             autoComplete="new-password"
                             className="mt-1 block w-full"
@@ -68,9 +68,8 @@ export default function ResetPassword({ token, email }: Props) {
 
                     <div className="grid gap-2">
                         <Label htmlFor="password_confirmation">Confirm password</Label>
-                        <Input
+                        <PasswordInput
                             id="password_confirmation"
-                            type="password"
                             name="password_confirmation"
                             autoComplete="new-password"
                             className="mt-1 block w-full"

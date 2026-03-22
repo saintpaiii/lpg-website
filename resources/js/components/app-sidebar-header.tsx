@@ -1,5 +1,5 @@
 import { router, usePage } from '@inertiajs/react';
-import { Bell, LogOut, PanelLeft } from 'lucide-react';
+import { Bell, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import {
     AlertDialog,
@@ -25,8 +25,48 @@ type Props = {
 export function AppSidebarHeader({ breadcrumbs = [] }: Props) {
     const { auth } = usePage<SharedData>().props;
     const user = auth.user;
-    const isAdmin = user.role === 'admin' || user.is_admin;
     const cleanup = useMobileNavigation();
+
+    function getRoleBadge(): { label: string; className: string } {
+        const sub = user.sub_role as string | null | undefined;
+
+        if (user.role === 'platform_admin' || user.is_admin) {
+            return { label: 'Admin', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300' };
+        }
+        if (user.role === 'platform_staff' || user.is_platform_staff) {
+            const label = sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff';
+            return { label, className: 'bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-950 dark:text-violet-300' };
+        }
+        if (user.role === 'admin' || user.role === 'manager' || user.role === 'cashier') {
+            const label = user.role.charAt(0).toUpperCase() + user.role.slice(1);
+            return { label, className: 'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300' };
+        }
+        if (user.role === 'warehouse') {
+            return { label: 'Warehouse', className: 'bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-950 dark:text-purple-300' };
+        }
+        if (user.role === 'seller') {
+            return { label: 'Owner', className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300' };
+        }
+        if (user.role === 'seller_staff') {
+            const label = sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff';
+            const colors: Record<string, string> = {
+                rider:     'bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-300',
+                cashier:   'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300',
+                warehouse: 'bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-950 dark:text-purple-300',
+            };
+            return { label, className: colors[sub ?? ''] ?? 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-300' };
+        }
+        if (user.role === 'rider') {
+            return { label: 'Rider', className: 'bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-300' };
+        }
+        if (user.role === 'customer') {
+            return { label: 'Customer', className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300' };
+        }
+        const label = user.role ? (user.role as string).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) : 'User';
+        return { label, className: 'bg-gray-100 text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300' };
+    }
+
+    const badge = getRoleBadge();
 
     // Derive page title from last breadcrumb
     const pageTitle =
@@ -69,15 +109,8 @@ export function AppSidebarHeader({ breadcrumbs = [] }: Props) {
                     <span className="max-w-[120px] truncate text-sm font-medium text-foreground">
                         {user.name}
                     </span>
-                    <Badge
-                        className={
-                            isAdmin
-                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300'
-                                : 'bg-green-100 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-300'
-                        }
-                        variant="secondary"
-                    >
-                        {isAdmin ? 'Admin' : 'Rider'}
+                    <Badge className={badge.className} variant="secondary">
+                        {badge.label}
                     </Badge>
                 </div>
 

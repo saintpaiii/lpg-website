@@ -14,12 +14,13 @@ class ProductController extends Controller
 {
     public function index(Request $request): Response
     {
-        $query = Product::with('inventory');
+        $query = Product::with(['inventory', 'store']);
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('brand', 'like', "%{$search}%");
+                  ->orWhere('brand', 'like', "%{$search}%")
+                  ->orWhereHas('store', fn ($sq) => $sq->where('store_name', 'like', "%{$search}%"));
             });
         }
 
@@ -32,18 +33,22 @@ class ProductController extends Controller
         $products = $query
             ->withCount('orderItems')
             ->orderBy('name')
-            ->paginate(15)
+            ->paginate(20)
             ->withQueryString()
             ->through(fn ($p) => [
-                'id'             => $p->id,
-                'name'           => $p->name,
-                'brand'          => $p->brand,
-                'weight_kg'      => (float) $p->weight_kg,
-                'selling_price'  => (float) $p->selling_price,
-                'cost_price'     => (float) $p->cost_price,
-                'description'    => $p->description,
-                'is_active'      => $p->is_active,
-                'order_items_count' => $p->order_items_count,
+                'id'               => $p->id,
+                'name'             => $p->name,
+                'brand'            => $p->brand,
+                'weight'           => $p->weight,
+                'weight_kg'        => (float) ($p->weight_kg ?? 0),
+                'refill_price'     => (float) ($p->refill_price ?? $p->selling_price ?? 0),
+                'purchase_price'   => (float) ($p->purchase_price ?? $p->selling_price ?? 0),
+                'description'      => $p->description,
+                'is_active'        => $p->is_active,
+                'order_items_count'=> $p->order_items_count,
+                'store_id'         => $p->store_id,
+                'store_name'       => $p->store?->store_name,
+                'store_city'       => $p->store?->city,
                 'inventory' => $p->inventory ? [
                     'quantity'      => $p->inventory->quantity,
                     'reorder_level' => $p->inventory->reorder_level,

@@ -42,46 +42,49 @@ class PayMongoWebhookController extends Controller
             return;
         }
 
-        $payment = Payment::where('paymongo_checkout_id', $sessionId)->first();
-        if (! $payment || $payment->status === 'paid') {
+        $payments = Payment::where('paymongo_checkout_id', $sessionId)->get();
+        if ($payments->isEmpty()) {
             return;
         }
 
-        // Extract payment method from payments array
-        $payments       = $attributes['payments'] ?? [];
-        $firstPayment   = $payments[0] ?? [];
-        $paymongoMethod = $firstPayment['data']['attributes']['source']['type'] ?? null;
-        $paymongoPayId  = $firstPayment['data']['id'] ?? null;
+        // Extract payment method from PayMongo payments array
+        $pmPayments     = $attributes['payments'] ?? [];
+        $firstPm        = $pmPayments[0] ?? [];
+        $paymongoMethod = $firstPm['data']['attributes']['source']['type'] ?? null;
+        $paymongoPayId  = $firstPm['data']['id'] ?? null;
         $localMethod    = $paymongoMethod ? PayMongoService::mapPaymentMethod($paymongoMethod) : null;
 
-        // Update payment record
-        $payment->update([
-            'status'                => 'paid',
-            'paymongo_payment_id'   => $paymongoPayId,
-            'payment_method'        => $localMethod,
-            'paid_at'               => now(),
-        ]);
+        foreach ($payments as $payment) {
+            if ($payment->status === 'paid') {
+                continue;
+            }
 
-        $order = $payment->order;
-        if (! $order) {
-            return;
-        }
+            $payment->update([
+                'status'              => 'paid',
+                'paymongo_payment_id' => $paymongoPayId,
+                'payment_method'      => $localMethod,
+                'paid_at'             => now(),
+            ]);
 
-        // Update order
-        $order->update([
-            'payment_status' => 'paid',
-            'payment_method' => $localMethod,
-        ]);
+            $order = $payment->order;
+            if (! $order) {
+                continue;
+            }
 
-        // Update invoice
-        $invoice = $order->invoice;
-        if ($invoice) {
-            $invoice->update([
+            $order->update([
                 'payment_status' => 'paid',
-                'paid_amount'    => $order->total_amount,
-                'paid_at'        => now(),
                 'payment_method' => $localMethod,
             ]);
+
+            $invoice = $order->invoice;
+            if ($invoice) {
+                $invoice->update([
+                    'payment_status' => 'paid',
+                    'paid_amount'    => $order->total_amount,
+                    'paid_at'        => now(),
+                    'payment_method' => $localMethod,
+                ]);
+            }
         }
     }
 }

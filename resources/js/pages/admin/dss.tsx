@@ -10,26 +10,23 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
-    ReferenceLine,
-    Cell,
 } from 'recharts';
 import {
-    AlertTriangle,
     ArrowDownRight,
     ArrowRight,
     ArrowUpRight,
     Brain,
+    Building2,
     Calendar,
     Crown,
     Package,
     RefreshCw,
     ShoppingCart,
     Sparkles,
-    Target,
+    Store,
     TrendingDown,
     TrendingUp,
-    User,
-    Warehouse,
+    Users,
     Zap,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,28 +35,6 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-type Severity = 'critical' | 'warning' | 'notice';
-
-type ReorderAlert = {
-    product_id: number;
-    name: string;
-    brand: string;
-    current_stock: number;
-    reorder_level: number;
-    avg_daily_sales: number | null;
-    days_until_stockout: number | null;
-    recommended_order: number | null;
-    days_to_order: string;
-    severity: Severity;
-};
-
-type DemandForecast = {
-    products: { product_id: number; name: string; brand: string; forecast: Record<string, number>; total: number }[];
-    chart: Record<string, any>[];
-    top_names: string[];
-    day_columns: { key: string; label: string }[];
-};
 
 type TrendPoint = {
     date: string;
@@ -79,20 +54,44 @@ type SalesTrend = {
     slope: number;
 };
 
+type TopStore = {
+    id: number;
+    store_name: string;
+    city: string;
+    orders_count: number;
+    revenue: number;
+    rank: number;
+};
+
+type CustomerGrowthPoint = {
+    week: string;
+    new_customers: number;
+};
+
+type TopProduct = {
+    product_id: number;
+    name: string;
+    brand: string;
+    units_sold: number;
+    revenue: number;
+};
+
 type BusinessInsights = {
     peak_day: string | null;
     peak_avg_orders: number;
-    top_customer: { name: string; orders_count: number; total_spent: number } | null;
+    top_store: { name: string; city: string; orders_count: number; total_revenue: number } | null;
     best_seller: { name: string; units_sold: number } | null;
     revenue_projection: number | null;
     this_month_revenue: number;
     this_month_orders: number;
+    total_approved_stores: number;
 };
 
 type Props = {
-    reorderAlerts: ReorderAlert[];
-    demandForecast: DemandForecast;
     salesTrend: SalesTrend;
+    topStores: TopStore[];
+    customerGrowth: CustomerGrowthPoint[];
+    topProducts: TopProduct[];
     businessInsights: BusinessInsights;
     generatedAt: string;
 };
@@ -101,9 +100,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Decision Support System', href: '/admin/dss' }];
 
-const FORECAST_COLORS = [
-    '#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
-];
+const STORE_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -161,311 +158,36 @@ function SectionHeader({
     );
 }
 
-// ── Section 1: Reorder Alerts ─────────────────────────────────────────────────
-
-const SEVERITY_CONFIG = {
-    critical: {
-        border:   'border-red-400',
-        bg:       'bg-red-50',
-        badge:    'bg-red-600 text-white',
-        label:    'CRITICAL',
-        stockBar: 'bg-red-500',
-        icon:     'text-red-600',
-        glow:     'shadow-red-100',
-    },
-    warning: {
-        border:   'border-amber-400',
-        bg:       'bg-amber-50',
-        badge:    'bg-amber-500 text-white',
-        label:    'WARNING',
-        stockBar: 'bg-amber-500',
-        icon:     'text-amber-600',
-        glow:     'shadow-amber-100',
-    },
-    notice: {
-        border:   'border-yellow-300',
-        bg:       'bg-yellow-50',
-        badge:    'bg-yellow-400 text-yellow-900',
-        label:    'LOW STOCK',
-        stockBar: 'bg-yellow-400',
-        icon:     'text-yellow-600',
-        glow:     'shadow-yellow-100',
-    },
-};
-
-function AlertCard({ alert }: { alert: ReorderAlert }) {
-    const cfg      = SEVERITY_CONFIG[alert.severity];
-    const stockPct = alert.reorder_level > 0
-        ? Math.min(100, Math.round((alert.current_stock / (alert.reorder_level * 2)) * 100))
-        : 0;
-
+function EmptyChart({ message }: { message: string }) {
     return (
-        <div className={`rounded-xl border-2 ${cfg.border} ${cfg.bg} p-4 shadow-md ${cfg.glow} transition-all hover:shadow-lg`}>
-            {/* Header */}
-            <div className="mb-3 flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-gray-900 text-base">{alert.name}</p>
-                    {alert.brand && <p className="text-xs text-gray-500">{alert.brand}</p>}
-                </div>
-                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide ${cfg.badge}`}>
-                    {cfg.label}
-                </span>
-            </div>
-
-            {/* Stock bar */}
-            <div className="mb-3">
-                <div className="mb-1 flex justify-between text-xs text-gray-500">
-                    <span>Current: <span className="font-bold text-gray-800">{alert.current_stock} units</span></span>
-                    <span>Reorder: {alert.reorder_level}</span>
-                </div>
-                <div className="h-2 w-full rounded-full bg-gray-200">
-                    <div
-                        className={`h-2 rounded-full ${cfg.stockBar} transition-all`}
-                        style={{ width: `${Math.max(2, stockPct)}%` }}
-                    />
-                </div>
-            </div>
-
-            {/* Stats */}
-            <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-lg bg-white/80 p-2 text-center">
-                    <p className="text-gray-500">Avg Daily Sales</p>
-                    <p className="font-bold text-gray-900">
-                        {alert.avg_daily_sales !== null ? `${alert.avg_daily_sales} units` : '—'}
-                    </p>
-                </div>
-                <div className="rounded-lg bg-white/80 p-2 text-center">
-                    <p className="text-gray-500">Days Until Stockout</p>
-                    <p className={`font-bold ${alert.days_until_stockout !== null ? (alert.severity === 'critical' ? 'text-red-700' : alert.severity === 'warning' ? 'text-amber-700' : 'text-yellow-700') : 'text-gray-400'}`}>
-                        {alert.days_until_stockout !== null ? `${alert.days_until_stockout} days` : 'N/A'}
-                    </p>
-                </div>
-            </div>
-
-            {/* Recommendation */}
-            <div className={`rounded-lg border ${cfg.border} bg-white/60 p-2.5 text-xs`}>
-                <p className="font-semibold text-gray-700 mb-0.5">Recommendation</p>
-                {alert.recommended_order !== null ? (
-                    <p className="text-gray-600">
-                        Order <span className="font-bold text-gray-900">{alert.recommended_order} units</span> of {alert.name}{' '}
-                        <span className="font-semibold">{alert.days_to_order}</span>.
-                    </p>
-                ) : (
-                    <p className="text-gray-500">Insufficient sales data — monitor stock level and reorder soon.</p>
-                )}
-            </div>
+        <div className="flex h-56 flex-col items-center justify-center gap-2 text-gray-300">
+            <Brain className="h-10 w-10" />
+            <p className="text-sm text-gray-400">{message}</p>
         </div>
     );
 }
 
-function ReorderAlertsSection({ alerts }: { alerts: ReorderAlert[] }) {
-    const critical = alerts.filter((a) => a.severity === 'critical').length;
-    const warning  = alerts.filter((a) => a.severity === 'warning').length;
-    const notice   = alerts.filter((a) => a.severity === 'notice').length;
-
-    return (
-        <section className="space-y-4">
-            <SectionHeader
-                icon={AlertTriangle}
-                title="Reorder Alerts"
-                subtitle="Products requiring immediate restocking attention"
-                badge={alerts.length > 0 ? `${alerts.length} alert${alerts.length !== 1 ? 's' : ''}` : 'All clear'}
-                badgeColor={critical > 0 ? 'red' : warning > 0 ? 'amber' : 'emerald'}
-            />
-
-            {alerts.length === 0 ? (
-                <Card>
-                    <CardContent className="flex flex-col items-center justify-center py-12">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 mb-3">
-                            <Warehouse className="h-7 w-7 text-emerald-600" />
-                        </div>
-                        <p className="font-semibold text-gray-700">All stock levels are healthy</p>
-                        <p className="text-sm text-gray-400 mt-1">No products are below reorder level or at risk of stockout.</p>
-                    </CardContent>
-                </Card>
-            ) : (
-                <>
-                    {/* Severity summary */}
-                    <div className="flex flex-wrap gap-3">
-                        {critical > 0 && (
-                            <div className="flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
-                                <Zap className="h-3.5 w-3.5" />
-                                {critical} Critical
-                            </div>
-                        )}
-                        {warning > 0 && (
-                            <div className="flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-700">
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                {warning} Warning
-                            </div>
-                        )}
-                        {notice > 0 && (
-                            <div className="flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1 text-sm font-semibold text-yellow-700">
-                                <Package className="h-3.5 w-3.5" />
-                                {notice} Low Stock
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {alerts.map((a) => <AlertCard key={a.product_id} alert={a} />)}
-                    </div>
-                </>
-            )}
-        </section>
-    );
-}
-
-// ── Section 2: Demand Forecast ────────────────────────────────────────────────
-
-function DemandForecastSection({ data }: { data: DemandForecast }) {
-    const hasData = data.chart.length > 0 && data.top_names.length > 0;
-
-    return (
-        <section className="space-y-4">
-            <SectionHeader
-                icon={Target}
-                title="7-Day Demand Forecast"
-                subtitle="Simple Moving Average — predicted units per product for the next 7 days"
-                badge={hasData ? `${data.products.length} product${data.products.length !== 1 ? 's' : ''}` : undefined}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-5">
-                {/* Chart */}
-                <Card className="lg:col-span-3">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                            Predicted Daily Units — Top Products
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {!hasData ? (
-                            <EmptyChart message="No sales history to generate a forecast." />
-                        ) : (
-                            <ResponsiveContainer width="100%" height={280}>
-                                <BarChart data={data.chart} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                    <XAxis
-                                        dataKey="day"
-                                        tick={{ fontSize: 12, fontWeight: 600 }}
-                                    />
-                                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-                                    <Tooltip
-                                        content={({ active, payload, label }) => {
-                                            if (!active || !payload?.length) return null;
-                                            const entry = data.chart.find((c) => c.day === label);
-                                            return (
-                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
-                                                    <p className="font-bold text-gray-800 mb-1">{label} {entry?.date}</p>
-                                                    {payload.map((p: any) => (
-                                                        <p key={p.dataKey} style={{ color: p.fill }} className="flex items-center gap-1.5">
-                                                            <span className="inline-block h-2 w-2 rounded-full" style={{ background: p.fill }} />
-                                                            {p.dataKey}: <span className="font-semibold">{p.value} units</span>
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            );
-                                        }}
-                                    />
-                                    <Legend
-                                        iconType="circle"
-                                        iconSize={8}
-                                        wrapperStyle={{ fontSize: 11 }}
-                                    />
-                                    {data.top_names.map((name, i) => (
-                                        <Bar
-                                            key={name}
-                                            dataKey={name}
-                                            fill={FORECAST_COLORS[i % FORECAST_COLORS.length]}
-                                            radius={[4, 4, 0, 0]}
-                                        />
-                                    ))}
-                                </BarChart>
-                            </ResponsiveContainer>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Table */}
-                <Card className="lg:col-span-2">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                            Weekly Totals
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {!hasData ? (
-                            <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
-                                    <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-400">
-                                            <th className="px-3 py-2">Product</th>
-                                            {data.day_columns.map((c) => (
-                                                <th key={c.key} className="px-2 py-2 text-center">{c.key}</th>
-                                            ))}
-                                            <th className="px-3 py-2 text-right">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {data.products.slice(0, 8).map((p, i) => (
-                                            <tr key={p.product_id} className="hover:bg-gray-50/60">
-                                                <td className="px-3 py-2">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span
-                                                            className="inline-block h-2 w-2 rounded-full shrink-0"
-                                                            style={{ background: FORECAST_COLORS[i % FORECAST_COLORS.length] }}
-                                                        />
-                                                        <span className="font-medium text-gray-800 truncate max-w-[80px]">{p.name}</span>
-                                                    </div>
-                                                </td>
-                                                {data.day_columns.map((c) => (
-                                                    <td key={c.key} className="px-2 py-2 text-center tabular-nums text-gray-600">
-                                                        {p.forecast[c.key] ?? 0}
-                                                    </td>
-                                                ))}
-                                                <td className="px-3 py-2 text-right tabular-nums font-bold text-blue-700">
-                                                    {p.total}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-        </section>
-    );
-}
-
-// ── Section 3: Sales Trend ────────────────────────────────────────────────────
+// ── Section 1: Platform Revenue Trend ─────────────────────────────────────────
 
 function TrendBadge({ direction, percent }: { direction: string; percent: number }) {
-    if (direction === 'increasing') {
-        return (
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
-                <TrendingUp className="h-6 w-6 text-emerald-600 shrink-0" />
-                <div>
-                    <p className="font-bold text-emerald-700 text-lg">+{percent}%</p>
-                    <p className="text-xs text-emerald-600">vs last week — Increasing</p>
-                </div>
+    if (direction === 'increasing') return (
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+            <TrendingUp className="h-6 w-6 text-emerald-600 shrink-0" />
+            <div>
+                <p className="font-bold text-emerald-700 text-lg">+{percent}%</p>
+                <p className="text-xs text-emerald-600">vs last week — Increasing</p>
             </div>
-        );
-    }
-    if (direction === 'decreasing') {
-        return (
-            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
-                <TrendingDown className="h-6 w-6 text-red-600 shrink-0" />
-                <div>
-                    <p className="font-bold text-red-700 text-lg">{percent}%</p>
-                    <p className="text-xs text-red-600">vs last week — Decreasing</p>
-                </div>
+        </div>
+    );
+    if (direction === 'decreasing') return (
+        <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+            <TrendingDown className="h-6 w-6 text-red-600 shrink-0" />
+            <div>
+                <p className="font-bold text-red-700 text-lg">{percent}%</p>
+                <p className="text-xs text-red-600">vs last week — Decreasing</p>
             </div>
-        );
-    }
+        </div>
+    );
     return (
         <div className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
             <ArrowRight className="h-6 w-6 text-blue-600 shrink-0" />
@@ -484,15 +206,12 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
         <section className="space-y-4">
             <SectionHeader
                 icon={TrendingUp}
-                title="Sales Trend Analysis"
-                subtitle="Linear regression on 30-day revenue + week-over-week comparison"
+                title="Platform Revenue Trend"
+                subtitle="Marketplace-wide daily revenue · Linear regression · Last 30 days"
             />
-
             <div className="grid gap-4 lg:grid-cols-4">
-                {/* Stats */}
                 <div className="space-y-3">
                     <TrendBadge direction={data.direction} percent={data.trend_percent} />
-
                     <Card>
                         <CardContent className="pt-4 space-y-3">
                             <div>
@@ -511,6 +230,7 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                                         <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Peak Day (30d)</p>
                                         <p className="font-bold text-gray-800">{data.peak_day.label}</p>
                                         <p className="text-sm text-emerald-600 font-semibold">{pesoFull(data.peak_day.revenue)}</p>
+                                        <p className="text-xs text-gray-400">{data.peak_day.orders_count} orders</p>
                                     </div>
                                 </>
                             )}
@@ -520,39 +240,30 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                                 <p className="font-mono text-sm text-gray-700">
                                     {data.slope > 0 ? '+' : ''}{data.slope.toFixed(4)} ₱/day
                                 </p>
-                                <p className="text-xs text-gray-400 mt-0.5">Linear regression coefficient</p>
+                                <p className="text-xs text-gray-400 mt-0.5">OLS regression coefficient</p>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
-
-                {/* Chart */}
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                            Daily Revenue + Trend Line (Last 30 Days)
+                            Daily Platform Revenue + Trend Line (Last 30 Days)
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {data.chart.length === 0 ? (
-                            <EmptyChart message="No sales data for the last 30 days." />
+                            <EmptyChart message="No orders across the marketplace in the last 30 days." />
                         ) : (
                             <ResponsiveContainer width="100%" height={280}>
                                 <LineChart data={data.chart} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                    <XAxis
-                                        dataKey="label"
-                                        tick={{ fontSize: 10 }}
-                                        interval={4}
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 11 }}
-                                        tickFormatter={pTick}
-                                        width={65}
-                                    />
+                                    <XAxis dataKey="label" tick={{ fontSize: 10 }} interval={4} />
+                                    <YAxis tick={{ fontSize: 11 }} tickFormatter={pTick} width={65} />
                                     <Tooltip
                                         content={({ active, payload, label }) => {
                                             if (!active || !payload?.length) return null;
+                                            const entry = data.chart.find((d) => d.label === label);
                                             return (
                                                 <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
                                                     <p className="font-bold text-gray-800 mb-1">{label}</p>
@@ -561,34 +272,208 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                                                             {p.name}: {pesoFull(p.value)}
                                                         </p>
                                                     ))}
-                                                    {payload[0] && (
-                                                        <p className="text-gray-500 mt-1 text-xs">
-                                                            Orders: {data.chart.find(d => d.label === label)?.orders_count ?? 0}
-                                                        </p>
-                                                    )}
+                                                    <p className="text-gray-500 mt-1 text-xs">Orders: {entry?.orders_count ?? 0}</p>
                                                 </div>
                                             );
                                         }}
                                     />
                                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="revenue"
-                                        name="Revenue"
-                                        stroke={lineColor}
-                                        strokeWidth={2}
-                                        dot={false}
-                                        activeDot={{ r: 5 }}
+                                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke={lineColor} strokeWidth={2} dot={false} activeDot={{ r: 5 }} />
+                                    <Line type="monotone" dataKey="trend" name="Trend Line" stroke="#94a3b8" strokeWidth={2} strokeDasharray="6 3" dot={false} activeDot={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
+    );
+}
+
+// ── Section 2: Top Performing Stores ──────────────────────────────────────────
+
+function TopStoresSection({ stores }: { stores: TopStore[] }) {
+    const hasData = stores.length > 0 && stores.some((s) => s.orders_count > 0);
+
+    return (
+        <section className="space-y-4">
+            <SectionHeader
+                icon={Building2}
+                title="Top Performing Stores"
+                subtitle="Ranked by order volume this month"
+                badge={stores.length}
+            />
+            <div className="grid gap-4 lg:grid-cols-5">
+                <Card className="lg:col-span-3">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                            Orders This Month — Top Stores
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {!hasData ? (
+                            <EmptyChart message="No orders recorded this month." />
+                        ) : (
+                            <ResponsiveContainer width="100%" height={Math.max(200, stores.length * 36)}>
+                                <BarChart
+                                    data={stores.filter((s) => s.orders_count > 0)}
+                                    layout="vertical"
+                                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="store_name" tick={{ fontSize: 11 }} width={120} />
+                                    <Tooltip
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const s = payload[0].payload as TopStore;
+                                            return (
+                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-gray-800">{s.store_name}</p>
+                                                    {s.city && <p className="text-xs text-gray-500">{s.city}</p>}
+                                                    <p className="text-blue-600 font-semibold mt-1">{s.orders_count} orders</p>
+                                                    <p className="text-emerald-600">{pesoFull(s.revenue)} revenue</p>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Bar dataKey="orders_count" name="Orders" fill="#2563eb" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                            Leaderboard
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {stores.length === 0 ? (
+                            <p className="px-4 py-8 text-center text-sm text-gray-400">No approved stores.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-400">
+                                            <th className="px-3 py-2">#</th>
+                                            <th className="px-3 py-2">Store</th>
+                                            <th className="px-2 py-2 text-center">Orders</th>
+                                            <th className="px-3 py-2 text-right">Revenue</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {stores.map((s, i) => (
+                                            <tr key={s.id} className="hover:bg-gray-50/60">
+                                                <td className="px-3 py-2.5">
+                                                    <span
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                                                        style={{ background: STORE_COLORS[i % STORE_COLORS.length] }}
+                                                    >
+                                                        {s.rank}
+                                                    </span>
+                                                </td>
+                                                <td className="px-3 py-2.5">
+                                                    <p className="font-medium text-gray-800 truncate max-w-[110px]">{s.store_name}</p>
+                                                    {s.city && <p className="text-gray-400">{s.city}</p>}
+                                                </td>
+                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-blue-700">{s.orders_count}</td>
+                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 font-semibold">{peso(s.revenue)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
+    );
+}
+
+// ── Section 3: Customer Growth ─────────────────────────────────────────────────
+
+function CustomerGrowthSection({ data }: { data: CustomerGrowthPoint[] }) {
+    const totalNew     = data.reduce((s, w) => s + w.new_customers, 0);
+    const thisWeek     = data[data.length - 1]?.new_customers ?? 0;
+    const lastWeekVal  = data[data.length - 2]?.new_customers ?? 0;
+    const growthPct    = lastWeekVal > 0 ? Math.round(((thisWeek - lastWeekVal) / lastWeekVal) * 100) : 0;
+
+    return (
+        <section className="space-y-4">
+            <SectionHeader
+                icon={Users}
+                title="Customer Growth"
+                subtitle="New customer registrations per week · Last 12 weeks"
+                badge={`+${totalNew} total`}
+                badgeColor="emerald"
+            />
+            <div className="grid gap-4 lg:grid-cols-4">
+                <div className="space-y-3">
+                    <Card>
+                        <CardContent className="pt-4 space-y-3">
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">This Week</p>
+                                <p className="text-3xl font-black text-gray-900 tabular-nums">{thisWeek}</p>
+                                <p className="text-sm text-gray-400">new customers</p>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Last Week</p>
+                                <p className="text-xl font-bold text-gray-500 tabular-nums">{lastWeekVal}</p>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Week-over-Week</p>
+                                <p className={`font-bold text-lg ${growthPct > 0 ? 'text-emerald-600' : growthPct < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                    {growthPct > 0 ? '+' : ''}{growthPct}%
+                                </p>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">12-Week Total</p>
+                                <p className="text-xl font-bold text-gray-900 tabular-nums">{totalNew}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+                <Card className="lg:col-span-3">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                            Weekly New Registrations (Last 12 Weeks)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {totalNew === 0 ? (
+                            <EmptyChart message="No new customer registrations in the last 12 weeks." />
+                        ) : (
+                            <ResponsiveContainer width="100%" height={280}>
+                                <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                    <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={1} />
+                                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                                    <Tooltip
+                                        content={({ active, payload, label }) => {
+                                            if (!active || !payload?.length) return null;
+                                            return (
+                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-gray-800 mb-1">Week of {label}</p>
+                                                    <p className="text-emerald-600 font-semibold">{payload[0].value} new customers</p>
+                                                </div>
+                                            );
+                                        }}
                                     />
                                     <Line
                                         type="monotone"
-                                        dataKey="trend"
-                                        name="Trend Line"
-                                        stroke="#94a3b8"
-                                        strokeWidth={2}
-                                        strokeDasharray="6 3"
-                                        dot={false}
-                                        activeDot={false}
+                                        dataKey="new_customers"
+                                        name="New Customers"
+                                        stroke="#10b981"
+                                        strokeWidth={2.5}
+                                        dot={{ fill: '#10b981', r: 4 }}
+                                        activeDot={{ r: 6 }}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
@@ -600,24 +485,110 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
     );
 }
 
-// ── Section 4: Business Insights ──────────────────────────────────────────────
+// ── Section 4: Top Products Across Marketplace ────────────────────────────────
+
+function TopProductsSection({ products }: { products: TopProduct[] }) {
+    const chartData = products.slice(0, 8);
+
+    return (
+        <section className="space-y-4">
+            <SectionHeader
+                icon={Package}
+                title="Most Popular Products"
+                subtitle="Highest-demand products across all stores · Last 30 days"
+                badge={products.length > 0 ? `${products.length} products` : undefined}
+            />
+            <div className="grid gap-4 lg:grid-cols-5">
+                <Card className="lg:col-span-3">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                            Units Sold — Top 8 Products
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {chartData.length === 0 ? (
+                            <EmptyChart message="No sales data for the last 30 days." />
+                        ) : (
+                            <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 36)}>
+                                <BarChart
+                                    data={chartData}
+                                    layout="vertical"
+                                    margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={130} />
+                                    <Tooltip
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const p = payload[0].payload as TopProduct;
+                                            return (
+                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-gray-800">{p.name}</p>
+                                                    {p.brand && <p className="text-xs text-gray-500">{p.brand}</p>}
+                                                    <p className="text-blue-600 font-semibold mt-1">{p.units_sold} units sold</p>
+                                                    <p className="text-emerald-600">{pesoFull(p.revenue)} revenue</p>
+                                                </div>
+                                            );
+                                        }}
+                                    />
+                                    <Bar dataKey="units_sold" name="Units Sold" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-2">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                            Rankings
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {products.length === 0 ? (
+                            <p className="px-4 py-8 text-center text-sm text-gray-400">No sales data.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-400">
+                                            <th className="px-3 py-2">#</th>
+                                            <th className="px-3 py-2">Product</th>
+                                            <th className="px-2 py-2 text-center">Units</th>
+                                            <th className="px-3 py-2 text-right">Revenue</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {products.map((p, i) => (
+                                            <tr key={p.product_id} className="hover:bg-gray-50/60">
+                                                <td className="px-3 py-2.5 text-gray-400 font-bold">{i + 1}</td>
+                                                <td className="px-3 py-2.5">
+                                                    <p className="font-medium text-gray-800 truncate max-w-[100px]">{p.name}</p>
+                                                    {p.brand && <p className="text-gray-400">{p.brand}</p>}
+                                                </td>
+                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-purple-700">{p.units_sold}</td>
+                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 font-semibold">{peso(p.revenue)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
+    );
+}
+
+// ── Section 5: Business Insights ──────────────────────────────────────────────
 
 function InsightCard({
-    icon: Icon,
-    iconBg,
-    iconColor,
-    label,
-    value,
-    sub,
-    accent,
+    icon: Icon, iconBg, iconColor, label, value, sub, accent,
 }: {
-    icon: React.ElementType;
-    iconBg: string;
-    iconColor: string;
-    label: string;
-    value: string;
-    sub?: string;
-    accent?: string;
+    icon: React.ElementType; iconBg: string; iconColor: string;
+    label: string; value: string; sub?: string; accent?: string;
 }) {
     return (
         <Card className="overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow">
@@ -647,17 +618,15 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
         <section className="space-y-4">
             <SectionHeader
                 icon={Sparkles}
-                title="Business Insights"
-                subtitle="AI-driven recommendations derived from your operational data"
+                title="Platform Business Insights"
+                subtitle="Key metrics and projections for marketplace health this month"
             />
-
-            {/* Month KPIs */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
                 <Card className="bg-gradient-to-br from-blue-600 to-blue-700 text-white border-0 shadow-lg">
                     <CardContent className="pt-5">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-blue-200">Revenue This Month</p>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-blue-200">Platform Revenue This Month</p>
                         <p className="mt-1 text-3xl font-black tabular-nums">{peso(data.this_month_revenue)}</p>
-                        <p className="mt-1 text-sm text-blue-200">{data.this_month_orders} orders processed</p>
+                        <p className="mt-1 text-sm text-blue-200">{data.this_month_orders} orders · {data.total_approved_stores} active stores</p>
                     </CardContent>
                 </Card>
                 {data.revenue_projection !== null ? (
@@ -678,9 +647,15 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                         </CardContent>
                     </Card>
                 )}
+                <Card className="border-dashed">
+                    <CardContent className="pt-5">
+                        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Active Stores</p>
+                        <p className="mt-1 text-3xl font-black tabular-nums text-gray-900">{data.total_approved_stores}</p>
+                        <p className="mt-1 text-sm text-gray-400">Approved & operating</p>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* Insight cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <InsightCard
                     icon={Calendar}
@@ -689,16 +664,16 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                     label="Peak Day"
                     value={data.peak_day ?? 'Insufficient data'}
                     sub={data.peak_day ? `${data.peak_avg_orders} avg orders` : 'Need 90 days of history'}
-                    accent={data.peak_day ? 'Busiest day of the week' : undefined}
+                    accent={data.peak_day ? 'Busiest day platform-wide' : undefined}
                 />
                 <InsightCard
-                    icon={User}
+                    icon={Store}
                     iconBg="bg-blue-100"
                     iconColor="text-blue-600"
-                    label="Top Customer This Month"
-                    value={data.top_customer?.name ?? 'No orders yet'}
-                    sub={data.top_customer ? `${data.top_customer.orders_count} orders · ${pesoFull(data.top_customer.total_spent)}` : undefined}
-                    accent={data.top_customer ? 'Most active customer' : undefined}
+                    label="Top Store This Month"
+                    value={data.top_store?.name ?? 'No orders yet'}
+                    sub={data.top_store ? `${data.top_store.orders_count} orders · ${pesoFull(data.top_store.total_revenue)}` : undefined}
+                    accent={data.top_store ? 'Highest order volume' : undefined}
                 />
                 <InsightCard
                     icon={Crown}
@@ -723,40 +698,22 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
     );
 }
 
-// ── Empty chart ────────────────────────────────────────────────────────────────
-
-function EmptyChart({ message }: { message: string }) {
-    return (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 text-gray-300">
-            <Brain className="h-10 w-10" />
-            <p className="text-sm text-gray-400">{message}</p>
-        </div>
-    );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function DssPage({
-    reorderAlerts,
-    demandForecast,
     salesTrend,
+    topStores,
+    customerGrowth,
+    topProducts,
     businessInsights,
     generatedAt,
 }: Props) {
-    const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
-    const warningCount  = reorderAlerts.filter((a) => a.severity === 'warning').length;
-
-    function handleRefresh() {
-        router.reload();
-    }
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Decision Support System" />
 
             {/* ── Hero Banner ────────────────────────────────────────────────── */}
             <div className="relative overflow-hidden bg-gradient-to-br from-slate-800 via-blue-900 to-indigo-900 px-6 py-8">
-                {/* Decorative circles */}
                 <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-blue-500/10" />
                 <div className="absolute -left-8 -bottom-8 h-32 w-32 rounded-full bg-indigo-500/10" />
 
@@ -771,49 +728,31 @@ export default function DssPage({
                                     Decision Support System
                                 </h1>
                                 <p className="text-sm text-blue-300">
-                                    AI-powered analytics for LPG distribution management
+                                    Marketplace-wide analytics · Platform admin view
                                 </p>
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-3 mt-3">
                             <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100">
-                                <Zap className="h-3 w-3" />
-                                SMA Demand Forecast
-                            </span>
-                            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100">
                                 <TrendingUp className="h-3 w-3" />
-                                Linear Regression Trend
+                                Revenue Trend (OLS)
                             </span>
                             <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100">
-                                <Target className="h-3 w-3" />
-                                Stockout Prediction
+                                <Building2 className="h-3 w-3" />
+                                Store Rankings
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100">
+                                <Users className="h-3 w-3" />
+                                Customer Growth
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-blue-100">
+                                <Zap className="h-3 w-3" />
+                                Top Products
                             </span>
                         </div>
                     </div>
 
                     <div className="flex flex-col items-end gap-3">
-                        {/* Alert summary pills */}
-                        <div className="flex gap-2">
-                            {criticalCount > 0 && (
-                                <div className="flex items-center gap-1.5 rounded-full bg-red-500/90 px-3 py-1.5 text-sm font-bold text-white">
-                                    <Zap className="h-3.5 w-3.5" />
-                                    {criticalCount} Critical
-                                </div>
-                            )}
-                            {warningCount > 0 && (
-                                <div className="flex items-center gap-1.5 rounded-full bg-amber-500/90 px-3 py-1.5 text-sm font-bold text-white">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    {warningCount} Warning
-                                </div>
-                            )}
-                            {criticalCount === 0 && warningCount === 0 && (
-                                <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/90 px-3 py-1.5 text-sm font-bold text-white">
-                                    All Systems OK
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Trend indicator */}
                         <div className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold ${
                             salesTrend.direction === 'increasing' ? 'bg-emerald-500/20 text-emerald-200' :
                             salesTrend.direction === 'decreasing' ? 'bg-red-500/20 text-red-200' :
@@ -822,15 +761,13 @@ export default function DssPage({
                             {salesTrend.direction === 'increasing' ? <ArrowUpRight className="h-4 w-4" /> :
                              salesTrend.direction === 'decreasing' ? <ArrowDownRight className="h-4 w-4" /> :
                              <ArrowRight className="h-4 w-4" />}
-                            Sales {salesTrend.direction === 'increasing' ? 'up' : salesTrend.direction === 'decreasing' ? 'down' : 'stable'}{' '}
+                            Revenue {salesTrend.direction === 'increasing' ? 'up' : salesTrend.direction === 'decreasing' ? 'down' : 'stable'}{' '}
                             {salesTrend.trend_percent > 0 ? '+' : ''}{salesTrend.trend_percent}% vs last week
                         </div>
-
-                        {/* Generated at + refresh */}
                         <div className="flex items-center gap-2 text-xs text-blue-300">
                             <span>Generated: {generatedAt}</span>
                             <button
-                                onClick={handleRefresh}
+                                onClick={() => router.reload()}
                                 className="flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-blue-200 hover:bg-white/20 transition-colors"
                             >
                                 <RefreshCw className="h-3 w-3" />
@@ -844,26 +781,29 @@ export default function DssPage({
             {/* ── Content ────────────────────────────────────────────────────── */}
             <div className="flex flex-1 flex-col gap-10 p-6">
 
-                <ReorderAlertsSection alerts={reorderAlerts} />
-
-                <Separator />
-
-                <DemandForecastSection data={demandForecast} />
-
-                <Separator />
-
                 <SalesTrendSection data={salesTrend} />
+
+                <Separator />
+
+                <TopStoresSection stores={topStores} />
+
+                <Separator />
+
+                <CustomerGrowthSection data={customerGrowth} />
+
+                <Separator />
+
+                <TopProductsSection products={topProducts} />
 
                 <Separator />
 
                 <BusinessInsightsSection data={businessInsights} />
 
-                {/* Footer note */}
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400">
                     <Brain className="mx-auto mb-1.5 h-5 w-5 text-gray-300" />
-                    DSS computations use Simple Moving Average for demand forecasting and Ordinary Least Squares
-                    linear regression for trend analysis. All results exclude soft-deleted and cancelled records.
-                    Computations are logged to the <code className="font-mono bg-gray-100 px-1 rounded">dss_logs</code> table for academic review.
+                    Admin DSS shows marketplace-wide metrics across all approved stores. Revenue trend uses Ordinary Least Squares
+                    linear regression. All computations exclude soft-deleted and cancelled records.
+                    Results are logged to the <code className="font-mono bg-gray-100 px-1 rounded">dss_logs</code> table for academic review.
                 </div>
             </div>
         </AppLayout>

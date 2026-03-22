@@ -1,0 +1,196 @@
+import { Head, Link, router } from '@inertiajs/react';
+import { Receipt, Search } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
+import type { BreadcrumbItem } from '@/types';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Dashboard', href: '/seller/dashboard' },
+    { title: 'Invoices',  href: '/seller/invoices'  },
+];
+
+type Invoice = {
+    id: number;
+    invoice_number: string;
+    total_amount: number;
+    paid_amount: number;
+    payment_status: string;
+    payment_method: string | null;
+    platform_commission: number;
+    net_amount: number;
+    due_date: string | null;
+    paid_at: string | null;
+    created_at: string;
+    customer: string;
+    order_number: string;
+    order_id: number;
+};
+
+type Counts = { all: number; paid: number; unpaid: number; partial: number };
+type Paginated = { data: Invoice[]; current_page: number; last_page: number; total: number };
+
+type Props = {
+    invoices: Paginated;
+    counts: Counts;
+    tab: string;
+    search: string;
+};
+
+const TABS = [
+    { key: 'all',     label: 'All',     count_key: 'all'     },
+    { key: 'paid',    label: 'Paid',    count_key: 'paid'    },
+    { key: 'unpaid',  label: 'Unpaid',  count_key: 'unpaid'  },
+    { key: 'partial', label: 'Partial', count_key: 'partial' },
+] as const;
+
+const PAY_COLORS: Record<string, string> = {
+    paid:    'bg-green-100 text-green-700',
+    unpaid:  'bg-red-100 text-red-700',
+    partial: 'bg-yellow-100 text-yellow-700',
+};
+
+export default function SellerInvoices({ invoices, counts, tab, search }: Props) {
+    const [searchVal, setSearchVal] = useState(search);
+
+    function goTab(t: string) {
+        router.get('/seller/invoices', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+    }
+
+    function doSearch(e: React.SyntheticEvent<HTMLFormElement>) {
+        e.preventDefault();
+        router.get('/seller/invoices', { tab, search: searchVal }, { preserveState: true, replace: true });
+    }
+
+    const totalAmount = invoices.data.reduce((s, i) => s + i.total_amount, 0);
+    const totalNet    = invoices.data.reduce((s, i) => s + i.net_amount, 0);
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Invoices" />
+
+            <div className="p-6 space-y-5">
+                {/* Header */}
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                            <Receipt className="h-6 w-6 text-blue-600" />
+                            Invoices
+                        </h1>
+                        <p className="text-muted-foreground text-sm mt-0.5">
+                            Revenue after platform commission.
+                        </p>
+                    </div>
+                    <form onSubmit={doSearch} className="flex gap-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Invoice # or customer…" className="pl-9 w-52" value={searchVal}
+                                onChange={(e) => setSearchVal(e.target.value)} />
+                        </div>
+                        <Button type="submit" variant="secondary" size="sm">Search</Button>
+                    </form>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex gap-1 border-b">
+                    {TABS.map(({ key, label, count_key }) => (
+                        <button key={key} onClick={() => goTab(key)}
+                            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
+                            {label}
+                            {counts[count_key] > 0 && (
+                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>{counts[count_key]}</span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+
+                <Card>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/30">
+                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Invoice</th>
+                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Customer</th>
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Total</th>
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Commission</th>
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Net</th>
+                                        <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {invoices.data.length === 0 ? (
+                                        <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No invoices found.</td></tr>
+                                    ) : invoices.data.map((inv) => (
+                                        <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                                            <td className="px-4 py-3">
+                                                <Link href={`/seller/invoices/${inv.id}`} className="font-mono text-xs text-blue-600 hover:underline font-medium">
+                                                    {inv.invoice_number}
+                                                </Link>
+                                                <p className="text-xs text-muted-foreground">{inv.order_number}</p>
+                                            </td>
+                                            <td className="px-4 py-3 hidden sm:table-cell">{inv.customer}</td>
+                                            <td className="px-4 py-3 text-right font-medium">
+                                                ₱{inv.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-red-600 hidden md:table-cell">
+                                                −₱{inv.platform_commission.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-semibold text-emerald-700">
+                                                ₱{inv.net_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                    {inv.payment_status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
+                                                {fmtDate(inv.created_at)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                {invoices.data.length > 0 && (
+                                    <tfoot>
+                                        <tr className="border-t bg-muted/20">
+                                            <td colSpan={2} className="px-4 py-2.5 text-sm text-muted-foreground">
+                                                Page total ({invoices.data.length})
+                                            </td>
+                                            <td className="px-4 py-2.5 text-right font-semibold">
+                                                ₱{totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td className="px-4 py-2.5 hidden md:table-cell" />
+                                            <td className="px-4 py-2.5 text-right font-semibold text-emerald-700">
+                                                ₱{totalNet.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </td>
+                                            <td colSpan={2} />
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        </div>
+
+                        {invoices.last_page > 1 && (
+                            <div className="flex items-center justify-between px-4 py-3 border-t text-sm text-muted-foreground">
+                                <span>{invoices.total} invoices</span>
+                                <div className="flex gap-1">
+                                    {Array.from({ length: invoices.last_page }, (_, i) => i + 1).map((pg) => (
+                                        <button key={pg}
+                                            onClick={() => router.get('/seller/invoices', { tab, search: searchVal, page: pg })}
+                                            className={`w-8 h-8 rounded text-xs font-medium ${pg === invoices.current_page ? 'bg-blue-600 text-white' : 'hover:bg-muted'}`}>
+                                            {pg}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    );
+}

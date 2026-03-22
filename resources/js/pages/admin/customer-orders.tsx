@@ -3,6 +3,7 @@ import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate, fmtMoney } from '@/lib/utils';
 import * as customerRoutes from '@/routes/admin/customers';
 import type { BreadcrumbItem } from '@/types';
 
@@ -51,14 +52,13 @@ type Props = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-const fmt = (n: number) =>
-    new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
+const fmt = (n: number) => fmtMoney(n);
 
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
     confirmed: 'bg-blue-100 text-blue-700',
-    preparing: 'bg-indigo-100 text-indigo-700',
-    out_for_delivery: 'bg-purple-100 text-purple-700',
+    preparing: 'bg-purple-100 text-purple-700',
+    out_for_delivery: 'bg-orange-100 text-orange-700',
     delivered: 'bg-green-100 text-green-700',
     cancelled: 'bg-red-100 text-red-700',
 };
@@ -164,7 +164,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                 <td className="px-4 py-3">
                                                     <StatusBadge value={o.payment_status} colors={PAYMENT_COLORS} />
                                                 </td>
-                                                <td className="px-4 py-3 text-gray-500">{o.created_at}</td>
+                                                <td className="px-4 py-3 text-gray-500">{fmtDate(o.created_at)}</td>
                                             </tr>
                                         ))}
                                     </tbody>

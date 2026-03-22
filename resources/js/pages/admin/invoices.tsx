@@ -1,31 +1,18 @@
 import { Head, router } from '@inertiajs/react';
 import {
-    Archive,
     BarChart3,
     Filter,
     FileText,
-    RotateCcw,
     Search,
-    Trash2,
 } from 'lucide-react';
 import { useState } from 'react';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { toast } from 'sonner';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -42,7 +29,6 @@ type InvoiceRow = {
     paid_at: string | null;
     due_date: string | null;
     created_at: string;
-    deleted_at: string | null;
     customer: {
         id: number;
         name: string;
@@ -53,6 +39,8 @@ type InvoiceRow = {
         order_number: string;
         status: string;
     } | null;
+    platform_commission: number | null;
+    net_amount: number | null;
 };
 
 type Summary = {
@@ -74,15 +62,12 @@ type Paginated<T> = {
 
 type Props = {
     invoices: Paginated<InvoiceRow>;
-    tab: string;
-    archivedCount: number;
     summary: Summary | null;
     filters: {
         payment_status?: string;
         date_from?: string;
         date_to?: string;
         search?: string;
-        tab?: string;
     };
 };
 
@@ -100,13 +85,6 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
     unpaid:  'Unpaid',
     partial: 'Partial',
     paid:    'Paid',
-};
-
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    cash:          'Cash',
-    gcash:         'GCash',
-    maya:          'Maya',
-    bank_transfer: 'Bank Transfer',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -153,71 +131,18 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     );
 }
 
-// ── Force Delete Dialog ────────────────────────────────────────────────────────
-
-function ForceDeleteDialog({
-    invoice,
-    onClose,
-}: {
-    invoice: InvoiceRow | null;
-    onClose: () => void;
-}) {
-    const [loading, setLoading] = useState(false);
-
-    function handleConfirm() {
-        if (!invoice) return;
-        setLoading(true);
-        router.delete(`/admin/invoices/${invoice.id}/force`, {
-            onSuccess: () => { setLoading(false); onClose(); toast.success('Invoice permanently deleted.'); },
-            onError:   () => setLoading(false),
-        });
-    }
-
-    return (
-        <AlertDialog open={!!invoice} onOpenChange={(o) => !o && onClose()}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Permanently Delete?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Permanently delete <span className="font-semibold">{invoice?.invoice_number}</span>?
-                        This cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                        className="bg-red-600 hover:bg-red-700 text-white"
-                        onClick={handleConfirm}
-                        disabled={loading}
-                    >
-                        {loading ? 'Deleting…' : 'Delete Permanently'}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function InvoicesPage({ invoices, tab, archivedCount, summary, filters }: Props) {
-    const [search, setSearch]         = useState(filters.search ?? '');
-    const [payStatus, setPayStatus]   = useState(filters.payment_status ?? '');
-    const [dateFrom, setDateFrom]     = useState(filters.date_from ?? '');
-    const [dateTo, setDateTo]         = useState(filters.date_to ?? '');
-    const [forceDeleteTarget, setForceDeleteTarget] = useState<InvoiceRow | null>(null);
-
-    const isArchived = tab === 'archived';
-
-    function switchTab(newTab: string) {
-        router.get('/admin/invoices', { tab: newTab }, { preserveState: false });
-    }
+export default function InvoicesPage({ invoices, summary, filters }: Props) {
+    const [search, setSearch]       = useState(filters.search ?? '');
+    const [payStatus, setPayStatus] = useState(filters.payment_status ?? '');
+    const [dateFrom, setDateFrom]   = useState(filters.date_from ?? '');
+    const [dateTo, setDateTo]       = useState(filters.date_to ?? '');
 
     function applyFilters() {
         router.get(
             '/admin/invoices',
             {
-                tab,
                 search:         search || undefined,
                 payment_status: payStatus || undefined,
                 date_from:      dateFrom || undefined,
@@ -229,21 +154,7 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
 
     function clearFilters() {
         setSearch(''); setPayStatus(''); setDateFrom(''); setDateTo('');
-        router.get('/admin/invoices', { tab }, { preserveState: false });
-    }
-
-    function handleArchive(inv: InvoiceRow) {
-        router.delete(`/admin/invoices/${inv.id}`, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Invoice archived.'),
-        });
-    }
-
-    function handleRestore(inv: InvoiceRow) {
-        router.post(`/admin/invoices/${inv.id}/restore`, {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Invoice restored.'),
-        });
+        router.get('/admin/invoices', {}, { preserveState: false });
     }
 
     const hasFilters = search || payStatus || dateFrom || dateTo;
@@ -257,7 +168,7 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                 {/* Header */}
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-                    <p className="mt-0.5 text-sm text-gray-500">Billing records auto-created when orders are confirmed.</p>
+                    <p className="mt-0.5 text-sm text-gray-500">Platform-wide invoice monitoring. Payment recording is handled by each seller.</p>
                 </div>
 
                 {/* Summary cards */}
@@ -306,37 +217,6 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                     </div>
                 )}
 
-                {/* Tabs */}
-                <div className="border-b border-gray-200">
-                    <nav className="-mb-px flex gap-6">
-                        <button
-                            onClick={() => switchTab('active')}
-                            className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
-                                !isArchived
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
-                        >
-                            Active
-                        </button>
-                        <button
-                            onClick={() => switchTab('archived')}
-                            className={`flex items-center gap-1.5 border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
-                                isArchived
-                                    ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                            }`}
-                        >
-                            Archived
-                            {archivedCount > 0 && (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
-                                    {archivedCount}
-                                </span>
-                            )}
-                        </button>
-                    </nav>
-                </div>
-
                 {/* Filters */}
                 <Card>
                     <CardContent className="pt-5">
@@ -351,17 +231,15 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                                     onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                                 />
                             </div>
-                            {!isArchived && (
-                                <Select value={payStatus || 'all'} onValueChange={(v) => setPayStatus(v === 'all' ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All statuses</SelectItem>
-                                        <SelectItem value="unpaid">Unpaid</SelectItem>
-                                        <SelectItem value="partial">Partial</SelectItem>
-                                        <SelectItem value="paid">Paid</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
+                            <Select value={payStatus || 'all'} onValueChange={(v) => setPayStatus(v === 'all' ? '' : v)}>
+                                <SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All statuses</SelectItem>
+                                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                                    <SelectItem value="partial">Partial</SelectItem>
+                                    <SelectItem value="paid">Paid</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                             <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                         </div>
@@ -383,7 +261,7 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <FileText className="h-4 w-4 text-blue-600" />
-                            {isArchived ? 'Archived Invoices' : 'Invoices'}
+                            Invoices
                             <span className="ml-auto text-sm font-normal text-gray-400">
                                 {invoices.total} record{invoices.total !== 1 ? 's' : ''}
                             </span>
@@ -393,9 +271,7 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                         {invoices.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                                 <FileText className="mb-3 h-10 w-10" />
-                                <p className="font-medium">
-                                    {isArchived ? 'No archived invoices' : 'No invoices yet'}
-                                </p>
+                                <p className="font-medium">No invoices found</p>
                                 <p className="mt-1 text-sm">Invoices are created automatically when orders are confirmed.</p>
                             </div>
                         ) : (
@@ -409,9 +285,10 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                                             <th className="px-4 py-3 text-right">Total</th>
                                             <th className="px-4 py-3 text-right">Paid</th>
                                             <th className="px-4 py-3 text-right">Balance</th>
+                                            <th className="px-4 py-3 text-right hidden xl:table-cell">Commission</th>
+                                            <th className="px-4 py-3 text-right hidden xl:table-cell">Net</th>
                                             <th className="px-4 py-3">Status</th>
                                             <th className="px-4 py-3">Date</th>
-                                            <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -446,50 +323,20 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                                                 <td className={`px-4 py-3 text-right tabular-nums font-medium ${inv.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                                     {peso(inv.balance)}
                                                 </td>
+                                                <td className="px-4 py-3 text-right tabular-nums text-amber-700 text-xs hidden xl:table-cell">
+                                                    {inv.platform_commission != null ? peso(inv.platform_commission) : '—'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right tabular-nums text-blue-700 text-xs hidden xl:table-cell">
+                                                    {inv.net_amount != null ? peso(inv.net_amount) : '—'}
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge status={inv.payment_status} />
                                                 </td>
                                                 <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                                                    {inv.created_at}
+                                                    {fmtDate(inv.created_at)}
                                                     {inv.due_date && (
-                                                        <p className="text-gray-400">Due: {inv.due_date}</p>
+                                                        <p className="text-gray-400">Due: {fmtDate(inv.due_date)}</p>
                                                     )}
-                                                </td>
-                                                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {isArchived ? (
-                                                            <>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => handleRestore(inv)}
-                                                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50"
-                                                                    title="Restore"
-                                                                >
-                                                                    <RotateCcw className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() => setForceDeleteTarget(inv)}
-                                                                    className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
-                                                                    title="Delete permanently"
-                                                                >
-                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            </>
-                                                        ) : (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() => handleArchive(inv)}
-                                                                className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                                                                title="Archive"
-                                                            >
-                                                                <Archive className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -504,11 +351,6 @@ export default function InvoicesPage({ invoices, tab, archivedCount, summary, fi
                     </CardContent>
                 </Card>
             </div>
-
-            <ForceDeleteDialog
-                invoice={forceDeleteTarget}
-                onClose={() => setForceDeleteTarget(null)}
-            />
         </AppLayout>
     );
 }

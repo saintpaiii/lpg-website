@@ -1,5 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
-import { toast } from 'sonner';
+import { Head } from '@inertiajs/react';
 import {
     ArrowLeft,
     Building2,
@@ -11,22 +10,12 @@ import {
     Printer,
     User,
 } from 'lucide-react';
-import { FormEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { useState } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +36,8 @@ type Invoice = {
     total_amount: number;
     paid_amount: number;
     balance: number;
+    platform_commission: number;
+    net_amount: number;
     payment_method: string | null;
     paid_at: string | null;
     due_date: string | null;
@@ -119,134 +110,6 @@ function peso(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 }
 
-// ── Record Payment Dialog ─────────────────────────────────────────────────────
-
-function RecordPaymentDialog({
-    invoice,
-    open,
-    onClose,
-}: {
-    invoice: Invoice;
-    open: boolean;
-    onClose: () => void;
-}) {
-    const { data, setData, post, processing, errors, reset } = useForm<{
-        amount: string;
-        payment_method: string;
-        notes: string;
-    }>({
-        amount: '',
-        payment_method: invoice.payment_method ?? 'cash',
-        notes: '',
-    });
-
-    // Reset when dialog closes
-    useEffect(() => {
-        if (!open) reset();
-    }, [open]);
-
-    const balance = invoice.balance;
-    const maxLabel = peso(balance);
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        post(`/admin/invoices/${invoice.id}/payment`, {
-            onSuccess: () => { reset(); onClose(); toast.success('Payment recorded.'); },
-        });
-    }
-
-    const amount = parseFloat(data.amount) || 0;
-    const afterPay = invoice.paid_amount + amount;
-    const willBePaid = afterPay >= invoice.total_amount;
-
-    return (
-        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <CreditCard className="h-4 w-4 text-blue-600" />
-                        Record Payment
-                    </DialogTitle>
-                </DialogHeader>
-
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    {/* Current balance info */}
-                    <div className="rounded-md bg-gray-50 p-3 text-sm">
-                        <div className="flex justify-between text-gray-600">
-                            <span>Total</span>
-                            <span className="font-semibold text-gray-900">{peso(invoice.total_amount)}</span>
-                        </div>
-                        <div className="flex justify-between text-gray-600 mt-1">
-                            <span>Already paid</span>
-                            <span className="font-semibold text-emerald-600">{peso(invoice.paid_amount)}</span>
-                        </div>
-                        <Separator className="my-2" />
-                        <div className="flex justify-between font-semibold">
-                            <span>Remaining balance</span>
-                            <span className="text-red-600">{maxLabel}</span>
-                        </div>
-                    </div>
-
-                    {/* Amount */}
-                    <div className="grid gap-1.5">
-                        <Label>Amount (₱) *</Label>
-                        <input
-                            type="number"
-                            min="0.01"
-                            max={balance}
-                            step="0.01"
-                            value={data.amount}
-                            onChange={(e) => setData('amount', e.target.value)}
-                            placeholder={`Max: ${balance.toFixed(2)}`}
-                            className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        {errors.amount && <p className="text-xs text-red-500">{errors.amount}</p>}
-                        {amount > 0 && (
-                            <p className={`text-xs font-medium ${willBePaid ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {willBePaid
-                                    ? '✓ Invoice will be fully paid'
-                                    : `Balance after payment: ${peso(invoice.total_amount - afterPay)}`
-                                }
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Method */}
-                    <div className="grid gap-1.5">
-                        <Label>Payment Method *</Label>
-                        <Select
-                            value={data.payment_method}
-                            onValueChange={(v) => setData('payment_method', v)}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="cash">Cash</SelectItem>
-                                <SelectItem value="gcash">GCash</SelectItem>
-                                <SelectItem value="maya">Maya</SelectItem>
-                                <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors.payment_method && <p className="text-xs text-red-500">{errors.payment_method}</p>}
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button
-                            type="submit"
-                            disabled={processing || !data.amount || amount <= 0}
-                            className="bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                            {processing ? 'Recording…' : 'Record Payment'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 // ── Invoice Print View (injected into DOM, shown on print) ────────────────────
 
 function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Company }) {
@@ -263,8 +126,8 @@ function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Com
                 <div className="text-right">
                     <h2 className="text-3xl font-bold text-gray-300">INVOICE</h2>
                     <p className="mt-1 text-lg font-semibold text-gray-900">{invoice.invoice_number}</p>
-                    <p className="text-sm text-gray-500">Date: {invoice.created_at}</p>
-                    {invoice.due_date && <p className="text-sm text-gray-500">Due: {invoice.due_date}</p>}
+                    <p className="text-sm text-gray-500">Date: {fmtDate(invoice.created_at)}</p>
+                    {invoice.due_date && <p className="text-sm text-gray-500">Due: {fmtDate(invoice.due_date)}</p>}
                 </div>
             </div>
 
@@ -335,7 +198,7 @@ function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Com
                         Payment Method: <span className="font-medium">{PAYMENT_METHOD_LABELS[invoice.payment_method] ?? invoice.payment_method}</span>
                     </p>
                     {invoice.paid_at && (
-                        <p className="text-sm text-gray-600">Paid at: <span className="font-medium">{invoice.paid_at}</span></p>
+                        <p className="text-sm text-gray-600">Paid at: <span className="font-medium">{fmtDate(invoice.paid_at)}</span></p>
                     )}
                 </div>
             )}
@@ -359,8 +222,6 @@ function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Com
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function InvoiceShowPage({ invoice, company }: Props) {
-    const [paymentOpen, setPaymentOpen] = useState(false);
-
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Invoices', href: '/admin/invoices' },
         { title: invoice.invoice_number, href: `/admin/invoices/${invoice.id}` },
@@ -395,15 +256,6 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                         Back to Invoices
                     </Button>
                     <div className="flex items-center gap-2">
-                        {!isPaid && !isArchived && (
-                            <Button
-                                onClick={() => setPaymentOpen(true)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                                <CreditCard className="mr-1.5 h-4 w-4" />
-                                Record Payment
-                            </Button>
-                        )}
                         <Button
                             variant="outline"
                             onClick={() => window.print()}
@@ -416,7 +268,7 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
 
                 {isArchived && (
                     <div className="rounded-md bg-amber-50 px-4 py-3 text-sm text-amber-700 border border-amber-200">
-                        This invoice is archived. Restore it to make changes.
+                        This invoice is read-only (platform monitoring).
                     </div>
                 )}
 
@@ -459,9 +311,9 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                     <div className="text-right">
                                         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Invoice</p>
                                         <p className="font-mono text-xl font-bold text-blue-600">{invoice.invoice_number}</p>
-                                        <p className="mt-1 text-sm text-gray-500">Issued: {invoice.created_at}</p>
+                                        <p className="mt-1 text-sm text-gray-500">Issued: {fmtDate(invoice.created_at)}</p>
                                         {invoice.due_date && (
-                                            <p className="text-sm text-gray-500">Due: {invoice.due_date}</p>
+                                            <p className="text-sm text-gray-500">Due: {fmtDate(invoice.due_date)}</p>
                                         )}
                                         <div className="mt-2">
                                             <span className={`inline-flex items-center rounded-full px-3 py-0.5 text-sm font-semibold ${STATUS_STYLES[invoice.payment_status]}`}>
@@ -608,6 +460,20 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                     </span>
                                 </div>
 
+                                {invoice.platform_commission > 0 && (
+                                    <>
+                                        <Separator />
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-amber-600">Platform Fee</span>
+                                            <span className="tabular-nums text-amber-600">-{peso(invoice.platform_commission)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm font-semibold">
+                                            <span>Net to Seller</span>
+                                            <span className="tabular-nums text-emerald-600">{peso(invoice.net_amount)}</span>
+                                        </div>
+                                    </>
+                                )}
+
                                 {invoice.payment_method && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Method</span>
@@ -618,14 +484,14 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                 {invoice.paid_at && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Paid at</span>
-                                        <span className="text-right">{invoice.paid_at}</span>
+                                        <span className="text-right">{fmtDate(invoice.paid_at)}</span>
                                     </div>
                                 )}
 
                                 {invoice.due_date && (
                                     <div className="flex justify-between text-sm">
                                         <span className="text-gray-500">Due date</span>
-                                        <span>{invoice.due_date}</span>
+                                        <span>{fmtDate(invoice.due_date)}</span>
                                     </div>
                                 )}
 
@@ -634,16 +500,6 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                         <CheckCircle className="h-4 w-4 shrink-0" />
                                         Fully paid
                                     </div>
-                                )}
-
-                                {!isPaid && !isArchived && (
-                                    <Button
-                                        onClick={() => setPaymentOpen(true)}
-                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                                    >
-                                        <CreditCard className="mr-1.5 h-4 w-4" />
-                                        Record Payment
-                                    </Button>
                                 )}
                             </CardContent>
                         </Card>
@@ -668,11 +524,6 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                 <InvoicePrintView invoice={invoice} company={company} />
             </div>
 
-            <RecordPaymentDialog
-                invoice={invoice}
-                open={paymentOpen}
-                onClose={() => setPaymentOpen(false)}
-            />
         </AppLayout>
     );
 }

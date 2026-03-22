@@ -1,6 +1,7 @@
-import { Head } from '@inertiajs/react';
-import { ClipboardList } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Head, Link } from '@inertiajs/react';
+import { ClipboardList, Truck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -15,20 +16,23 @@ export default function RiderOrders() {
 
             <div className="flex flex-col gap-6 p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-                    <p className="text-muted-foreground">View all orders (read-only).</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+                    <p className="mt-0.5 text-sm text-gray-500">Order reference for your deliveries.</p>
                 </div>
 
                 <Card>
-                    <CardHeader>
-                        <CardTitle>All Orders</CardTitle>
-                        <CardDescription>Order list for reference</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <ClipboardList className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                            <p className="text-sm font-medium text-muted-foreground">No orders found</p>
-                        </div>
+                    <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                        <ClipboardList className="mb-4 h-12 w-12 text-gray-300" />
+                        <p className="font-medium text-gray-700">Orders are managed through deliveries</p>
+                        <p className="mt-1 text-sm text-gray-500">
+                            Go to your deliveries to see order details for each assigned delivery.
+                        </p>
+                        <Button asChild className="mt-6 bg-blue-600 hover:bg-blue-700 text-white">
+                            <Link href="/rider/deliveries">
+                                <Truck className="mr-1.5 h-4 w-4" />
+                                Go to My Deliveries
+                            </Link>
+                        </Button>
                     </CardContent>
                 </Card>
             </div>

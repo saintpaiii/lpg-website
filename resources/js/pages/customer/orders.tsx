@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { Package, Printer } from 'lucide-react';
+import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
@@ -34,8 +35,8 @@ type Props = {
 const STATUS_STYLES: Record<string, string> = {
     pending:          'bg-yellow-100 text-yellow-700 border-yellow-200',
     confirmed:        'bg-blue-100 text-blue-700 border-blue-200',
-    preparing:        'bg-indigo-100 text-indigo-700 border-indigo-200',
-    out_for_delivery: 'bg-purple-100 text-purple-700 border-purple-200',
+    preparing:        'bg-purple-100 text-purple-700 border-purple-200',
+    out_for_delivery: 'bg-orange-100 text-orange-700 border-orange-200',
     delivered:        'bg-emerald-100 text-emerald-700 border-emerald-200',
     cancelled:        'bg-gray-100 text-gray-500 border-gray-200',
 };
@@ -56,9 +57,9 @@ export default function Orders({ orders }: Props) {
                     <p className="text-sm text-gray-500">
                         {orders.total} order{orders.total !== 1 ? 's' : ''} total
                     </p>
-                    <Link href="/customer/orders/create">
+                    <Link href="/customer/products">
                         <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                            + Place New Order
+                            Browse Products
                         </Button>
                     </Link>
                 </div>
@@ -76,8 +77,8 @@ export default function Orders({ orders }: Props) {
                                 <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
                                 <p className="font-medium">No orders yet</p>
                                 <p className="text-sm mt-1">Place your first order to get started.</p>
-                                <Link href="/customer/orders/create" className="mt-4 inline-block">
-                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Place Order</Button>
+                                <Link href="/customer/products" className="mt-4 inline-block">
+                                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Browse Products</Button>
                                 </Link>
                             </div>
                         ) : (
@@ -105,7 +106,7 @@ export default function Orders({ orders }: Props) {
                                                         {order.order_number}
                                                     </Link>
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{order.created_at}</td>
+                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(order.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <p className="text-xs text-gray-600">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
                                                     <p className="text-xs text-gray-400 truncate max-w-[160px]">{order.items_summary}</p>

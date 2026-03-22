@@ -2,6 +2,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { AlertTriangle, ChevronDown, Plus, Search, X } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -264,7 +265,7 @@ export default function OrderCreatePage({ customers, products }: Props) {
                         <CardContent className="grid gap-4">
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="grid gap-1.5">
-                                    <Label>Transaction Type *</Label>
+                                    <Label>Transaction Type <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.transaction_type}
                                         onValueChange={(v) => setData('transaction_type', v as 'refill' | 'new_purchase')}
@@ -277,7 +278,7 @@ export default function OrderCreatePage({ customers, products }: Props) {
                                     </Select>
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label>Payment Method *</Label>
+                                    <Label>Payment Method <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.payment_method}
                                         onValueChange={(v) => setData('payment_method', v as any)}
@@ -292,7 +293,7 @@ export default function OrderCreatePage({ customers, products }: Props) {
                                     </Select>
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label>Payment Status *</Label>
+                                    <Label>Payment Status <span className="text-red-500">*</span></Label>
                                     <Select
                                         value={data.payment_status}
                                         onValueChange={(v) => setData('payment_status', v as any)}
@@ -447,6 +448,7 @@ export default function OrderCreatePage({ customers, products }: Props) {
                             disabled={processing || !canSubmit}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
+                            {processing && <Spinner className="mr-1.5" />}
                             {processing ? 'Creating…' : 'Create Order'}
                         </Button>
                     </div>

@@ -16,17 +16,20 @@ class EnsureIsCustomer
 
         $user = $request->user();
 
-        if ($user->role !== 'customer') {
+        // Sellers can also access the customer portal (they were customers first)
+        if (! in_array($user->role, ['customer', 'seller'])) {
             abort(403, 'Access denied.');
         }
 
         if (! $user->is_active) {
+            $reason = $user->deactivation_reason;
+            $notes  = $user->deactivation_notes;
             auth()->logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
-            return redirect()->route('login')->withErrors([
-                'email' => 'Your account has been deactivated.',
-            ]);
+            return redirect()->route('login')
+                ->withErrors(['email' => 'Your account has been deactivated.'])
+                ->with('deactivation_info', ['reason' => $reason, 'notes' => $notes]);
         }
 
         return $next($request);

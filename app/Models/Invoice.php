@@ -12,10 +12,12 @@ class Invoice extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'store_id',
         'invoice_number',
         'order_id',
         'customer_id',
         'total_amount',
+        'platform_commission',
         'payment_status',
         'paid_amount',
         'payment_method',
@@ -26,11 +28,17 @@ class Invoice extends Model
     protected function casts(): array
     {
         return [
-            'total_amount' => 'decimal:2',
-            'paid_amount'  => 'decimal:2',
-            'paid_at'      => 'datetime',
-            'due_date'     => 'date',
+            'total_amount'        => 'decimal:2',
+            'platform_commission' => 'decimal:2',
+            'paid_amount'         => 'decimal:2',
+            'paid_at'             => 'datetime',
+            'due_date'            => 'date',
         ];
+    }
+
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 
     public function order(): BelongsTo

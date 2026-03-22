@@ -72,7 +72,7 @@ class InventoryController extends Controller
         // ── Default: stock overview ────────────────────────────────────────────
         $search = $request->input('search');
 
-        $query = Inventory::with('product')
+        $query = Inventory::with(['product', 'product.store'])
             ->whereHas('product'); // excludes inventories whose product is soft-deleted
 
         if ($search) {
@@ -93,10 +93,12 @@ class InventoryController extends Controller
                 'quantity'      => $i->quantity,
                 'reorder_level' => $i->reorder_level,
                 'product' => [
-                    'id'        => $i->product->id,
-                    'name'      => $i->product->name,
-                    'brand'     => $i->product->brand,
-                    'is_active' => $i->product->is_active,
+                    'id'         => $i->product->id,
+                    'name'       => $i->product->name,
+                    'brand'      => $i->product->brand,
+                    'is_active'  => $i->product->is_active,
+                    'store_name' => $i->product->store?->store_name,
+                    'store_city' => $i->product->store?->city,
                 ],
             ]);
 

@@ -1,31 +1,20 @@
-import { Head, router, useForm } from '@inertiajs/react';
-import { toast } from 'sonner';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowDownCircle,
-    ArrowUpCircle,
     CheckCircle2,
     Filter,
     History,
     Package,
-    Settings2,
+    Store,
     Warehouse,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -35,6 +24,8 @@ type ProductRef = {
     name: string;
     brand: string | null;
     is_active?: boolean;
+    store_name?: string | null;
+    store_city?: string | null;
 };
 
 type InventoryRow = {
@@ -163,229 +154,11 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     );
 }
 
-// ── Stock In form ──────────────────────────────────────────────────────────────
-
-type StockForm = { quantity: string; notes: string };
-const emptyStockForm: StockForm = { quantity: '', notes: '' };
-
-function StockInDialog({
-    target,
-    onClose,
-}: {
-    target: InventoryRow | null;
-    onClose: () => void;
-}) {
-    const { data, setData, post, processing, errors, reset } = useForm<StockForm>(emptyStockForm);
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        if (!target) return;
-        post(`/admin/inventory/${target.product.id}/stock-in`, {
-            onSuccess: () => { reset(); onClose(); toast.success('Stock added.'); },
-        });
-    }
-
-    return (
-        <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ArrowUpCircle className="h-4 w-4 text-emerald-600" />
-                        Stock In — {target?.product.name}
-                    </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                        Current stock: <span className="font-semibold">{target?.quantity ?? 0}</span> units
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="in-qty">Quantity to Add *</Label>
-                        <Input
-                            id="in-qty"
-                            type="number"
-                            min="1"
-                            value={data.quantity}
-                            onChange={(e) => setData('quantity', e.target.value)}
-                            placeholder="e.g. 10"
-                            autoFocus
-                        />
-                        {errors.quantity && <p className="text-xs text-red-500">{errors.quantity}</p>}
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="in-notes">Notes</Label>
-                        <Input
-                            id="in-notes"
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                            placeholder="e.g. Supplier delivery, PO #123"
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={processing} className="bg-emerald-600 hover:bg-emerald-700 text-white">
-                            {processing ? 'Saving…' : 'Add Stock'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-// ── Stock Out form ─────────────────────────────────────────────────────────────
-
-function StockOutDialog({
-    target,
-    onClose,
-}: {
-    target: InventoryRow | null;
-    onClose: () => void;
-}) {
-    const { data, setData, post, processing, errors, reset } = useForm<StockForm>(emptyStockForm);
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        if (!target) return;
-        post(`/admin/inventory/${target.product.id}/stock-out`, {
-            onSuccess: () => { reset(); onClose(); toast.success('Stock removed.'); },
-        });
-    }
-
-    const qtyNum  = parseInt(data.quantity) || 0;
-    const overQty = target ? qtyNum > target.quantity : false;
-
-    return (
-        <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ArrowDownCircle className="h-4 w-4 text-amber-600" />
-                        Stock Out — {target?.product.name}
-                    </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    <div className="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                        Current stock: <span className="font-semibold">{target?.quantity ?? 0}</span> units
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="out-qty">Quantity to Remove *</Label>
-                        <Input
-                            id="out-qty"
-                            type="number"
-                            min="1"
-                            max={target?.quantity}
-                            value={data.quantity}
-                            onChange={(e) => setData('quantity', e.target.value)}
-                            placeholder="e.g. 5"
-                            autoFocus
-                        />
-                        {overQty && (
-                            <p className="text-xs text-red-500">
-                                Cannot exceed current stock ({target?.quantity} units).
-                            </p>
-                        )}
-                        {errors.quantity && <p className="text-xs text-red-500">{errors.quantity}</p>}
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="out-notes">Reason / Notes</Label>
-                        <Input
-                            id="out-notes"
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                            placeholder="e.g. Damaged goods, manual adjustment"
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button
-                            type="submit"
-                            disabled={processing || overQty || qtyNum < 1}
-                            className="bg-amber-600 hover:bg-amber-700 text-white"
-                        >
-                            {processing ? 'Saving…' : 'Remove Stock'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-// ── Reorder Level form ─────────────────────────────────────────────────────────
-
-type ReorderForm = { reorder_level: string };
-
-function ReorderDialog({
-    target,
-    onClose,
-}: {
-    target: InventoryRow | null;
-    onClose: () => void;
-}) {
-    const { data, setData, patch, processing, errors, reset } = useForm<ReorderForm>({
-        reorder_level: target?.reorder_level.toString() ?? '',
-    });
-
-    // sync initial value when target changes
-    const [lastId, setLastId] = useState<number | null>(null);
-    if (target && target.id !== lastId) {
-        setLastId(target.id);
-        setData('reorder_level', target.reorder_level.toString());
-    }
-
-    function handleSubmit(e: FormEvent) {
-        e.preventDefault();
-        if (!target) return;
-        patch(`/admin/inventory/${target.product.id}/reorder-level`, {
-            onSuccess: () => { reset(); onClose(); toast.success('Reorder level updated.'); },
-        });
-    }
-
-    return (
-        <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-w-sm">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Settings2 className="h-4 w-4 text-blue-600" />
-                        Set Reorder Level — {target?.product.name}
-                    </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="grid gap-4">
-                    <p className="text-sm text-gray-500">
-                        The system will flag this product as "Low" when stock drops to or below this level.
-                    </p>
-                    <div className="grid gap-1.5">
-                        <Label htmlFor="reorder">Reorder Level *</Label>
-                        <Input
-                            id="reorder"
-                            type="number"
-                            min="0"
-                            value={data.reorder_level}
-                            onChange={(e) => setData('reorder_level', e.target.value)}
-                            placeholder="e.g. 10"
-                            autoFocus
-                        />
-                        {errors.reorder_level && <p className="text-xs text-red-500">{errors.reorder_level}</p>}
-                    </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={processing} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            {processing ? 'Saving…' : 'Update'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 // ── Stock Overview tab ─────────────────────────────────────────────────────────
 
 function StockOverview({ inventories, filters }: OverviewProps) {
-    const [search, setSearch]         = useState(filters.search ?? '');
-    const [stockInTarget, setStockIn] = useState<InventoryRow | null>(null);
-    const [stockOutTarget, setStockOut] = useState<InventoryRow | null>(null);
-    const [reorderTarget, setReorder]  = useState<InventoryRow | null>(null);
+    const [search, setSearch] = useState(filters.search ?? '');
 
     function doSearch(val: string) {
         setSearch(val);
@@ -451,10 +224,10 @@ function StockOverview({ inventories, filters }: OverviewProps) {
                                     <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                                         <th className="px-4 py-3">Product</th>
                                         <th className="px-4 py-3">Brand</th>
+                                        <th className="px-4 py-3">Store</th>
                                         <th className="px-4 py-3 text-right">Stock</th>
                                         <th className="px-4 py-3 text-right">Reorder At</th>
                                         <th className="px-4 py-3 text-center">Status</th>
-                                        <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -469,6 +242,17 @@ function StockOverview({ inventories, filters }: OverviewProps) {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-gray-500">{row.product.brand ?? '—'}</td>
+                                            <td className="px-4 py-3">
+                                                {row.product.store_name ? (
+                                                    <div className="flex items-center gap-1 text-xs">
+                                                        <Store className="h-3 w-3 text-gray-400 shrink-0" />
+                                                        <div>
+                                                            <p className="font-medium text-gray-800">{row.product.store_name}</p>
+                                                            {row.product.store_city && <p className="text-gray-400">{row.product.store_city}</p>}
+                                                        </div>
+                                                    </div>
+                                                ) : <span className="text-xs text-gray-400">—</span>}
+                                            </td>
                                             <td className={`px-4 py-3 text-right font-bold tabular-nums ${
                                                 row.quantity === 0
                                                     ? 'text-red-600'
@@ -484,41 +268,6 @@ function StockOverview({ inventories, filters }: OverviewProps) {
                                             <td className="px-4 py-3 text-center">
                                                 <StockStatusBadge qty={row.quantity} reorder={row.reorder_level} />
                                             </td>
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setStockIn(row)}
-                                                        title="Stock In"
-                                                        className="h-8 gap-1 px-2 text-xs text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-                                                    >
-                                                        <ArrowUpCircle className="h-3.5 w-3.5" />
-                                                        In
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setStockOut(row)}
-                                                        title="Stock Out"
-                                                        disabled={row.quantity === 0}
-                                                        className="h-8 gap-1 px-2 text-xs text-amber-700 hover:bg-amber-50 hover:text-amber-800 disabled:opacity-30"
-                                                    >
-                                                        <ArrowDownCircle className="h-3.5 w-3.5" />
-                                                        Out
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => setReorder(row)}
-                                                        title="Set Reorder Level"
-                                                        className="h-8 gap-1 px-2 text-xs text-blue-700 hover:bg-blue-50 hover:text-blue-800"
-                                                    >
-                                                        <Settings2 className="h-3.5 w-3.5" />
-                                                        Reorder
-                                                    </Button>
-                                                </div>
-                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -532,9 +281,6 @@ function StockOverview({ inventories, filters }: OverviewProps) {
                 </CardContent>
             </Card>
 
-            <StockInDialog  target={stockInTarget}  onClose={() => setStockIn(null)} />
-            <StockOutDialog target={stockOutTarget} onClose={() => setStockOut(null)} />
-            <ReorderDialog  target={reorderTarget}  onClose={() => setReorder(null)} />
         </>
     );
 }
@@ -683,7 +429,7 @@ function TransactionHistory({ transactions, productList, filters }: Transactions
                                     {transactions.data.map((tx) => (
                                         <tr key={tx.id} className="hover:bg-gray-50/60">
                                             <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
-                                                {tx.created_at}
+                                                {fmtDate(tx.created_at)}
                                             </td>
                                             <td className="px-4 py-3">
                                                 {tx.product ? (
@@ -756,7 +502,7 @@ export default function InventoryPage(props: Props) {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Inventory</h1>
                     <p className="mt-0.5 text-sm text-gray-500">
-                        Manage stock levels and view transaction history.
+                        Read-only overview of stock levels across all stores. Sellers manage their own inventory.
                     </p>
                 </div>
 

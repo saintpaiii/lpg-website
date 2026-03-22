@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'manager' | 'cashier' | 'warehouse' | 'rider' | 'customer';
+export type UserRole = 'platform_admin' | 'platform_staff' | 'admin' | 'manager' | 'cashier' | 'warehouse' | 'rider' | 'customer' | 'seller' | 'seller_staff';
 
 export type User = {
     id: number;
@@ -8,6 +8,10 @@ export type User = {
     phone?: string | null;
     is_active: boolean;
     is_admin: boolean;
+    is_platform_staff: boolean;
+    id_verified?: boolean;
+    store_id?: number | null;
+    sub_role?: string | null;
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
@@ -16,9 +20,22 @@ export type User = {
     [key: string]: unknown;
 };
 
+export type SellerStore = {
+    id: number;
+    store_name: string;
+    status: string;
+};
+
+export type SellerApplication = {
+    status: 'pending' | 'rejected';
+    rejection_reason: string | null;
+} | null;
+
 export type Auth = {
     user: User;
     permissions: string[];
+    store: SellerStore | null;
+    seller_application: SellerApplication;
 };
 
 export type TwoFactorSetupData = {
