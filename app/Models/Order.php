@@ -25,6 +25,10 @@ class Order extends Model
         'payment_method',
         'payment_status',
         'notes',
+        'cancellation_reason',
+        'cancellation_notes',
+        'cancelled_by',
+        'cancelled_at',
         'ordered_at',
         'delivered_at',
         'created_by',
@@ -38,6 +42,7 @@ class Order extends Model
             'platform_fee' => 'decimal:2',
             'ordered_at'   => 'datetime',
             'delivered_at' => 'datetime',
+            'cancelled_at' => 'datetime',
         ];
     }
 

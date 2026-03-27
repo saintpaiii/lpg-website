@@ -1,14 +1,17 @@
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
+    AlertTriangle,
     BadgeCheck,
     CheckCircle2,
     PhilippinePeso,
+    ShieldAlert,
     ShoppingCart,
     Store,
     TrendingUp,
     UserPlus,
     Users,
+    XCircle,
 } from 'lucide-react';
 import {
     Bar,
@@ -46,12 +49,15 @@ type RegistrationPoint = { week: string; users: number };
 type OrderPoint       = { date: string; orders: number };
 type ActivityItem     = { type: string; message: string; time: string };
 
+type AuthStats = { successToday: number; failedToday: number; suspiciousCount: number };
+
 type Props = {
     stats: Stats;
     commissionsChart: CommissionPoint[];
     registrationsChart: RegistrationPoint[];
     ordersChart: OrderPoint[];
     recentActivity: ActivityItem[];
+    authStats: AuthStats;
 };
 
 function fmt(n: number) {
@@ -70,6 +76,7 @@ export default function Dashboard({
     registrationsChart,
     ordersChart,
     recentActivity,
+    authStats,
 }: Props) {
     const statCards = [
         {
@@ -279,6 +286,54 @@ export default function Dashboard({
                                 <Line dataKey="orders" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
                             </LineChart>
                         </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+
+                {/* Auth Activity card */}
+                <Card className={authStats.suspiciousCount > 0 ? 'border-orange-300' : authStats.failedToday > 10 ? 'border-red-300' : ''}>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-2">
+                                <ShieldAlert className="h-4 w-4 text-blue-600" />
+                                Recent Auth Activity
+                            </span>
+                            <Link href="/admin/auth-logs" className="text-xs text-blue-600 hover:underline font-normal">
+                                View all
+                            </Link>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-center">
+                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                    <span className="text-2xl font-black text-emerald-700">{authStats.successToday}</span>
+                                </div>
+                                <p className="text-xs text-emerald-600">Successful logins today</p>
+                            </div>
+                            <div className={`rounded-lg border p-3 text-center ${authStats.failedToday > 10 ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}>
+                                <div className="flex items-center justify-center gap-1.5 mb-1">
+                                    <XCircle className={`h-4 w-4 ${authStats.failedToday > 10 ? 'text-red-600' : 'text-gray-400'}`} />
+                                    <span className={`text-2xl font-black ${authStats.failedToday > 10 ? 'text-red-700' : 'text-gray-700'}`}>{authStats.failedToday}</span>
+                                </div>
+                                <p className={`text-xs ${authStats.failedToday > 10 ? 'text-red-600' : 'text-gray-500'}`}>Failed attempts today</p>
+                            </div>
+                        </div>
+                        {authStats.suspiciousCount > 0 && (
+                            <div className="flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm">
+                                <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0" />
+                                <p className="text-orange-800 text-xs">
+                                    <span className="font-bold">{authStats.suspiciousCount} IP(s)</span> with 5+ failed attempts in the last hour.{' '}
+                                    <Link href="/admin/auth-logs" className="underline">Review now</Link>
+                                </p>
+                            </div>
+                        )}
+                        {authStats.failedToday > 10 && authStats.suspiciousCount === 0 && (
+                            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
+                                <p className="text-xs text-red-700 font-medium">High number of failed login attempts today.</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

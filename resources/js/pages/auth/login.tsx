@@ -1,6 +1,6 @@
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, Flame, Package, Truck, BarChart3 } from 'lucide-react';
-import React from 'react';
+import { AlertTriangle, ArrowLeft, Flame, Lock, Package, Truck, BarChart3 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +13,8 @@ import type { SharedData } from '@/types';
 type Props = {
     status?: string;
     canResetPassword: boolean;
+    retryAfter?: number;        // seconds until login is unlocked (0 = not locked)
+    remainingAttempts?: number | null; // attempts left before lockout (null = unknown/fresh)
 };
 
 const FEATURES = [
@@ -21,7 +23,7 @@ const FEATURES = [
     { icon: BarChart3, label: 'Manage Orders',   desc: 'Full order and invoice history'     },
 ];
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({ status, canResetPassword, retryAfter = 0, remainingAttempts = null }: Props) {
     const { flash } = usePage<SharedData>().props;
     const deactivationInfo = flash?.deactivation_info;
 
@@ -31,8 +33,28 @@ export default function Login({ status, canResetPassword }: Props) {
         remember: false as boolean,
     });
 
+    // Lockout countdown
+    const [countdown, setCountdown] = useState(retryAfter > 0 ? retryAfter : 0);
+    const isLocked = countdown > 0;
+
+    useEffect(() => {
+        setCountdown(retryAfter > 0 ? retryAfter : 0);
+    }, [retryAfter]);
+
+    useEffect(() => {
+        if (countdown <= 0) return;
+        const timer = setInterval(() => {
+            setCountdown((c) => {
+                if (c <= 1) { clearInterval(timer); return 0; }
+                return c - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [countdown]);
+
     function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (isLocked) return;
         post('/login');
     }
 
@@ -170,6 +192,43 @@ export default function Login({ status, canResetPassword }: Props) {
                             </div>
                         )}
 
+                        {/* Lockout countdown banner */}
+                        {isLocked && (
+                            <div className="mb-6 rounded-xl bg-red-50 ring-1 ring-red-200 overflow-hidden">
+                                <div className="px-4 py-3">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Lock className="h-4 w-4 text-red-600 shrink-0" />
+                                        <p className="text-sm font-semibold text-red-700">Too many failed attempts</p>
+                                    </div>
+                                    <p className="text-sm text-red-600">
+                                        Try again in{' '}
+                                        <span className="font-bold tabular-nums">
+                                            {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, '0')}
+                                        </span>
+                                    </p>
+                                    <div className="mt-2 h-1.5 rounded-full bg-red-200 overflow-hidden">
+                                        <div
+                                            className="h-full bg-red-500 transition-all duration-1000 ease-linear"
+                                            style={{ width: `${retryAfter > 0 ? (countdown / retryAfter) * 100 : 0}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Remaining attempts warning */}
+                        {!isLocked && remainingAttempts !== null && remainingAttempts !== undefined && remainingAttempts <= 2 && (
+                            <div className="mb-5 rounded-xl bg-amber-50 ring-1 ring-amber-200 px-4 py-3 flex items-start gap-2.5">
+                                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                <p className="text-sm text-amber-700">
+                                    {remainingAttempts === 0
+                                        ? 'Next failed attempt will temporarily lock your account for 3 minutes.'
+                                        : `${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining before your account is temporarily locked.`
+                                    }
+                                </p>
+                            </div>
+                        )}
+
                         {deactivationInfo && (
                             <div className="mb-6 rounded-xl bg-red-50 ring-1 ring-red-200 overflow-hidden">
                                 <div className="flex items-start gap-3 px-4 py-3">
@@ -206,6 +265,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                     className="h-11 transition-shadow focus:shadow-sm focus:shadow-blue-500/20"
                                     value={data.email}
                                     onChange={(e) => setData('email', e.target.value)}
+                                    disabled={isLocked}
                                 />
                                 <InputError message={errors.email} />
                             </div>
@@ -228,6 +288,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                     className="h-11 transition-shadow focus:shadow-sm focus:shadow-blue-500/20"
                                     value={data.password}
                                     onChange={(e) => setData('password', e.target.value)}
+                                    disabled={isLocked}
                                 />
                                 <InputError message={errors.password} />
                             </div>
@@ -236,6 +297,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                 <Checkbox id="remember" name="remember" tabIndex={3}
                                     checked={data.remember}
                                     onCheckedChange={(checked) => setData('remember', !!checked)}
+                                    disabled={isLocked}
                                 />
                                 <Label htmlFor="remember" className="cursor-pointer text-sm text-gray-600 dark:text-gray-400">
                                     Keep me signed in
@@ -243,7 +305,7 @@ export default function Login({ status, canResetPassword }: Props) {
                             </div>
 
                             <div className="fade-5">
-                                <Button type="submit" tabIndex={4} disabled={processing}
+                                <Button type="submit" tabIndex={4} disabled={processing || isLocked}
                                     className="h-11 w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 shadow-md shadow-blue-600/20 hover:shadow-blue-600/30 transition-all">
                                     {processing && <Spinner />}
                                     Sign In

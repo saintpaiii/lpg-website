@@ -9,6 +9,7 @@ import {
     Package,
     Receipt,
     Settings,
+    ShieldAlert,
     ShoppingBag,
     ShoppingCart,
     Store,
@@ -130,6 +131,7 @@ export function AppSidebar() {
         can('reports.view')    && { title: 'Reports',            href: '/admin/reports',                                      icon: BarChart3       },
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
+        isPlatformAdmin        && { title: 'Auth Logs',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },
         { title: 'Profile', href: '/settings/profile', icon: User },
     ].filter(Boolean) as NavItem[];
 

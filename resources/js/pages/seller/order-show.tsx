@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle2, Package, Truck, XCircle } from 'lucide-react';
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Package, Truck, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -30,6 +30,13 @@ type Delivery = {
     delivered_at: string | null;
 };
 
+type PaymentRecord = {
+    status: 'pending' | 'paid' | 'failed' | 'cancelled';
+    pay_ref: string | null;
+    paid_at: string | null;
+    method: string | null;
+};
+
 type Order = {
     id: number;
     order_number: string;
@@ -39,6 +46,10 @@ type Order = {
     payment_method: string | null;
     payment_status: string;
     notes: string | null;
+    cancellation_reason: string | null;
+    cancellation_notes: string | null;
+    cancelled_by: 'customer' | 'seller' | null;
+    cancelled_at: string | null;
     ordered_at: string | null;
     delivered_at: string | null;
     created_at: string;
@@ -48,6 +59,7 @@ type Order = {
     invoice_number: string | null;
     invoice_id: number | null;
     delivery: Delivery | null;
+    payment_record: PaymentRecord | null;
 };
 
 type Rider = { id: number; name: string; phone: string | null };
@@ -79,9 +91,11 @@ export default function SellerOrderShow({ order, riders }: Props) {
         { title: order.order_number, href: `/seller/orders/${order.id}` },
     ];
 
-    const [showCancel, setShowCancel]     = useState(false);
-    const [showAssign, setShowAssign]     = useState(false);
+    const [showCancel,    setShowCancel]    = useState(false);
+    const [showAssign,    setShowAssign]    = useState(false);
     const [selectedRider, setSelectedRider] = useState('');
+    const [cancelReason,  setCancelReason]  = useState('');
+    const [cancelNotes,   setCancelNotes]   = useState('');
 
     const { data: payData, setData: setPayData, patch: patchPay, processing: payProcessing } = useForm({
         payment_status: order.payment_status,
@@ -93,8 +107,13 @@ export default function SellerOrderShow({ order, riders }: Props) {
     }
 
     function submitCancel() {
-        router.patch(`/seller/orders/${order.id}/status`, { status: 'cancelled' }, {
-            onSuccess: () => setShowCancel(false),
+        if (!cancelReason) return;
+        router.patch(`/seller/orders/${order.id}/status`, {
+            status:              'cancelled',
+            cancellation_reason: cancelReason,
+            cancellation_notes:  cancelNotes,
+        }, {
+            onSuccess: () => { setShowCancel(false); setCancelReason(''); setCancelNotes(''); },
         });
     }
 
@@ -250,16 +269,58 @@ export default function SellerOrderShow({ order, riders }: Props) {
                         {/* Payment */}
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm">Payment</CardTitle></CardHeader>
-                            <CardContent>
-                                {isFinal ? (
-                                    <div className="text-sm space-y-1">
-                                        <p><span className="text-muted-foreground">Method:</span> <span className="capitalize">{order.payment_method ?? '—'}</span></p>
-                                        <p><span className="text-muted-foreground">Status:</span> <span className="capitalize font-medium">{order.payment_status}</span></p>
+                            <CardContent className="space-y-2 text-sm">
+                                {/* Online vs COD indicator */}
+                                <div className="flex items-center gap-2">
+                                    {order.payment_record ? (
+                                        <>
+                                            <CreditCard className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                            <span className="text-muted-foreground text-xs">Online (PayMongo)</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Banknote className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                                            <span className="text-muted-foreground text-xs">Cash on Delivery</span>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Status + method (read-only display) */}
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Status</span>
+                                    <span className={`font-medium capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : order.payment_status === 'unpaid' ? 'text-red-600' : ''}`}>
+                                        {order.payment_status === 'paid' && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
+                                        {order.payment_status}
+                                    </span>
+                                </div>
+
+                                {order.payment_method && (
+                                    <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Method</span>
+                                        <span className="capitalize">{order.payment_method.replace('_', ' ')}</span>
                                     </div>
-                                ) : (
-                                    <form onSubmit={updatePayment} className="space-y-3">
-                                        <div className="grid gap-1.5">
-                                            <p className="text-xs font-medium text-muted-foreground">Method</p>
+                                )}
+
+                                {/* PayMongo details */}
+                                {order.payment_record?.paid_at && (
+                                    <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
+                                        Paid via PayMongo on {order.payment_record.paid_at}
+                                    </p>
+                                )}
+                                {order.payment_record?.pay_ref && (
+                                    <div className="pt-1 border-t">
+                                        <p className="text-xs text-muted-foreground mb-0.5">Transaction Ref</p>
+                                        <p className="font-mono text-xs break-all text-gray-700">
+                                            {order.payment_record.pay_ref}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* COD: editable form for non-final, non-online orders */}
+                                {!isFinal && !order.payment_record && (
+                                    <form onSubmit={updatePayment} className="space-y-2 pt-2 border-t mt-2">
+                                        <div className="grid gap-1">
+                                            <p className="text-xs font-medium text-muted-foreground">Update Method</p>
                                             <Select value={payData.payment_method} onValueChange={(v) => setPayData('payment_method', v)}>
                                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -269,8 +330,8 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="grid gap-1.5">
-                                            <p className="text-xs font-medium text-muted-foreground">Status</p>
+                                        <div className="grid gap-1">
+                                            <p className="text-xs font-medium text-muted-foreground">Update Status</p>
                                             <Select value={payData.payment_status} onValueChange={(v) => setPayData('payment_status', v)}>
                                                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
@@ -308,12 +369,52 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                 <CardContent><p className="text-sm text-muted-foreground">{order.notes}</p></CardContent>
                             </Card>
                         )}
+
+                        {/* Cancellation info */}
+                        {order.status === 'cancelled' && (
+                            <Card className="border-red-200 bg-red-50/40 dark:bg-red-900/10">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm text-red-700 flex items-center gap-1.5">
+                                        <XCircle className="h-3.5 w-3.5" />
+                                        Cancellation
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-sm space-y-1.5">
+                                    <p>
+                                        <span className="text-muted-foreground">Cancelled by: </span>
+                                        <span className="font-medium">
+                                            {order.cancelled_by === 'customer' ? 'Customer' : order.cancelled_by === 'seller' ? 'Seller' : '—'}
+                                        </span>
+                                    </p>
+                                    {order.cancelled_at && (
+                                        <p>
+                                            <span className="text-muted-foreground">At: </span>
+                                            <span className="text-xs">{order.cancelled_at}</span>
+                                        </p>
+                                    )}
+                                    {order.cancellation_reason && (
+                                        <p>
+                                            <span className="text-muted-foreground">Reason: </span>
+                                            <span className="font-medium">{order.cancellation_reason}</span>
+                                        </p>
+                                    )}
+                                    {order.cancellation_notes && (
+                                        <p className="text-xs text-muted-foreground italic">"{order.cancellation_notes}"</p>
+                                    )}
+                                    {order.cancelled_by === 'customer' && (
+                                        <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-red-200">
+                                            If payment was received, please process a refund for the customer.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                 </div>
             </div>
 
             {/* Cancel dialog */}
-            <AlertDialog open={showCancel} onOpenChange={setShowCancel}>
+            <AlertDialog open={showCancel} onOpenChange={(open) => { setShowCancel(open); if (!open) { setCancelReason(''); setCancelNotes(''); } }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Cancel Order</AlertDialogTitle>
@@ -321,9 +422,38 @@ export default function SellerOrderShow({ order, riders }: Props) {
                             Cancel <strong>{order.order_number}</strong>? Stock will be restored if the order was already confirmed.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-3 px-1 pb-2">
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">Reason <span className="text-red-500">*</span></label>
+                            <select
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                                <option value="">Select a reason…</option>
+                                <option value="Out of stock">Out of stock</option>
+                                <option value="Cannot fulfill order">Cannot fulfill order</option>
+                                <option value="Customer requested cancellation">Customer requested cancellation</option>
+                                <option value="Store temporarily closed">Store temporarily closed</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">Notes <span className="text-muted-foreground text-xs">(optional)</span></label>
+                            <textarea
+                                value={cancelNotes}
+                                onChange={(e) => setCancelNotes(e.target.value)}
+                                rows={2}
+                                placeholder="Additional details…"
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                            />
+                        </div>
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Go Back</AlertDialogCancel>
-                        <AlertDialogAction onClick={submitCancel} className="bg-red-600 hover:bg-red-700">Cancel Order</AlertDialogAction>
+                        <AlertDialogAction onClick={submitCancel} disabled={!cancelReason} className="bg-red-600 hover:bg-red-700">
+                            Cancel Order
+                        </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

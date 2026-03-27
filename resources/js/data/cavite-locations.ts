@@ -1,0 +1,334 @@
+export interface CaviteCity {
+    name: string;
+    barangays: string[];
+}
+
+export const caviteCities: CaviteCity[] = [
+    {
+        name: 'Alfonso',
+        barangays: [
+            'Amuyong', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)',
+            'Barangay IV (Poblacion)', 'Barangay V (Poblacion)', 'Bilog', 'Buck Estate',
+            'Esperanza Ibaba', 'Esperanza Ilaya', 'Kaysuyo', 'Kaytitinga I', 'Kaytitinga II',
+            'Kaytitinga III', 'Luksuhin', 'Luksuhin Ilaya', 'Mangas I', 'Mangas II',
+            'Marahan I', 'Marahan II', 'Matagbak I', 'Matagbak II', 'Pajo', 'Palumlum',
+            'Santa Teresa', 'Sikat', 'Sinaliw Malaki', 'Sinaliw na Munti', 'Sulsugin',
+            'Taywanak Ibaba', 'Taywanak Ilaya', 'Upli',
+        ],
+    },
+    {
+        name: 'Amadeo',
+        barangays: [
+            'Banaybanay', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)',
+            'Barangay IV (Poblacion)', 'Barangay V (Poblacion)', 'Barangay VI (Poblacion)',
+            'Barangay VII (Poblacion)', 'Barangay VIII (Poblacion)', 'Barangay IX (Poblacion)',
+            'Barangay X (Poblacion)', 'Barangay XI (Poblacion)', 'Barangay XII (Poblacion)',
+            'Bucal', 'Buho', 'Dagatan', 'Halang', 'Loma', 'Maitim I', 'Maymangga',
+            'Minantok Kanluran', 'Minantok Silangan', 'Pangil', 'Salaban', 'Talon', 'Tamacan',
+        ],
+    },
+    {
+        name: 'Bacoor',
+        barangays: [
+            'Alima', 'Aniban I', 'Aniban II', 'Aniban III', 'Aniban IV', 'Aniban V',
+            'Banalo', 'Bayanan', 'Campo Santo', 'Daang Bukid', 'Digman', 'Dulong Bayan',
+            'Habay I', 'Habay II', 'Kaingin', 'Ligas I', 'Ligas II', 'Ligas III',
+            'Mabolo I', 'Mabolo II', 'Mabolo III', 'Maliksi I', 'Maliksi II', 'Maliksi III',
+            'Mambog I', 'Mambog II', 'Mambog III', 'Mambog IV', 'Mambog V',
+            'Molino I', 'Molino II', 'Molino III', 'Molino IV', 'Molino V', 'Molino VI', 'Molino VII',
+            'Niog I', 'Niog II', 'Niog III',
+            'P. F. Espiritu I', 'P. F. Espiritu II', 'P. F. Espiritu III', 'P. F. Espiritu IV',
+            'P. F. Espiritu V', 'P. F. Espiritu VI', 'P. F. Espiritu VII', 'P. F. Espiritu VIII',
+            'Queens Row Central', 'Queens Row East', 'Queens Row West',
+            'Real I', 'Real II', 'Salinas I', 'Salinas II', 'Salinas III', 'Salinas IV',
+            'San Nicolas I', 'San Nicolas II', 'San Nicolas III', 'Sineguelasan', 'Tabing Dagat',
+            'Talaba I', 'Talaba II', 'Talaba III', 'Talaba IV', 'Talaba V', 'Talaba VI', 'Talaba VII',
+            'Zapote I', 'Zapote II', 'Zapote III', 'Zapote IV', 'Zapote V',
+        ],
+    },
+    {
+        name: 'Carmona',
+        barangays: [
+            'Barangay 1 (Poblacion)', 'Barangay 2 (Poblacion)', 'Barangay 3 (Poblacion)',
+            'Barangay 4 (Poblacion)', 'Barangay 5 (Poblacion)', 'Barangay 6 (Poblacion)',
+            'Barangay 7 (Poblacion)', 'Bancal', 'Cabilang Baybay', 'Lantic',
+            'Mabuhay', 'Maduya', 'Milagrosa', 'Rosario',
+        ],
+    },
+    {
+        name: 'Cavite City',
+        barangays: [
+            'Barangay 1 (Hen. M. Alvarez)', 'Barangay 2 (C. Tirona)', 'Barangay 3 (Hen. E. Aguinaldo)',
+            'Barangay 4 (Hen. M. Trias)', 'Barangay 5 (Hen. E. Evangelista)', 'Barangay 6 (Diego Silang)',
+            'Barangay 7 (Kapitan Kong)', 'Barangay 8 (Manuel S. Rojas)', 'Barangay 9 (Kanaway)',
+            'Barangay 10 (Kingfisher)', 'Barangay 10-A (Kingfisher A)', 'Barangay 10-B (Kingfisher B)',
+            'Barangay 11 (Lawin)', 'Barangay 12 (Love Bird)', 'Barangay 13 (Aguila)',
+            'Barangay 14 (Loro)', 'Barangay 15 (Kilyawan)', 'Barangay 16 (Martines)',
+            'Barangay 17 (Kalapati)', 'Barangay 18 (Maya)', 'Barangay 19 (Gemini)',
+            'Barangay 20 (Virgo)', 'Barangay 21 (Scorpio)', 'Barangay 22 (Leo)',
+            'Barangay 22-A (Leo A)', 'Barangay 23 (Aquarius)', 'Barangay 24 (Libra)',
+            'Barangay 25 (Capricorn)', 'Barangay 26 (Cancer)', 'Barangay 27 (Sagitarius)',
+            'Barangay 28 (Taurus)', 'Barangay 29 (Lao-lao)', 'Barangay 29-A (Lao-lao A)',
+            'Barangay 30 (Bid-bid)', 'Barangay 31 (Maya-maya)', 'Barangay 32 (Salay-salay)',
+            'Barangay 33 (Buwan-buwan)', 'Barangay 34 (Lapu-lapu)', 'Barangay 35 (Hasa-hasa)',
+            'Barangay 36 (Sap-sap)', 'Barangay 36-A (Sap-sap A)', 'Barangay 37 (Cadena de Amor)',
+            'Barangay 37-A (Cadena de Amor A)', 'Barangay 38 (Sampaguita)', 'Barangay 38-A (Sampaguita A)',
+            'Barangay 39 (Jasmin)', 'Barangay 40 (Gumamela)', 'Barangay 41 (Rosal)',
+            'Barangay 42 (Pinagbuklod)', 'Barangay 42-A (Pinagbuklod A)', 'Barangay 42-B (Pinagbuklod B)',
+            'Barangay 42-C (Pinagbuklod C)', 'Barangay 43 (Pinagpala)', 'Barangay 44 (Maligaya)',
+            'Barangay 45 (Kaunlaran)', 'Barangay 45-A (Kaunlaran A)', 'Barangay 46 (Sinagtala)',
+            'Barangay 47 (Pagkakaisa)', 'Barangay 47-A (Pagkakaisa A)', 'Barangay 47-B (Pagkakaisa B)',
+            'Barangay 48 (Narra)', 'Barangay 48-A (Narra A)', 'Barangay 49 (Akasya)',
+            'Barangay 49-A (Akasya A)', 'Barangay 50 (Kabalyero)', 'Barangay 51 (Kamagong)',
+            'Barangay 52 (Ipil)', 'Barangay 53 (Yakal)', 'Barangay 53-A (Yakal A)',
+            'Barangay 53-B (Yakal B)', 'Barangay 54 (Pechay)', 'Barangay 54-A (Pechay A)',
+            'Barangay 55 (Ampalaya)', 'Barangay 56 (Labanos)', 'Barangay 57 (Repolyo)',
+            'Barangay 58 (Patola)', 'Barangay 58-A (Patola A)', 'Barangay 59 (Sitaw)',
+            'Barangay 60 (Letsugas)', 'Barangay 61 (Talong)', 'Barangay 61-A (Talong A)',
+            'Barangay 62 (Kangkong)', 'Barangay 62-A (Kangkong A)', 'Barangay 62-B (Kangkong B)',
+        ],
+    },
+    {
+        name: 'Dasmariñas',
+        barangays: [
+            'Burol', 'Burol I', 'Burol II', 'Burol III', 'Datu Esmael',
+            'Emmanuel Bergado I', 'Emmanuel Bergado II', 'Fatima I', 'Fatima II', 'Fatima III',
+            'H-2', 'Langkaan I', 'Langkaan II', 'Luzviminda I', 'Luzviminda II',
+            'Paliparan I', 'Paliparan II', 'Paliparan III', 'Sabang',
+            'Saint Peter I', 'Saint Peter II', 'Salawag', 'Salitran I', 'Salitran II',
+            'Salitran III', 'Salitran IV', 'Sampaloc I', 'Sampaloc II', 'Sampaloc III',
+            'Sampaloc IV', 'Sampaloc V', 'San Agustin I', 'San Agustin II', 'San Agustin III',
+            'San Andres I', 'San Andres II', 'San Antonio de Padua I', 'San Antonio de Padua II',
+            'San Dionisio', 'San Esteban', 'San Francisco I', 'San Francisco II',
+            'San Isidro Labrador I', 'San Isidro Labrador II', 'San Jose', 'San Juan',
+            'San Lorenzo Ruiz I', 'San Lorenzo Ruiz II', 'San Luis I', 'San Luis II',
+            'San Manuel I', 'San Manuel II', 'San Mateo', 'San Miguel I', 'San Miguel II',
+            'San Nicolas I', 'San Nicolas II', 'San Roque', 'San Simon',
+            'Santa Cristina I', 'Santa Cristina II', 'Santa Cruz I', 'Santa Cruz II',
+            'Santa Fe', 'Santa Lucia', 'Santa Maria', 'Santo Cristo', 'Santo Niño I', 'Santo Niño II',
+            'Victoria Reyes', 'Zone I', 'Zone I-B', 'Zone II', 'Zone III', 'Zone IV',
+        ],
+    },
+    {
+        name: 'General Emilio Aguinaldo',
+        barangays: [
+            'A. Dalusag', 'Batas Dao', 'Castaños Cerca', 'Castaños Lejos', 'Kabulusan',
+            'Kaymisas', 'Kaypaaba', 'Lumipa', 'Narvaez', 'Poblacion I', 'Poblacion II',
+            'Poblacion III', 'Poblacion IV', 'Tabora',
+        ],
+    },
+    {
+        name: 'General Mariano Alvarez',
+        barangays: [
+            'Aldiano Olaes', 'Barangay 1 (Poblacion)', 'Barangay 2 (Poblacion)',
+            'Barangay 3 (Poblacion)', 'Barangay 4 (Poblacion)', 'Barangay 5 (Poblacion)',
+            'Benjamin Tirona', 'Bernardo Pulido', 'Epifanio Malia', 'Fiorello Calimag',
+            'Francisco de Castro', 'Francisco Reyes', 'Gavino Maderan', 'Gregoria de Jesus',
+            'Inocencio Salud', 'Jacinto Lumbreras', 'Kapitan Kua', 'Koronel Jose P. Elises',
+            'Macario Dacon', 'Marcelino Memije', 'Nicolasa Virata', 'Pantaleon Granados',
+            'Ramon Cruz', 'San Gabriel', 'San Jose', 'Severino de Las Alas', 'Tiniente Tiago',
+        ],
+    },
+    {
+        name: 'General Trias',
+        barangays: [
+            'Alingaro', 'Arnaldo (Pob.)', 'Bacao I', 'Bacao II', 'Bagumbayan (Pob.)',
+            'Biclatan', 'Buenavista I', 'Buenavista II', 'Buenavista III',
+            'Corregidor (Pob.)', 'Dulong Bayan (Pob.)', 'Gov. Ferrer (Pob.)',
+            'Javalera', 'Manggahan', 'Navarro', 'Ninety Sixth (Pob.)',
+            'Panungyanan', 'Pasong Camachile I', 'Pasong Camachile II',
+            'Pasong Kawayan I', 'Pasong Kawayan II', 'Pinagtipunan',
+            'Prinza (Pob.)', 'Sampalucan (Pob.)', 'San Francisco', 'San Gabriel (Pob.)',
+            'San Juan I', 'San Juan II', 'Santa Clara', 'Santiago', 'Tapia', 'Tejero', 'Vibora (Pob.)',
+        ],
+    },
+    {
+        name: 'Imus',
+        barangays: [
+            'Alapan I-A', 'Alapan I-B', 'Alapan I-C', 'Alapan II-A', 'Alapan II-B',
+            'Anabu I-A', 'Anabu I-B', 'Anabu I-C', 'Anabu I-D', 'Anabu I-E',
+            'Anabu I-F', 'Anabu I-G', 'Anabu II-A', 'Anabu II-B', 'Anabu II-C',
+            'Anabu II-D', 'Anabu II-E', 'Anabu II-F', 'Bagong Silang',
+            'Bayan Luma I', 'Bayan Luma II', 'Bayan Luma III', 'Bayan Luma IV',
+            'Bayan Luma V', 'Bayan Luma VI', 'Bayan Luma VII', 'Bayan Luma VIII', 'Bayan Luma IX',
+            'Bucandala I', 'Bucandala II', 'Bucandala III', 'Bucandala IV', 'Bucandala V',
+            'Buhay na Tubig', 'Carsadang Bago I', 'Carsadang Bago II', 'Magdalo', 'Maharlika',
+            'Malagasang I-A', 'Malagasang I-B', 'Malagasang I-C', 'Malagasang I-D',
+            'Malagasang I-E', 'Malagasang I-F', 'Malagasang I-G',
+            'Malagasang II-A', 'Malagasang II-B', 'Malagasang II-C', 'Malagasang II-D',
+            'Malagasang II-E', 'Malagasang II-F', 'Malagasang II-G',
+            'Mariano Espeleta I', 'Mariano Espeleta II', 'Mariano Espeleta III',
+            'Medicion I-A', 'Medicion I-B', 'Medicion I-C', 'Medicion I-D',
+            'Medicion II-A', 'Medicion II-B', 'Medicion II-C', 'Medicion II-D',
+            'Medicion II-E', 'Medicion II-F',
+            'Pag-asa I', 'Pag-asa II', 'Pag-asa III',
+            'Palico I', 'Palico II', 'Palico III', 'Palico IV',
+            'Pasong Buaya I', 'Pasong Buaya II', 'Pinagbuklod',
+            'Poblacion I-A', 'Poblacion I-B', 'Poblacion I-C',
+            'Poblacion II-A', 'Poblacion II-B',
+            'Poblacion III-A', 'Poblacion III-B',
+            'Poblacion IV-A', 'Poblacion IV-B', 'Poblacion IV-C', 'Poblacion IV-D',
+            'Tanzang Luma I', 'Tanzang Luma II', 'Tanzang Luma III',
+            'Tanzang Luma IV', 'Tanzang Luma V', 'Tanzang Luma VI',
+            'Toclong I-A', 'Toclong I-B', 'Toclong I-C', 'Toclong II-A', 'Toclong II-B',
+        ],
+    },
+    {
+        name: 'Indang',
+        barangays: [
+            'Agus-Us', 'Alulod', 'Banaba Cerca', 'Banaba Lejos', 'Bancod',
+            'Barangay 1 (Pob.)', 'Barangay 2 (Pob.)', 'Barangay 3 (Pob.)', 'Barangay 4 (Pob.)',
+            'Buna Cerca', 'Buna Lejos I', 'Buna Lejos II', 'Calumpang Cerca', 'Calumpang Lejos I',
+            'Carasuchi', 'Daine I', 'Daine II', 'Guyam Malaki', 'Guyam Munti', 'Harasan',
+            'Kayquit I', 'Kayquit II', 'Kayquit III', 'Kaytambog', 'Kaytapos', 'Limbon',
+            'Lumampong Balagbag', 'Lumampong Halayhay', 'Mahabangkahoy Cerca', 'Mahabangkahoy Lejos',
+            'Mataas na Lupa (Checkpoint)', 'Pulo', 'Tambo Balagbag', 'Tambo Ilaya',
+            'Tambo Kulit', 'Tambo Malaki',
+        ],
+    },
+    {
+        name: 'Kawit',
+        barangays: [
+            'Balsahan-Bisita', 'Batong Dalig', 'Binakayan-Aplaya', 'Binakayan-Kanluran',
+            'Congbalay-Legaspi', 'Gahak', 'Kaingen', 'Magdalo', 'Manggahan-Lawin',
+            'Marulas', 'Panamitan', 'Poblacion', 'Pulvorista', 'Samala-Marquez',
+            'San Sebastian', 'Santa Isabel', 'Tabon I', 'Tabon II', 'Tabon III',
+            'Toclong', 'Tramo-Bantayan', 'Wakas I', 'Wakas II',
+        ],
+    },
+    {
+        name: 'Magallanes',
+        barangays: [
+            'Baliwag', 'Barangay 1 (Pob.)', 'Barangay 2 (Pob.)', 'Barangay 3 (Pob.)',
+            'Barangay 4 (Pob.)', 'Barangay 5 (Pob.)', 'Bendita I', 'Bendita II',
+            'Caluangan', 'Kabulusan', 'Medina', 'Pacheco', 'Ramirez',
+            'San Agustin', 'Tua', 'Urdaneta',
+        ],
+    },
+    {
+        name: 'Maragondon',
+        barangays: [
+            'Bucal I', 'Bucal II', 'Bucal III-A', 'Bucal III-B', 'Bucal IV-A', 'Bucal IV-B',
+            'Caingin (Poblacion)', 'Garita I-A', 'Garita I-B', 'Layong Mabilog', 'Mabato',
+            'Pantihan I', 'Pantihan II', 'Pantihan III', 'Pantihan IV', 'Patungan',
+            'Pinagsanhan I-A', 'Pinagsanhan I-B', 'Poblacion I-A', 'Poblacion I-B',
+            'Poblacion II-A', 'Poblacion II-B', 'San Miguel I-A', 'San Miguel I-B',
+            'Talipusngo', 'Tulay Kanluran', 'Tulay Silangan',
+        ],
+    },
+    {
+        name: 'Mendez',
+        barangays: [
+            'Anuling Cerca I', 'Anuling Cerca II', 'Anuling Lejos I', 'Anuling Lejos II',
+            'Asis I', 'Asis II', 'Asis III', 'Banayad', 'Bukal', 'Galicia I', 'Galicia II',
+            'Galicia III', 'Miguel Mojica', 'Palocpoc I', 'Palocpoc II', 'Panungyan I',
+            'Panungyan II', 'Poblacion I', 'Poblacion II', 'Poblacion III', 'Poblacion IV',
+            'Poblacion V', 'Poblacion VI', 'Poblacion VII',
+        ],
+    },
+    {
+        name: 'Naic',
+        barangays: [
+            'Bagong Karsada', 'Balsahan', 'Bancaan', 'Bucana Malaki', 'Bucana Sasahan',
+            'Calubcob', 'Capt. C. Nazareno', 'Gomez-Zamora', 'Halang', 'Humbac',
+            'Ibayo Estacion', 'Ibayo Silangan', 'Kanluran', 'Labac', 'Latoria',
+            'Mabolo', 'Makina', 'Malainen Bago', 'Malainen Luma', 'Molino',
+            'Munting Mapino', 'Muzon', 'Palangue 1', 'Palangue 2 & 3', 'Sabang',
+            'San Roque', 'Santulan', 'Sapa', 'Timalan Balsahan', 'Timalan Concepcion',
+        ],
+    },
+    {
+        name: 'Noveleta',
+        barangays: [
+            'Magdiwang', 'Poblacion', 'Salcedo I', 'Salcedo II', 'San Antonio I', 'San Antonio II',
+            'San Jose I', 'San Jose II', 'San Juan I', 'San Juan II', 'San Rafael I',
+            'San Rafael II', 'San Rafael III', 'San Rafael IV', 'Santa Rosa I', 'Santa Rosa II',
+        ],
+    },
+    {
+        name: 'Rosario',
+        barangays: [
+            'Bagbag I', 'Bagbag II', 'Kanluran', 'Ligtong I', 'Ligtong II', 'Ligtong III',
+            'Ligtong IV', 'Muzon I', 'Muzon II', 'Poblacion', 'Sapa I', 'Sapa II',
+            'Sapa III', 'Sapa IV', 'Silangan I', 'Silangan II', 'Tejeros Convention',
+            'Wawa I', 'Wawa II', 'Wawa III',
+        ],
+    },
+    {
+        name: 'Silang',
+        barangays: [
+            'Acacia', 'Adlas', 'Anahaw I', 'Anahaw II', 'Balite I', 'Balite II', 'Balubad',
+            'Banaba', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)',
+            'Barangay IV (Poblacion)', 'Barangay V (Poblacion)', 'Batas', 'Biga I', 'Biga II',
+            'Biluso', 'Bucal', 'Buho', 'Bulihan', 'Cabangaan', 'Carmen', 'Hoyo', 'Hukay',
+            'Iba', 'Inchican', 'Ipil I', 'Ipil II', 'Kalubkob', 'Kaong', 'Lalaan I', 'Lalaan II',
+            'Litlit', 'Lucsuhin', 'Lumil', 'Maguyam', 'Malabag', 'Malaking Tatyao',
+            'Mataas na Burol', 'Munting Ilog', 'Narra I', 'Narra II', 'Narra III',
+            'Paligawan', 'Pasong Langka', 'Pooc I', 'Pooc II', 'Pulong Bunga', 'Pulong Saging',
+            'Puting Kahoy', 'Sabutan', 'San Miguel I', 'San Miguel II', 'San Vicente I',
+            'San Vicente II', 'Santol', 'Tartaria', 'Tibig', 'Toledo', 'Tubuan I',
+            'Tubuan II', 'Tubuan III', 'Ulat', 'Yakal',
+        ],
+    },
+    {
+        name: 'Tagaytay',
+        barangays: [
+            'Asisan', 'Bagong Tubig', 'Calabuso', 'Dapdap East', 'Dapdap West',
+            'Francisco', 'Guinhawa North', 'Guinhawa South', 'Iruhin East', 'Iruhin South',
+            'Iruhin West', 'Kaybagal East', 'Kaybagal North', 'Kaybagal South',
+            'Mag-Asawang Ilat', 'Maharlika East', 'Maharlika West', 'Maitim 2nd Central',
+            'Maitim 2nd East', 'Maitim 2nd West', 'Mendez Crossing East', 'Mendez Crossing West',
+            'Neogan', 'Patutong Malaki North', 'Patutong Malaki South', 'Sambong', 'San Jose',
+            'Silang Junction North', 'Silang Junction South', 'Sungay North', 'Sungay South',
+            'Tolentino East', 'Tolentino West', 'Zambal',
+        ],
+    },
+    {
+        name: 'Tanza',
+        barangays: [
+            'Amaya I', 'Amaya II', 'Amaya III', 'Amaya IV', 'Amaya V', 'Amaya VI', 'Amaya VII',
+            'Bagtas', 'Barangay I (Poblacion)', 'Barangay II (Poblacion)', 'Barangay III (Poblacion)',
+            'Barangay IV (Poblacion)', 'Biga', 'Biwas', 'Bucal', 'Bunga', 'Calibuyo', 'Capipisa',
+            'Daang Amaya I', 'Daang Amaya II', 'Daang Amaya III', 'Halayhay',
+            'Julugan I', 'Julugan II', 'Julugan III', 'Julugan IV',
+            'Julugan V', 'Julugan VI', 'Julugan VII', 'Julugan VIII',
+            'Lambingan', 'Mulawin', 'Paradahan I', 'Paradahan II',
+            'Punta I', 'Punta II', 'Sahud Ulan', 'Sanja Mayor', 'Santol', 'Tanauan', 'Tres Cruses',
+        ],
+    },
+    {
+        name: 'Ternate',
+        barangays: [
+            'Bucana', 'Poblacion I', 'Poblacion I-A', 'Poblacion II', 'Poblacion III',
+            'San Jose', 'San Juan I', 'San Juan II', 'Sapang I', 'Sapang II',
+        ],
+    },
+    {
+        name: 'Trece Martires',
+        barangays: [
+            'Aguado', 'Cabezas', 'Cabuco', 'Conchu', 'De Ocampo', 'Gregorio',
+            'Inocencio', 'Lallana', 'Lapidario', 'Luciano', 'Osorio', 'Perez', 'San Agustin',
+        ],
+    },
+];
+
+export const cavityCityNames = caviteCities.map((c) => c.name);
+
+export function getBarangays(cityName: string): string[] {
+    return caviteCities.find((c) => c.name === cityName)?.barangays ?? [];
+}
+
+/** Format an address for display: "Street, Barangay, City, Cavite" */
+export function formatAddress(
+    address: string | null | undefined,
+    barangay: string | null | undefined,
+    city: string | null | undefined,
+): string {
+    return [address, barangay, city, 'Cavite'].filter(Boolean).join(', ');
+}
+
+/** Short location label for product/store cards: "City, Cavite" */
+export function formatCity(city: string | null | undefined): string {
+    if (!city) return 'Cavite';
+    return `${city}, Cavite`;
+}

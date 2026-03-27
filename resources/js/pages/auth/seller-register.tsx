@@ -1,7 +1,11 @@
 import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, BadgeCheck, Building2, FileText, Flame, Store, Upload, X } from 'lucide-react';
+import {
+    ArrowLeft, BadgeCheck, Building2, CheckSquare, FileText,
+    Flame, ScrollText, Store, Upload, X,
+} from 'lucide-react';
 import React, { useRef, useState } from 'react';
+import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,22 +14,23 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
 import { Spinner } from '@/components/ui/spinner';
 
-type FileField = 'valid_id' | 'bir_permit' | 'business_permit';
+// ── Document field config ──────────────────────────────────────────────────────
 
-const FILE_LABELS: Record<FileField, { label: string; hint: string }> = {
-    valid_id:         { label: 'Valid Government ID',   hint: 'Owner\'s government-issued ID (JPG, PNG, PDF · max 5 MB)' },
-    bir_permit:       { label: 'BIR Certificate of Registration', hint: 'Certificate of Registration from BIR (JPG, PNG, PDF · max 5 MB)' },
-    business_permit:  { label: 'Business / Mayor\'s Permit', hint: 'Current Mayor\'s Permit or Business Permit (JPG, PNG, PDF · max 5 MB)' },
-};
+type DocKey = 'valid_id' | 'bir_permit' | 'business_permit' | 'fsic_permit' | 'doe_lpg_license' | 'lto_permit';
+
+const DOC_FIELDS: { key: DocKey; label: string; hint: string }[] = [
+    { key: 'valid_id',         label: 'Valid Government ID',                hint: "Owner's government-issued ID (JPG, PNG, PDF · max 5 MB)" },
+    { key: 'bir_permit',       label: 'BIR Certificate of Registration',   hint: 'Certificate of Registration from BIR (JPG, PNG, PDF · max 5 MB)' },
+    { key: 'business_permit',  label: "Business / Mayor's Permit",         hint: "Current Mayor's Permit or Business Permit (JPG, PNG, PDF · max 5 MB)" },
+    { key: 'fsic_permit',      label: 'FSIC (Fire Safety Inspection Certificate)', hint: 'Issued by the Bureau of Fire Protection — required for LPG businesses (JPG, PNG, PDF · max 5 MB)' },
+    { key: 'doe_lpg_license',  label: 'DOE LPG Retail License',            hint: 'Required license from the Department of Energy to sell LPG (JPG, PNG, PDF · max 5 MB)' },
+    { key: 'lto_permit',       label: 'LTO (License to Operate)',          hint: 'License to Operate issued by the relevant regulatory agency (JPG, PNG, PDF · max 5 MB)' },
+];
+
+// ── File upload sub-component ─────────────────────────────────────────────────
 
 function FileUploadField({
-    id,
-    label,
-    hint,
-    file,
-    error,
-    onFileChange,
-    onClear,
+    id, label, hint, file, error, onFileChange, onClear,
 }: {
     id: string;
     label: string;
@@ -82,42 +87,97 @@ function FileUploadField({
     );
 }
 
+// ── Agreement checkbox ────────────────────────────────────────────────────────
+
+function AgreementCheckbox({
+    checked, onChange, id, children,
+}: {
+    checked: boolean;
+    onChange: (v: boolean) => void;
+    id: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <label htmlFor={id} className="flex items-start gap-3 cursor-pointer group">
+            <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                checked ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600 group-hover:border-blue-400'
+            }`}>
+                {checked && <CheckSquare className="h-3 w-3 text-white" />}
+            </div>
+            <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="sr-only" />
+            <span className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{children}</span>
+        </label>
+    );
+}
+
+// ── Terms section helper ──────────────────────────────────────────────────────
+
+function TermsSection({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">{title}</p>
+            <ul className="list-disc list-inside space-y-0.5 text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
+                {children}
+            </ul>
+        </div>
+    );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+const STEP_LABELS = ['Store Info', 'Documents', 'Terms'];
+
+const BENEFITS = [
+    { icon: Store,       title: 'Reach More Customers', desc: 'List your products on the LPG Marketplace and reach customers across Cavite.' },
+    { icon: BadgeCheck,  title: 'Verified & Trusted',   desc: 'Your store gets a verified badge after document review, building customer trust.' },
+    { icon: Building2,   title: 'Manage Your Store',    desc: 'Full dashboard for orders, inventory, deliveries, invoices, and reports.' },
+];
+
 export default function SellerRegister() {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors]         = useState<Record<string, string>>({});
-    const [step, setStep]             = useState<1 | 2>(1);
+    const [step, setStep]             = useState<1 | 2 | 3>(1);
 
-    const [files, setFiles] = useState<Record<FileField, File | null>>({
+    const [files, setFiles] = useState<Record<DocKey, File | null>>({
         valid_id:        null,
         bir_permit:      null,
         business_permit: null,
+        fsic_permit:     null,
+        doe_lpg_license: null,
+        lto_permit:      null,
     });
 
     const [fields, setFields] = useState({
-        name:               '',
-        email:              '',
-        phone:              '',
-        password:           '',
+        name:                  '',
+        email:                 '',
+        phone:                 '',
+        password:              '',
         password_confirmation: '',
-        store_name:         '',
-        store_description:  '',
-        store_address:      '',
-        store_city:         '',
-        store_barangay:     '',
-        store_province:     'Cavite',
+        store_name:            '',
+        store_description:     '',
+        store_address:         '',
+        store_city:            '',
+        store_barangay:        '',
+        store_province:        'Cavite',
     });
+
+    const [agreeTerms, setAgreeTerms]           = useState(false);
+    const [agreeAuthentic, setAgreeAuthentic]   = useState(false);
+    const [agreeCommission, setAgreeCommission] = useState(false);
+    const allAgreed = agreeTerms && agreeAuthentic && agreeCommission;
 
     function set(key: keyof typeof fields, value: string) {
         setFields((prev) => ({ ...prev, [key]: value }));
     }
 
-    function setFile(key: FileField, file: File | null) {
+    function setFile(key: DocKey, file: File | null) {
         setFiles((prev) => ({ ...prev, [key]: file }));
         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: '' }));
     }
 
     async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (!allAgreed) return;
         setProcessing(true);
         setErrors({});
 
@@ -126,6 +186,7 @@ export default function SellerRegister() {
         for (const [key, file] of Object.entries(files)) {
             if (file) formData.append(key, file);
         }
+        formData.append('terms_agreed', '1');
 
         try {
             await axios.post('/seller/register', formData, {
@@ -139,18 +200,16 @@ export default function SellerRegister() {
                 mapped[key] = (messages as string[])[0];
             }
             setErrors(mapped);
-            // If errors are on step 1 fields, go back to step 1
-            const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation'];
+            // Navigate back to offending step
+            const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation',
+                               'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay'];
+            const step2Keys = DOC_FIELDS.map(d => d.key);
             if (step1Keys.some((k) => mapped[k])) setStep(1);
+            else if (step2Keys.some((k) => mapped[k])) setStep(2);
+            else setStep(3);
             setProcessing(false);
         }
     }
-
-    const BENEFITS = [
-        { icon: Store, title: 'Reach More Customers', desc: 'List your products on the LPG Marketplace and reach customers across Cavite.' },
-        { icon: BadgeCheck, title: 'Verified & Trusted', desc: 'Your store gets a verified badge after document review, building customer trust.' },
-        { icon: Building2, title: 'Manage Your Store', desc: 'Full dashboard for orders, inventory, deliveries, invoices, and reports.' },
-    ];
 
     return (
         <div className="flex min-h-screen">
@@ -226,13 +285,20 @@ export default function SellerRegister() {
                         </div>
 
                         {/* Step indicators */}
-                        <div className="flex gap-2 mb-8">
-                            {[1, 2].map((s) => (
-                                <div
-                                    key={s}
-                                    className={`flex-1 h-1.5 rounded-full transition-colors ${s <= step ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`}
-                                />
-                            ))}
+                        <div className="flex gap-1 mb-8">
+                            {STEP_LABELS.map((label, i) => {
+                                const s = (i + 1) as 1 | 2 | 3;
+                                const done = step > s;
+                                const active = step === s;
+                                return (
+                                    <div key={label} className="flex-1 flex flex-col items-center gap-1">
+                                        <div className={`w-full h-1.5 rounded-full transition-colors ${done ? 'bg-blue-600' : active ? 'bg-blue-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
+                                        <span className={`text-xs font-medium ${active ? 'text-blue-600' : done ? 'text-blue-400' : 'text-gray-400'}`}>
+                                            Step {s}: {label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
                         </div>
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-5" encType="multipart/form-data">
@@ -240,50 +306,50 @@ export default function SellerRegister() {
                             {/* ── Step 1: Account & Store Info ─────────────── */}
                             {step === 1 && (
                                 <>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1 of 2 — Account & Store Details</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1 of 3 — Account & Store Details</p>
 
                                     <div className="grid gap-5 sm:grid-cols-2">
                                         <div className="grid gap-2">
-                                            <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Owner full name <span className="text-red-500">*</span>
                                             </Label>
-                                            <Input id="name" type="text" required autoFocus placeholder="Juan dela Cruz" className="h-11"
+                                            <Input type="text" required autoFocus placeholder="Juan dela Cruz" className="h-11"
                                                 value={fields.name} onChange={(e) => set('name', e.target.value)} />
                                             <InputError message={errors.name} />
                                         </div>
                                         <div className="grid gap-2">
-                                            <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Phone number <span className="text-red-500">*</span>
                                             </Label>
-                                            <Input id="phone" type="tel" required placeholder="09xx-xxx-xxxx" className="h-11"
+                                            <Input type="tel" required placeholder="09xx-xxx-xxxx" className="h-11"
                                                 value={fields.phone} onChange={(e) => set('phone', e.target.value)} />
                                             <InputError message={errors.phone} />
                                         </div>
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Email address <span className="text-red-500">*</span>
                                         </Label>
-                                        <Input id="email" type="email" required placeholder="you@example.com" className="h-11"
+                                        <Input type="email" required placeholder="you@example.com" className="h-11"
                                             value={fields.email} onChange={(e) => set('email', e.target.value)} />
                                         <InputError message={errors.email} />
                                     </div>
 
                                     <div className="grid gap-5 sm:grid-cols-2">
                                         <div className="grid gap-2">
-                                            <Label htmlFor="password" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Password <span className="text-red-500">*</span>
                                             </Label>
-                                            <PasswordInput id="password" required placeholder="••••••••" className="h-11"
+                                            <PasswordInput required placeholder="••••••••" className="h-11"
                                                 value={fields.password} onChange={(e) => set('password', e.target.value)} />
                                             <InputError message={errors.password} />
                                         </div>
                                         <div className="grid gap-2">
-                                            <Label htmlFor="password_confirmation" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Confirm password <span className="text-red-500">*</span>
                                             </Label>
-                                            <PasswordInput id="password_confirmation" required placeholder="••••••••" className="h-11"
+                                            <PasswordInput required placeholder="••••••••" className="h-11"
                                                 value={fields.password_confirmation} onChange={(e) => set('password_confirmation', e.target.value)} />
                                             <InputError message={errors.password_confirmation} />
                                         </div>
@@ -293,20 +359,19 @@ export default function SellerRegister() {
                                     <hr className="border-gray-200 dark:border-gray-800" />
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="store_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Store / business name <span className="text-red-500">*</span>
                                         </Label>
-                                        <Input id="store_name" type="text" required placeholder="e.g. Petron Gasul Cavite" className="h-11"
+                                        <Input type="text" required placeholder="e.g. Petron Gasul Cavite" className="h-11"
                                             value={fields.store_name} onChange={(e) => set('store_name', e.target.value)} />
                                         <InputError message={errors.store_name} />
                                     </div>
 
                                     <div className="grid gap-2">
-                                        <Label htmlFor="store_description" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                             Store description
                                         </Label>
                                         <textarea
-                                            id="store_description"
                                             rows={3}
                                             placeholder="Briefly describe your LPG business and service area..."
                                             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
@@ -316,48 +381,24 @@ export default function SellerRegister() {
                                         <InputError message={errors.store_description} />
                                     </div>
 
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="store_address" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                            Store address <span className="text-red-500">*</span>
-                                        </Label>
-                                        <Input id="store_address" type="text" required placeholder="123 Rizal St., Brgy. San Roque" className="h-11"
-                                            value={fields.store_address} onChange={(e) => set('store_address', e.target.value)} />
-                                        <InputError message={errors.store_address} />
-                                    </div>
-
-                                    <div className="grid gap-5 sm:grid-cols-3">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="store_barangay" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Barangay <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input id="store_barangay" type="text" required placeholder="Brgy. San Roque" className="h-11"
-                                                value={fields.store_barangay} onChange={(e) => set('store_barangay', e.target.value)} />
-                                            <InputError message={errors.store_barangay} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="store_city" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                City <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input id="store_city" type="text" required placeholder="Imus" className="h-11"
-                                                value={fields.store_city} onChange={(e) => set('store_city', e.target.value)} />
-                                            <InputError message={errors.store_city} />
-                                        </div>
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="store_province" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Province <span className="text-red-500">*</span>
-                                            </Label>
-                                            <Input id="store_province" type="text" required placeholder="Cavite" className="h-11"
-                                                value={fields.store_province} onChange={(e) => set('store_province', e.target.value)} />
-                                            <InputError message={errors.store_province} />
-                                        </div>
-                                    </div>
+                                    <AddressFields
+                                        address={fields.store_address}
+                                        city={fields.store_city}
+                                        barangay={fields.store_barangay}
+                                        onAddressChange={(v) => set('store_address', v)}
+                                        onCityChange={(v) => set('store_city', v)}
+                                        onBarangayChange={(v) => set('store_barangay', v)}
+                                        errors={errors}
+                                        errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
+                                        requiredBarangay
+                                    />
 
                                     <Button
                                         type="button"
                                         className="h-11 w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 mt-2"
                                         onClick={() => setStep(2)}
                                     >
-                                        Next: Upload Documents
+                                        Next: Upload Documents →
                                     </Button>
                                 </>
                             )}
@@ -365,38 +406,132 @@ export default function SellerRegister() {
                             {/* ── Step 2: Document Uploads ──────────────────── */}
                             {step === 2 && (
                                 <>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 2 of 2 — Upload Required Documents</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 2 of 3 — Upload Required Documents</p>
 
                                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300">
-                                        All three documents are required for seller verification. Your application will be reviewed by the platform admin within 1–3 business days.
+                                        All six documents are required for seller verification. Your application will be reviewed within 1–3 business days.
                                     </div>
 
-                                    {(Object.keys(FILE_LABELS) as FileField[]).map((key) => (
+                                    {DOC_FIELDS.map((doc) => (
                                         <FileUploadField
-                                            key={key}
-                                            id={key}
-                                            label={FILE_LABELS[key].label}
-                                            hint={FILE_LABELS[key].hint}
-                                            file={files[key]}
-                                            error={errors[key]}
-                                            onFileChange={(f) => setFile(key, f)}
-                                            onClear={() => setFile(key, null)}
+                                            key={doc.key}
+                                            id={doc.key}
+                                            label={doc.label}
+                                            hint={doc.hint}
+                                            file={files[doc.key]}
+                                            error={errors[doc.key]}
+                                            onFileChange={(f) => setFile(doc.key, f)}
+                                            onClear={() => setFile(doc.key, null)}
                                         />
                                     ))}
 
                                     <div className="flex gap-3 mt-2">
+                                        <Button type="button" variant="outline" className="h-11 flex-1" onClick={() => setStep(1)}>
+                                            ← Back
+                                        </Button>
                                         <Button
                                             type="button"
-                                            variant="outline"
-                                            className="h-11 flex-1"
-                                            onClick={() => setStep(1)}
+                                            className="h-11 flex-1 bg-blue-600 font-semibold text-white hover:bg-blue-700"
+                                            onClick={() => setStep(3)}
                                         >
-                                            Back
+                                            Next: Terms & Conditions →
+                                        </Button>
+                                    </div>
+                                </>
+                            )}
+
+                            {/* ── Step 3: Terms & Conditions ────────────────── */}
+                            {step === 3 && (
+                                <>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 3 of 3 — Review & Agree to Terms</p>
+
+                                    {/* Scrollable terms */}
+                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
+                                        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                                            <ScrollText className="h-4 w-4 text-blue-600" />
+                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">Terms and Conditions</span>
+                                        </div>
+                                        <div className="max-h-72 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 space-y-4">
+                                            <p className="font-medium text-gray-900 dark:text-white">
+                                                By registering as a seller on LPG Distribution Cavite, you agree to the following:
+                                            </p>
+
+                                            <TermsSection title="1. Platform Commission">
+                                                <li>The platform charges a <strong>5% commission</strong> on every completed order (based on product subtotal, excluding delivery fee)</li>
+                                                <li>Commission is automatically deducted from your earnings</li>
+                                                <li>Commission rate may be adjusted by the platform administrator</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="2. Payment Processing">
+                                                <li>Online payments are processed through PayMongo</li>
+                                                <li>COD payments are recorded by the seller</li>
+                                                <li>Platform earnings are settled after order delivery</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="3. Store Requirements">
+                                                <li>You must maintain valid and up-to-date permits (BIR, Business Permit, FSIC, DOE License, LTO)</li>
+                                                <li>Expired permits may result in store suspension</li>
+                                                <li>You are responsible for product quality and safety</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="4. Order Fulfillment">
+                                                <li>You must process orders within 24 hours</li>
+                                                <li>Delivery must be completed within the agreed timeframe</li>
+                                                <li>Repeated order cancellations may result in penalties or suspension</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="5. Account Conduct">
+                                                <li>Fraudulent activity will result in permanent ban</li>
+                                                <li>The platform reserves the right to suspend or terminate seller accounts for violations</li>
+                                                <li>All uploaded documents must be authentic</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="6. Data Privacy">
+                                                <li>Your store information and documents are kept confidential</li>
+                                                <li>Customer data shared with you is for order fulfillment only</li>
+                                                <li>You must comply with the Data Privacy Act of 2012</li>
+                                            </TermsSection>
+
+                                            <TermsSection title="7. Liability">
+                                                <li>The platform is not liable for disputes between sellers and customers</li>
+                                                <li>Sellers are responsible for their own tax obligations</li>
+                                                <li>Product liability rests with the seller</li>
+                                            </TermsSection>
+                                        </div>
+                                    </div>
+
+                                    {/* Agreement checkboxes */}
+                                    <div className="space-y-3">
+                                        <AgreementCheckbox checked={agreeTerms} onChange={setAgreeTerms} id="reg_agree_terms">
+                                            I have read and agree to the Terms and Conditions
+                                        </AgreementCheckbox>
+                                        <AgreementCheckbox checked={agreeAuthentic} onChange={setAgreeAuthentic} id="reg_agree_authentic">
+                                            I confirm that all uploaded documents are authentic and valid
+                                        </AgreementCheckbox>
+                                        <AgreementCheckbox checked={agreeCommission} onChange={setAgreeCommission} id="reg_agree_commission">
+                                            I understand and agree to the platform commission fee of{' '}
+                                            <strong>5% per completed order</strong>
+                                        </AgreementCheckbox>
+                                    </div>
+
+                                    {errors.terms_agreed && (
+                                        <p className="text-sm text-red-500">{errors.terms_agreed}</p>
+                                    )}
+
+                                    {!allAgreed && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+                                            Please check all three boxes above to submit your application.
+                                        </p>
+                                    )}
+
+                                    <div className="flex gap-3 mt-2">
+                                        <Button type="button" variant="outline" className="h-11 flex-1" onClick={() => setStep(2)}>
+                                            ← Back
                                         </Button>
                                         <Button
                                             type="submit"
-                                            disabled={processing}
-                                            className="h-11 flex-1 bg-blue-600 font-semibold text-white hover:bg-blue-700"
+                                            disabled={processing || !allAgreed}
+                                            className="h-11 flex-1 bg-blue-600 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
                                         >
                                             {processing && <Spinner />}
                                             Submit Application

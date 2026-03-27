@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { Flame, Printer } from 'lucide-react';
 import { fmtDate } from '@/lib/utils';
+import { formatAddress } from '@/data/cavite-locations';
 
 type InvoiceItem = {
     quantity: number;
@@ -119,7 +120,7 @@ export default function InvoicePrint({ invoice, company }: Props) {
                                     {invoice.customer.address && <p className="text-sm text-gray-600">{invoice.customer.address}</p>}
                                     {(invoice.customer.barangay || invoice.customer.city) && (
                                         <p className="text-sm text-gray-600">
-                                            {[invoice.customer.barangay, invoice.customer.city].filter(Boolean).join(', ')}
+                                            {formatAddress(null, invoice.customer.barangay, invoice.customer.city)}
                                         </p>
                                     )}
                                 </>

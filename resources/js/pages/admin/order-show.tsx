@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -285,7 +286,7 @@ export default function OrderShowPage({ order }: Props) {
                                         {(order.customer.address || order.customer.barangay) && (
                                             <p className="flex items-start gap-1.5 text-gray-500">
                                                 <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                                                {[order.customer.address, order.customer.barangay, order.customer.city].filter(Boolean).join(', ')}
+                                                {formatAddress(order.customer.address, order.customer.barangay, order.customer.city)}
                                             </p>
                                         )}
                                     </div>

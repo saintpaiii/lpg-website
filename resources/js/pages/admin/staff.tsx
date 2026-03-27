@@ -162,18 +162,20 @@ function StaffFormDialog({
         name: string;
         email: string;
         password: string;
+        password_confirmation: string;
         phone: string;
         sub_role: string;
     }>({
-        name:     editTarget?.name     ?? '',
-        email:    editTarget?.email    ?? '',
-        password: '',
-        phone:    editTarget?.phone    ?? '',
-        sub_role: editTarget?.sub_role ?? '',
+        name:                  editTarget?.name     ?? '',
+        email:                 editTarget?.email    ?? '',
+        password:              '',
+        password_confirmation: '',
+        phone:                 editTarget?.phone    ?? '',
+        sub_role:              editTarget?.sub_role ?? '',
     });
 
     if (isEdit && data.name !== editTarget.name && data.email !== editTarget.email) {
-        setData({ name: editTarget.name, email: editTarget.email, password: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
+        setData({ name: editTarget.name, email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
     }
 
     function handleSubmit(e: { preventDefault(): void }) {
@@ -236,6 +238,17 @@ function StaffFormDialog({
                         />
                         {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
                         <PasswordStrengthIndicator password={data.password} />
+                    </div>
+
+                    <div className="grid gap-1.5">
+                        <Label>{isEdit ? 'Confirm New Password' : <>Confirm Password <span className="text-red-500">*</span></>}</Label>
+                        <PasswordInput
+                            value={data.password_confirmation}
+                            onChange={(e) => setData('password_confirmation', e.target.value)}
+                            placeholder="Re-enter password"
+                            autoComplete="new-password"
+                        />
+                        {errors.password_confirmation && <p className="text-xs text-red-500">{errors.password_confirmation}</p>}
                     </div>
 
                     <div className="grid gap-1.5">

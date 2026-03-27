@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { StarRating } from '@/components/ui/star-rating';
 import CustomerLayout from '@/layouts/customer-layout';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
         });
     }
 
-    const location = [store.barangay, store.city, store.province].filter(Boolean).join(', ');
+    const location = formatAddress(null, store.barangay ?? null, store.city ?? null);
 
     return (
         <CustomerLayout>

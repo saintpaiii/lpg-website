@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,7 @@ function CustomerCombobox({
                         {selected.phone && <span className="ml-2 text-gray-400 text-xs">{selected.phone}</span>}
                         {(selected.barangay || selected.city) && (
                             <p className="text-xs text-gray-400 mt-0.5">
-                                {[selected.barangay, selected.city].filter(Boolean).join(', ')}
+                                {formatAddress(null, selected.barangay, selected.city)}
                             </p>
                         )}
                     </div>
@@ -142,7 +143,7 @@ function CustomerCombobox({
                             >
                                 <p className="font-medium text-gray-900">{c.name}</p>
                                 <p className="text-xs text-gray-400">
-                                    {[c.phone, c.barangay, c.city].filter(Boolean).join(' · ')}
+                                    {[c.phone, c.barangay ? `${c.barangay}, ${c.city ?? ''}` : c.city].filter(Boolean).join(' · ')}
                                 </p>
                             </button>
                         ))

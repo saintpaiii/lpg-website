@@ -12,7 +12,6 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
@@ -26,6 +25,12 @@ class FortifyServiceProvider extends ServiceProvider
     {
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
         $this->app->singleton(RegisterResponseContract::class, RegisteredUserResponse::class);
+
+        // Use our extended rate limiter (3-minute lockout instead of 1-minute)
+        $this->app->singleton(
+            \Laravel\Fortify\LoginRateLimiter::class,
+            \App\Services\LoginRateLimiter::class,
+        );
     }
 
     /**
@@ -52,11 +57,21 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureViews(): void
     {
-        Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
-            'canResetPassword' => Features::enabled(Features::resetPasswords()),
-            'canRegister' => Features::enabled(Features::registration()),
-            'status' => $request->session()->get('status'),
-        ]));
+        Fortify::loginView(function (Request $request) {
+            $lockedUntil        = $request->session()->get('login.locked_until', 0);
+            $retryAfterSeconds  = max(0, $lockedUntil - now()->timestamp);
+            $remainingAttempts  = $retryAfterSeconds > 0
+                ? 0
+                : $request->session()->get('login.remaining');
+
+            return Inertia::render('auth/login', [
+                'canResetPassword'  => Features::enabled(Features::resetPasswords()),
+                'canRegister'       => Features::enabled(Features::registration()),
+                'status'            => $request->session()->get('status'),
+                'retryAfter'        => $retryAfterSeconds,
+                'remainingAttempts' => $remainingAttempts,
+            ]);
+        });
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
             'email' => $request->email,
@@ -82,14 +97,16 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureRateLimiting(): void
     {
-        RateLimiter::for('two-factor', function (Request $request) {
-            return Limit::perMinute(5)->by($request->session()->get('login.id'));
+        // Used by Fortify's throttle:login middleware on POST /login
+        RateLimiter::for('login', function (Request $request) {
+            $throttleKey = \Illuminate\Support\Str::transliterate(
+                \Illuminate\Support\Str::lower($request->input(\Laravel\Fortify\Fortify::username())) . '|' . $request->ip()
+            );
+            return Limit::perMinutes(3, 5)->by($throttleKey);
         });
 
-        RateLimiter::for('login', function (Request $request) {
-            $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
-
-            return Limit::perMinute(5)->by($throttleKey);
+        RateLimiter::for('two-factor', function (Request $request) {
+            return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
     }
 }

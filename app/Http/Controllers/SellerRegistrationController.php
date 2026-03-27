@@ -30,6 +30,8 @@ class SellerRegistrationController extends Controller
     /** POST /seller/register */
     public function store(Request $request): RedirectResponse
     {
+        $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024);
+
         $validated = $request->validate([
             // Owner account
             'name'                  => ['required', 'string', 'max:255'],
@@ -46,9 +48,15 @@ class SellerRegistrationController extends Controller
             'store_province'        => ['required', 'string', 'max:100'],
 
             // Document uploads
-            'valid_id'              => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
-            'bir_permit'            => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
-            'business_permit'       => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
+            'valid_id'              => ['required', $fileRule()],
+            'bir_permit'            => ['required', $fileRule()],
+            'business_permit'       => ['required', $fileRule()],
+            'fsic_permit'           => ['required', $fileRule()],
+            'doe_lpg_license'       => ['required', $fileRule()],
+            'lto_permit'            => ['required', $fileRule()],
+
+            // Terms agreement
+            'terms_agreed'          => ['required', 'accepted'],
         ]);
 
         DB::transaction(function () use ($request, $validated) {
@@ -56,6 +64,9 @@ class SellerRegistrationController extends Controller
             $validIdPath        = $request->file('valid_id')->store('valid_ids', 'public');
             $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'public');
             $businessPermitPath = $request->file('business_permit')->store('business_permits', 'public');
+            $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'public');
+            $doeLicensePath     = $request->file('doe_lpg_license')->store('doe_licenses', 'public');
+            $ltoPermitPath      = $request->file('lto_permit')->store('lto_permits', 'public');
 
             // Create seller user account (email unverified)
             $user = User::create([
@@ -82,6 +93,9 @@ class SellerRegistrationController extends Controller
                 'email'            => $validated['email'],
                 'bir_permit'       => $birPermitPath,
                 'business_permit'  => $businessPermitPath,
+                'fsic_permit'      => $fsicPermitPath,
+                'doe_lpg_license'  => $doeLicensePath,
+                'lto_permit'       => $ltoPermitPath,
                 'status'           => 'pending',
                 'subscription_plan'=> 'free',
                 'commission_rate'  => 5.00,
@@ -98,7 +112,11 @@ class SellerRegistrationController extends Controller
                 'valid_id_path'        => $validIdPath,
                 'bir_permit_path'      => $birPermitPath,
                 'business_permit_path' => $businessPermitPath,
+                'fsic_permit_path'     => $fsicPermitPath,
+                'doe_lpg_license_path' => $doeLicensePath,
+                'lto_permit_path'      => $ltoPermitPath,
                 'status'               => 'pending',
+                'terms_agreed_at'      => now(),
             ]);
 
             // Send email verification

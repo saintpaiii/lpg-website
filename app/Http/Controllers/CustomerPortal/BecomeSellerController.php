@@ -49,6 +49,8 @@ class BecomeSellerController extends Controller
             return redirect('/seller/dashboard');
         }
 
+        $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024);
+
         $request->validate([
             'store_name'        => ['required', 'string', 'max:255'],
             'store_description' => ['nullable', 'string', 'max:1000'],
@@ -57,13 +59,20 @@ class BecomeSellerController extends Controller
             'store_barangay'    => ['required', 'string', 'max:100'],
             'store_province'    => ['required', 'string', 'max:100'],
             'store_phone'       => ['required', 'string', 'max:20'],
-            'bir_permit'        => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
-            'business_permit'   => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
-            'valid_id'          => ['nullable', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
+            'bir_permit'        => ['required', $fileRule()],
+            'business_permit'   => ['required', $fileRule()],
+            'valid_id'          => ['nullable', $fileRule()],
+            'fsic_permit'       => ['required', $fileRule()],
+            'doe_lpg_license'   => ['required', $fileRule()],
+            'lto_permit'        => ['required', $fileRule()],
+            'terms_agreed'      => ['required', 'accepted'],
         ]);
 
         $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'public');
         $businessPermitPath = $request->file('business_permit')->store('business_permits', 'public');
+        $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'public');
+        $doeLicensePath     = $request->file('doe_lpg_license')->store('doe_licenses', 'public');
+        $ltoPermitPath      = $request->file('lto_permit')->store('lto_permits', 'public');
 
         // Reuse existing valid_id if not re-uploading
         $validIdPath = $request->hasFile('valid_id')
@@ -83,6 +92,9 @@ class BecomeSellerController extends Controller
                 'phone'           => $request->store_phone,
                 'bir_permit'      => $birPermitPath,
                 'business_permit' => $businessPermitPath,
+                'fsic_permit'     => $fsicPermitPath,
+                'doe_lpg_license' => $doeLicensePath,
+                'lto_permit'      => $ltoPermitPath,
                 'status'          => 'pending',
                 'commission_rate' => 5.00,
             ]
@@ -103,7 +115,11 @@ class BecomeSellerController extends Controller
             'valid_id_path'        => $validIdPath,
             'bir_permit_path'      => $birPermitPath,
             'business_permit_path' => $businessPermitPath,
+            'fsic_permit_path'     => $fsicPermitPath,
+            'doe_lpg_license_path' => $doeLicensePath,
+            'lto_permit_path'      => $ltoPermitPath,
             'status'               => 'pending',
+            'terms_agreed_at'      => now(),
         ]);
 
         return redirect('/customer/become-seller')

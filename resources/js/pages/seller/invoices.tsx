@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Receipt, Search } from 'lucide-react';
+import { Eye, Receipt, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -120,17 +120,16 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Net</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {invoices.data.length === 0 ? (
-                                        <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No invoices found.</td></tr>
+                                        <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No invoices found.</td></tr>
                                     ) : invoices.data.map((inv) => (
                                         <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                             <td className="px-4 py-3">
-                                                <Link href={`/seller/invoices/${inv.id}`} className="font-mono text-xs text-blue-600 hover:underline font-medium">
-                                                    {inv.invoice_number}
-                                                </Link>
+                                                <p className="font-mono text-xs text-blue-600 font-medium">{inv.invoice_number}</p>
                                                 <p className="text-xs text-muted-foreground">{inv.order_number}</p>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{inv.customer}</td>
@@ -151,6 +150,15 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
                                                 {fmtDate(inv.created_at)}
                                             </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Link href={`/seller/invoices/${inv.id}`}>
+                                                    <Button size="sm" variant="outline"
+                                                        className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
+                                                        <Eye className="h-3 w-3" />
+                                                        View
+                                                    </Button>
+                                                </Link>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -167,7 +175,7 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                                             <td className="px-4 py-2.5 text-right font-semibold text-emerald-700">
                                                 ₱{totalNet.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
-                                            <td colSpan={2} />
+                                            <td colSpan={3} />
                                         </tr>
                                     </tfoot>
                                 )}

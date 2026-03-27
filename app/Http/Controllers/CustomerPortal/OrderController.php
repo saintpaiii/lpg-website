@@ -4,6 +4,8 @@ namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Inventory;
+use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Order;
 use Illuminate\Support\Facades\Storage;
@@ -77,6 +79,7 @@ class OrderController extends Controller
                     'items_count'    => $o->items->count(),
                     'items_summary'  => $o->items->map(fn ($i) => $i->product?->name)->filter()->implode(', '),
                     'invoice_id'     => $o->invoice?->id,
+                    'cancelled_by'   => $o->cancelled_by,
                 ]);
         }
 
@@ -297,6 +300,62 @@ class OrderController extends Controller
         return response()->json($result);
     }
 
+    // ── Cancel ────────────────────────────────────────────────────────────────
+
+    public function cancel(Request $request, Order $order): RedirectResponse
+    {
+        $customer = $this->getCustomer($request);
+
+        if (! $customer || $order->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        if (! in_array($order->status, ['pending', 'confirmed'])) {
+            return back()->with('error', 'This order cannot be cancelled.');
+        }
+
+        $data = $request->validate([
+            'cancellation_reason' => 'required|string|max:255',
+            'cancellation_notes'  => 'nullable|string|max:1000',
+        ]);
+
+        DB::transaction(function () use ($order, $data, $request) {
+            // Restore stock if order was already confirmed (stock was deducted)
+            if ($order->status === 'confirmed') {
+                $order->load('items');
+                foreach ($order->items as $item) {
+                    $inventory = Inventory::where('product_id', $item->product_id)->first();
+                    if ($inventory) {
+                        $inventory->increment('quantity', $item->quantity);
+                        InventoryTransaction::create([
+                            'product_id' => $item->product_id,
+                            'type'       => 'cancelled',
+                            'quantity'   => $item->quantity,
+                            'reference'  => $order->order_number,
+                            'notes'      => 'Order cancelled by customer — stock restored',
+                            'user_id'    => $request->user()->id,
+                        ]);
+                    }
+                }
+            }
+
+            $order->update([
+                'status'              => 'cancelled',
+                'cancellation_reason' => $data['cancellation_reason'],
+                'cancellation_notes'  => $data['cancellation_notes'] ?? null,
+                'cancelled_by'        => 'customer',
+                'cancelled_at'        => now(),
+            ]);
+
+            // Void invoice if one exists
+            if ($order->invoice) {
+                $order->invoice->update(['payment_status' => 'voided']);
+            }
+        });
+
+        return redirect()->route('customer.orders')->with('success', 'Order cancelled successfully.');
+    }
+
     // ── Show ──────────────────────────────────────────────────────────────────
 
     public function show(Request $request, Order $order): Response
@@ -327,10 +386,14 @@ class OrderController extends Controller
                 'total_amount'     => (float) $order->total_amount,
                 'payment_method'   => $order->payment_method,
                 'payment_status'   => $order->payment_status,
-                'notes'            => $order->notes,
-                'ordered_at'       => $order->ordered_at?->format('M d, Y g:i A'),
-                'delivered_at'     => $order->delivered_at?->format('M d, Y g:i A'),
-                'created_at'       => $order->created_at->format('M d, Y g:i A'),
+                'notes'                => $order->notes,
+                'cancellation_reason'  => $order->cancellation_reason,
+                'cancellation_notes'   => $order->cancellation_notes,
+                'cancelled_by'         => $order->cancelled_by,
+                'cancelled_at'         => $order->cancelled_at?->format('M d, Y g:i A'),
+                'ordered_at'           => $order->ordered_at?->format('M d, Y g:i A'),
+                'delivered_at'         => $order->delivered_at?->format('M d, Y g:i A'),
+                'created_at'           => $order->created_at->format('M d, Y g:i A'),
                 'items'            => $order->items->map(fn ($i) => [
                     'id'         => $i->id,
                     'product_id' => $i->product_id,

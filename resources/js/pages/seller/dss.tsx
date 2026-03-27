@@ -17,13 +17,18 @@ import {
     ArrowRight,
     ArrowUpRight,
     Brain,
+    CalendarDays,
+    CheckCircle2,
     Crown,
+    Lightbulb,
     Package,
     RefreshCw,
     ShoppingCart,
     Target,
     TrendingDown,
     TrendingUp,
+    Truck,
+    Users,
     Warehouse,
     Zap,
 } from 'lucide-react';
@@ -90,11 +95,38 @@ type DemandForecast = {
     day_columns: { key: string; label: string }[];
 };
 
+type Recommendation = {
+    type: 'critical' | 'warning' | 'info' | 'success';
+    text: string;
+};
+
+type Insights = {
+    this_month_revenue: number;
+    last_month_revenue: number;
+    this_month_orders: number;
+    last_month_orders: number;
+    revenue_change_pct: number | null;
+    projected_revenue: number;
+    days_elapsed: number;
+    days_in_month: number;
+    this_month_customers: number;
+    repeat_customers: number;
+    repeat_rate: number;
+    busiest_day: string | null;
+    delivery_success_rate: number | null;
+    avg_delivery_hours: number | null;
+    total_deliveries: number;
+    failed_deliveries: number;
+    low_stock_count: number;
+    recommendations: Recommendation[];
+};
+
 type Props = {
     reorderAlerts: ReorderAlert[];
     salesTrend: SalesTrend;
     topProducts: TopProduct[];
     demandForecast: DemandForecast;
+    insights: Insights;
     generatedAt: string;
 };
 
@@ -466,9 +498,237 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
     );
 }
 
+// ── Monthly Summary Card ────────────────────────────────────────────────────────
+
+function MonthlySummaryCard({ data }: { data: Insights }) {
+    const pct = data.revenue_change_pct;
+    const up   = pct !== null && pct > 0;
+    const down = pct !== null && pct < 0;
+
+    const progressPct = Math.min(100, Math.round((data.days_elapsed / data.days_in_month) * 100));
+
+    return (
+        <section className="space-y-4">
+            <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
+                    <CalendarDays className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900">Monthly Summary</h2>
+                    <p className="text-sm text-gray-500">
+                        Day {data.days_elapsed} of {data.days_in_month} — {progressPct}% through the month
+                    </p>
+                </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* This month revenue */}
+                <Card>
+                    <CardContent className="pt-5 pb-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">This Month Revenue</p>
+                        <p className="text-2xl font-black text-gray-900 tabular-nums">{peso(data.this_month_revenue)}</p>
+                        {pct !== null ? (
+                            <p className={`text-xs font-semibold flex items-center gap-0.5 ${up ? 'text-emerald-600' : down ? 'text-red-500' : 'text-gray-400'}`}>
+                                {up ? <ArrowUpRight className="h-3.5 w-3.5" /> : down ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                                {pct > 0 ? '+' : ''}{pct}% vs last month
+                            </p>
+                        ) : (
+                            <p className="text-xs text-gray-400">No prior month data</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Projected revenue */}
+                <Card className="border-blue-200 bg-blue-50/40">
+                    <CardContent className="pt-5 pb-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Projected (Month End)</p>
+                        <p className="text-2xl font-black text-blue-700 tabular-nums">{peso(data.projected_revenue)}</p>
+                        <p className="text-xs text-blue-400">Based on {data.days_elapsed}-day daily average</p>
+                    </CardContent>
+                </Card>
+
+                {/* Orders */}
+                <Card>
+                    <CardContent className="pt-5 pb-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Orders This Month</p>
+                        <p className="text-2xl font-black text-gray-900 tabular-nums">{data.this_month_orders}</p>
+                        <p className="text-xs text-gray-400">Last month: {data.last_month_orders}</p>
+                    </CardContent>
+                </Card>
+
+                {/* Customers */}
+                <Card>
+                    <CardContent className="pt-5 pb-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Unique Customers</p>
+                        <p className="text-2xl font-black text-gray-900 tabular-nums">{data.this_month_customers}</p>
+                        <p className="text-xs text-gray-400">{data.repeat_rate}% repeat rate ({data.repeat_customers} reorders)</p>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Month progress bar */}
+            <div className="rounded-xl border bg-white p-4">
+                <div className="mb-2 flex justify-between text-xs text-gray-500">
+                    <span>Month progress — Day {data.days_elapsed}/{data.days_in_month}</span>
+                    <span className="font-semibold">{progressPct}%</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-gray-100">
+                    <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${progressPct}%` }} />
+                </div>
+            </div>
+        </section>
+    );
+}
+
+// ── Insights Section ────────────────────────────────────────────────────────────
+
+function InsightsSection({ data, reorderAlerts }: { data: Insights; reorderAlerts: ReorderAlert[] }) {
+    const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
+
+    // Sales performance insight
+    const salesInsight = (() => {
+        const pct = data.revenue_change_pct;
+        if (pct === null) return { level: 'info', text: 'Not enough history to compare months yet. Keep recording orders to unlock month-over-month analysis.' };
+        if (pct >= 20) return { level: 'success', text: `Outstanding! Revenue is up ${pct}% compared to last month. Your store is growing strongly.` };
+        if (pct >= 5)  return { level: 'success', text: `Good progress — revenue is up ${pct}% from last month. Consistent growth is a positive sign.` };
+        if (pct >= -5) return { level: 'info',    text: `Revenue is roughly the same as last month (${pct > 0 ? '+' : ''}${pct}%). Consider small promotions to push growth.` };
+        if (pct >= -15)return { level: 'warning', text: `Revenue is down ${Math.abs(pct)}% from last month. Review which products or days are underperforming.` };
+        return { level: 'warning', text: `Revenue has dropped significantly (${pct}% vs last month). Investigate order volume and pricing issues urgently.` };
+    })();
+
+    // Stock health insight
+    const stockInsight = (() => {
+        if (criticalCount > 0) return { level: 'critical', text: `${criticalCount} product(s) are completely out of stock. This is causing lost sales right now — restock immediately.` };
+        if (data.low_stock_count > 0) return { level: 'warning', text: `${data.low_stock_count} product(s) are below their reorder level. Order replenishments soon before stock runs out.` };
+        return { level: 'success', text: 'All products are above their reorder levels. Stock health is good — no immediate action required.' };
+    })();
+
+    // Customer insight
+    const customerInsight = (() => {
+        if (data.this_month_customers === 0) return { level: 'info', text: 'No customer orders recorded this month yet.' };
+        if (data.repeat_rate >= 50) return { level: 'success', text: `Excellent retention! ${data.repeat_rate}% of customers reordered this month. Your store has strong customer loyalty.` };
+        if (data.repeat_rate >= 30) return { level: 'info', text: `${data.repeat_rate}% of customers reordered this month. Decent retention — consider loyalty rewards to push this higher.` };
+        return { level: 'warning', text: `Only ${data.repeat_rate}% of customers reordered. Most customers are one-time buyers. Improve follow-up and loyalty offers.` };
+    })();
+
+    // Revenue projection insight
+    const projectionInsight = (() => {
+        if (data.last_month_revenue === 0) return { level: 'info', text: `On track for ${peso(data.projected_revenue)} this month based on the current daily average of ${peso(Math.round(data.this_month_revenue / data.days_elapsed))}/day.` };
+        const pctVsLast = Math.round(((data.projected_revenue - data.last_month_revenue) / data.last_month_revenue) * 100);
+        if (pctVsLast > 10) return { level: 'success', text: `Projected to earn ${peso(data.projected_revenue)} — about ${pctVsLast}% more than last month's ${peso(data.last_month_revenue)}.` };
+        if (pctVsLast >= -5) return { level: 'info', text: `Projected ${peso(data.projected_revenue)} — roughly in line with last month's ${peso(data.last_month_revenue)}.` };
+        return { level: 'warning', text: `Projected ${peso(data.projected_revenue)} — ${Math.abs(pctVsLast)}% below last month's ${peso(data.last_month_revenue)}. Increase order volume to close the gap.` };
+    })();
+
+    // Delivery performance insight
+    const deliveryInsight = (() => {
+        if (data.total_deliveries === 0) return { level: 'info', text: 'No deliveries recorded in the last 30 days.' };
+        const rate = data.delivery_success_rate ?? 0;
+        const timeText = data.avg_delivery_hours !== null ? ` Average delivery time: ${data.avg_delivery_hours}h.` : '';
+        if (rate >= 95) return { level: 'success', text: `Excellent! ${rate}% delivery success rate in the last 30 days.${timeText}` };
+        if (rate >= 85) return { level: 'info',    text: `Good delivery performance — ${rate}% success rate.${timeText} ${data.failed_deliveries} failed deliveries.` };
+        return { level: 'warning', text: `Delivery success rate is ${rate}% — ${data.failed_deliveries} failed out of ${data.total_deliveries} total.${timeText} Review rider assignments.` };
+    })();
+
+    const LEVEL_STYLE = {
+        critical: { card: 'border-red-200 bg-red-50',     icon: 'bg-red-500',     text: 'text-red-800' },
+        warning:  { card: 'border-amber-200 bg-amber-50', icon: 'bg-amber-500',   text: 'text-amber-800' },
+        success:  { card: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-500', text: 'text-emerald-800' },
+        info:     { card: 'border-blue-200 bg-blue-50',   icon: 'bg-blue-500',    text: 'text-blue-800' },
+    } as const;
+
+    type Level = keyof typeof LEVEL_STYLE;
+
+    function InsightCard({ title, text, level, icon }: { title: string; text: string; level: Level; icon: React.ReactNode }) {
+        const s = LEVEL_STYLE[level];
+        return (
+            <div className={`rounded-xl border p-4 ${s.card}`}>
+                <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${s.icon}`}>
+                        {icon}
+                    </div>
+                    <p className={`font-bold text-sm ${s.text}`}>{title}</p>
+                </div>
+                <p className={`text-sm leading-relaxed ${s.text} opacity-90`}>{text}</p>
+            </div>
+        );
+    }
+
+    return (
+        <section className="space-y-4">
+            <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
+                    <Lightbulb className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900">Automated Insights</h2>
+                    <p className="text-sm text-gray-500">Plain-language analysis of your store performance</p>
+                </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <InsightCard title="Sales Performance" text={salesInsight.text} level={salesInsight.level as Level}
+                    icon={<TrendingUp className="h-4 w-4 text-white" />} />
+                <InsightCard title="Stock Health" text={stockInsight.text} level={stockInsight.level as Level}
+                    icon={<Warehouse className="h-4 w-4 text-white" />} />
+                <InsightCard title="Customer Loyalty" text={customerInsight.text} level={customerInsight.level as Level}
+                    icon={<Users className="h-4 w-4 text-white" />} />
+                <InsightCard title="Revenue Projection" text={projectionInsight.text} level={projectionInsight.level as Level}
+                    icon={<Target className="h-4 w-4 text-white" />} />
+                <InsightCard title="Delivery Performance" text={deliveryInsight.text} level={deliveryInsight.level as Level}
+                    icon={<Truck className="h-4 w-4 text-white" />} />
+                {data.busiest_day && (
+                    <InsightCard title="Peak Day" level="info"
+                        text={`${data.busiest_day} is your busiest day based on the last 30 days. Prioritize stock replenishment and rider availability on that day.`}
+                        icon={<CalendarDays className="h-4 w-4 text-white" />} />
+                )}
+            </div>
+        </section>
+    );
+}
+
+// ── Recommendations Card ────────────────────────────────────────────────────────
+
+function RecommendationsCard({ recs }: { recs: Recommendation[] }) {
+    const REC_STYLE = {
+        critical: { dot: 'bg-red-500',     text: 'text-red-700',     bg: 'bg-red-50 border-red-200'     },
+        warning:  { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200' },
+        success:  { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+        info:     { dot: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200'   },
+    } as const;
+
+    return (
+        <section className="space-y-4">
+            <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 shadow-sm">
+                    <CheckCircle2 className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-gray-900">Actionable Recommendations</h2>
+                    <p className="text-sm text-gray-500">Steps you can take right now based on your data</p>
+                </div>
+            </div>
+
+            <Card>
+                <CardContent className="py-4 space-y-3">
+                    {recs.map((rec, i) => {
+                        const s = REC_STYLE[rec.type];
+                        return (
+                            <div key={i} className={`flex items-start gap-3 rounded-lg border p-3 ${s.bg}`}>
+                                <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${s.dot}`} />
+                                <p className={`text-sm leading-relaxed ${s.text}`}>{rec.text}</p>
+                            </div>
+                        );
+                    })}
+                </CardContent>
+            </Card>
+        </section>
+    );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, generatedAt }: Props) {
+export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt }: Props) {
     const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
     const warningCount  = reorderAlerts.filter((a) => a.severity === 'warning').length;
 
@@ -552,6 +812,18 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
             {/* Content */}
             <div className="flex flex-1 flex-col gap-10 p-6">
 
+                <MonthlySummaryCard data={insights} />
+
+                <Separator />
+
+                <InsightsSection data={insights} reorderAlerts={reorderAlerts} />
+
+                <Separator />
+
+                <RecommendationsCard recs={insights.recommendations} />
+
+                <Separator />
+
                 {/* Reorder Alerts */}
                 <section className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -624,8 +896,8 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                 {/* Footer note */}
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400">
                     <Brain className="mx-auto mb-1.5 h-5 w-5 text-gray-300" />
-                    DSS computations use Simple Moving Average for demand forecasting and Ordinary Least Squares
-                    linear regression for trend analysis. All results are scoped to your store and exclude cancelled orders.
+                    DSS computations use Simple Moving Average for demand forecasting and Ordinary Least Squares linear regression for trend analysis.
+                    Insights and recommendations are generated using rule-based IF/ELSE logic — not AI. All results are scoped to your store and exclude cancelled orders.
                 </div>
             </div>
         </AppLayout>

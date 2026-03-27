@@ -1,6 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ArchiveRestore, Edit2, Search, Trash2, Users } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
+import { AddressFields } from '@/components/address-fields';
 import { toast } from 'sonner';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -451,34 +452,15 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                         </div>
 
                         {/* Address */}
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="address">Address</Label>
-                            <Input
-                                id="address"
-                                value={data.address}
-                                onChange={(e) => setData('address', e.target.value)}
-                            />
-                        </div>
-
-                        {/* City + Barangay */}
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="city">City</Label>
-                                <Input
-                                    id="city"
-                                    value={data.city}
-                                    onChange={(e) => setData('city', e.target.value)}
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="barangay">Barangay</Label>
-                                <Input
-                                    id="barangay"
-                                    value={data.barangay}
-                                    onChange={(e) => setData('barangay', e.target.value)}
-                                />
-                            </div>
-                        </div>
+                        <AddressFields
+                            address={data.address}
+                            city={data.city}
+                            barangay={data.barangay}
+                            onAddressChange={(v) => setData('address', v)}
+                            onCityChange={(v) => setData('city', v)}
+                            onBarangayChange={(v) => setData('barangay', v)}
+                            errors={errors}
+                        />
 
                         {/* Phone + Email */}
                         <div className="grid grid-cols-2 gap-3">

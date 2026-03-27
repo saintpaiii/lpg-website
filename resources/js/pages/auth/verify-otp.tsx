@@ -9,9 +9,10 @@ import { useFlashToast } from '@/hooks/use-flash-toast';
 type Props = {
     email: string;
     resend_available: number; // seconds until resend is available (0 = available now)
+    code_expires_in: number;  // seconds until current OTP expires
 };
 
-export default function VerifyOtp({ email, resend_available }: Props) {
+export default function VerifyOtp({ email, resend_available, code_expires_in }: Props) {
     useFlashToast();
 
     // 6 individual digit refs
@@ -33,6 +34,21 @@ export default function VerifyOtp({ email, resend_available }: Props) {
         }, 1000);
         return () => clearInterval(timer);
     }, [countdown]);
+
+    // OTP expiry countdown
+    const [otpCountdown, setOtpCountdown] = useState(code_expires_in > 0 ? code_expires_in : 0);
+    const otpExpired = otpCountdown <= 0;
+
+    useEffect(() => {
+        if (otpCountdown <= 0) return;
+        const timer = setInterval(() => {
+            setOtpCountdown((c) => {
+                if (c <= 1) { clearInterval(timer); return 0; }
+                return c - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [otpCountdown]);
 
     // Focus first input on mount
     useEffect(() => {
@@ -121,6 +137,7 @@ export default function VerifyOtp({ email, resend_available }: Props) {
             onSuccess: () => {
                 setResending(false);
                 setCountdown(60);
+                setOtpCountdown(60); // reset OTP expiry timer for the new code
                 // Clear digits and refocus
                 setDigits(['', '', '', '', '', '']);
                 setTimeout(() => inputRefs.current[0]?.focus(), 50);
@@ -211,7 +228,7 @@ export default function VerifyOtp({ email, resend_available }: Props) {
                                 <Button
                                     type="submit"
                                     className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                                    disabled={submitting || digits.join('').length < 6}
+                                    disabled={submitting || digits.join('').length < 6 || otpExpired}
                                 >
                                     {submitting
                                         ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Verifying…</>
@@ -245,9 +262,19 @@ export default function VerifyOtp({ email, resend_available }: Props) {
                             </p>
                         </div>
 
-                                        <p className="mt-5 text-center text-xs text-gray-400 dark:text-gray-500">
-                            Code expires in 10 minutes. Check your spam folder if you don't see it.
-                        </p>
+                                        {otpExpired ? (
+                            <p className="mt-5 text-center text-sm font-medium text-red-500 dark:text-red-400">
+                                Code expired. Click Resend to get a new one.
+                            </p>
+                        ) : (
+                            <p className="mt-5 text-center text-xs text-gray-400 dark:text-gray-500">
+                                Code expires in{' '}
+                                <span className="font-medium tabular-nums text-gray-500 dark:text-gray-400">
+                                    {Math.floor(otpCountdown / 60)}:{String(otpCountdown % 60).padStart(2, '0')}
+                                </span>
+                                . Check your spam folder if you don&apos;t see it.
+                            </p>
+                        )}
 
                         <p className="mt-3 text-center text-xs text-gray-400 dark:text-gray-500">
                             Wrong email?{' '}

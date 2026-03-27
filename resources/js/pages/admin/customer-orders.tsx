@@ -6,6 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate, fmtMoney } from '@/lib/utils';
 import * as customerRoutes from '@/routes/admin/customers';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
                         <p className="mt-0.5 text-sm text-gray-500">
-                            {customer.barangay}{customer.city ? `, ${customer.city}` : ''} ·{' '}
+                            {formatAddress(null, customer.barangay ?? null, customer.city ?? null)} ·{' '}
                             {customer.phone ?? 'No phone'} ·{' '}
                             <span className="capitalize">{customer.customer_type}</span>
                         </p>

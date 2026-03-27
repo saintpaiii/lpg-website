@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import CustomerLayout from '@/layouts/customer-layout';
+import { formatAddress } from '@/data/cavite-locations';
 import type { FormEvent } from 'react';
 
 type TransactionType = 'refill' | 'new_purchase';
@@ -340,8 +341,7 @@ export default function OrderCreate({ products, defaultAddress }: Props) {
                             {defaultAddress && (
                                 <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 px-3 py-2.5 text-xs text-blue-800 dark:text-blue-300">
                                     <p className="font-semibold mb-0.5">Delivery address:</p>
-                                    <p>{defaultAddress.address}</p>
-                                    <p>{defaultAddress.barangay && `${defaultAddress.barangay}, `}{defaultAddress.city}</p>
+                                    <p>{formatAddress(defaultAddress.address, defaultAddress.barangay, defaultAddress.city)}</p>
                                 </div>
                             )}
 

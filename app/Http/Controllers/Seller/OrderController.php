@@ -68,9 +68,13 @@ class OrderController extends Controller
                     'brand' => $item->product->brand,
                 ] : null,
             ])->values()->all(),
-            'has_invoice'    => $o->invoice()->exists(),
-            'invoice_number' => $o->invoice?->invoice_number,
-            'invoice_id'     => $o->invoice?->id,
+            'has_invoice'         => $o->invoice()->exists(),
+            'invoice_number'      => $o->invoice?->invoice_number,
+            'invoice_id'          => $o->invoice?->id,
+            'cancellation_reason' => $o->cancellation_reason,
+            'cancellation_notes'  => $o->cancellation_notes,
+            'cancelled_by'        => $o->cancelled_by,
+            'cancelled_at'        => $o->cancelled_at?->format('M d, Y g:i A'),
         ];
     }
 
@@ -229,7 +233,7 @@ class OrderController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($order->store_id !== $store->id) abort(403);
 
-        $order->load(['customer', 'items.product', 'invoice', 'delivery.rider']);
+        $order->load(['customer', 'items.product', 'invoice', 'delivery.rider', 'payments']);
 
         // Riders for this store (seller_staff with sub_role=rider)
         $riders = User::where('store_id', $store->id)
@@ -242,6 +246,8 @@ class OrderController extends Controller
             ->values()
             ->all();
 
+        $latestPayment = $order->payments->sortByDesc('created_at')->first();
+
         return Inertia::render('seller/order-show', [
             'order' => $this->formatOrder($order) + [
                 'delivery' => $order->delivery ? [
@@ -252,6 +258,12 @@ class OrderController extends Controller
                         : null,
                     'assigned_at'  => $order->delivery->assigned_at?->format('M d, Y g:i A'),
                     'delivered_at' => $order->delivery->delivered_at?->format('M d, Y g:i A'),
+                ] : null,
+                'payment_record' => $latestPayment ? [
+                    'status'    => $latestPayment->status,
+                    'pay_ref'   => $latestPayment->paymongo_checkout_id,
+                    'paid_at'   => $latestPayment->paid_at?->format('M d, Y'),
+                    'method'    => $latestPayment->payment_method,
                 ] : null,
             ],
             'riders' => $riders,
@@ -264,7 +276,9 @@ class OrderController extends Controller
         if ($order->store_id !== $store->id) abort(403);
 
         $data = $request->validate([
-            'status' => 'required|in:pending,confirmed,preparing,out_for_delivery,delivered,cancelled',
+            'status'              => 'required|in:pending,confirmed,preparing,out_for_delivery,delivered,cancelled',
+            'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:255',
+            'cancellation_notes'  => 'nullable|string|max:1000',
         ]);
 
         $newStatus = $data['status'];
@@ -338,6 +352,17 @@ class OrderController extends Controller
             $updates = ['status' => $newStatus];
             if ($newStatus === 'delivered' && ! $order->delivered_at) {
                 $updates['delivered_at'] = now();
+            }
+            if ($newStatus === 'cancelled') {
+                $updates['cancellation_reason'] = $data['cancellation_reason'] ?? null;
+                $updates['cancellation_notes']  = $data['cancellation_notes'] ?? null;
+                $updates['cancelled_by']         = 'seller';
+                $updates['cancelled_at']         = now();
+
+                // Void invoice if one exists
+                if ($order->invoice) {
+                    $order->invoice->update(['payment_status' => 'voided']);
+                }
             }
             $order->update($updates);
         });

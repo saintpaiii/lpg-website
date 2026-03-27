@@ -240,7 +240,7 @@ class StaffController extends Controller
         ]);
 
         $user->delete();
-        return back()->with('success', "{$user->name} archived.");
+        return redirect()->route('seller.staff', ['tab' => 'archived'])->with('success', "{$user->name} archived.");
     }
 
     public function restore(User $user): RedirectResponse
@@ -256,7 +256,19 @@ class StaffController extends Controller
             'deactivated_at'      => null,
             'deactivated_by'      => null,
         ]);
-        return back()->with('success', "{$user->name} restored.");
+        return redirect()->route('seller.staff')->with('success', "{$user->name} restored.");
+    }
+
+    public function forceDestroy(User $user): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        if ($user->store_id !== $store->id) abort(403);
+
+        $name = $user->name;
+        UserPermission::where('user_id', $user->id)->forceDelete();
+        $user->forceDelete();
+
+        return redirect()->route('seller.staff', ['tab' => 'archived'])->with('success', "{$name} permanently deleted.");
     }
 
     public function toggle(Request $request, User $user): RedirectResponse

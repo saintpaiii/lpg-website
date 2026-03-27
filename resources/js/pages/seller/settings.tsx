@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
+import { AddressFields } from '@/components/address-fields';
 import {
     Building2,
     Camera,
@@ -7,6 +8,7 @@ import {
     MapPin,
     Phone,
     Store,
+    Truck,
 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ interface StoreData {
     email: string | null;
     logo_url: string | null;
     commission_rate: number;
+    delivery_fee: number;
 }
 
 interface Props {
@@ -56,6 +59,7 @@ export default function SellerSettings({ store }: Props) {
         province: string;
         phone: string;
         email: string;
+        delivery_fee: string;
         logo: File | null;
         _method: string;
     }>({
@@ -67,8 +71,9 @@ export default function SellerSettings({ store }: Props) {
         province:    store.province,
         phone:       store.phone ?? '',
         email:       store.email ?? '',
-        logo:        null,
-        _method:     'PUT',
+        delivery_fee: store.delivery_fee > 0 ? String(store.delivery_fee) : '',
+        logo:         null,
+        _method:      'PUT',
     });
 
     function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -193,6 +198,34 @@ export default function SellerSettings({ store }: Props) {
                         </CardContent>
                     </Card>
 
+                    {/* Delivery */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Truck className="h-4 w-4 text-blue-600" />
+                                Delivery
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="delivery_fee">Delivery Fee (₱)</Label>
+                                <Input
+                                    id="delivery_fee"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={data.delivery_fee}
+                                    onChange={(e) => setData('delivery_fee', e.target.value)}
+                                    placeholder="50.00"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Flat delivery fee charged to customers per order. Set to 0 for free delivery.
+                                </p>
+                                {errors.delivery_fee && <p className="text-xs text-red-500">{errors.delivery_fee}</p>}
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* Contact & Location */}
                     <Card>
                         <CardHeader>
@@ -202,50 +235,15 @@ export default function SellerSettings({ store }: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
-                                <Input
-                                    id="address"
-                                    value={data.address}
-                                    onChange={(e) => setData('address', e.target.value)}
-                                    placeholder="Street address"
-                                />
-                                {errors.address && <p className="text-xs text-red-500">{errors.address}</p>}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="barangay">Barangay</Label>
-                                    <Input
-                                        id="barangay"
-                                        value={data.barangay}
-                                        onChange={(e) => setData('barangay', e.target.value)}
-                                        placeholder="Barangay"
-                                    />
-                                    {errors.barangay && <p className="text-xs text-red-500">{errors.barangay}</p>}
-                                </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="city">City / Municipality <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        id="city"
-                                        value={data.city}
-                                        onChange={(e) => setData('city', e.target.value)}
-                                        placeholder="City"
-                                    />
-                                    {errors.city && <p className="text-xs text-red-500">{errors.city}</p>}
-                                </div>
-                            </div>
-
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="province">Province <span className="text-red-500">*</span></Label>
-                                <Input
-                                    id="province"
-                                    value={data.province}
-                                    onChange={(e) => setData('province', e.target.value)}
-                                    placeholder="e.g. Cavite"
-                                />
-                                {errors.province && <p className="text-xs text-red-500">{errors.province}</p>}
-                            </div>
+                            <AddressFields
+                                address={data.address}
+                                city={data.city}
+                                barangay={data.barangay}
+                                onAddressChange={(v) => setData('address', v)}
+                                onCityChange={(v) => setData('city', v)}
+                                onBarangayChange={(v) => setData('barangay', v)}
+                                errors={errors}
+                            />
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="grid gap-1.5">

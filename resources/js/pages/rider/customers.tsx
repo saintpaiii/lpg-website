@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Customers', href: '/rider/customers' }];
 
@@ -165,7 +166,7 @@ export default function RiderCustomers({ customers, filters }: Props) {
                                                     {(c.address || c.barangay) ? (
                                                         <span className="flex items-start gap-1 text-gray-600 text-xs">
                                                             <MapPin className="h-3.5 w-3.5 shrink-0 text-gray-400 mt-0.5" />
-                                                            {[c.address, c.barangay, c.city].filter(Boolean).join(', ')}
+                                                            {formatAddress(c.address, c.barangay, c.city)}
                                                         </span>
                                                     ) : <span className="text-gray-300">—</span>}
                                                 </td>

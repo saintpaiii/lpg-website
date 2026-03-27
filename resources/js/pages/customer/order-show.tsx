@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Camera, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, MapPin, Printer, RefreshCw, Star } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, Circle, Clock, ExternalLink, MapPin, Printer, Star, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,15 @@ type Payment = {
     paid_at: string | null;
 };
 
+const CANCEL_REASONS = [
+    'Changed my mind',
+    'Found a better price',
+    'Ordered by mistake',
+    'Delivery takes too long',
+    'Want to change order details',
+    'Other',
+];
+
 type Order = {
     id: number;
     order_number: string;
@@ -32,6 +41,10 @@ type Order = {
     payment_method: string | null;
     payment_status: string;
     notes: string | null;
+    cancellation_reason: string | null;
+    cancellation_notes: string | null;
+    cancelled_by: 'customer' | 'seller' | null;
+    cancelled_at: string | null;
     ordered_at: string | null;
     delivered_at: string | null;
     created_at: string;
@@ -167,14 +180,31 @@ function DeliveryTimeline({ proofs }: { proofs: NonNullable<Order['delivery']>['
     );
 }
 
-function StatusStepper({ status }: { status: string }) {
+function StatusStepper({ status, order }: { status: string; order: Order }) {
     const isCancelled = status === 'cancelled';
     const currentIdx  = ORDER_STEPS.findIndex((s) => s.key === status);
 
     if (isCancelled) {
         return (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
-                This order has been cancelled.
+            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 space-y-1">
+                <p className="text-sm text-red-700 font-medium">
+                    This order was cancelled
+                    {order.cancelled_by === 'customer' ? ' by you' : order.cancelled_by === 'seller' ? ' by the seller' : ''}.
+                </p>
+                {order.cancellation_reason && (
+                    <p className="text-sm text-red-600">Reason: {order.cancellation_reason}</p>
+                )}
+                {order.cancellation_notes && (
+                    <p className="text-xs text-red-500 italic">"{order.cancellation_notes}"</p>
+                )}
+                {order.cancelled_at && (
+                    <p className="text-xs text-red-400">Cancelled at {order.cancelled_at}</p>
+                )}
+                {order.payment_status === 'paid' && (
+                    <p className="text-xs text-amber-700 mt-1 pt-1 border-t border-red-200">
+                        Your payment will be refunded by the seller.
+                    </p>
+                )}
             </div>
         );
     }
@@ -242,8 +272,25 @@ function StarSelector({ value, onChange }: { value: number; onChange: (v: number
 
 export default function OrderShow({ order }: Props) {
     const canPrint  = order.invoice && ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
-    const [paying, setPaying]     = useState(false);
-    const [verifying, setVerifying] = useState(false);
+    const canCancel = ['pending', 'confirmed'].includes(order.status);
+    const [cancelOpen,     setCancelOpen]      = useState(false);
+    const [cancelReason,   setCancelReason]    = useState('');
+    const [cancelNotes,    setCancelNotes]     = useState('');
+    const [cancelling,     setCancelling]      = useState(false);
+
+    function submitCancel() {
+        if (!cancelReason) return;
+        setCancelling(true);
+        router.post(`/customer/orders/${order.id}/cancel`, {
+            cancellation_reason: cancelReason,
+            cancellation_notes:  cancelNotes,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { setCancelOpen(false); setCancelReason(''); setCancelNotes(''); },
+            onError:   () => toast.error('Failed to cancel order. Please try again.'),
+            onFinish:  () => setCancelling(false),
+        });
+    }
 
     // Rating state
     const [rateOpen, setRateOpen] = useState(false);
@@ -285,11 +332,6 @@ export default function OrderShow({ order }: Props) {
         });
     }
 
-    function getCsrfToken(): string {
-        const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-        return match ? decodeURIComponent(match[1]) : '';
-    }
-
     // Show toast for ?payment=success|cancelled query param
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -297,7 +339,7 @@ export default function OrderShow({ order }: Props) {
         if (val === 'success') {
             toast.success('Payment received! Your order has been updated.');
         } else if (val === 'cancelled') {
-            toast.error('Payment was cancelled. You can retry below.');
+            toast.error('Payment was cancelled.');
         }
         if (val) {
             const url = new URL(window.location.href);
@@ -305,74 +347,6 @@ export default function OrderShow({ order }: Props) {
             window.history.replaceState({}, '', url.toString());
         }
     }, []);
-
-    // Whether to show Pay Now / Retry
-    const showPayButton = order.payment_status !== 'paid' && (
-        !order.payment || order.payment.status === 'pending' || order.payment.status === 'cancelled' || order.payment.status === 'failed'
-    ) && order.status !== 'cancelled';
-
-    // Only show for online payment orders (no payment_method means online)
-    const isOnlineOrder = order.payment !== null || order.payment_method === null;
-
-    function handlePayNow() {
-        setPaying(true);
-        fetch(`/customer/orders/${order.id}/pay`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-XSRF-TOKEN': getCsrfToken(),
-            },
-            body: JSON.stringify({}),
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.checkout_url) {
-                    window.location.href = data.checkout_url;
-                } else {
-                    toast.error(data.error ?? 'Could not start payment. Please try again.');
-                    setPaying(false);
-                }
-            })
-            .catch(() => {
-                toast.error('Network error. Please try again.');
-                setPaying(false);
-            });
-    }
-
-    function handleVerifyPayment() {
-        setVerifying(true);
-        fetch(`/customer/orders/${order.id}/verify-payment`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-XSRF-TOKEN': getCsrfToken(),
-            },
-            body: JSON.stringify({}),
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                if (data.status === 'paid') {
-                    toast.success(data.message);
-                    router.reload({ only: ['order'] });
-                } else if (data.status === 'error') {
-                    toast.error(data.message);
-                } else {
-                    toast.info(data.message);
-                }
-                setVerifying(false);
-            })
-            .catch(() => {
-                toast.error('Network error. Please try again.');
-                setVerifying(false);
-            });
-    }
-
-    // Show verify button when there is a pending payment and order isn't cancelled/paid
-    const showVerifyButton = order.payment?.status === 'pending'
-        && order.payment_status !== 'paid'
-        && order.status !== 'cancelled';
 
     return (
         <CustomerLayout>
@@ -393,31 +367,6 @@ export default function OrderShow({ order }: Props) {
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
-                        {isOnlineOrder && showPayButton && (
-                            <Button
-                                size="sm"
-                                onClick={handlePayNow}
-                                disabled={paying || verifying}
-                                className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                                <CreditCard className="h-4 w-4" />
-                                {order.payment?.status === 'cancelled' || order.payment?.status === 'failed'
-                                    ? 'Retry Payment'
-                                    : 'Pay Now'}
-                            </Button>
-                        )}
-                        {showVerifyButton && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={handleVerifyPayment}
-                                disabled={verifying || paying}
-                                className="gap-1.5"
-                            >
-                                <RefreshCw className={`h-4 w-4 ${verifying ? 'animate-spin' : ''}`} />
-                                Verify Payment
-                            </Button>
-                        )}
                         {canRate && (
                             <Button
                                 size="sm"
@@ -427,6 +376,17 @@ export default function OrderShow({ order }: Props) {
                             >
                                 <Star className="h-4 w-4" />
                                 Rate Products
+                            </Button>
+                        )}
+                        {canCancel && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={() => { setCancelReason(''); setCancelNotes(''); setCancelOpen(true); }}
+                            >
+                                <XCircle className="h-4 w-4" />
+                                Cancel Order
                             </Button>
                         )}
                         {canPrint && (
@@ -446,7 +406,7 @@ export default function OrderShow({ order }: Props) {
                         <CardTitle className="text-base">Delivery Status</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <StatusStepper status={order.status} />
+                        <StatusStepper status={order.status} order={order} />
                         {order.delivery && (
                             <>
                                 <div className="mt-4 pt-4 border-t border-gray-100 grid gap-2 sm:grid-cols-2 text-sm">
@@ -617,13 +577,75 @@ export default function OrderShow({ order }: Props) {
                     </div>
                 </div>
             </div>
+            {/* Cancel Order dialog */}
+            <Dialog open={cancelOpen} onOpenChange={(open) => !open && setCancelOpen(false)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            Cancel Order
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-1">
+                        <p className="text-sm text-gray-600">
+                            Cancel order <strong className="font-mono">{order.order_number}</strong>?
+                            {order.status === 'confirmed' && ' Stock will be restored to the seller.'}
+                        </p>
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">
+                                Reason <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Select a reason…</option>
+                                {CANCEL_REASONS.map((r) => (
+                                    <option key={r} value={r}>{r}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">
+                                Additional notes <span className="text-gray-400 text-xs">(optional)</span>
+                            </label>
+                            <textarea
+                                value={cancelNotes}
+                                onChange={(e) => setCancelNotes(e.target.value)}
+                                rows={3}
+                                placeholder="Any additional details…"
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                            />
+                        </div>
+                        {order.payment_status === 'paid' && (
+                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                Your order was paid. A refund will be processed by the seller.
+                            </p>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCancelOpen(false)} disabled={cancelling}>
+                            Keep Order
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={submitCancel}
+                            disabled={cancelling || !cancelReason}
+                        >
+                            {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Rate Products dialog */}
             <Dialog open={rateOpen} onOpenChange={(o) => !o && setRateOpen(false)}>
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <Star className="h-4 w-4 text-amber-400" />
-                            Rate Your Products
+                            Rate Products
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-5 py-2">

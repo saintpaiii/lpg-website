@@ -1,5 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
+import { AddressFields } from '@/components/address-fields';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,43 +103,15 @@ export default function CustomerProfile({ profile }: Props) {
                                 </div>
                             </div>
 
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="address" className="text-sm font-medium">Street address <span className="text-red-500">*</span></Label>
-                                <Input
-                                    id="address"
-                                    value={profileForm.data.address}
-                                    onChange={(e) => profileForm.setData('address', e.target.value)}
-                                />
-                                {profileForm.errors.address && (
-                                    <p className="text-xs text-red-500">{profileForm.errors.address}</p>
-                                )}
-                            </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="city" className="text-sm font-medium">City / Municipality <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        id="city"
-                                        value={profileForm.data.city}
-                                        onChange={(e) => profileForm.setData('city', e.target.value)}
-                                    />
-                                    {profileForm.errors.city && (
-                                        <p className="text-xs text-red-500">{profileForm.errors.city}</p>
-                                    )}
-                                </div>
-
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="barangay" className="text-sm font-medium">Barangay</Label>
-                                    <Input
-                                        id="barangay"
-                                        value={profileForm.data.barangay}
-                                        onChange={(e) => profileForm.setData('barangay', e.target.value)}
-                                    />
-                                    {profileForm.errors.barangay && (
-                                        <p className="text-xs text-red-500">{profileForm.errors.barangay}</p>
-                                    )}
-                                </div>
-                            </div>
+                            <AddressFields
+                                address={profileForm.data.address}
+                                city={profileForm.data.city}
+                                barangay={profileForm.data.barangay}
+                                onAddressChange={(v) => profileForm.setData('address', v)}
+                                onCityChange={(v) => profileForm.setData('city', v)}
+                                onBarangayChange={(v) => profileForm.setData('barangay', v)}
+                                errors={profileForm.errors}
+                            />
 
                             <div className="pt-2">
                                 <Button

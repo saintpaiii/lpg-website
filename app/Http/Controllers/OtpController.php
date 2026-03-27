@@ -28,14 +28,18 @@ class OtpController extends Controller
         }
 
         // Generate a code if there's no active one yet
-        if (! OtpCode::latestActiveFor($user)) {
-            $otp = OtpCode::generateFor($user);
-            Mail::to($user->email)->send(new OtpMail($user, $otp->code));
+        $activeOtp = OtpCode::latestActiveFor($user);
+        if (! $activeOtp) {
+            $activeOtp = OtpCode::generateFor($user);
+            Mail::to($user->email)->send(new OtpMail($user, $activeOtp->code));
         }
 
+        $expiresIn = max(0, (int) now()->diffInSeconds($activeOtp->expires_at, false));
+
         return Inertia::render('auth/verify-otp', [
-            'email'           => $user->email,
+            'email'            => $user->email,
             'resend_available' => $this->resendAvailableIn($user->id),
+            'code_expires_in'  => $expiresIn,
         ]);
     }
 

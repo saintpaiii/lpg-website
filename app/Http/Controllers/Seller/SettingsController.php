@@ -28,6 +28,7 @@ class SettingsController extends Controller
                 'email'       => $store->email,
                 'logo_url'    => $store->logo ? Storage::url($store->logo) : null,
                 'commission_rate'  => (float) $store->commission_rate,
+                'delivery_fee'    => (float) ($store->delivery_fee ?? 0),
             ],
         ]);
     }
@@ -43,9 +44,10 @@ class SettingsController extends Controller
             'city'        => 'required|string|max:100',
             'barangay'    => 'nullable|string|max:100',
             'province'    => 'required|string|max:100',
-            'phone'       => 'nullable|string|max:20',
-            'email'       => 'nullable|email|max:255',
-            'logo'        => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'phone'        => 'nullable|string|max:20',
+            'email'        => 'nullable|email|max:255',
+            'delivery_fee' => 'nullable|numeric|min:0|max:9999.99',
+            'logo'         => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
         ]);
 
         $updates = [
@@ -55,8 +57,9 @@ class SettingsController extends Controller
             'city'        => $data['city'],
             'barangay'    => $data['barangay'] ?? null,
             'province'    => $data['province'],
-            'phone'       => $data['phone'] ?? null,
-            'email'       => $data['email'] ?? null,
+            'phone'        => $data['phone'] ?? null,
+            'email'        => $data['email'] ?? null,
+            'delivery_fee' => $data['delivery_fee'] ?? 0,
         ];
 
         if ($request->hasFile('logo')) {
@@ -68,6 +71,6 @@ class SettingsController extends Controller
 
         $store->update($updates);
 
-        return back()->with('success', 'Store settings updated.');
+        return back()->with('success', 'Settings saved successfully.');
     }
 }

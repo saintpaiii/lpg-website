@@ -61,6 +61,7 @@ Route::middleware(['auth', 'verified', 'seller'])
         Route::middleware('permission:invoices.view')->group(function () {
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+            Route::post('invoices/{invoice}/record-payment', [InvoiceController::class, 'recordPayment'])->name('invoices.record-payment');
         });
 
         // ── Inventory ────────────────────────────────────────────────────────
@@ -83,6 +84,8 @@ Route::middleware(['auth', 'verified', 'seller'])
             Route::delete('staff/{user}', [StaffController::class, 'destroy'])->name('staff.destroy');
             Route::post('staff/{user}/restore', [StaffController::class, 'restore'])
                 ->withTrashed()->name('staff.restore');
+            Route::delete('staff/{user}/force', [StaffController::class, 'forceDestroy'])
+                ->withTrashed()->name('staff.force-delete');
         });
 
         // ── Reviews ──────────────────────────────────────────────────────────
@@ -104,5 +107,6 @@ Route::middleware(['auth', 'verified', 'seller'])
         Route::middleware('permission:settings.view')->group(function () {
             Route::get('settings', [SettingsController::class, 'index'])->name('settings');
             Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
+            Route::put('settings', [SettingsController::class, 'update']);
         });
     });

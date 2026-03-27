@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, Loader2, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
+import { CheckCircle, Eye, Loader2, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -30,6 +30,7 @@ type Order = {
     payment_status: string;
     customer: { id: number; name: string } | null;
     created_at: string;
+    cancelled_by: 'customer' | 'seller' | null;
 };
 
 type Rider  = { id: number; name: string };
@@ -67,10 +68,12 @@ type ActionDialog =
     | null;
 
 export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
-    const [searchVal, setSearchVal] = useState(filters.search ?? '');
-    const [dialog,    setDialog]    = useState<ActionDialog>(null);
-    const [riderId,   setRiderId]   = useState('');
-    const [loading,   setLoading]   = useState(false);
+    const [searchVal,    setSearchVal]    = useState(filters.search ?? '');
+    const [dialog,       setDialog]       = useState<ActionDialog>(null);
+    const [riderId,      setRiderId]      = useState('');
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelNotes,  setCancelNotes]  = useState('');
+    const [loading,      setLoading]      = useState(false);
 
     function goTab(t: string) {
         router.get('/seller/orders', { tab: t, search: searchVal }, { preserveState: true, replace: true });
@@ -83,12 +86,14 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
     function openDialog(d: ActionDialog) {
         setRiderId('');
+        setCancelReason('');
+        setCancelNotes('');
         setDialog(d);
     }
 
-    function patchStatus(orderId: number, status: string, onDone?: () => void) {
+    function patchStatus(orderId: number, status: string, extra: Record<string, string> = {}, onDone?: () => void) {
         setLoading(true);
-        router.patch(`/seller/orders/${orderId}/status`, { status }, {
+        router.patch(`/seller/orders/${orderId}/status`, { status, ...extra }, {
             preserveScroll: true,
             onSuccess: () => { setDialog(null); onDone?.(); },
             onError: (errs) => {
@@ -111,7 +116,11 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
     function handleCancel() {
         if (!dialog || dialog.type !== 'cancel') return;
-        patchStatus(dialog.order.id, 'cancelled');
+        if (!cancelReason) { toast.error('Please select a cancellation reason.'); return; }
+        patchStatus(dialog.order.id, 'cancelled', {
+            cancellation_reason: cancelReason,
+            cancellation_notes:  cancelNotes,
+        });
     }
 
     function handleAssignRider() {
@@ -201,20 +210,16 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Payment</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
-                                        {tab === 'active' && (
-                                            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Actions</th>
-                                        )}
+                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {orders.data.length === 0 ? (
-                                        <tr><td colSpan={tab === 'active' ? 7 : 6} className="text-center py-12 text-muted-foreground">No orders found.</td></tr>
+                                        <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No orders found.</td></tr>
                                     ) : orders.data.map((o) => (
                                         <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                             <td className="px-4 py-3">
-                                                <Link href={`/seller/orders/${o.id}`} className="font-mono text-xs text-blue-600 hover:underline font-medium">
-                                                    {o.order_number}
-                                                </Link>
+                                                <p className="font-mono text-xs text-blue-600 font-medium">{o.order_number}</p>
                                                 <p className="text-xs text-muted-foreground capitalize">{o.transaction_type.replace('_', ' ')}</p>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{o.customer?.name ?? '—'}</td>
@@ -225,6 +230,11 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
                                                     {o.status.replace('_', ' ')}
                                                 </span>
+                                                {o.status === 'cancelled' && o.cancelled_by && (
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                        by {o.cancelled_by === 'customer' ? 'Customer' : 'Seller'}
+                                                    </p>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center hidden md:table-cell">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[o.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
@@ -234,11 +244,9 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
                                                 {fmtDate(o.created_at)}
                                             </td>
-                                            {tab === 'active' && (
-                                                <td className="px-4 py-3 text-center">
-                                                    <OrderActions order={o} riders={riders} onOpen={openDialog} />
-                                                </td>
-                                            )}
+                                            <td className="px-4 py-3">
+                                                <OrderActions order={o} riders={riders} tab={tab} onOpen={openDialog} />
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -315,9 +323,36 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                 ' Stock will be restored.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    <div className="space-y-3 px-1 pb-2">
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">Reason <span className="text-red-500">*</span></label>
+                            <select
+                                value={cancelReason}
+                                onChange={(e) => setCancelReason(e.target.value)}
+                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                                <option value="">Select a reason…</option>
+                                <option value="Out of stock">Out of stock</option>
+                                <option value="Cannot fulfill order">Cannot fulfill order</option>
+                                <option value="Customer requested cancellation">Customer requested cancellation</option>
+                                <option value="Store temporarily closed">Store temporarily closed</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-sm font-medium">Notes <span className="text-muted-foreground text-xs">(optional)</span></label>
+                            <textarea
+                                value={cancelNotes}
+                                onChange={(e) => setCancelNotes(e.target.value)}
+                                rows={2}
+                                placeholder="Additional details…"
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+                            />
+                        </div>
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={loading}>Keep Order</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleCancel} disabled={loading}
+                        <AlertDialogAction onClick={handleCancel} disabled={loading || !cancelReason}
                             className="bg-red-600 hover:bg-red-700">
                             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
                             Cancel Order
@@ -367,45 +402,62 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 }
 
 function OrderActions({
-    order, riders, onOpen,
+    order, riders, tab, onOpen,
 }: {
     order:  Order;
     riders: Rider[];
+    tab:    string;
     onOpen: (d: ActionDialog) => void;
 }) {
     const isFinal = ['delivered', 'cancelled'].includes(order.status);
-    if (isFinal) return <span className="text-xs text-muted-foreground">—</span>;
 
     return (
-        <div className="flex items-center justify-center gap-1 flex-wrap">
-            {order.status === 'pending' && (
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+            {/* View — always present */}
+            <Link href={`/seller/orders/${order.id}`}>
                 <Button size="sm" variant="outline"
-                    className="h-7 px-2 text-xs text-green-700 border-green-300 hover:bg-green-50"
-                    onClick={() => onOpen({ type: 'confirm', order })}>
-                    Confirm
+                    className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
+                    <Eye className="h-3 w-3" />
+                    View
                 </Button>
-            )}
-            {order.status === 'confirmed' && (
-                <Button size="sm" variant="outline"
-                    className="h-7 px-2 text-xs text-purple-700 border-purple-300 hover:bg-purple-50"
-                    onClick={() => onOpen({ type: 'prepare', order })}>
-                    Prepare
-                </Button>
-            )}
-            {order.status === 'preparing' && (
-                <Button size="sm" variant="outline"
-                    className="h-7 px-2 text-xs text-orange-700 border-orange-300 hover:bg-orange-50"
-                    onClick={() => onOpen({ type: 'assign_rider', order })}>
-                    <Truck className="h-3 w-3 mr-1" />
-                    Assign
-                </Button>
-            )}
-            {!isFinal && order.status !== 'out_for_delivery' && (
-                <Button size="sm" variant="outline"
-                    className="h-7 px-2 text-xs text-red-600 border-red-300 hover:bg-red-50"
-                    onClick={() => onOpen({ type: 'cancel', order })}>
-                    Cancel
-                </Button>
+            </Link>
+
+            {/* Active-tab action buttons */}
+            {tab === 'active' && !isFinal && (
+                <>
+                    {order.status === 'pending' && (
+                        <Button size="sm"
+                            className="h-7 px-2.5 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
+                            onClick={() => onOpen({ type: 'confirm', order })}>
+                            <CheckCircle className="h-3 w-3" />
+                            Confirm
+                        </Button>
+                    )}
+                    {order.status === 'confirmed' && (
+                        <Button size="sm"
+                            className="h-7 px-2.5 text-xs bg-amber-500 hover:bg-amber-600 text-white gap-1"
+                            onClick={() => onOpen({ type: 'prepare', order })}>
+                            <Package className="h-3 w-3" />
+                            Prepare
+                        </Button>
+                    )}
+                    {order.status === 'preparing' && (
+                        <Button size="sm"
+                            className="h-7 px-2.5 text-xs bg-purple-600 hover:bg-purple-700 text-white gap-1"
+                            onClick={() => onOpen({ type: 'assign_rider', order })}>
+                            <Truck className="h-3 w-3" />
+                            Assign
+                        </Button>
+                    )}
+                    {order.status !== 'out_for_delivery' && (
+                        <Button size="sm" variant="outline"
+                            className="h-7 px-2.5 text-xs text-red-600 border-red-300 hover:bg-red-50 gap-1"
+                            onClick={() => onOpen({ type: 'cancel', order })}>
+                            <XCircle className="h-3 w-3" />
+                            Cancel
+                        </Button>
+                    )}
+                </>
             )}
         </div>
     );

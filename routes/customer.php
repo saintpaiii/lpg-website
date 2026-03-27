@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified', 'customer'])
 
         // Product browsing
         Route::get('products', [ProductBrowseController::class, 'index'])->name('products');
+        Route::get('products/{id}', [ProductBrowseController::class, 'show'])->name('products.show');
 
         // Cart
         Route::get('cart', [CartController::class, 'index'])->name('cart');
@@ -39,6 +40,7 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('orders/{order}/pay', [PaymentController::class, 'payNow'])->name('orders.pay');
         Route::post('orders/{order}/verify-payment', [OrderController::class, 'verifyPayment'])->name('orders.verify-payment');
+        Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/rate', [RatingController::class, 'store'])->name('orders.rate');
 
         // Store pages

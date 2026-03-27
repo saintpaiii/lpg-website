@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,10 @@ type StoreDetail = {
     valid_id_url: string | null;
     bir_permit_url: string | null;
     business_permit_url: string | null;
+    fsic_permit_url: string | null;
+    doe_lpg_license_url: string | null;
+    lto_permit_url: string | null;
+    terms_agreed_at: string | null;
     suspension_reason: string | null;
     suspension_notes: string | null;
     suspended_at: string | null;
@@ -279,7 +284,7 @@ export default function StoreShow({ store, stats, history }: Props) {
                             )}
                             <div className="flex items-start gap-2">
                                 <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                                <span>{store.address}, {store.barangay ? `Brgy. ${store.barangay}, ` : ''}{store.city}, {store.province}</span>
+                                <span>{formatAddress(store.address, store.barangay, store.city)}</span>
                             </div>
                             {store.phone && (
                                 <div className="flex items-center gap-2">
@@ -355,13 +360,38 @@ export default function StoreShow({ store, stats, history }: Props) {
                                         <DocLink url={store.valid_id_url} label="View ID" />
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">BIR Permit</span>
+                                        <span className="text-xs text-muted-foreground">BIR Registration</span>
                                         <DocLink url={store.bir_permit_url} label="View BIR" />
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-xs text-muted-foreground">Business Permit</span>
                                         <DocLink url={store.business_permit_url} label="View Permit" />
                                     </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">FSIC (Fire Safety)</span>
+                                        <DocLink url={store.fsic_permit_url} label="View FSIC" />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">DOE LPG License</span>
+                                        <DocLink url={store.doe_lpg_license_url} label="View DOE License" />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">LTO (License to Operate)</span>
+                                        <DocLink url={store.lto_permit_url} label="View LTO" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-2 border-t">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs text-muted-foreground">Agreed to Terms</span>
+                                    {store.terms_agreed_at ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                                            <CheckCircle2 className="h-3.5 w-3.5" /> Yes, on {store.terms_agreed_at}
+                                        </span>
+                                    ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

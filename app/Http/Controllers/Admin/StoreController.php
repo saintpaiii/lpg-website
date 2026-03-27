@@ -125,6 +125,13 @@ class StoreController extends Controller
                     ? Storage::url($verification?->bir_permit_path ?? $store->bir_permit) : null,
                 'business_permit_url' => ($verification?->business_permit_path ?? $store->business_permit)
                     ? Storage::url($verification?->business_permit_path ?? $store->business_permit) : null,
+                'fsic_permit_url' => ($verification?->fsic_permit_path ?? $store->fsic_permit)
+                    ? Storage::url($verification?->fsic_permit_path ?? $store->fsic_permit) : null,
+                'doe_lpg_license_url' => ($verification?->doe_lpg_license_path ?? $store->doe_lpg_license)
+                    ? Storage::url($verification?->doe_lpg_license_path ?? $store->doe_lpg_license) : null,
+                'lto_permit_url' => ($verification?->lto_permit_path ?? $store->lto_permit)
+                    ? Storage::url($verification?->lto_permit_path ?? $store->lto_permit) : null,
+                'terms_agreed_at' => $verification?->terms_agreed_at?->format('M d, Y'),
             ],
             'stats'   => $stats,
             'history' => $history,

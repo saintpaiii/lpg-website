@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
 import { CreditCard, Loader2, MapPin, ShoppingCart, Store, Truck } from 'lucide-react';
+import { formatAddress } from '@/data/cavite-locations';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -117,9 +118,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
                             <div className="text-sm text-gray-700 dark:text-gray-300 space-y-0.5">
                                 <p className="font-semibold">{customer.name}</p>
                                 <p>{customer.phone}</p>
-                                <p>
-                                    {[customer.address, customer.barangay, customer.city].filter(Boolean).join(', ')}
-                                </p>
+                                <p>{formatAddress(customer.address, customer.barangay, customer.city)}</p>
                             </div>
                         ) : (
                             <div className="text-sm text-amber-700 dark:text-amber-400">

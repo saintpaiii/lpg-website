@@ -13,6 +13,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
+import { formatCity } from '@/data/cavite-locations';
 
 type Product = {
     id: number;
@@ -279,7 +280,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                 ) : (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {products.data.map(p => (
-                            <Card key={p.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                            <Card
+                                key={p.id}
+                                className="overflow-hidden hover:shadow-md transition-shadow flex flex-col cursor-pointer"
+                                onClick={() => router.visit(`/customer/products/${p.id}`)}
+                            >
                                 <div className="relative">
                                     {p.image_url ? (
                                         <img src={p.image_url} alt={p.name} className="w-full h-40 object-cover" />
@@ -301,11 +306,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         <MapPin className="h-3 w-3 shrink-0" />
                                         <button
                                             className="hover:text-blue-600 hover:underline transition-colors text-left"
-                                            onClick={() => router.visit(`/customer/store/${p.store_id}`)}
+                                            onClick={(e) => { e.stopPropagation(); router.visit(`/customer/store/${p.store_id}`); }}
                                         >
                                             {p.store_name}
                                         </button>
-                                        <span>· {[p.store_barangay, p.store_city].filter(Boolean).join(', ')}</span>
+                                        <span>· {formatCity(p.store_city)}</span>
                                     </div>
                                     <div className="mb-2">
                                         <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
@@ -333,7 +338,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         <Button
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm h-9"
                                             disabled={p.stock === 0}
-                                            onClick={() => openCartDialog(p)}
+                                            onClick={(e) => { e.stopPropagation(); openCartDialog(p); }}
                                         >
                                             <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
                                             Add to Cart

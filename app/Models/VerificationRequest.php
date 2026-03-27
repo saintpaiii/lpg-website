@@ -17,16 +17,21 @@ class VerificationRequest extends Model
         'valid_id_path',
         'bir_permit_path',
         'business_permit_path',
+        'fsic_permit_path',
+        'doe_lpg_license_path',
+        'lto_permit_path',
         'status',
         'reviewed_by',
         'reviewed_at',
         'rejection_reason',
+        'terms_agreed_at',
     ];
 
     protected function casts(): array
     {
         return [
-            'reviewed_at' => 'datetime',
+            'reviewed_at'    => 'datetime',
+            'terms_agreed_at'=> 'datetime',
         ];
     }
 

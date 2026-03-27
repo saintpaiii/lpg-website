@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuthLog;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Store;
@@ -107,6 +108,25 @@ class DashboardController extends Controller
             ->map(fn ($a) => ['type' => $a['type'], 'message' => $a['message'], 'time' => $a['time']])
             ->values();
 
+        // ── Auth stats (today) ─────────────────────────────────────────────────
+        $authSuccessToday = AuthLog::whereDate('created_at', $today)
+            ->where('status', 'success')
+            ->where('action', 'login_success')
+            ->count();
+
+        $authFailedToday = AuthLog::whereDate('created_at', $today)
+            ->where('status', 'failed')
+            ->whereIn('action', ['login_failed', 'account_locked'])
+            ->count();
+
+        $suspiciousActivity = AuthLog::where('status', 'failed')
+            ->where('created_at', '>=', $now->copy()->subHour())
+            ->whereNotNull('ip_address')
+            ->selectRaw('ip_address, COUNT(*) as attempts')
+            ->groupBy('ip_address')
+            ->having('attempts', '>=', 5)
+            ->count();
+
         return Inertia::render('admin/dashboard', [
             'stats' => [
                 'totalStores'          => $totalStores,
@@ -125,6 +145,11 @@ class DashboardController extends Controller
             'registrationsChart' => $registrationsChart,
             'ordersChart'        => $ordersChart,
             'recentActivity'     => $recentActivity,
+            'authStats' => [
+                'successToday'      => $authSuccessToday,
+                'failedToday'       => $authFailedToday,
+                'suspiciousCount'   => $suspiciousActivity,
+            ],
         ]);
     }
 }

@@ -51,7 +51,7 @@ class OtpCode extends Model
         return self::create([
             'user_id'    => $user->id,
             'code'       => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT),
-            'expires_at' => now()->addMinutes(10),
+            'expires_at' => now()->addSeconds(60),
             'used'       => false,
             'attempts'   => 0,
         ]);

@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DssLog;
+use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Store;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -21,6 +23,7 @@ class DssController extends Controller
         $customerGrowth   = $this->computeCustomerGrowth();
         $topProducts      = $this->computeTopProducts();
         $businessInsights = $this->computeBusinessInsights();
+        $platformInsights = $this->computePlatformInsights();
 
         DssLog::create([
             'type' => 'admin_dashboard_run',
@@ -39,6 +42,7 @@ class DssController extends Controller
             'customerGrowth'   => $customerGrowth,
             'topProducts'      => $topProducts,
             'businessInsights' => $businessInsights,
+            'platformInsights' => $platformInsights,
             'generatedAt'      => now()->format('M d, Y g:i A'),
         ]);
     }
@@ -312,6 +316,121 @@ class DssController extends Controller
             'this_month_revenue'    => $thisMonthRevenue,
             'this_month_orders'     => $thisMonthOrders,
             'total_approved_stores' => $totalApprovedStores,
+        ];
+    }
+
+    // ── Platform Insights ─────────────────────────────────────────────────────
+
+    private function computePlatformInsights(): array
+    {
+        $now       = Carbon::now();
+        $thisStart = $now->copy()->startOfMonth();
+        $lastStart = $now->copy()->subMonth()->startOfMonth();
+        $lastEnd   = $now->copy()->subMonth()->endOfMonth();
+
+        // Revenue comparison
+        $thisRevenue = (float) Order::whereNull('deleted_at')
+            ->whereNotIn('status', ['cancelled'])
+            ->where('created_at', '>=', $thisStart)
+            ->sum('total_amount');
+
+        $lastRevenue = (float) Order::whereNull('deleted_at')
+            ->whereNotIn('status', ['cancelled'])
+            ->whereBetween('created_at', [$lastStart, $lastEnd])
+            ->sum('total_amount');
+
+        $revenueChangePct = $lastRevenue > 0
+            ? round((($thisRevenue - $lastRevenue) / $lastRevenue) * 100, 1)
+            : null;
+
+        // Commission earned this month
+        $commissionThisMonth = (float) Invoice::whereNull('deleted_at')
+            ->where('created_at', '>=', $thisStart)
+            ->sum('platform_commission');
+
+        // New sellers this month (stores created this month, any status)
+        $newSellersThisMonth = Store::where('created_at', '>=', $thisStart)->count();
+
+        // Pending seller verifications
+        $pendingVerifications = Store::where('status', 'pending')->count();
+
+        // New customers this month
+        $newCustomersThisMonth = User::where('role', 'customer')
+            ->where('created_at', '>=', $thisStart)
+            ->count();
+
+        $newCustomersLastMonth = User::where('role', 'customer')
+            ->whereBetween('created_at', [$lastStart, $lastEnd])
+            ->count();
+
+        $customerChangePct = $newCustomersLastMonth > 0
+            ? round((($newCustomersThisMonth - $newCustomersLastMonth) / $newCustomersLastMonth) * 100, 1)
+            : null;
+
+        // Active vs inactive sellers (stores with 0 orders this month)
+        $totalApproved = Store::where('status', 'approved')->count();
+        $activeThisMonth = Store::where('status', 'approved')
+            ->whereHas('orders', fn ($q) => $q->where('created_at', '>=', $thisStart))
+            ->count();
+        $inactiveCount = $totalApproved - $activeThisMonth;
+
+        // Week-over-week customer growth (last 2 weeks)
+        $thisWeekCustomers = User::where('role', 'customer')
+            ->where('created_at', '>=', $now->copy()->startOfWeek())
+            ->count();
+
+        // Platform-wide order success rate (delivered vs total last 30 days)
+        $totalOrders30d = Order::whereNull('deleted_at')
+            ->where('created_at', '>=', $now->copy()->subDays(30))
+            ->count();
+        $deliveredOrders30d = Order::whereNull('deleted_at')
+            ->where('status', 'delivered')
+            ->where('created_at', '>=', $now->copy()->subDays(30))
+            ->count();
+        $orderSuccessRate = $totalOrders30d > 0
+            ? (int) round(($deliveredOrders30d / $totalOrders30d) * 100)
+            : null;
+
+        // Recommendations
+        $recs = [];
+
+        if ($pendingVerifications > 0) {
+            $recs[] = ['type' => 'warning', 'text' => "{$pendingVerifications} seller application(s) are pending verification. Review and approve or reject them to keep the marketplace active."];
+        }
+        if ($revenueChangePct !== null && $revenueChangePct >= 15) {
+            $recs[] = ['type' => 'success', 'text' => "Platform revenue is up {$revenueChangePct}% from last month. Consider investing in seller growth programs to sustain momentum."];
+        } elseif ($revenueChangePct !== null && $revenueChangePct < -10) {
+            $recs[] = ['type' => 'warning', 'text' => "Platform revenue dropped " . abs($revenueChangePct) . "% from last month. Investigate underperforming stores and review pricing or promotions."];
+        }
+        if ($inactiveCount > 0 && $totalApproved > 0) {
+            $recs[] = ['type' => 'info', 'text' => "{$inactiveCount} approved store(s) have no orders this month. Consider reaching out to inactive sellers to re-engage them."];
+        }
+        if ($customerChangePct !== null && $customerChangePct < -20) {
+            $recs[] = ['type' => 'warning', 'text' => "New customer registrations dropped " . abs($customerChangePct) . "% vs last month. Review the registration flow and marketing reach."];
+        }
+        if ($orderSuccessRate !== null && $orderSuccessRate < 80) {
+            $recs[] = ['type' => 'warning', 'text' => "Platform order completion rate is {$orderSuccessRate}% in the last 30 days. High cancellation/failure rate may indicate delivery or stock issues across stores."];
+        }
+        if (empty($recs)) {
+            $recs[] = ['type' => 'info', 'text' => 'Platform is operating smoothly with no critical issues. Continue monitoring seller performance and customer acquisition trends.'];
+        }
+
+        return [
+            'this_month_revenue'     => round($thisRevenue, 2),
+            'last_month_revenue'     => round($lastRevenue, 2),
+            'revenue_change_pct'     => $revenueChangePct,
+            'commission_this_month'  => round($commissionThisMonth, 2),
+            'new_sellers_this_month' => $newSellersThisMonth,
+            'pending_verifications'  => $pendingVerifications,
+            'new_customers_this_month' => $newCustomersThisMonth,
+            'new_customers_last_month' => $newCustomersLastMonth,
+            'customer_change_pct'    => $customerChangePct,
+            'active_stores_this_month' => $activeThisMonth,
+            'inactive_stores'        => $inactiveCount,
+            'total_approved_stores'  => $totalApproved,
+            'order_success_rate'     => $orderSuccessRate,
+            'this_week_customers'    => $thisWeekCustomers,
+            'recommendations'        => $recs,
         ];
     }
 }

@@ -74,7 +74,7 @@ class StaffController extends Controller
         $data = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
             'phone'    => 'nullable|string|max:20',
             'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
         ]);
@@ -171,7 +171,7 @@ class StaffController extends Controller
         $data = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => "required|email|unique:users,email,{$user->id}",
-            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols()],
+            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
             'phone'    => 'nullable|string|max:20',
             'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
         ]);
@@ -365,7 +365,7 @@ class StaffController extends Controller
             'performed_by' => $request->user()->id,
         ]);
 
-        return back()->with('success', "{$user->name}'s account has been restored.");
+        return redirect()->route('admin.staff')->with('success', "{$user->name}'s account has been restored.");
     }
 
     // ── Force Delete ──────────────────────────────────────────────────────────
@@ -376,6 +376,6 @@ class StaffController extends Controller
         UserPermission::withTrashed()->where('user_id', $user->id)->forceDelete();
         $user->forceDelete();
 
-        return back()->with('success', "{$name}'s account has been permanently deleted.");
+        return redirect()->route('admin.staff', ['tab' => 'archived'])->with('success', "{$name}'s account has been permanently deleted.");
     }
 }

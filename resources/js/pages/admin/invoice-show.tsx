@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -340,7 +341,7 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                                 )}
                                                 {(invoice.customer.address || invoice.customer.barangay) && (
                                                     <p className="text-sm text-gray-500">
-                                                        {[invoice.customer.address, invoice.customer.barangay, invoice.customer.city].filter(Boolean).join(', ')}
+                                                        {formatAddress(invoice.customer.address, invoice.customer.barangay, invoice.customer.city)}
                                                     </p>
                                                 )}
                                             </div>

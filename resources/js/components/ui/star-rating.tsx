@@ -10,7 +10,16 @@ interface StarRatingProps {
  */
 export function StarRating({ value, count, size = 'sm' }: StarRatingProps) {
     if (typeof count !== 'undefined' && count === 0) {
-        return <span className="text-xs text-gray-400 italic">No reviews yet</span>;
+        return (
+            <div className="flex items-center gap-1">
+                <span className="flex leading-none">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <span key={i} className={`${size === 'xs' ? 'text-[11px]' : 'text-sm'} text-gray-300`}>★</span>
+                    ))}
+                </span>
+                <span className={`${size === 'xs' ? 'text-[10px]' : 'text-xs'} text-gray-400 italic`}>No reviews yet</span>
+            </div>
+        );
     }
 
     const filled   = Math.round(value); // round to nearest integer for star fill

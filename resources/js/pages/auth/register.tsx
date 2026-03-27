@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
 import { ArrowLeft, Flame } from 'lucide-react';
 import React, { useState } from 'react';
+import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,38 +158,15 @@ export default function Register() {
                             </div>
 
                             {/* Address */}
-                            <div className="grid gap-2">
-                                <Label htmlFor="address" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Street address <span className="text-red-500">*</span>
-                                </Label>
-                                <Input id="address" type="text" required autoComplete="street-address"
-                                    placeholder="123 Rizal St." className="h-11"
-                                    value={fields.address} onChange={(e) => set('address', e.target.value)} />
-                                <InputError message={errors.address} />
-                            </div>
-
-                            {/* City + Barangay */}
-                            <div className="grid gap-5 sm:grid-cols-2">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="city" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        City / Municipality <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Input id="city" type="text" required autoComplete="address-level2"
-                                        placeholder="Cavite City" className="h-11"
-                                        value={fields.city} onChange={(e) => set('city', e.target.value)} />
-                                    <InputError message={errors.city} />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="barangay" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Barangay
-                                    </Label>
-                                    <Input id="barangay" type="text" autoComplete="address-level3"
-                                        placeholder="Brgy. San Roque" className="h-11"
-                                        value={fields.barangay} onChange={(e) => set('barangay', e.target.value)} />
-                                    <InputError message={errors.barangay} />
-                                </div>
-                            </div>
+                            <AddressFields
+                                address={fields.address}
+                                city={fields.city}
+                                barangay={fields.barangay}
+                                onAddressChange={(v) => set('address', v)}
+                                onCityChange={(v) => set('city', v)}
+                                onBarangayChange={(v) => set('barangay', v)}
+                                errors={errors}
+                            />
 
                             {/* Password */}
                             <div className="grid gap-5 sm:grid-cols-2">

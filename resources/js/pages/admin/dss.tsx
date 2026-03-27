@@ -18,7 +18,9 @@ import {
     Brain,
     Building2,
     Calendar,
+    CheckCircle2,
     Crown,
+    Lightbulb,
     Package,
     RefreshCw,
     ShoppingCart,
@@ -87,12 +89,36 @@ type BusinessInsights = {
     total_approved_stores: number;
 };
 
+type PlatformRec = {
+    type: 'critical' | 'warning' | 'info' | 'success';
+    text: string;
+};
+
+type PlatformInsights = {
+    this_month_revenue: number;
+    last_month_revenue: number;
+    revenue_change_pct: number | null;
+    commission_this_month: number;
+    new_sellers_this_month: number;
+    pending_verifications: number;
+    new_customers_this_month: number;
+    new_customers_last_month: number;
+    customer_change_pct: number | null;
+    active_stores_this_month: number;
+    inactive_stores: number;
+    total_approved_stores: number;
+    order_success_rate: number | null;
+    this_week_customers: number;
+    recommendations: PlatformRec[];
+};
+
 type Props = {
     salesTrend: SalesTrend;
     topStores: TopStore[];
     customerGrowth: CustomerGrowthPoint[];
     topProducts: TopProduct[];
     businessInsights: BusinessInsights;
+    platformInsights: PlatformInsights;
     generatedAt: string;
 };
 
@@ -698,6 +724,175 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
     );
 }
 
+// ── Platform Insights Section ──────────────────────────────────────────────────
+
+function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
+    data: PlatformInsights;
+    salesTrend: SalesTrend;
+    customerGrowth: CustomerGrowthPoint[];
+}) {
+    const revenueUp   = data.revenue_change_pct !== null && data.revenue_change_pct > 0;
+    const revenueDown = data.revenue_change_pct !== null && data.revenue_change_pct < 0;
+
+    // Revenue insight
+    const revenueInsight = (() => {
+        const pct = data.revenue_change_pct;
+        if (pct === null) return { level: 'info', text: 'No prior month data to compare against. Platform revenue history will build over time.' };
+        if (pct >= 20)  return { level: 'success', text: `Platform revenue is up ${pct}% from last month — strong marketplace growth. Top-performing stores are driving volume.` };
+        if (pct >= 5)   return { level: 'success', text: `Revenue grew ${pct}% vs last month. Steady platform growth — monitor seller onboarding to sustain this.` };
+        if (pct >= -5)  return { level: 'info',    text: `Revenue is roughly flat (${pct > 0 ? '+' : ''}${pct}% vs last month). Consider seller activation campaigns to push growth.` };
+        if (pct >= -15) return { level: 'warning', text: `Revenue declined ${Math.abs(pct)}% from last month. Review inactive stores and underperforming products.` };
+        return { level: 'warning', text: `Revenue dropped significantly (${pct}% vs last month). Immediate investigation of store activity and order completion is recommended.` };
+    })();
+
+    // Customer acquisition insight
+    const customerInsight = (() => {
+        const pct = data.customer_change_pct;
+        if (pct === null) return { level: 'info', text: `${data.new_customers_this_month} new customers registered this month. Build baseline by tracking month-over-month.` };
+        if (pct >= 20)  return { level: 'success', text: `Customer acquisition is up ${pct}% vs last month — ${data.new_customers_this_month} new customers this month. Great growth signal.` };
+        if (pct >= 0)   return { level: 'info',    text: `${data.new_customers_this_month} new customers this month (+${pct}% vs last month). Consistent acquisition pace.` };
+        return { level: 'warning', text: `New customer registrations dropped ${Math.abs(pct)}% vs last month (${data.new_customers_this_month} this month). Review onboarding and marketing.` };
+    })();
+
+    // Seller ecosystem insight
+    const sellerInsight = (() => {
+        const inactivePct = data.total_approved_stores > 0
+            ? Math.round((data.inactive_stores / data.total_approved_stores) * 100)
+            : 0;
+        if (data.pending_verifications > 0 && inactivePct >= 30) {
+            return { level: 'warning', text: `${data.pending_verifications} seller(s) pending approval and ${inactivePct}% of approved stores have no orders this month. Prioritize activating the ecosystem.` };
+        }
+        if (data.pending_verifications > 0) {
+            return { level: 'info', text: `${data.pending_verifications} seller verification(s) pending review. ${data.active_stores_this_month} of ${data.total_approved_stores} approved stores placed orders this month.` };
+        }
+        if (inactivePct >= 40) {
+            return { level: 'warning', text: `${inactivePct}% of approved stores (${data.inactive_stores}) have no orders this month. Consider a seller re-engagement campaign.` };
+        }
+        return { level: 'success', text: `${data.active_stores_this_month} of ${data.total_approved_stores} approved stores are active this month. No pending verifications.` };
+    })();
+
+    // Order completion insight
+    const orderInsight = (() => {
+        if (data.order_success_rate === null) return { level: 'info', text: 'No orders recorded in the last 30 days to compute a completion rate.' };
+        const r = data.order_success_rate;
+        if (r >= 90) return { level: 'success', text: `Excellent platform order completion rate of ${r}% in the last 30 days. Sellers and riders are performing well.` };
+        if (r >= 75) return { level: 'info',    text: `Order completion rate is ${r}% across the platform. Room for improvement — review cancelled and failed orders.` };
+        return { level: 'warning', text: `Low platform completion rate of ${r}%. High cancellation or delivery failures across stores — investigate root causes.` };
+    })();
+
+    // Sales trend insight
+    const trendInsight = (() => {
+        const d = salesTrend.direction;
+        const p = salesTrend.trend_percent;
+        if (d === 'increasing') return { level: 'success', text: `Platform revenue has been increasing over the last 30 days (+${p}% vs prior week). The OLS regression trend line is positive.` };
+        if (d === 'decreasing') return { level: 'warning', text: `Platform revenue trend is declining (−${p}% vs prior week). Review recent store performance and order patterns.` };
+        return { level: 'info', text: `Platform revenue is stable over the last 30 days (${p}% variance). No strong growth or decline detected.` };
+    })();
+
+    const LEVEL_STYLE = {
+        critical: { card: 'border-red-200 bg-red-50',         icon: 'bg-red-500',      text: 'text-red-800' },
+        warning:  { card: 'border-amber-200 bg-amber-50',     icon: 'bg-amber-500',    text: 'text-amber-800' },
+        success:  { card: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-500',  text: 'text-emerald-800' },
+        info:     { card: 'border-blue-200 bg-blue-50',       icon: 'bg-blue-500',     text: 'text-blue-800' },
+    } as const;
+    type Level = keyof typeof LEVEL_STYLE;
+
+    const REC_STYLE = {
+        critical: { dot: 'bg-red-500',     text: 'text-red-700',     bg: 'bg-red-50 border-red-200'         },
+        warning:  { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200'     },
+        success:  { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
+        info:     { dot: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200'       },
+    } as const;
+
+    function InsightCard({ title, text, level, icon }: { title: string; text: string; level: Level; icon: React.ReactNode }) {
+        const s = LEVEL_STYLE[level];
+        return (
+            <div className={`rounded-xl border p-4 ${s.card}`}>
+                <div className="flex items-center gap-2.5 mb-2">
+                    <div className={`flex h-7 w-7 items-center justify-center rounded-lg ${s.icon}`}>{icon}</div>
+                    <p className={`font-bold text-sm ${s.text}`}>{title}</p>
+                </div>
+                <p className={`text-sm leading-relaxed ${s.text} opacity-90`}>{text}</p>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            {/* Insight cards */}
+            <section className="space-y-4">
+                <SectionHeader
+                    icon={Lightbulb}
+                    title="Platform Insights"
+                    subtitle="Automated plain-language analysis of marketplace health"
+                />
+
+                {/* Summary stats row */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border bg-white p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Commission Earned</p>
+                        <p className="text-2xl font-black text-emerald-700 tabular-nums">{pesoFull(data.commission_this_month)}</p>
+                        <p className="text-xs text-gray-400">Platform revenue this month</p>
+                    </div>
+                    <div className="rounded-xl border bg-white p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Revenue vs Last Month</p>
+                        <p className={`text-2xl font-black tabular-nums flex items-center gap-1 ${revenueUp ? 'text-emerald-600' : revenueDown ? 'text-red-500' : 'text-gray-600'}`}>
+                            {revenueUp ? <ArrowUpRight className="h-5 w-5" /> : revenueDown ? <ArrowDownRight className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                            {data.revenue_change_pct !== null ? `${data.revenue_change_pct > 0 ? '+' : ''}${data.revenue_change_pct}%` : '—'}
+                        </p>
+                        <p className="text-xs text-gray-400">vs {pesoFull(data.last_month_revenue)} last month</p>
+                    </div>
+                    <div className="rounded-xl border bg-white p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">New Customers</p>
+                        <p className="text-2xl font-black text-gray-900 tabular-nums">{data.new_customers_this_month}</p>
+                        <p className="text-xs text-gray-400">{data.this_week_customers} this week</p>
+                    </div>
+                    <div className={`rounded-xl border p-4 space-y-1 ${data.pending_verifications > 0 ? 'border-amber-300 bg-amber-50' : 'bg-white'}`}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pending Verifications</p>
+                        <p className={`text-2xl font-black tabular-nums ${data.pending_verifications > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {data.pending_verifications}
+                        </p>
+                        <p className="text-xs text-gray-400">{data.active_stores_this_month}/{data.total_approved_stores} stores active</p>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <InsightCard title="Revenue Performance" text={revenueInsight.text} level={revenueInsight.level as Level}
+                        icon={<TrendingUp className="h-4 w-4 text-white" />} />
+                    <InsightCard title="Sales Trend (30d)" text={trendInsight.text} level={trendInsight.level as Level}
+                        icon={<Sparkles className="h-4 w-4 text-white" />} />
+                    <InsightCard title="Customer Acquisition" text={customerInsight.text} level={customerInsight.level as Level}
+                        icon={<Users className="h-4 w-4 text-white" />} />
+                    <InsightCard title="Seller Ecosystem" text={sellerInsight.text} level={sellerInsight.level as Level}
+                        icon={<Building2 className="h-4 w-4 text-white" />} />
+                    <InsightCard title="Order Completion" text={orderInsight.text} level={orderInsight.level as Level}
+                        icon={<ShoppingCart className="h-4 w-4 text-white" />} />
+                </div>
+            </section>
+
+            {/* Recommendations */}
+            <section className="space-y-4">
+                <SectionHeader
+                    icon={CheckCircle2}
+                    title="Platform Recommendations"
+                    subtitle="Actionable steps based on current marketplace data"
+                />
+                <div className="rounded-xl border bg-white p-4 space-y-3">
+                    {data.recommendations.map((rec, i) => {
+                        const s = REC_STYLE[rec.type];
+                        return (
+                            <div key={i} className={`flex items-start gap-3 rounded-lg border p-3 ${s.bg}`}>
+                                <div className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${s.dot}`} />
+                                <p className={`text-sm leading-relaxed ${s.text}`}>{rec.text}</p>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+        </>
+    );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function DssPage({
@@ -706,6 +901,7 @@ export default function DssPage({
     customerGrowth,
     topProducts,
     businessInsights,
+    platformInsights,
     generatedAt,
 }: Props) {
     return (
@@ -799,10 +995,14 @@ export default function DssPage({
 
                 <BusinessInsightsSection data={businessInsights} />
 
+                <Separator />
+
+                <PlatformInsightsSection data={platformInsights} salesTrend={salesTrend} customerGrowth={customerGrowth} />
+
                 <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400">
                     <Brain className="mx-auto mb-1.5 h-5 w-5 text-gray-300" />
-                    Admin DSS shows marketplace-wide metrics across all approved stores. Revenue trend uses Ordinary Least Squares
-                    linear regression. All computations exclude soft-deleted and cancelled records.
+                    Admin DSS shows marketplace-wide metrics across all approved stores. Revenue trend uses Ordinary Least Squares linear regression.
+                    Insights and recommendations are generated using rule-based IF/ELSE logic — not AI. All computations exclude soft-deleted and cancelled records.
                     Results are logged to the <code className="font-mono bg-gray-100 px-1 rounded">dss_logs</code> table for academic review.
                 </div>
             </div>

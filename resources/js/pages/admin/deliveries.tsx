@@ -49,6 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { formatAddress } from '@/data/cavite-locations';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -312,7 +313,7 @@ function AssignDeliveryDialog({
                             {(selectedOrder.customer.address || selectedOrder.customer.barangay) && (
                                 <p className="flex items-center gap-1 text-gray-500 mt-0.5">
                                     <MapPin className="h-3 w-3" />
-                                    {[selectedOrder.customer.address, selectedOrder.customer.barangay, selectedOrder.customer.city].filter(Boolean).join(', ')}
+                                    {formatAddress(selectedOrder.customer.address, selectedOrder.customer.barangay, selectedOrder.customer.city)}
                                 </p>
                             )}
                             <p className="mt-1 font-semibold text-blue-700">

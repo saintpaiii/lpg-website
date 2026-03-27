@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Models\Delivery;
 use App\Models\Inventory;
 use App\Models\OrderItem;
 use Carbon\Carbon;
@@ -174,7 +175,155 @@ class DssController extends Controller
             'salesTrend'     => $salesTrend,
             'topProducts'    => $topProducts,
             'demandForecast' => $demandForecast,
+            'insights'       => $this->computeInsights($store),
             'generatedAt'    => now()->format('M d, Y g:i A'),
         ]);
+    }
+
+    private function computeInsights(mixed $store): array
+    {
+        $now           = Carbon::now();
+        $thisStart     = $now->copy()->startOfMonth();
+        $lastStart     = $now->copy()->subMonth()->startOfMonth();
+        $lastEnd       = $now->copy()->subMonth()->endOfMonth();
+        $thirtyDaysAgo = $now->copy()->subDays(30);
+
+        // ── Monthly revenue & orders ──────────────────────────────────────
+        $thisMoRevenue = (float) $store->orders()
+            ->where('created_at', '>=', $thisStart)
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('total_amount');
+
+        $lastMoRevenue = (float) $store->orders()
+            ->whereBetween('created_at', [$lastStart, $lastEnd])
+            ->whereNotIn('status', ['cancelled'])
+            ->sum('total_amount');
+
+        $thisMoOrders = (int) $store->orders()
+            ->where('created_at', '>=', $thisStart)->count();
+
+        $lastMoOrders = (int) $store->orders()
+            ->whereBetween('created_at', [$lastStart, $lastEnd])->count();
+
+        // ── Revenue projection ────────────────────────────────────────────
+        $daysElapsed   = max(1, $now->day);
+        $daysInMonth   = $now->daysInMonth;
+        $remainingDays = $daysInMonth - $now->day;
+        $dailyAvg      = $thisMoRevenue / $daysElapsed;
+        $projected     = round($thisMoRevenue + ($dailyAvg * $remainingDays), 2);
+
+        $revenueChangePct = $lastMoRevenue > 0
+            ? round((($thisMoRevenue - $lastMoRevenue) / $lastMoRevenue) * 100, 1)
+            : null;
+
+        // ── Customer insights ─────────────────────────────────────────────
+        $thisMoCustomers = (int) $store->orders()
+            ->where('created_at', '>=', $thisStart)
+            ->whereNotNull('customer_id')
+            ->distinct('customer_id')
+            ->count('customer_id');
+
+        $repeatCustomers = (int) $store->orders()
+            ->where('created_at', '>=', $thisStart)
+            ->whereNotNull('customer_id')
+            ->selectRaw('customer_id')
+            ->groupBy('customer_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->get()
+            ->count();
+
+        $repeatRate = $thisMoCustomers > 0
+            ? (int) round(($repeatCustomers / $thisMoCustomers) * 100)
+            : 0;
+
+        // ── Busiest day of week (last 30 days) ────────────────────────────
+        $dayNames  = ['', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        $topDayRow = $store->orders()
+            ->where('created_at', '>=', $thirtyDaysAgo)
+            ->selectRaw('DAYOFWEEK(created_at) as dow, COUNT(*) as cnt')
+            ->groupBy('dow')
+            ->orderByDesc('cnt')
+            ->first();
+        $busiestDay = $topDayRow ? ($dayNames[$topDayRow->dow] ?? null) : null;
+
+        // ── Delivery performance (last 30 days) ───────────────────────────
+        $deliveries = Delivery::whereHas('order', fn ($q) => $q->where('store_id', $store->id))
+            ->where('created_at', '>=', $thirtyDaysAgo)
+            ->get();
+
+        $totalDel    = $deliveries->count();
+        $successDel  = $deliveries->where('status', 'delivered')->count();
+        $failedDel   = $deliveries->where('status', 'failed')->count();
+        $successRate = $totalDel > 0 ? (int) round(($successDel / $totalDel) * 100) : null;
+
+        $completed = $deliveries->filter(
+            fn ($d) => $d->status === 'delivered' && $d->assigned_at && $d->delivered_at
+        );
+        $avgDeliveryHours = null;
+        if ($completed->count() > 0) {
+            $mins = $completed->sum(
+                fn ($d) => Carbon::parse($d->assigned_at)->diffInMinutes(Carbon::parse($d->delivered_at))
+            );
+            $avgDeliveryHours = round($mins / $completed->count() / 60, 1);
+        }
+
+        // ── Low stock counts ──────────────────────────────────────────────
+        $allInv = Inventory::whereHas('product',
+            fn ($q) => $q->where('store_id', $store->id)->where('is_active', true)
+        )->get();
+
+        $lowStockCount      = $allInv->filter(fn ($i) => $i->quantity <= $i->reorder_level)->count();
+        $criticalStockCount = $allInv->filter(fn ($i) => $i->quantity === 0)->count();
+
+        // ── Recommendations (IF/ELSE logic) ──────────────────────────────
+        $recs = [];
+
+        if ($criticalStockCount > 0) {
+            $recs[] = ['type' => 'critical', 'text' => "{$criticalStockCount} product(s) are completely out of stock. Restock immediately to avoid losing orders."];
+        }
+        $nonCriticalLow = $lowStockCount - $criticalStockCount;
+        if ($nonCriticalLow > 0) {
+            $recs[] = ['type' => 'warning', 'text' => "{$nonCriticalLow} product(s) are approaching their reorder level. Place replenishment orders soon."];
+        }
+        if ($revenueChangePct !== null && $revenueChangePct < -10) {
+            $recs[] = ['type' => 'warning', 'text' => 'Revenue is down ' . abs($revenueChangePct) . '% from last month. Consider promotions or reviewing your product pricing.'];
+        }
+        if ($repeatRate < 30 && $thisMoCustomers >= 5) {
+            $recs[] = ['type' => 'info', 'text' => "Only {$repeatRate}% of customers reordered this month. Introduce loyalty perks or follow-up messages to improve retention."];
+        }
+        if ($successRate !== null && $successRate < 85 && $totalDel >= 3) {
+            $recs[] = ['type' => 'warning', 'text' => "Delivery success rate is {$successRate}%. Review failed deliveries and improve rider-to-area assignments."];
+        }
+        if ($busiestDay) {
+            $recs[] = ['type' => 'info', 'text' => "{$busiestDay} is your busiest day. Ensure adequate inventory and rider availability on that day."];
+        }
+        if ($lastMoRevenue > 0 && $projected > $lastMoRevenue * 1.1) {
+            $gain = (int) round((($projected - $lastMoRevenue) / $lastMoRevenue) * 100);
+            $recs[] = ['type' => 'success', 'text' => "You're on pace to exceed last month's revenue by ~{$gain}%. Keep up the momentum!"];
+        }
+        if (empty($recs)) {
+            $recs[] = ['type' => 'info', 'text' => 'Store is performing well with no critical issues detected. Continue monitoring stock levels and customer trends.'];
+        }
+
+        return [
+            'this_month_revenue'    => round($thisMoRevenue, 2),
+            'last_month_revenue'    => round($lastMoRevenue, 2),
+            'this_month_orders'     => $thisMoOrders,
+            'last_month_orders'     => $lastMoOrders,
+            'revenue_change_pct'    => $revenueChangePct,
+            'projected_revenue'     => $projected,
+            'days_elapsed'          => $now->day,
+            'days_in_month'         => $daysInMonth,
+            'this_month_customers'  => $thisMoCustomers,
+            'repeat_customers'      => $repeatCustomers,
+            'repeat_rate'           => $repeatRate,
+            'busiest_day'           => $busiestDay,
+            'delivery_success_rate' => $successRate,
+            'avg_delivery_hours'    => $avgDeliveryHours,
+            'total_deliveries'      => $totalDel,
+            'failed_deliveries'     => $failedDel,
+            'low_stock_count'       => $lowStockCount,
+            'recommendations'       => $recs,
+        ];
     }
 }

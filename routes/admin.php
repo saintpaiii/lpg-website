@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AuthLogController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
@@ -93,4 +94,9 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::patch('verifications/{verification}/approve', [VerificationController::class, 'approve'])->name('verifications.approve');
         Route::patch('verifications/{verification}/reject', [VerificationController::class, 'reject'])->name('verifications.reject');
     });
+
+    // Auth Logs — platform admin only
+    Route::get('auth-logs', [AuthLogController::class, 'index'])
+        ->middleware('permission:dashboard.view')
+        ->name('auth-logs');
 });
