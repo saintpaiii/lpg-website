@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Customer;
 use App\Models\Delivery;
 use App\Models\Inventory;
@@ -19,6 +20,7 @@ use Inertia\Response;
 
 class OrderController extends Controller
 {
+    use GeneratesExport;
     private function generateOrderNumber(): string
     {
         $year   = date('Y');
@@ -101,6 +103,11 @@ class OrderController extends Controller
             });
         }
 
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+        if ($dateFrom) $query->whereDate('created_at', '>=', $dateFrom);
+        if ($dateTo)   $query->whereDate('created_at', '<=', $dateTo);
+
         $orders = $query->latest()->paginate(20)->withQueryString()
             ->through(fn ($o) => $this->formatOrder($o));
 
@@ -125,9 +132,85 @@ class OrderController extends Controller
             'orders'  => $orders,
             'tab'     => $tab,
             'counts'  => $counts,
-            'filters' => $request->only('status', 'search', 'tab'),
+            'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to'),
             'riders'  => $riders,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $store  = request()->attributes->get('seller_store');
+        $tab    = $request->input('tab', 'active');
+        $format = $request->get('format', 'csv');
+
+        $query = Order::with(['customer'])
+            ->where('store_id', $store->id);
+
+        if ($tab === 'archived') {
+            $query->onlyTrashed();
+        }
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', fn ($cq) => $cq->where('name', 'like', "%{$search}%"));
+            });
+        }
+        if ($df = $request->get('date_from')) $query->whereDate('created_at', '>=', $df);
+        if ($dt = $request->get('date_to'))   $query->whereDate('created_at', '<=', $dt);
+
+        $orders = $query->latest()->get();
+
+        $from = $request->get('date_from') ?: now()->startOfMonth()->toDateString();
+        $to   = $request->get('date_to')   ?: now()->toDateString();
+        $filename = $this->exportFilename('orders', $store->store_name, $from, $to, $format);
+
+        $columns = [
+            ['key' => 'order_number',     'label' => 'Order #',        'class' => 'mono'],
+            ['key' => 'customer_name',    'label' => 'Customer'],
+            ['key' => 'created_at',       'label' => 'Date'],
+            ['key' => 'status',           'label' => 'Status'],
+            ['key' => 'transaction_type', 'label' => 'Type'],
+            ['key' => 'payment_method',   'label' => 'Payment'],
+            ['key' => 'payment_status',   'label' => 'Pay Status'],
+            ['key' => 'total_amount',     'label' => 'Total', 'align' => 'right'],
+        ];
+
+        $rows = $orders->map(fn ($o) => [
+            'order_number'     => $o->order_number,
+            'customer_name'    => $o->customer?->name ?? '—',
+            'created_at'       => $o->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
+            'status'           => str_replace('_', ' ', $o->status),
+            'transaction_type' => $o->transaction_type ?? '—',
+            'payment_method'   => $o->payment_method ?? '—',
+            'payment_status'   => $o->payment_status,
+            'total_amount'     => $this->peso((float) $o->total_amount),
+        ])->values()->all();
+
+        $grandTotal = $orders->sum(fn ($o) => (float) $o->total_amount);
+
+        if ($format === 'pdf') {
+            return $this->pdfResponse($filename, [
+                'title'        => 'Orders Export',
+                'orgName'      => $store->store_name,
+                'orgSub'       => $store->city ?? 'Cavite, Philippines',
+                'dateRange'    => \Carbon\Carbon::parse($from)->format('M d, Y') . ' – ' . \Carbon\Carbon::parse($to)->format('M d, Y'),
+                'summaryItems' => [
+                    ['label' => 'Total Orders', 'value' => count($rows)],
+                    ['label' => 'Grand Total',  'value' => $this->peso($grandTotal)],
+                ],
+                'columns'   => $columns,
+                'rows'      => $rows,
+                'totalsRow' => ['order_number' => 'TOTAL', 'customer_name' => '', 'created_at' => '', 'status' => '', 'transaction_type' => '', 'payment_method' => '', 'payment_status' => '', 'total_amount' => $this->peso($grandTotal)],
+            ]);
+        }
+
+        $headings = ['Order #', 'Customer', 'Date', 'Status', 'Type', 'Payment', 'Pay Status', 'Total'];
+        $csvRows  = array_map(fn ($r) => [$r['order_number'], $r['customer_name'], $r['created_at'], $r['status'], $r['transaction_type'], $r['payment_method'], $r['payment_status'], $r['total_amount']], $rows);
+        $csvRows[] = ['TOTAL', '', '', '', '', '', '', $this->peso($grandTotal)];
+        return $this->csvResponse($filename, $headings, $csvRows);
     }
 
     public function create(): Response
@@ -359,16 +442,39 @@ class OrderController extends Controller
                 $updates['cancelled_by']         = 'seller';
                 $updates['cancelled_at']         = now();
 
+                // If already paid, flag for refund instead of leaving as paid
+                if ($order->payment_status === 'paid') {
+                    $updates['payment_status'] = 'to_refund';
+                }
+
                 // Void invoice if one exists
                 if ($order->invoice) {
                     $order->invoice->update(['payment_status' => 'voided']);
                 }
             }
             $order->update($updates);
+
+            if ($newStatus === 'delivered') {
+                \App\Services\WalletService::creditOrder($order->fresh());
+            }
         });
 
         $label = str_replace('_', ' ', $newStatus);
         return back()->with('success', "Order {$order->order_number} marked as " . ucfirst($label) . '.');
+    }
+
+    public function markRefunded(Order $order): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        if ($order->store_id !== $store->id) abort(403);
+
+        if ($order->payment_status !== 'to_refund') {
+            return back()->with('error', 'Order is not pending a refund.');
+        }
+
+        $order->update(['payment_status' => 'refunded']);
+
+        return back()->with('success', "Order {$order->order_number} marked as refunded.");
     }
 
     public function updatePayment(Request $request, Order $order): RedirectResponse

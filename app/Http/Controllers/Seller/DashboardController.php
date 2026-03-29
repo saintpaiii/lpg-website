@@ -24,13 +24,13 @@ class DashboardController extends Controller
         $pendingOrders = $store->orders()->where('status', 'pending')->count();
 
         $revenueThisMonth = (float) $store->orders()
+            ->where('status', 'delivered')
             ->whereMonth('created_at', now()->month)
             ->whereYear('created_at', now()->year)
-            ->where('payment_status', 'paid')
             ->sum('total_amount');
 
         $revenueAllTime = (float) $store->orders()
-            ->where('payment_status', 'paid')
+            ->where('status', 'delivered')
             ->sum('total_amount');
 
         $commissionThisMonth = round($revenueThisMonth * (float) $store->commission_rate / 100, 2);
@@ -40,8 +40,8 @@ class DashboardController extends Controller
         $ordersChart = collect(range(29, 0))->map(function (int $daysAgo) use ($store) {
             $date = Carbon::today()->subDays($daysAgo);
             $revenue = (float) $store->orders()
+                ->where('status', 'delivered')
                 ->whereDate('created_at', $date)
-                ->where('payment_status', 'paid')
                 ->sum('total_amount');
             $commission = round($revenue * (float) $store->commission_rate / 100, 2);
             return [

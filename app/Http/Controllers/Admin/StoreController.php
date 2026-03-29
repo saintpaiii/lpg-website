@@ -146,6 +146,9 @@ class StoreController extends Controller
             'approved_by' => $request->user()->id,
         ]);
 
+        // Ensure wallet exists for the newly approved store
+        \App\Models\SellerWallet::firstOrCreate(['store_id' => $store->id]);
+
         // Mark owner's ID as verified
         $store->owner?->update(['id_verified' => true]);
 

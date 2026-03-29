@@ -14,12 +14,25 @@ const PERM_ROUTES: [string, string][] = [
     ['settings.view',      '/admin/settings'],
 ];
 
+const SELLER_STAFF_PERM_ROUTES: [string, string][] = [
+    ['dashboard.view',  '/seller/dashboard'],
+    ['orders.view',     '/seller/orders'],
+    ['invoices.view',   '/seller/invoices'],
+    ['inventory.view',  '/seller/inventory'],
+    ['deliveries.view', '/seller/deliveries'],
+    ['products.view',   '/seller/products'],
+    ['reports.view',    '/seller/reports'],
+];
+
 function homeUrl(role: string, subRole: string | null | undefined, permissions: string[]): string {
     if (role === 'customer') return '/customer/dashboard';
     if (role === 'seller') return '/seller/dashboard';
     if (role === 'seller_staff') {
         if (subRole === 'rider') return '/rider/deliveries';
-        return '/seller/dashboard';
+        for (const [perm, url] of SELLER_STAFF_PERM_ROUTES) {
+            if (permissions.includes(perm)) return url;
+        }
+        return '/seller/my-attendance';
     }
     if (role === 'platform_staff') {
         for (const [perm, url] of PERM_ROUTES) {

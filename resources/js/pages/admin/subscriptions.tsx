@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { fmtDate } from '@/lib/utils';
+import { fmtDate, fmtStatus } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -158,7 +158,7 @@ export default function Subscriptions({ subscriptions, counts, tab, search }: Pr
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                    {s.status}
+                                                    {fmtStatus(s.status)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">

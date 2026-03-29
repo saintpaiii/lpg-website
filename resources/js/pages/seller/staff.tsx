@@ -13,8 +13,6 @@ import {
     UserX,
     Users,
 } from 'lucide-react';
-import { PasswordInput } from '@/components/ui/password-input';
-import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
 import { FormEvent, useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import {
@@ -49,9 +47,14 @@ import type { BreadcrumbItem } from '@/types';
 type StaffMember = {
     id: number;
     name: string;
+    first_name: string | null;
+    middle_name: string | null;
+    last_name: string | null;
     email: string;
     phone: string | null;
     sub_role: string;
+    schedule_start: string | null;
+    schedule_end: string | null;
     is_active: boolean;
     created_at: string;
     deleted_at: string | null;
@@ -85,12 +88,14 @@ const SUB_ROLE_LABELS: Record<string, string> = {
     cashier:   'Cashier',
     warehouse: 'Warehouse',
     rider:     'Rider',
+    hr:        'HR',
 };
 
 const SUB_ROLE_STYLES: Record<string, string> = {
     cashier:   'bg-emerald-100 text-emerald-700',
     warehouse: 'bg-amber-100 text-amber-700',
     rider:     'bg-blue-100 text-blue-700',
+    hr:        'bg-purple-100 text-purple-700',
 };
 
 const DEACTIVATE_REASONS = [
@@ -167,24 +172,51 @@ function StaffFormDialog({
 }) {
     const isEdit = !!editTarget;
 
+    // Normalise stored time to HH:MM (24-hour) for <input type="time">.
+    // DB may store "05:30 AM" (12-hour); the time input only accepts "HH:MM".
+    function toHHMM(t: string | null | undefined): string {
+        if (!t) return '';
+        const match = t.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!match) return t; // already "HH:MM" or empty
+        let h = parseInt(match[1], 10);
+        const m = match[2];
+        const period = match[3].toUpperCase();
+        if (period === 'AM' && h === 12) h = 0;
+        if (period === 'PM' && h !== 12) h += 12;
+        return `${String(h).padStart(2, '0')}:${m}`;
+    }
+
     const { data, setData, post, put, processing, errors, reset } = useForm<{
-        name: string;
+        first_name: string;
+        middle_name: string;
+        last_name: string;
         email: string;
-        password: string;
-        password_confirmation: string;
         phone: string;
         sub_role: string;
+        schedule_start: string;
+        schedule_end: string;
     }>({
-        name:                  editTarget?.name     ?? '',
-        email:                 editTarget?.email    ?? '',
-        password:              '',
-        password_confirmation: '',
-        phone:                 editTarget?.phone    ?? '',
-        sub_role:              editTarget?.sub_role ?? 'cashier',
+        first_name:     editTarget?.first_name     ?? '',
+        middle_name:    editTarget?.middle_name    ?? '',
+        last_name:      editTarget?.last_name      ?? '',
+        email:          editTarget?.email          ?? '',
+        phone:          editTarget?.phone          ?? '',
+        sub_role:       editTarget?.sub_role       ?? 'cashier',
+        schedule_start: toHHMM(editTarget?.schedule_start),
+        schedule_end:   toHHMM(editTarget?.schedule_end),
     });
 
-    if (isEdit && data.name !== editTarget.name && data.email !== editTarget.email) {
-        setData({ name: editTarget.name, email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role });
+    if (isEdit && editTarget && data.email !== editTarget.email) {
+        setData({
+            first_name:     editTarget.first_name     ?? '',
+            middle_name:    editTarget.middle_name    ?? '',
+            last_name:      editTarget.last_name      ?? '',
+            email:          editTarget.email,
+            phone:          editTarget.phone          ?? '',
+            sub_role:       editTarget.sub_role,
+            schedule_start: toHHMM(editTarget.schedule_start),
+            schedule_end:   toHHMM(editTarget.schedule_end),
+        });
     }
 
     function handleSubmit(e: FormEvent) {
@@ -204,7 +236,7 @@ function StaffFormDialog({
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {isEdit ? <Pencil className="h-4 w-4 text-blue-600" /> : <Plus className="h-4 w-4 text-blue-600" />}
@@ -213,10 +245,24 @@ function StaffFormDialog({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="grid gap-4">
+                    {/* Name fields */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                            <Label>First Name <span className="text-red-500">*</span></Label>
+                            <Input value={data.first_name} onChange={(e) => setData('first_name', e.target.value)} placeholder="Juan" />
+                            {errors.first_name && <p className="text-xs text-red-500">{errors.first_name}</p>}
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label>Last Name <span className="text-red-500">*</span></Label>
+                            <Input value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} placeholder="Dela Cruz" />
+                            {errors.last_name && <p className="text-xs text-red-500">{errors.last_name}</p>}
+                        </div>
+                    </div>
+
                     <div className="grid gap-1.5">
-                        <Label>Full Name <span className="text-red-500">*</span></Label>
-                        <Input value={data.name} onChange={(e) => setData('name', e.target.value)} placeholder="Juan Dela Cruz" />
-                        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                        <Label>Middle Name <span className="text-xs text-gray-400">(optional)</span></Label>
+                        <Input value={data.middle_name} onChange={(e) => setData('middle_name', e.target.value)} placeholder="Santos" />
+                        {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
                     </div>
 
                     <div className="grid gap-1.5">
@@ -226,30 +272,7 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>{isEdit ? 'New Password (leave blank to keep current)' : <>Password <span className="text-red-500">*</span></>}</Label>
-                        <PasswordInput
-                            value={data.password}
-                            onChange={(e) => setData('password', e.target.value)}
-                            placeholder={isEdit ? '••••••••' : 'Minimum 8 characters'}
-                            autoComplete="new-password"
-                        />
-                        {errors.password && <p className="text-xs text-red-500">{errors.password}</p>}
-                        <PasswordStrengthIndicator password={data.password} />
-                    </div>
-
-                    <div className="grid gap-1.5">
-                        <Label>{isEdit ? 'Confirm New Password' : <>Confirm Password <span className="text-red-500">*</span></>}</Label>
-                        <PasswordInput
-                            value={data.password_confirmation}
-                            onChange={(e) => setData('password_confirmation', e.target.value)}
-                            placeholder="Re-enter password"
-                            autoComplete="new-password"
-                        />
-                        {errors.password_confirmation && <p className="text-xs text-red-500">{errors.password_confirmation}</p>}
-                    </div>
-
-                    <div className="grid gap-1.5">
-                        <Label>Phone</Label>
+                        <Label>Phone <span className="text-xs text-gray-400">(optional)</span></Label>
                         <Input value={data.phone} onChange={(e) => setData('phone', e.target.value)} placeholder="09XXXXXXXXX" />
                         {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
                     </div>
@@ -262,14 +285,37 @@ function StaffFormDialog({
                                 <SelectItem value="cashier">Cashier</SelectItem>
                                 <SelectItem value="warehouse">Warehouse</SelectItem>
                                 <SelectItem value="rider">Rider</SelectItem>
+                                <SelectItem value="hr">HR</SelectItem>
                             </SelectContent>
                         </Select>
                         {errors.sub_role && <p className="text-xs text-red-500">{errors.sub_role}</p>}
                     </div>
 
+                    {/* Work schedule */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                            <Label>Schedule Start <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Input
+                                type="time"
+                                value={data.schedule_start}
+                                onChange={(e) => setData('schedule_start', e.target.value)}
+                            />
+                            {errors.schedule_start && <p className="text-xs text-red-500">{errors.schedule_start}</p>}
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label>Schedule End <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Input
+                                type="time"
+                                value={data.schedule_end}
+                                onChange={(e) => setData('schedule_end', e.target.value)}
+                            />
+                            {errors.schedule_end && <p className="text-xs text-red-500">{errors.schedule_end}</p>}
+                        </div>
+                    </div>
+
                     {!isEdit && (
                         <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                            The staff member will use these credentials to log in. Riders will access the rider portal; cashier and warehouse will access the seller portal.
+                            Password defaults to their last name (lowercase). They will be asked to change it on first login. Login credentials will be emailed to them.
                         </div>
                     )}
 

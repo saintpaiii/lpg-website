@@ -19,7 +19,7 @@ export default function AppSidebarLayout({
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
                 {children}
             </AppContent>
-            <Toaster richColors position="top-right" />
+            <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
         </AppShell>
     );
 }

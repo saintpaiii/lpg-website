@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, Eye, Loader2, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
+import { CheckCircle, Eye, FileDown, Loader2, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -41,7 +41,7 @@ type Props = {
     orders:  Paginated;
     counts:  Counts;
     tab:     string;
-    filters: { status?: string; search?: string };
+    filters: { status?: string; search?: string; date_from?: string; date_to?: string };
     riders:  Rider[];
 };
 
@@ -55,9 +55,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PAY_COLORS: Record<string, string> = {
-    paid:    'bg-green-100 text-green-700',
-    unpaid:  'bg-red-100 text-red-700',
-    partial: 'bg-yellow-100 text-yellow-700',
+    paid:       'bg-green-100 text-green-700',
+    unpaid:     'bg-red-100 text-red-700',
+    partial:    'bg-yellow-100 text-yellow-700',
+    to_refund:  'bg-orange-100 text-orange-700',
+    refunded:   'bg-gray-100 text-gray-600',
 };
 
 type ActionDialog =
@@ -69,19 +71,35 @@ type ActionDialog =
 
 export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
     const [searchVal,    setSearchVal]    = useState(filters.search ?? '');
+    const [dateFrom,     setDateFrom]     = useState(filters.date_from ?? '');
+    const [dateTo,       setDateTo]       = useState(filters.date_to ?? '');
     const [dialog,       setDialog]       = useState<ActionDialog>(null);
     const [riderId,      setRiderId]      = useState('');
     const [cancelReason, setCancelReason] = useState('');
     const [cancelNotes,  setCancelNotes]  = useState('');
     const [loading,      setLoading]      = useState(false);
 
+    function navigate(overrides: Record<string, string> = {}) {
+        router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, ...overrides }, { preserveState: true, replace: true });
+    }
+
     function goTab(t: string) {
-        router.get('/seller/orders', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+        navigate({ tab: t });
     }
 
     function doSearch(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
-        router.get('/seller/orders', { tab, search: searchVal }, { preserveState: true, replace: true });
+        navigate();
+    }
+
+    function applyDates() {
+        navigate();
+    }
+
+    function clearDates() {
+        setDateFrom('');
+        setDateTo('');
+        router.get('/seller/orders', { tab, search: searchVal, date_from: '', date_to: '' }, { preserveState: true, replace: true });
     }
 
     function openDialog(d: ActionDialog) {
@@ -172,6 +190,14 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                             </div>
                             <Button type="submit" variant="secondary" size="sm">Search</Button>
                         </form>
+                        <a href={`/seller/orders/export?format=csv&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> CSV
+                        </a>
+                        <a href={`/seller/orders/export?format=pdf&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> PDF
+                        </a>
                     </div>
                 </div>
 
@@ -195,6 +221,20 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                             {label}
                         </button>
                     ))}
+                </div>
+
+                {/* Date filter */}
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">From</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">To</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={applyDates}>Apply</Button>
+                    {(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={clearDates}>Clear</Button>}
                 </div>
 
                 {/* Table */}
@@ -238,7 +278,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             </td>
                                             <td className="px-4 py-3 text-center hidden md:table-cell">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[o.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                                    {o.payment_status}
+                                                    {o.payment_status === 'to_refund' ? 'To Refund' : o.payment_status === 'refunded' ? 'Refunded' : o.payment_status}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">

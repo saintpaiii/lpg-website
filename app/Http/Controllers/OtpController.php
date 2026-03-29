@@ -16,7 +16,7 @@ class OtpController extends Controller
 {
     /**
      * Show the OTP entry page.
-     * Auto-generates and sends a code if the user has no active one.
+     * Does NOT auto-send — user must click "Send Verification Code" first.
      */
     public function show(Request $request): Response|RedirectResponse
     {
@@ -27,19 +27,15 @@ class OtpController extends Controller
             return redirect($this->dashboardRoute($user));
         }
 
-        // Generate a code if there's no active one yet
         $activeOtp = OtpCode::latestActiveFor($user);
-        if (! $activeOtp) {
-            $activeOtp = OtpCode::generateFor($user);
-            Mail::to($user->email)->send(new OtpMail($user, $activeOtp->code));
-        }
-
-        $expiresIn = max(0, (int) now()->diffInSeconds($activeOtp->expires_at, false));
+        $codeSent  = $activeOtp !== null;
+        $expiresIn = $codeSent ? max(0, (int) now()->diffInSeconds($activeOtp->expires_at, false)) : 0;
 
         return Inertia::render('auth/verify-otp', [
             'email'            => $user->email,
             'resend_available' => $this->resendAvailableIn($user->id),
             'code_expires_in'  => $expiresIn,
+            'code_sent'        => $codeSent,
         ]);
     }
 

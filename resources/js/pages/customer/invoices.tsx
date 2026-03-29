@@ -1,8 +1,10 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Receipt, Printer } from 'lucide-react';
+import { useState } from 'react';
 import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import CustomerLayout from '@/layouts/customer-layout';
 
 type Invoice = {
@@ -16,6 +18,7 @@ type Invoice = {
     paid_at: string | null;
     created_at: string;
     order_number: string | null;
+    order_status: string | null;
 };
 
 type Paginated<T> = {
@@ -30,18 +33,49 @@ type Paginated<T> = {
 
 type Props = {
     invoices: Paginated<Invoice>;
+    date_from: string;
+    date_to: string;
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:  'bg-red-100 text-red-700 border-red-200',
-    paid:    'bg-emerald-100 text-emerald-700 border-emerald-200',
-    partial: 'bg-amber-100 text-amber-700 border-amber-200',
+    unpaid:    'bg-red-100 text-red-700 border-red-200',
+    paid:      'bg-emerald-100 text-emerald-700 border-emerald-200',
+    partial:   'bg-amber-100 text-amber-700 border-amber-200',
+    to_refund: 'bg-orange-100 text-orange-700 border-orange-200',
+    refunded:  'bg-gray-100 text-gray-600 border-gray-200',
 };
 
-export default function Invoices({ invoices }: Props) {
+export default function Invoices({ invoices, date_from, date_to }: Props) {
+    const [dateFrom, setDateFrom] = useState(date_from);
+    const [dateTo,   setDateTo]   = useState(date_to);
+
+    function applyDates() {
+        router.get('/customer/invoices', { date_from: dateFrom, date_to: dateTo }, { preserveState: true, replace: true });
+    }
+
+    function clearDates() {
+        setDateFrom('');
+        setDateTo('');
+        router.get('/customer/invoices', { date_from: '', date_to: '' }, { preserveState: true, replace: true });
+    }
+
     return (
         <CustomerLayout title="My Invoices">
             <Head title="My Invoices — LPG Portal" />
+
+            <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-2">
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500 font-medium">From</label>
+                    <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1">
+                    <label className="text-xs text-gray-500 font-medium">To</label>
+                    <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                </div>
+                <Button size="sm" variant="outline" onClick={applyDates}>Apply</Button>
+                {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-gray-500" onClick={clearDates}>Clear</Button>}
+            </div>
 
             <Card>
                 <CardHeader className="pb-2">
@@ -94,7 +128,7 @@ export default function Invoices({ invoices }: Props) {
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                    {inv.payment_status.charAt(0).toUpperCase() + inv.payment_status.slice(1)}
+                                                    {inv.payment_status === 'to_refund' ? 'To Refund' : inv.payment_status === 'refunded' ? 'Refunded' : inv.payment_status.charAt(0).toUpperCase() + inv.payment_status.slice(1)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
@@ -105,15 +139,17 @@ export default function Invoices({ invoices }: Props) {
                                                     <Link href={`/customer/invoices/${inv.id}`}>
                                                         <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">View</Button>
                                                     </Link>
-                                                    <a
-                                                        href={`/invoices/${inv.id}/print`}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50" title="Print Receipt">
-                                                            <Printer className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </a>
+                                                    {inv.order_status === 'delivered' && inv.payment_status === 'paid' && (
+                                                        <a
+                                                            href={`/invoices/${inv.id}/print`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50" title="Print Receipt">
+                                                                <Printer className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </a>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -148,6 +184,7 @@ export default function Invoices({ invoices }: Props) {
                     )}
                 </CardContent>
             </Card>
+            </div>
         </CustomerLayout>
     );
 }

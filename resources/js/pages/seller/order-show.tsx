@@ -288,11 +288,28 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                 {/* Status + method (read-only display) */}
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Status</span>
-                                    <span className={`font-medium capitalize ${order.payment_status === 'paid' ? 'text-emerald-600' : order.payment_status === 'unpaid' ? 'text-red-600' : ''}`}>
-                                        {order.payment_status === 'paid' && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
-                                        {order.payment_status}
+                                    <span className={`font-medium capitalize ${
+                                        order.payment_status === 'paid'      ? 'text-emerald-600' :
+                                        order.payment_status === 'unpaid'    ? 'text-red-600' :
+                                        order.payment_status === 'to_refund' ? 'text-orange-600' :
+                                        order.payment_status === 'refunded'  ? 'text-gray-500' : ''
+                                    }`}>
+                                        {order.payment_status === 'paid'      && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
+                                        {order.payment_status === 'to_refund' ? 'To Refund' :
+                                         order.payment_status === 'refunded'  ? 'Refunded' :
+                                         order.payment_status}
                                     </span>
                                 </div>
+
+                                {/* Mark as Refunded button */}
+                                {order.payment_status === 'to_refund' && (
+                                    <button
+                                        onClick={() => router.patch(route('seller.orders.refunded', { order: order.id }))}
+                                        className="w-full mt-1 text-xs rounded border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 px-2 py-1.5 transition-colors"
+                                    >
+                                        Mark as Refunded
+                                    </button>
+                                )}
 
                                 {order.payment_method && (
                                     <div className="flex justify-between">

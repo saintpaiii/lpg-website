@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { fmtDate } from '@/lib/utils';
+import { fmtDate, fmtStatus } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -269,7 +269,7 @@ export default function UserShow({ user, store, orders }: Props) {
                                         : store.status === 'rejected' ? 'bg-red-100 text-red-700'
                                         : 'bg-gray-100 text-gray-600'
                                     }`}>
-                                        {store.status}
+                                        {fmtStatus(store.status)}
                                     </span>
                                     <Link href={`/admin/stores/${store.id}`} className="text-xs text-primary hover:underline">
                                         View Store →

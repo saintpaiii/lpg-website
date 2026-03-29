@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { BadgeCheck, CheckCircle2, ExternalLink, FileText, Search, XCircle } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, ExternalLink, Eye, FileText, Search, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import {
     AlertDialog,
@@ -13,6 +13,12 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
@@ -36,9 +42,23 @@ type VerificationRow = {
     user_email: string;
     user_id_verified: boolean;
     reviewer_name: string | null;
+    // Store info
+    store_name: string | null;
+    store_phone: string | null;
+    store_address: string | null;
+    store_city: string | null;
+    store_barangay: string | null;
+    // Resubmission
+    is_resubmission: boolean;
+    previous_rejection_reason: string | null;
+    reuploaded_docs: string[];
+    // Document URLs
     valid_id_url: string | null;
     bir_permit_url: string | null;
     business_permit_url: string | null;
+    fsic_permit_url: string | null;
+    doe_lpg_license_url: string | null;
+    lto_permit_url: string | null;
 };
 
 type Counts = { pending: number; approved: number; rejected: number };
@@ -62,26 +82,35 @@ const TYPE_LABELS: Record<string, string> = {
     seller_application:       'Seller Application',
 };
 
-function DocLink({ url, label }: { url: string | null; label: string }) {
-    if (!url) return <span className="text-xs text-muted-foreground">—</span>;
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+function DocRow({ label, url }: { label: string; url: string | null }) {
     return (
-        <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 hover:underline"
-        >
-            <FileText className="h-3 w-3" /> {label} <ExternalLink className="h-2.5 w-2.5" />
-        </a>
+        <div className="flex items-center justify-between py-2 border-b last:border-0">
+            <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+            {url ? (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                    <FileText className="h-3.5 w-3.5" /> View <ExternalLink className="h-3 w-3" />
+                </a>
+            ) : (
+                <span className="text-sm text-muted-foreground italic">Not uploaded</span>
+            )}
+        </div>
     );
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Verifications({ verifications, counts, tab, search }: Props) {
-    const [searchVal, setSearchVal]     = useState(search);
+    const [searchVal, setSearchVal]         = useState(search);
+    const [detailTarget, setDetailTarget]   = useState<VerificationRow | null>(null);
+    const [rejectMode, setRejectMode]       = useState(false);
     const [approveTarget, setApproveTarget] = useState<VerificationRow | null>(null);
-    const [rejectTarget, setRejectTarget]   = useState<VerificationRow | null>(null);
 
     const { data, setData, patch, processing, reset } = useForm({ reason: '' });
 
@@ -94,6 +123,18 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
         router.get('/admin/verifications', { tab, search: searchVal }, { preserveState: true, replace: true });
     }
 
+    function closeDetail() {
+        setDetailTarget(null);
+        setRejectMode(false);
+        reset();
+    }
+
+    function openApprove(v: VerificationRow) {
+        setDetailTarget(null);
+        setRejectMode(false);
+        setApproveTarget(v);
+    }
+
     function submitApprove() {
         router.patch(`/admin/verifications/${approveTarget?.id}/approve`, {}, {
             onSuccess: () => setApproveTarget(null),
@@ -101,10 +142,12 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
     }
 
     function submitReject() {
-        patch(`/admin/verifications/${rejectTarget?.id}/reject`, {
-            onSuccess: () => { setRejectTarget(null); reset(); },
+        patch(`/admin/verifications/${detailTarget?.id}/reject`, {
+            onSuccess: () => closeDetail(),
         });
     }
+
+    const v = detailTarget;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -169,85 +212,70 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">User</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
-                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Documents</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">ID Status</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Submitted</th>
-                                        {tab === 'pending' && (
-                                            <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Actions</th>
-                                        )}
-                                        {(tab === 'approved' || tab === 'rejected') && (
-                                            <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Reviewed</th>
-                                        )}
+                                        <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {verifications.data.length === 0 ? (
                                         <tr>
-                                            <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                                            <td colSpan={5} className="text-center py-12 text-muted-foreground">
                                                 No verifications in this category.
                                             </td>
                                         </tr>
-                                    ) : verifications.data.map((v) => (
-                                        <tr key={v.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                                    ) : verifications.data.map((row) => (
+                                        <tr key={row.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                             <td className="px-4 py-3">
-                                                <p className="font-medium">{v.user_name}</p>
-                                                <p className="text-xs text-muted-foreground">{v.user_email}</p>
+                                                <p className="font-medium">{row.user_name}</p>
+                                                <p className="text-xs text-muted-foreground">{row.user_email}</p>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">
-                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                    v.type === 'seller_application'
-                                                        ? 'bg-purple-100 text-purple-700'
-                                                        : 'bg-blue-100 text-blue-700'
-                                                }`}>
-                                                    {TYPE_LABELS[v.type] ?? v.type}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-3 hidden md:table-cell">
-                                                <div className="flex flex-col gap-1">
-                                                    <DocLink url={v.valid_id_url} label="Valid ID" />
-                                                    {v.type === 'seller_application' && <>
-                                                        <DocLink url={v.bir_permit_url} label="BIR Permit" />
-                                                        <DocLink url={v.business_permit_url} label="Business Permit" />
-                                                    </>}
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                                        row.type === 'seller_application'
+                                                            ? 'bg-purple-100 text-purple-700'
+                                                            : 'bg-blue-100 text-blue-700'
+                                                    }`}>
+                                                        {TYPE_LABELS[row.type] ?? row.type}
+                                                    </span>
+                                                    {row.is_resubmission && row.status === 'pending' && (
+                                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+                                                            Resubmitted
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                    v.user_id_verified
+                                                    row.user_id_verified
                                                         ? 'bg-green-100 text-green-700'
                                                         : 'bg-yellow-100 text-yellow-700'
                                                 }`}>
-                                                    {v.user_id_verified ? 'Verified' : 'Unverified'}
+                                                    {row.user_id_verified ? 'Verified' : 'Unverified'}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
-                                                {v.created_at}
+                                                {row.created_at}
                                             </td>
-                                            {tab === 'pending' && (
-                                                <td className="px-4 py-3 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <Button size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50 h-7 text-xs"
-                                                            onClick={() => setRejectTarget(v)}>
-                                                            <XCircle className="h-3 w-3 mr-1" /> Reject
-                                                        </Button>
-                                                        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
-                                                            onClick={() => setApproveTarget(v)}>
-                                                            <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                            {(tab === 'approved' || tab === 'rejected') && (
-                                                <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
-                                                    {v.reviewed_at ?? '—'}
-                                                    {v.reviewer_name && <span className="block">by {v.reviewer_name}</span>}
-                                                    {v.rejection_reason && (
-                                                        <span className="block text-red-500 italic max-w-[180px] truncate" title={v.rejection_reason}>
-                                                            {v.rejection_reason}
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {(tab === 'approved' || tab === 'rejected') && (
+                                                        <span className="text-xs text-muted-foreground text-right hidden lg:block">
+                                                            {row.reviewed_at ?? '—'}
+                                                            {row.reviewer_name && <span className="block">by {row.reviewer_name}</span>}
                                                         </span>
                                                     )}
-                                                </td>
-                                            )}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 text-xs gap-1"
+                                                        onClick={() => { setDetailTarget(row); setRejectMode(false); reset(); }}
+                                                    >
+                                                        <Eye className="h-3 w-3" /> View Details
+                                                    </Button>
+                                                </div>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -271,46 +299,195 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                 </Card>
             </div>
 
-            {/* Approve dialog */}
+            {/* ── Details Dialog ──────────────────────────────────────────────── */}
+            <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) closeDetail(); }}>
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <BadgeCheck className="h-5 w-5 text-blue-600" />
+                            {v?.type === 'seller_application' ? 'Seller Application' : 'ID Verification'}
+                            {v?.is_resubmission && v?.status === 'pending' && (
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+                                    Resubmitted
+                                </span>
+                            )}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {v && !rejectMode && (
+                        <div className="space-y-5 py-1">
+
+                            {/* 1. Applicant Info */}
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Applicant Info</h3>
+                                <div className="rounded-md border p-3 space-y-1.5">
+                                    <div className="flex gap-2">
+                                        <span className="text-sm text-muted-foreground w-24 shrink-0">Name</span>
+                                        <span className="text-sm font-medium">{v.user_name}</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="text-sm text-muted-foreground w-24 shrink-0">Email</span>
+                                        <span className="text-sm">{v.user_email}</span>
+                                    </div>
+                                    {v.type === 'seller_application' && <>
+                                        {v.store_name && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">Store Name</span>
+                                                <span className="text-sm font-medium">{v.store_name}</span>
+                                            </div>
+                                        )}
+                                        {v.store_phone && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">Phone</span>
+                                                <span className="text-sm">{v.store_phone}</span>
+                                            </div>
+                                        )}
+                                        {v.store_address && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">Address</span>
+                                                <span className="text-sm">
+                                                    {v.store_address}
+                                                    {v.store_barangay ? `, ${v.store_barangay}` : ''}
+                                                    {v.store_city ? `, ${v.store_city}` : ''}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </>}
+                                </div>
+                            </section>
+
+                            {/* 2. Documents */}
+                            <section>
+                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Documents</h3>
+                                <div className="rounded-md border px-3 divide-y">
+                                    <DocRow label="Valid ID" url={v.valid_id_url} />
+                                    {v.type === 'seller_application' && <>
+                                        <DocRow label="BIR Certificate of Registration" url={v.bir_permit_url} />
+                                        <DocRow label="Business Permit / Mayor's Permit" url={v.business_permit_url} />
+                                        <DocRow label="FSIC (Fire Safety Inspection Certificate)" url={v.fsic_permit_url} />
+                                        <DocRow label="DOE LPG Retail License" url={v.doe_lpg_license_url} />
+                                        <DocRow label="LTO (License to Operate)" url={v.lto_permit_url} />
+                                    </>}
+                                </div>
+                            </section>
+
+                            {/* 3. Resubmission Info */}
+                            {v.is_resubmission && (
+                                <section>
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Resubmission History</h3>
+                                    <div className="rounded-md border p-3 space-y-2">
+                                        {v.previous_rejection_reason && (
+                                            <div>
+                                                <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-0.5">Previous rejection reason:</p>
+                                                <p className="text-sm text-gray-700 dark:text-gray-300 italic">{v.previous_rejection_reason}</p>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-0.5">Documents re-uploaded:</p>
+                                            {v.reuploaded_docs.length > 0 ? (
+                                                <p className="text-sm text-emerald-600 dark:text-emerald-400">{v.reuploaded_docs.join(', ')}</p>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">None — all documents kept from previous submission.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* 4. Reviewed info (approved/rejected tabs) */}
+                            {(v.status === 'approved' || v.status === 'rejected') && (
+                                <section>
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Review Decision</h3>
+                                    <div className="rounded-md border p-3 space-y-1.5">
+                                        <div className="flex gap-2">
+                                            <span className="text-sm text-muted-foreground w-24 shrink-0">Decision</span>
+                                            <span className={`text-sm font-medium ${v.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>
+                                                {v.status === 'approved' ? 'Approved' : 'Rejected'}
+                                            </span>
+                                        </div>
+                                        {v.reviewed_at && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">Reviewed</span>
+                                                <span className="text-sm">{v.reviewed_at}{v.reviewer_name ? ` by ${v.reviewer_name}` : ''}</span>
+                                            </div>
+                                        )}
+                                        {v.rejection_reason && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">Reason</span>
+                                                <span className="text-sm text-red-600 dark:text-red-400 italic">{v.rejection_reason}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </section>
+                            )}
+
+                            {/* 5. Action buttons (pending tab only) */}
+                            {tab === 'pending' && (
+                                <div className="flex justify-end gap-2 pt-2 border-t">
+                                    <Button
+                                        variant="outline"
+                                        className="border-red-300 text-red-600 hover:bg-red-50"
+                                        onClick={() => setRejectMode(true)}
+                                    >
+                                        <XCircle className="h-4 w-4 mr-1.5" /> Reject
+                                    </Button>
+                                    <Button
+                                        className="bg-green-600 hover:bg-green-700 text-white"
+                                        onClick={() => openApprove(v)}
+                                    >
+                                        <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Reject mode: show reason input */}
+                    {v && rejectMode && (
+                        <div className="space-y-4 py-1">
+                            <p className="text-sm text-muted-foreground">
+                                Provide a reason for rejecting <strong>{v.user_name}</strong>'s application.
+                                This will be shown to the applicant so they know what to fix.
+                            </p>
+                            <textarea
+                                className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                                rows={4}
+                                placeholder="e.g. BIR certificate appears expired. Please re-upload a current copy."
+                                value={data.reason}
+                                onChange={(e) => setData('reason', e.target.value)}
+                                autoFocus
+                            />
+                            <div className="flex justify-end gap-2 pt-2 border-t">
+                                <Button variant="outline" onClick={() => setRejectMode(false)}>
+                                    ← Back
+                                </Button>
+                                <Button
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                    onClick={submitReject}
+                                    disabled={!data.reason.trim() || processing}
+                                >
+                                    Confirm Rejection
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Approve confirmation ────────────────────────────────────────── */}
             <AlertDialog open={!!approveTarget} onOpenChange={(o) => { if (!o) setApproveTarget(null); }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Approve Verification</AlertDialogTitle>
+                        <AlertDialogTitle>Approve Application</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Approve the ID verification for <strong>{approveTarget?.user_name}</strong>? Their account will be marked as ID-verified.
+                            Approve the seller application for <strong>{approveTarget?.user_name}</strong>?
+                            Their account will be promoted to seller and they can access the seller portal.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={submitApprove} className="bg-green-600 hover:bg-green-700">Approve</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            {/* Reject dialog */}
-            <AlertDialog open={!!rejectTarget} onOpenChange={(o) => { if (!o) { setRejectTarget(null); reset(); } }}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Reject Verification</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Provide a reason for rejecting <strong>{rejectTarget?.user_name}</strong>'s ID verification.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <textarea
-                        className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        rows={3}
-                        placeholder="Reason for rejection…"
-                        value={data.reason}
-                        onChange={(e) => setData('reason', e.target.value)}
-                    />
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={submitReject}
-                            disabled={!data.reason.trim() || processing}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            Reject
+                        <AlertDialogAction onClick={submitApprove} className="bg-green-600 hover:bg-green-700">
+                            Approve
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

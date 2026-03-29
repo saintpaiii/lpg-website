@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Admin\AuthLogController;
+use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CustomerController;
+use App\Http\Controllers\Admin\WithdrawalController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -57,12 +59,14 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     // Invoices (read-only — platform monitoring)
     Route::middleware('permission:invoices.view')->group(function () {
         Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
+        Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     });
 
-    Route::get('reports', [ReportsController::class, 'index'])
-        ->middleware('permission:reports.view')
-        ->name('reports');
+    Route::middleware('permission:reports.view')->group(function () {
+        Route::get('reports', [ReportsController::class, 'index'])->name('reports');
+        Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
+    });
 
     Route::get('dss', [DssController::class, 'index'])
         ->middleware('permission:dss.view')
@@ -95,8 +99,25 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::patch('verifications/{verification}/reject', [VerificationController::class, 'reject'])->name('verifications.reject');
     });
 
+    // Seller Withdrawal Requests (platform admin only)
+    Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals');
+    Route::get('withdrawals/export', [WithdrawalController::class, 'export'])->name('withdrawals.export');
+    Route::patch('withdrawals/{withdrawal}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
+    Route::patch('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
+    Route::patch('withdrawals/{withdrawal}/release', [WithdrawalController::class, 'markReleased'])->name('withdrawals.release');
+
     // Auth Logs — platform admin only
     Route::get('auth-logs', [AuthLogController::class, 'index'])
         ->middleware('permission:dashboard.view')
         ->name('auth-logs');
+
+    // Banners — platform admin only
+    Route::get('banners', [BannerController::class, 'index'])->name('banners');
+    Route::post('banners', [BannerController::class, 'store'])->name('banners.store');
+    Route::put('banners/{banner}', [BannerController::class, 'update'])->name('banners.update');
+    Route::patch('banners/{banner}/toggle', [BannerController::class, 'toggle'])->name('banners.toggle');
+    Route::post('banners/reorder', [BannerController::class, 'reorder'])->name('banners.reorder');
+    Route::delete('banners/{banner}', [BannerController::class, 'destroy'])->name('banners.destroy');
+    Route::post('banners/{banner}/restore', [BannerController::class, 'restore'])->withTrashed()->name('banners.restore');
+    Route::delete('banners/{banner}/force', [BannerController::class, 'forceDestroy'])->withTrashed()->name('banners.force-delete');
 });

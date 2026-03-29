@@ -24,10 +24,10 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                 isActive={active}
                                 tooltip={{ children: item.title }}
                                 className={cn(
-                                    'h-9 rounded-md px-3 text-sm font-medium transition-colors',
+                                    'h-9 rounded-md px-3 text-sm font-medium transition-all duration-150',
                                     active
-                                        ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700'
-                                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                                        ? 'bg-blue-600 text-white hover:bg-blue-700 hover:text-white dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700 shadow-sm'
+                                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5',
                                 )}
                             >
                                 <Link href={item.href} prefetch>

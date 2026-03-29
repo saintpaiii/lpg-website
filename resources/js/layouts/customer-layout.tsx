@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Clock, Flame, LayoutDashboard, LogOut, Package, Receipt, Search, ShoppingBag, ShoppingCart, Store, User, XCircle } from 'lucide-react';
+import { Clock, Flame, LogOut, Package, Receipt, Search, ShoppingBag, ShoppingCart, Store, User, XCircle } from 'lucide-react';
 import { useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { Toaster } from 'sonner';
 import {
@@ -21,7 +21,6 @@ type Props = {
 };
 
 const navItems = [
-    { label: 'My Dashboard', href: '/customer/dashboard', icon: LayoutDashboard },
     { label: 'Browse',       href: '/customer/products',  icon: ShoppingBag },
     { label: 'My Orders',    href: '/customer/orders',    icon: Package },
     { label: 'My Invoices',  href: '/customer/invoices',  icon: Receipt },
@@ -31,7 +30,9 @@ const navItems = [
 export default function CustomerLayout({ children, title }: Props) {
     const { auth, cart_count } = usePage<SharedData>().props;
     const isSeller = auth.user.role === 'seller';
+    const isAdmin  = ['platform_admin', 'admin'].includes(auth.user.role);
     const sellerApp = auth.seller_application;
+    const visibleNavItems = isAdmin ? navItems.slice(0, 1) : navItems; // Admin only sees Browse
     useFlashToast();
 
     const [logoutOpen, setLogoutOpen] = useState(false);
@@ -56,7 +57,7 @@ export default function CustomerLayout({ children, title }: Props) {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex items-center justify-between h-16">
                         {/* Logo */}
-                        <Link href="/customer/dashboard" className="flex items-center gap-2.5 font-bold text-base">
+                        <Link href="/customer/products" className="flex items-center gap-2.5 font-bold text-base">
                             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
                                 <Flame className="h-5 w-5 text-white" />
                             </div>
@@ -67,16 +68,16 @@ export default function CustomerLayout({ children, title }: Props) {
 
                         {/* Desktop nav links */}
                         <div className="hidden md:flex items-center gap-1">
-                            {navItems.map(({ label, href, icon: Icon }) => {
+                            {visibleNavItems.map(({ label, href, icon: Icon }) => {
                                 const active = currentPath === href || currentPath.startsWith(href + '/');
                                 return (
                                     <Link
                                         key={href}
                                         href={href}
-                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                                             active
-                                                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                                : 'text-gray-600 hover:text-blue-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800'
+                                                ? 'bg-blue-100 text-blue-700 font-semibold dark:bg-blue-900/40 dark:text-blue-300'
+                                                : 'font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800'
                                         }`}
                                     >
                                         <Icon className="h-4 w-4" />
@@ -84,12 +85,23 @@ export default function CustomerLayout({ children, title }: Props) {
                                     </Link>
                                 );
                             })}
+                            {isAdmin && (
+                                <>
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 px-2 select-none">Admin Preview</span>
+                                    <Link
+                                        href="/admin/dashboard"
+                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
+                                    >
+                                        ← Back to Admin
+                                    </Link>
+                                </>
+                            )}
                         </div>
 
                         {/* User + actions */}
                         <div className="flex items-center gap-1">
-                            {/* Seller portal link */}
-                            {isSeller ? (
+                            {/* Admin preview label + back link */}
+                            {isAdmin ? null : isSeller ? (
                                 <Link
                                     href="/seller/dashboard"
                                     className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors dark:text-emerald-400 dark:bg-emerald-900/20"
@@ -126,27 +138,31 @@ export default function CustomerLayout({ children, title }: Props) {
                                     <span className="hidden md:block">Start Selling</span>
                                 </Link>
                             )}
-                            {/* Search button */}
-                            <button
-                                onClick={() => { setSearchOpen(v => !v); setTimeout(() => searchRef.current?.focus(), 50); }}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
-                                title="Search products"
-                            >
-                                <Search className="h-4 w-4" />
-                            </button>
-                            {/* Cart icon */}
-                            <Link
-                                href="/customer/cart"
-                                className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
-                                title="Cart"
-                            >
-                                <ShoppingCart className="h-4 w-4" />
-                                {cart_count > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
-                                        {cart_count > 9 ? '9+' : cart_count}
-                                    </span>
-                                )}
-                            </Link>
+                            {/* Search button — hidden for admin (search bar on browse page itself) */}
+                            {!isAdmin && (
+                                <button
+                                    onClick={() => { setSearchOpen(v => !v); setTimeout(() => searchRef.current?.focus(), 50); }}
+                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
+                                    title="Search products"
+                                >
+                                    <Search className="h-4 w-4" />
+                                </button>
+                            )}
+                            {/* Cart icon — hidden for admin */}
+                            {!isAdmin && (
+                                <Link
+                                    href="/customer/cart"
+                                    className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
+                                    title="Cart"
+                                >
+                                    <ShoppingCart className="h-4 w-4" />
+                                    {cart_count > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                            {cart_count > 9 ? '9+' : cart_count}
+                                        </span>
+                                    )}
+                                </Link>
+                            )}
                             <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-400 px-2">
                                 {auth.user?.name}
                             </span>
@@ -164,16 +180,16 @@ export default function CustomerLayout({ children, title }: Props) {
                 {/* Mobile nav */}
                 <div className="md:hidden border-t border-gray-100 dark:border-gray-800 overflow-x-auto">
                     <div className="flex px-4 py-2 gap-1 min-w-max">
-                        {navItems.map(({ label, href, icon: Icon }) => {
+                        {visibleNavItems.map(({ label, href, icon: Icon }) => {
                             const active = currentPath === href || currentPath.startsWith(href + '/');
                             return (
                                 <Link
                                     key={href}
                                     href={href}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${
                                         active
-                                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                                            : 'text-gray-600 hover:text-blue-600 dark:text-gray-400'
+                                            ? 'bg-blue-100 text-blue-700 font-semibold dark:bg-blue-900/40 dark:text-blue-300'
+                                            : 'font-medium text-gray-600 hover:text-blue-600 dark:text-gray-400'
                                     }`}
                                 >
                                     <Icon className="h-3.5 w-3.5" />
@@ -181,6 +197,17 @@ export default function CustomerLayout({ children, title }: Props) {
                                 </Link>
                             );
                         })}
+                        {isAdmin && (
+                            <>
+                                <span className="text-xs text-gray-400 dark:text-gray-500 px-2 flex items-center select-none">Admin Preview</span>
+                                <Link
+                                    href="/admin/dashboard"
+                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-blue-600 whitespace-nowrap transition-colors dark:text-gray-400"
+                                >
+                                    ← Back to Admin
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
             </nav>
@@ -223,7 +250,7 @@ export default function CustomerLayout({ children, title }: Props) {
                 )}
                 {children}
             </main>
-            <Toaster richColors position="top-right" />
+            <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
 
             {/* Logout confirmation */}
             <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>

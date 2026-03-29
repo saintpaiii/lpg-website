@@ -12,7 +12,7 @@ export function useFlashToast() {
         | undefined;
 
     useEffect(() => {
-        if (flash?.success) toast.success(flash.success, { id: `flash-success:${flash.success}` });
-        if (flash?.error)   toast.error(flash.error,     { id: `flash-error:${flash.error}` });
+        if (flash?.success) toast.success(flash.success, { id: `flash-success:${flash.success}`, duration: 3000 });
+        if (flash?.error)   toast.error(flash.error,     { id: `flash-error:${flash.error}`,     duration: 3000 });
     }, [flash?.success, flash?.error]);
 }

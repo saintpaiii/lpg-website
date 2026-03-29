@@ -125,12 +125,14 @@ export default function SellerInvoiceShow({ invoice }: Props) {
                                 <Button size="sm" variant="outline">View Order</Button>
                             </Link>
                         )}
-                        <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="outline" className="gap-1.5">
-                                <Printer className="h-4 w-4" />
-                                Print
-                            </Button>
-                        </a>
+                        {invoice.payment_status === 'paid' && (
+                            <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
+                                <Button size="sm" variant="outline" className="gap-1.5">
+                                    <Printer className="h-4 w-4" />
+                                    Print
+                                </Button>
+                            </a>
+                        )}
                     </div>
                 </div>
 

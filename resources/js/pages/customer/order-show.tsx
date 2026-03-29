@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Camera, CheckCircle2, Circle, Clock, ExternalLink, MapPin, Printer, Star, XCircle } from 'lucide-react';
+import { ArrowLeft, Camera, CheckCircle2, Circle, Clock, ExternalLink, MapPin, Star, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ const CANCEL_REASONS = [
 type Order = {
     id: number;
     order_number: string;
+    store_name: string;
     status: string;
     transaction_type: string;
     total_amount: number;
@@ -99,9 +100,11 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:  'bg-red-100 text-red-700',
-    paid:    'bg-emerald-100 text-emerald-700',
-    partial: 'bg-amber-100 text-amber-700',
+    unpaid:     'bg-red-100 text-red-700',
+    paid:       'bg-emerald-100 text-emerald-700',
+    partial:    'bg-amber-100 text-amber-700',
+    to_refund:  'bg-orange-100 text-orange-700',
+    refunded:   'bg-gray-100 text-gray-600',
 };
 
 const PROOF_STATUS_COLORS: Record<string, string> = {
@@ -271,8 +274,7 @@ function StarSelector({ value, onChange }: { value: number; onChange: (v: number
 }
 
 export default function OrderShow({ order }: Props) {
-    const canPrint  = order.invoice && ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
-    const canCancel = ['pending', 'confirmed'].includes(order.status);
+    const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
     const [cancelOpen,     setCancelOpen]      = useState(false);
     const [cancelReason,   setCancelReason]    = useState('');
     const [cancelNotes,    setCancelNotes]     = useState('');
@@ -389,14 +391,6 @@ export default function OrderShow({ order }: Props) {
                                 Cancel Order
                             </Button>
                         )}
-                        {canPrint && (
-                            <a href={`/invoices/${order.invoice!.id}/print`} target="_blank" rel="noopener noreferrer">
-                                <Button variant="outline" size="sm" className="gap-1.5">
-                                    <Printer className="h-4 w-4" />
-                                    Print Receipt
-                                </Button>
-                            </a>
-                        )}
                     </div>
                 </div>
 
@@ -487,6 +481,10 @@ export default function OrderShow({ order }: Props) {
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="flex justify-between">
+                                    <span className="text-gray-500">Store</span>
+                                    <span className="font-medium text-right">{order.store_name}</span>
+                                </div>
+                                <div className="flex justify-between">
                                     <span className="text-gray-500">Type</span>
                                     <span className="font-medium">{order.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</span>
                                 </div>
@@ -518,7 +516,9 @@ export default function OrderShow({ order }: Props) {
                                 <div className="flex justify-between items-center">
                                     <span className="text-gray-500">Status</span>
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? ''}`}>
-                                        {order.payment_status}
+                                        {order.payment_status === 'to_refund' ? 'To Refund' :
+                                         order.payment_status === 'refunded'  ? 'Refunded' :
+                                         order.payment_status}
                                     </span>
                                 </div>
                                 {order.payment_method && (

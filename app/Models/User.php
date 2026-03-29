@@ -17,6 +17,9 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $fillable = [
         'name',
+        'first_name',
+        'middle_name',
+        'last_name',
         'email',
         'password',
         'email_verified_at',
@@ -29,6 +32,10 @@ class User extends Authenticatable implements MustVerifyEmail
         'id_verified',
         'store_id',
         'sub_role',
+        'schedule_start',
+        'schedule_end',
+        'must_change_password',
+        'daily_rate_override',
         'deactivation_reason',
         'deactivation_notes',
         'deactivated_at',
@@ -52,6 +59,8 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_platform_staff'       => 'boolean',
             'is_active'               => 'boolean',
             'id_verified'             => 'boolean',
+            'must_change_password'    => 'boolean',
+            'daily_rate_override'     => 'decimal:2',
         ];
     }
 

@@ -118,21 +118,21 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
 
                 {/* Revenue breakdown cards */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
+                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-emerald-500">
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Gross Revenue (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(stats.revenueThisMonth)}</p>
                             <p className="text-xs text-muted-foreground mt-1">{fmt(stats.revenueAllTime)} all time</p>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-amber-400">
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Platform Fee (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-amber-600">{fmt(stats.commissionThisMonth)}</p>
                             <p className="text-xs text-muted-foreground mt-1">{stats.commissionRate}% commission rate</p>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-blue-500">
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Net Revenue (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-blue-600">{fmt(stats.netRevenueThisMonth)}</p>
@@ -144,7 +144,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                 {/* Stat cards */}
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {statCards.map(({ label, value, sub, icon: Icon, color, bg, href }) => (
-                        <Card key={label} className="relative overflow-hidden">
+                        <Card key={label} className="relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                             <CardContent className="pt-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
@@ -164,7 +164,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
 
                 {/* Charts */}
                 <div className="grid gap-6 lg:grid-cols-5">
-                    <Card className="lg:col-span-3">
+                    <Card className="lg:col-span-3 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <BarChart3 className="h-4 w-4 text-blue-600" />
@@ -188,7 +188,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         </CardContent>
                     </Card>
 
-                    <Card className="lg:col-span-2">
+                    <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <TrendingUp className="h-4 w-4 text-emerald-600" />
@@ -220,7 +220,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
 
                 <div className="grid gap-6 lg:grid-cols-5">
                     {/* Recent orders */}
-                    <Card className="lg:col-span-3">
+                    <Card className="lg:col-span-3 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -270,7 +270,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                     </Card>
 
                     {/* Low stock */}
-                    <Card className="lg:col-span-2">
+                    <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base flex items-center gap-2">

@@ -10,7 +10,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { Filter, LineChart as LineChartIcon, PhilippinePeso, TrendingDown, TrendingUp } from 'lucide-react';
+import { FileDown, Filter, LineChart as LineChartIcon, PhilippinePeso, TrendingDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -92,11 +92,23 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
             <Head title="Reports" />
 
             <div className="p-6 space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Revenue Reports</h1>
-                    <p className="text-muted-foreground text-sm mt-0.5">
-                        Track your gross revenue, platform fees, and net earnings.
-                    </p>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Revenue Reports</h1>
+                        <p className="text-muted-foreground text-sm mt-0.5">
+                            Track your gross revenue, platform fees, and net earnings.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <a href={`/seller/reports/export?format=csv&date_from=${from}&date_to=${to}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> CSV
+                        </a>
+                        <a href={`/seller/reports/export?format=pdf&date_from=${from}&date_to=${to}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> PDF
+                        </a>
+                    </div>
                 </div>
 
                 {/* Date range */}

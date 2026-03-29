@@ -260,7 +260,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                                    {store.status}
+                                                    {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden sm:table-cell">

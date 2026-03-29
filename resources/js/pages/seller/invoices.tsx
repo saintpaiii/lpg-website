@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, Receipt, Search } from 'lucide-react';
+import { Eye, FileDown, Printer, Receipt, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -28,6 +28,7 @@ type Invoice = {
     customer: string;
     order_number: string;
     order_id: number;
+    order_status: string | null;
 };
 
 type Counts = { all: number; paid: number; unpaid: number; partial: number };
@@ -38,6 +39,8 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    date_from: string;
+    date_to: string;
 };
 
 const TABS = [
@@ -53,16 +56,30 @@ const PAY_COLORS: Record<string, string> = {
     partial: 'bg-yellow-100 text-yellow-700',
 };
 
-export default function SellerInvoices({ invoices, counts, tab, search }: Props) {
+export default function SellerInvoices({ invoices, counts, tab, search, date_from, date_to }: Props) {
     const [searchVal, setSearchVal] = useState(search);
+    const [dateFrom,  setDateFrom]  = useState(date_from);
+    const [dateTo,    setDateTo]    = useState(date_to);
+
+    function navigate(overrides: Record<string, string> = {}) {
+        router.get('/seller/invoices', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, ...overrides }, { preserveState: true, replace: true });
+    }
 
     function goTab(t: string) {
-        router.get('/seller/invoices', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+        navigate({ tab: t });
     }
 
     function doSearch(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
-        router.get('/seller/invoices', { tab, search: searchVal }, { preserveState: true, replace: true });
+        navigate();
+    }
+
+    function applyDates() { navigate(); }
+
+    function clearDates() {
+        setDateFrom('');
+        setDateTo('');
+        router.get('/seller/invoices', { tab, search: searchVal, date_from: '', date_to: '' }, { preserveState: true, replace: true });
     }
 
     const totalAmount = invoices.data.reduce((s, i) => s + i.total_amount, 0);
@@ -84,14 +101,24 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                             Revenue after platform commission.
                         </p>
                     </div>
-                    <form onSubmit={doSearch} className="flex gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Invoice # or customer…" className="pl-9 w-52" value={searchVal}
-                                onChange={(e) => setSearchVal(e.target.value)} />
-                        </div>
-                        <Button type="submit" variant="secondary" size="sm">Search</Button>
-                    </form>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <form onSubmit={doSearch} className="flex gap-2">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input placeholder="Invoice # or customer…" className="pl-9 w-52" value={searchVal}
+                                    onChange={(e) => setSearchVal(e.target.value)} />
+                            </div>
+                            <Button type="submit" variant="secondary" size="sm">Search</Button>
+                        </form>
+                        <a href={`/seller/invoices/export?format=csv&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> CSV
+                        </a>
+                        <a href={`/seller/invoices/export?format=pdf&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> PDF
+                        </a>
+                    </div>
                 </div>
 
                 {/* Tabs */}
@@ -105,6 +132,20 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                             )}
                         </button>
                     ))}
+                </div>
+
+                {/* Date filter */}
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">From</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">To</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={applyDates}>Apply</Button>
+                    {(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={clearDates}>Clear</Button>}
                 </div>
 
                 <Card>
@@ -151,13 +192,23 @@ export default function SellerInvoices({ invoices, counts, tab, search }: Props)
                                                 {fmtDate(inv.created_at)}
                                             </td>
                                             <td className="px-4 py-3 text-right">
-                                                <Link href={`/seller/invoices/${inv.id}`}>
-                                                    <Button size="sm" variant="outline"
-                                                        className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
-                                                        <Eye className="h-3 w-3" />
-                                                        View
-                                                    </Button>
-                                                </Link>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Link href={`/seller/invoices/${inv.id}`}>
+                                                        <Button size="sm" variant="outline"
+                                                            className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
+                                                            <Eye className="h-3 w-3" />
+                                                            View
+                                                        </Button>
+                                                    </Link>
+                                                    {inv.order_status === 'delivered' && inv.payment_status === 'paid' && (
+                                                        <a href={`/invoices/${inv.id}/print`} target="_blank" rel="noopener noreferrer">
+                                                            <Button size="sm" variant="ghost"
+                                                                className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50" title="Print Receipt">
+                                                                <Printer className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

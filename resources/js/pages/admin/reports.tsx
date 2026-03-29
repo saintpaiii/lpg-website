@@ -14,6 +14,7 @@ import {
 import { useState } from 'react';
 import {
     BarChart2,
+    FileDown,
     Filter,
     PhilippinePeso,
     ShoppingCart,
@@ -338,7 +339,7 @@ function StoresTab({ data }: { data: StoresData }) {
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                    {s.status}
+                                                    {s.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{s.orders_count.toLocaleString()}</td>
@@ -622,6 +623,14 @@ export default function ReportsPage({
                             className="w-36 text-sm"
                         />
                         <Button size="sm" onClick={applyDates}>Apply</Button>
+                        <a href={`/admin/reports/export?format=csv&tab=${tab}&date_from=${fromVal}&date_to=${toVal}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> CSV
+                        </a>
+                        <a href={`/admin/reports/export?format=pdf&tab=${tab}&date_from=${fromVal}&date_to=${toVal}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> PDF
+                        </a>
                     </div>
                 </div>
 

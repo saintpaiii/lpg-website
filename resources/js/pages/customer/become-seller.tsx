@@ -1,6 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
 import {
-    AlertCircle, CheckCircle2, CheckSquare, Clock, FileText,
+    AlertCircle, CheckCircle2, CheckSquare, Clock, ExternalLink, FileText,
     ScrollText, Shield, ShieldCheck, Store, Upload, XCircle,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -17,9 +17,30 @@ type Application = {
     created_at: string;
 } | null;
 
+type PreviousStore = {
+    store_name: string;
+    description: string | null;
+    address: string;
+    city: string;
+    barangay: string;
+    province: string;
+    phone: string;
+} | null;
+
+type PreviousDocs = {
+    valid_id_url: string | null;
+    bir_permit_url: string | null;
+    business_permit_url: string | null;
+    fsic_permit_url: string | null;
+    doe_lpg_license_url: string | null;
+    lto_permit_url: string | null;
+} | null;
+
 type Props = {
     application: Application;
     has_valid_id: boolean;
+    previous_store: PreviousStore;
+    previous_docs: PreviousDocs;
 };
 
 // ── File field definitions ─────────────────────────────────────────────────────
@@ -27,26 +48,31 @@ type Props = {
 const DOC_FIELDS = [
     {
         key: 'bir_permit' as const,
+        urlKey: 'bir_permit_url' as const,
         label: 'BIR Certificate of Registration',
         description: 'Registration certificate from the Bureau of Internal Revenue',
     },
     {
         key: 'business_permit' as const,
+        urlKey: 'business_permit_url' as const,
         label: "Business Permit / Mayor's Permit",
         description: "Current Mayor's Permit or Business Permit from your LGU",
     },
     {
         key: 'fsic_permit' as const,
+        urlKey: 'fsic_permit_url' as const,
         label: 'FSIC (Fire Safety Inspection Certificate)',
         description: 'Issued by the Bureau of Fire Protection — required for LPG businesses',
     },
     {
         key: 'doe_lpg_license' as const,
+        urlKey: 'doe_lpg_license_url' as const,
         label: 'DOE LPG Retail License',
         description: 'Required license from the Department of Energy to sell LPG',
     },
     {
         key: 'lto_permit' as const,
+        urlKey: 'lto_permit_url' as const,
         label: 'LTO (License to Operate)',
         description: 'License to Operate issued by the relevant regulatory agency',
     },
@@ -58,15 +84,16 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
     const [agreeAuthentic, setAgreeAuthentic] = useState(false);
     const [agreeCommission, setAgreeCommission] = useState(false);
     const allAgreed = agreeTerms && agreeAuthentic && agreeCommission;
+    const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
 
-    const { data, setData, post, processing, errors, progress } = useForm<{
+    const { data, setData, post, processing, errors, progress, transform } = useForm<{
         store_name: string;
         store_description: string;
         store_address: string;
@@ -82,36 +109,53 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
         lto_permit: File | null;
         terms_agreed: boolean;
     }>({
-        store_name: '',
-        store_description: '',
-        store_address: '',
-        store_city: '',
-        store_barangay: '',
-        store_province: 'Cavite',
-        store_phone: '',
-        bir_permit: null,
+        store_name:        previous_store?.store_name    ?? '',
+        store_description: previous_store?.description   ?? '',
+        store_address:     previous_store?.address       ?? '',
+        store_city:        previous_store?.city          ?? '',
+        store_barangay:    previous_store?.barangay      ?? '',
+        store_province:    previous_store?.province      ?? 'Cavite',
+        store_phone:       previous_store?.phone         ?? '',
+        bir_permit:      null,
         business_permit: null,
-        valid_id: null,
-        fsic_permit: null,
+        valid_id:        null,
+        fsic_permit:     null,
         doe_lpg_license: null,
-        lto_permit: null,
-        terms_agreed: false,
+        lto_permit:      null,
+        terms_agreed:    false,
     });
 
-    const idRef   = useRef<HTMLInputElement>(null);
+    const idRef             = useRef<HTMLInputElement>(null);
+    const birPermitRef      = useRef<HTMLInputElement>(null);
+    const businessPermitRef = useRef<HTMLInputElement>(null);
+    const fsicPermitRef     = useRef<HTMLInputElement>(null);
+    const doeLicenseRef     = useRef<HTMLInputElement>(null);
+    const ltoPermitRef      = useRef<HTMLInputElement>(null);
+
     const fileRefs = {
-        bir_permit:      useRef<HTMLInputElement>(null),
-        business_permit: useRef<HTMLInputElement>(null),
-        fsic_permit:     useRef<HTMLInputElement>(null),
-        doe_lpg_license: useRef<HTMLInputElement>(null),
-        lto_permit:      useRef<HTMLInputElement>(null),
+        bir_permit:      birPermitRef,
+        business_permit: businessPermitRef,
+        fsic_permit:     fsicPermitRef,
+        doe_lpg_license: doeLicenseRef,
+        lto_permit:      ltoPermitRef,
     };
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
         if (!allAgreed) return;
-        setData('terms_agreed', true);
+        transform(d => ({ ...d, terms_agreed: true }));
         post('/customer/become-seller', { forceFormData: true });
+    }
+
+    function validateStep1() {
+        const errs: Record<string, string> = {};
+        if (!data.store_name.trim())     errs.store_name     = 'Store name is required.';
+        if (!data.store_phone.trim())    errs.store_phone    = 'Phone number is required.';
+        if (!data.store_address.trim())  errs.store_address  = 'Street address is required.';
+        if (!data.store_city.trim())     errs.store_city     = 'City is required.';
+        if (!data.store_barangay.trim()) errs.store_barangay = 'Barangay is required.';
+        setStep1Errors(errs);
+        if (Object.keys(errs).length === 0) setStep(2);
     }
 
     const isPending  = application?.status === 'pending';
@@ -145,7 +189,7 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                 <div>
                                     <p className="font-semibold text-amber-800 dark:text-amber-300">Application Pending Review</p>
                                     <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
-                                        Submitted on {application?.created_at}. We typically review applications within 1–3 business days.
+                                        Your application has been submitted and is pending review.
                                         You will be notified once a decision has been made.
                                     </p>
                                 </div>
@@ -218,7 +262,7 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                                 placeholder="e.g. Santos LPG Supply"
                                             />
-                                            {errors.store_name && <p className="mt-1 text-xs text-red-600">{errors.store_name}</p>}
+                                            {(errors.store_name || step1Errors.store_name) && <p className="mt-1 text-xs text-red-600">{errors.store_name || step1Errors.store_name}</p>}
                                         </div>
 
                                         <div>
@@ -245,7 +289,7 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                                                 placeholder="09XX-XXX-XXXX"
                                             />
-                                            {errors.store_phone && <p className="mt-1 text-xs text-red-600">{errors.store_phone}</p>}
+                                            {(errors.store_phone || step1Errors.store_phone) && <p className="mt-1 text-xs text-red-600">{errors.store_phone || step1Errors.store_phone}</p>}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -266,13 +310,16 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                             errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
                                             requiredBarangay
                                         />
+                                        {step1Errors.store_address && <p className="mt-1 text-xs text-red-600">{step1Errors.store_address}</p>}
+                                        {step1Errors.store_city && <p className="mt-1 text-xs text-red-600">{step1Errors.store_city}</p>}
+                                        {step1Errors.store_barangay && <p className="mt-1 text-xs text-red-600">{step1Errors.store_barangay}</p>}
                                     </CardContent>
                                 </Card>
 
                                 <div className="flex justify-end">
                                     <Button
                                         type="button"
-                                        onClick={() => setStep(2)}
+                                        onClick={validateStep1}
                                         className="bg-blue-600 hover:bg-blue-700"
                                     >
                                         Next: Upload Documents →
@@ -294,17 +341,20 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                         {/* Valid ID — special case with "already on file" logic */}
                                         <div>
                                             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Valid Government ID <span className="text-red-500">{has_valid_id ? '' : '*'}</span>
+                                                Valid Government ID <span className="text-red-500">{(has_valid_id || previous_docs?.valid_id_url) ? '' : '*'}</span>
                                             </p>
-                                            {has_valid_id && (
+                                            {has_valid_id && !previous_docs?.valid_id_url && (
                                                 <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 mb-2">
                                                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                                                     Valid ID already on file. You may upload a new one to replace it.
                                                 </div>
                                             )}
+                                            {previous_docs?.valid_id_url && (
+                                                <PreviousDocBadge url={previous_docs.valid_id_url} />
+                                            )}
                                             <FileField
                                                 label=""
-                                                required={!has_valid_id}
+                                                required={!has_valid_id && !previous_docs?.valid_id_url}
                                                 hint="Owner's government-issued ID — JPG, PNG, or PDF, max 5 MB"
                                                 file={data.valid_id}
                                                 error={errors.valid_id}
@@ -315,19 +365,24 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
                                         </div>
 
                                         {/* Other required docs */}
-                                        {DOC_FIELDS.map(doc => (
-                                            <FileField
-                                                key={doc.key}
-                                                label={doc.label}
-                                                description={doc.description}
-                                                required
-                                                hint="JPG, PNG, or PDF — max 5 MB"
-                                                file={data[doc.key]}
-                                                error={errors[doc.key]}
-                                                inputRef={fileRefs[doc.key]}
-                                                onChange={f => setData(doc.key, f)}
-                                            />
-                                        ))}
+                                        {DOC_FIELDS.map(doc => {
+                                            const existingUrl = previous_docs?.[doc.urlKey] ?? null;
+                                            return (
+                                                <div key={doc.key}>
+                                                    {existingUrl && <PreviousDocBadge url={existingUrl} />}
+                                                    <FileField
+                                                        label={doc.label}
+                                                        description={doc.description}
+                                                        required={!existingUrl}
+                                                        hint="JPG, PNG, or PDF — max 5 MB"
+                                                        file={data[doc.key]}
+                                                        error={errors[doc.key]}
+                                                        inputRef={fileRefs[doc.key]}
+                                                        onChange={f => setData(doc.key, f)}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </CardContent>
                                 </Card>
 
@@ -481,6 +536,20 @@ export default function BecomeSellerPage({ application, has_valid_id }: Props) {
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
+
+function PreviousDocBadge({ url }: { url: string }) {
+    return (
+        <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 mb-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>Previously uploaded.</span>
+            <a href={url} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 underline hover:text-emerald-900 dark:hover:text-emerald-200">
+                View <ExternalLink className="h-3 w-3" />
+            </a>
+            <span className="text-emerald-600 dark:text-emerald-500">— re-upload below to replace it.</span>
+        </div>
+    );
+}
 
 function TermsSection({ title, children }: { title: string; children: React.ReactNode }) {
     return (

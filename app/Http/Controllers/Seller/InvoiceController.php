@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Invoice;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,7 @@ use Inertia\Response;
 
 class InvoiceController extends Controller
 {
+    use GeneratesExport;
     public function index(Request $request): Response
     {
         $store  = request()->attributes->get('seller_store');
@@ -35,6 +37,11 @@ class InvoiceController extends Controller
             });
         }
 
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+        if ($dateFrom) $query->whereDate('created_at', '>=', $dateFrom);
+        if ($dateTo)   $query->whereDate('created_at', '<=', $dateTo);
+
         $invoices = $query->latest()->paginate(20)->withQueryString()
             ->through(fn ($i) => [
                 'id'                  => $i->id,
@@ -51,6 +58,7 @@ class InvoiceController extends Controller
                 'customer'            => $i->customer?->name ?? '—',
                 'order_number'        => $i->order?->order_number ?? '—',
                 'order_id'            => $i->order_id,
+                'order_status'        => $i->order?->status,
             ]);
 
         $counts = [
@@ -63,9 +71,90 @@ class InvoiceController extends Controller
         return Inertia::render('seller/invoices', [
             'invoices' => $invoices,
             'counts'   => $counts,
-            'tab'      => $tab,
-            'search'   => $search ?? '',
+            'tab'       => $tab,
+            'search'    => $search ?? '',
+            'date_from' => $request->get('date_from') ?: '',
+            'date_to'   => $request->get('date_to')   ?: '',
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $store  = request()->attributes->get('seller_store');
+        $tab    = $request->input('tab', 'all');
+        $format = $request->get('format', 'csv');
+
+        $query = Invoice::with(['order', 'customer'])->where('store_id', $store->id);
+        if ($tab === 'paid')    $query->where('payment_status', 'paid');
+        if ($tab === 'unpaid')  $query->where('payment_status', 'unpaid');
+        if ($tab === 'partial') $query->where('payment_status', 'partial');
+        if ($s = $request->input('search')) {
+            $query->where(function ($q) use ($s) {
+                $q->where('invoice_number', 'like', "%{$s}%")
+                  ->orWhereHas('customer', fn ($cq) => $cq->where('name', 'like', "%{$s}%"));
+            });
+        }
+        if ($df = $request->get('date_from')) $query->whereDate('created_at', '>=', $df);
+        if ($dt = $request->get('date_to'))   $query->whereDate('created_at', '<=', $dt);
+
+        $invoices = $query->latest()->get();
+
+        $from = $request->get('date_from') ?: now()->startOfMonth()->toDateString();
+        $to   = $request->get('date_to')   ?: now()->toDateString();
+        $filename = $this->exportFilename('invoices', $store->store_name, $from, $to, $format);
+
+        $columns = [
+            ['key' => 'invoice_number', 'label' => 'Invoice #',    'class' => 'mono'],
+            ['key' => 'order_number',   'label' => 'Order #',      'class' => 'mono'],
+            ['key' => 'customer',       'label' => 'Customer'],
+            ['key' => 'created_at',     'label' => 'Date'],
+            ['key' => 'total_amount',   'label' => 'Total',        'align' => 'right'],
+            ['key' => 'commission',     'label' => 'Commission',   'align' => 'right'],
+            ['key' => 'net_amount',     'label' => 'Net',          'align' => 'right'],
+            ['key' => 'status',         'label' => 'Status'],
+            ['key' => 'method',         'label' => 'Method'],
+        ];
+
+        $rows = $invoices->map(fn ($i) => [
+            'invoice_number' => $i->invoice_number,
+            'order_number'   => $i->order?->order_number ?? '—',
+            'customer'       => $i->customer?->name ?? '—',
+            'created_at'     => $i->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
+            'total_amount'   => $this->peso((float) $i->total_amount),
+            'commission'     => $this->peso((float) ($i->platform_commission ?? 0)),
+            'net_amount'     => $this->peso(max(0, (float) $i->total_amount - (float) ($i->platform_commission ?? 0))),
+            'status'         => $i->payment_status,
+            'method'         => $i->payment_method ?? '—',
+            // raw for totals
+            '_total'  => (float) $i->total_amount,
+            '_comm'   => (float) ($i->platform_commission ?? 0),
+        ])->values()->all();
+
+        $grandTotal = collect($rows)->sum('_total');
+        $grandComm  = collect($rows)->sum('_comm');
+
+        if ($format === 'pdf') {
+            return $this->pdfResponse($filename, [
+                'title'        => 'Invoices Export',
+                'orgName'      => $store->store_name,
+                'orgSub'       => $store->city ?? 'Cavite, Philippines',
+                'dateRange'    => \Carbon\Carbon::parse($from)->format('M d, Y') . ' – ' . \Carbon\Carbon::parse($to)->format('M d, Y'),
+                'summaryItems' => [
+                    ['label' => 'Total Invoices', 'value' => count($rows)],
+                    ['label' => 'Gross Total',    'value' => $this->peso($grandTotal)],
+                    ['label' => 'Commission',     'value' => $this->peso($grandComm)],
+                    ['label' => 'Net Total',      'value' => $this->peso($grandTotal - $grandComm)],
+                ],
+                'columns'   => $columns,
+                'rows'      => $rows,
+                'totalsRow' => ['invoice_number' => 'TOTAL', 'order_number' => '', 'customer' => '', 'created_at' => '', 'total_amount' => $this->peso($grandTotal), 'commission' => $this->peso($grandComm), 'net_amount' => $this->peso($grandTotal - $grandComm), 'status' => '', 'method' => ''],
+            ]);
+        }
+
+        $headings = ['Invoice #', 'Order #', 'Customer', 'Date', 'Total', 'Commission', 'Net', 'Status', 'Method'];
+        $csvRows  = array_map(fn ($r) => [$r['invoice_number'], $r['order_number'], $r['customer'], $r['created_at'], $r['total_amount'], $r['commission'], $r['net_amount'], $r['status'], $r['method']], $rows);
+        $csvRows[] = ['TOTAL', '', '', '', $this->peso($grandTotal), $this->peso($grandComm), $this->peso($grandTotal - $grandComm), '', ''];
+        return $this->csvResponse($filename, $headings, $csvRows);
     }
 
     public function show(Invoice $invoice): Response

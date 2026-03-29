@@ -65,10 +65,11 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
-    unpaid: 'bg-red-100 text-red-700',
-    paid: 'bg-green-100 text-green-700',
-    partial: 'bg-amber-100 text-amber-700',
-    refunded: 'bg-gray-100 text-gray-600',
+    unpaid:    'bg-red-100 text-red-700',
+    paid:      'bg-green-100 text-green-700',
+    partial:   'bg-amber-100 text-amber-700',
+    to_refund: 'bg-orange-100 text-orange-700',
+    refunded:  'bg-gray-100 text-gray-600',
 };
 
 function StatusBadge({ value, colors }: { value: string; colors: Record<string, string> }) {

@@ -375,6 +375,12 @@ class DemoSeeder extends Seeder
             'deliveries.view', 'deliveries.update_status',
             'orders.view', 'customers.view',
         ];
+        $hrPerms = [
+            'dashboard.view',
+            'orders.view',
+            'invoices.view', 'invoices.payment',
+            'reports.view',
+        ];
         $customerPerms = ['products.view', 'orders.view'];
 
         $rolePermMap = [
@@ -384,6 +390,7 @@ class DemoSeeder extends Seeder
             'cashier'        => $cashierPerms,
             'warehouse'      => $warehousePerms,
             'rider'          => $riderPerms,
+            'hr'             => $hrPerms,
             'customer'       => $customerPerms,
         ];
 

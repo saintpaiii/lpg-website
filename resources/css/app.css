@@ -142,6 +142,62 @@
     }
 }
 
+/* ── Page transition fade-in ─────────────────────────────────────────────── */
+/*
+ * IMPORTANT: Do NOT apply transform to #app > div or the SidebarProvider
+ * wrapper. Any CSS transform on that element (even translateY(0)) creates a
+ * new containing block, which breaks position:fixed on the sidebar inside it,
+ * causing the sidebar to scroll away with the page content.
+ * Use opacity-only on the wrapper; apply the slide-up only to the content area.
+ */
+#app > div,
+[data-page] {
+    animation: page-fade-in 0.18s ease-out both;
+}
+
+@keyframes page-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Slide-up effect scoped to the content area only.
+   SidebarInset is a SIBLING (not ancestor) of the fixed sidebar,
+   so transforms here do not affect sidebar positioning. */
+[data-slot="sidebar-inset"] {
+    animation: content-slide-in 0.18s ease-out both;
+}
+
+@keyframes content-slide-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Table row hover transitions ─────────────────────────────────────────── */
+tbody tr {
+    transition: background-color 0.12s ease;
+}
+
+/* ── Card hover lift ─────────────────────────────────────────────────────── */
+.card-hover {
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.card-hover:hover {
+    box-shadow: 0 4px 16px 0 rgb(0 0 0 / 0.08);
+    transform: translateY(-1px);
+}
+
+/* ── Sidebar nav link transitions ────────────────────────────────────────── */
+[data-sidebar="menu-button"] {
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+/* ── Button press micro-animation ────────────────────────────────────────── */
+button:active:not(:disabled),
+a[role="button"]:active {
+    transform: scale(0.97);
+    transition: transform 0.08s ease;
+}
+
 @media print {
     * {
         -webkit-print-color-adjust: exact !important;

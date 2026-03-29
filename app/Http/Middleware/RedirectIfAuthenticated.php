@@ -34,7 +34,7 @@ class RedirectIfAuthenticated
             return match ($user->sub_role) {
                 'rider'     => '/rider/deliveries',
                 'warehouse' => '/seller/inventory',
-                default     => '/seller/invoices',
+                default     => '/seller/dashboard',
             };
         }
 

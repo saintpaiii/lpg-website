@@ -20,12 +20,18 @@ class InvoiceController extends Controller
     {
         $customer = $this->getCustomer($request);
 
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+
         $invoices = collect();
         if ($customer) {
-            $invoices = $customer->invoices()
-                ->with('order')
-                ->orderByDesc('created_at')
+            $invQuery = $customer->invoices()->with('order')->orderByDesc('created_at');
+            if ($dateFrom) $invQuery->whereDate('created_at', '>=', $dateFrom);
+            if ($dateTo)   $invQuery->whereDate('created_at', '<=', $dateTo);
+
+            $invoices = $invQuery
                 ->paginate(15)
+                ->withQueryString()
                 ->through(fn ($inv) => [
                     'id'             => $inv->id,
                     'invoice_number' => $inv->invoice_number,
@@ -37,11 +43,14 @@ class InvoiceController extends Controller
                     'paid_at'        => $inv->paid_at?->format('M d, Y'),
                     'created_at'     => $inv->created_at->format('M d, Y'),
                     'order_number'   => $inv->order?->order_number,
+                    'order_status'   => $inv->order?->status,
                 ]);
         }
 
         return Inertia::render('customer/invoices', [
-            'invoices' => $invoices,
+            'invoices'  => $invoices,
+            'date_from' => $request->get('date_from') ?: '',
+            'date_to'   => $request->get('date_to')   ?: '',
         ]);
     }
 

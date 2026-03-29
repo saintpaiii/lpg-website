@@ -3,6 +3,7 @@ import { Package, Printer, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
@@ -26,6 +27,7 @@ const CANCEL_REASONS = [
 type Order = {
     id: number;
     order_number: string;
+    store_name: string;
     status: string;
     total_amount: number;
     payment_method: string;
@@ -49,6 +51,9 @@ type Paginated<T> = {
 
 type Props = {
     orders: Paginated<Order>;
+    date_from: string;
+    date_to: string;
+    status: string;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -61,16 +66,30 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:  'bg-red-100 text-red-700',
-    paid:    'bg-emerald-100 text-emerald-700',
+    unpaid:    'bg-red-100 text-red-700',
+    paid:      'bg-emerald-100 text-emerald-700',
+    to_refund: 'bg-orange-100 text-orange-700',
+    refunded:  'bg-gray-100 text-gray-600',
     partial: 'bg-amber-100 text-amber-700',
 };
 
-export default function Orders({ orders }: Props) {
+const STATUS_TABS = [
+    { value: '',                 label: 'All' },
+    { value: 'pending',          label: 'Pending' },
+    { value: 'confirmed',        label: 'Confirmed' },
+    { value: 'preparing',        label: 'Preparing' },
+    { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'delivered',        label: 'Delivered' },
+    { value: 'cancelled',        label: 'Cancelled' },
+] as const;
+
+export default function Orders({ orders, date_from, date_to, status }: Props) {
     const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
     const [cancelReason, setCancelReason] = useState('');
     const [cancelNotes, setCancelNotes] = useState('');
     const [cancelling, setCancelling] = useState(false);
+    const [dateFrom, setDateFrom] = useState(date_from);
+    const [dateTo,   setDateTo]   = useState(date_to);
 
     // Show toast when returning from PayMongo (checkout success_url points here)
     useEffect(() => {
@@ -100,6 +119,20 @@ export default function Orders({ orders }: Props) {
         setCancelNotes('');
     }
 
+    function applyDates() {
+        router.get('/customer/orders', { date_from: dateFrom, date_to: dateTo, status }, { preserveState: true, replace: true });
+    }
+
+    function clearDates() {
+        setDateFrom('');
+        setDateTo('');
+        router.get('/customer/orders', { date_from: '', date_to: '', status }, { preserveState: true, replace: true });
+    }
+
+    function applyStatus(s: string) {
+        router.get('/customer/orders', { date_from: dateFrom, date_to: dateTo, status: s }, { preserveState: false, replace: true });
+    }
+
     function submitCancel() {
         if (!cancelOrder || !cancelReason) return;
         setCancelling(true);
@@ -119,15 +152,44 @@ export default function Orders({ orders }: Props) {
             <Head title="My Orders — LPG Portal" />
 
             <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                {/* Status tabs */}
+                <div className="overflow-x-auto -mx-1">
+                    <div className="flex gap-1 min-w-max px-1 pb-1">
+                        {STATUS_TABS.map(tab => (
+                            <button
+                                key={tab.value}
+                                onClick={() => applyStatus(tab.value)}
+                                className={`px-3.5 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                    status === tab.value
+                                        ? 'bg-blue-600 text-white shadow-sm'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm text-gray-500">
                         {orders.total} order{orders.total !== 1 ? 's' : ''} total
                     </p>
-                    <Link href="/customer/products">
-                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Browse Products
-                        </Button>
-                    </Link>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium">From</label>
+                            <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium">To</label>
+                            <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                        </div>
+                        <Button size="sm" variant="outline" onClick={applyDates}>Apply</Button>
+                        {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-gray-500" onClick={clearDates}>Clear</Button>}
+                        <Link href="/customer/products">
+                            <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Browse Products</Button>
+                        </Link>
+                    </div>
                 </div>
 
                 <Card>
@@ -153,6 +215,7 @@ export default function Orders({ orders }: Props) {
                                     <thead>
                                         <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                                             <th className="px-4 py-3">Order #</th>
+                                            <th className="px-4 py-3">Store</th>
                                             <th className="px-4 py-3">Date</th>
                                             <th className="px-4 py-3">Items</th>
                                             <th className="px-4 py-3 text-right">Total</th>
@@ -161,9 +224,9 @@ export default function Orders({ orders }: Props) {
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {orders.data.map((order) => (
-                                            <tr key={order.id} className="hover:bg-gray-50/60">
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                                        {orders.data.map((order, i) => (
+                                            <tr key={order.id} className={`transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10 ${i % 2 === 1 ? 'bg-gray-50/50 dark:bg-gray-800/20' : ''}`}>
                                                 <td className="px-4 py-3">
                                                     <Link
                                                         href={`/customer/orders/${order.id}`}
@@ -172,6 +235,7 @@ export default function Orders({ orders }: Props) {
                                                         {order.order_number}
                                                     </Link>
                                                 </td>
+                                                <td className="px-4 py-3 text-xs text-gray-700 font-medium">{order.store_name}</td>
                                                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(order.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <p className="text-xs text-gray-600">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
@@ -182,7 +246,7 @@ export default function Orders({ orders }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                        {order.status.replace('_', ' ')}
+                                                        {order.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                                                     </span>
                                                     {order.status === 'cancelled' && order.cancelled_by && (
                                                         <p className="text-[10px] text-gray-400 mt-0.5">
@@ -191,8 +255,8 @@ export default function Orders({ orders }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? ''}`}>
-                                                        {order.payment_status}
+                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                        {order.payment_status === 'to_refund' ? 'To Refund' : order.payment_status === 'refunded' ? 'Refunded' : order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -202,7 +266,7 @@ export default function Orders({ orders }: Props) {
                                                                 View
                                                             </Button>
                                                         </Link>
-                                                        {order.invoice_id && ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status) && (
+                                                        {order.invoice_id && order.status === 'delivered' && order.payment_status === 'paid' && (
                                                             <a
                                                                 href={`/invoices/${order.invoice_id}/print`}
                                                                 target="_blank"
@@ -213,7 +277,7 @@ export default function Orders({ orders }: Props) {
                                                                 </Button>
                                                             </a>
                                                         )}
-                                                        {['pending', 'confirmed'].includes(order.status) && (
+                                                        {['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid' && (
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"

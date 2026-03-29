@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Mail\StaffAccountCreated;
 use App\Models\AccountAction;
 use App\Models\Permission;
 use App\Models\RolePermission;
@@ -11,7 +12,7 @@ use App\Models\UserPermission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -42,14 +43,19 @@ class StaffController extends Controller
 
         $staff = $query->latest()->paginate(20)->withQueryString()
             ->through(fn ($u) => [
-                'id'         => $u->id,
-                'name'       => $u->name,
-                'email'      => $u->email,
-                'phone'      => $u->phone,
-                'sub_role'   => $u->sub_role,
-                'is_active'  => $u->is_active,
-                'created_at' => $u->created_at->format('M d, Y'),
-                'deleted_at' => $u->deleted_at?->format('M d, Y'),
+                'id'             => $u->id,
+                'name'           => $u->name,
+                'first_name'     => $u->first_name,
+                'middle_name'    => $u->middle_name,
+                'last_name'      => $u->last_name,
+                'email'          => $u->email,
+                'phone'          => $u->phone,
+                'sub_role'       => $u->sub_role,
+                'schedule_start' => $u->schedule_start,
+                'schedule_end'   => $u->schedule_end,
+                'is_active'      => $u->is_active,
+                'created_at'     => $u->created_at->format('M d, Y'),
+                'deleted_at'     => $u->deleted_at?->format('M d, Y'),
             ]);
 
         $counts = [
@@ -70,26 +76,46 @@ class StaffController extends Controller
         $store = request()->attributes->get('seller_store');
 
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'phone'    => 'nullable|string|max:20',
-            'sub_role' => 'required|in:cashier,warehouse,rider',
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
+            'first_name'     => 'required|string|max:100',
+            'middle_name'    => 'nullable|string|max:100',
+            'last_name'      => 'required|string|max:100',
+            'email'          => 'required|email|unique:users,email',
+            'phone'          => 'nullable|string|max:20',
+            'sub_role'       => 'required|in:cashier,warehouse,rider,hr',
+            'schedule_start' => 'nullable|string|max:10',
+            'schedule_end'   => 'nullable|string|max:10',
         ]);
 
-        User::create([
-            'name'              => $data['name'],
-            'email'             => $data['email'],
-            'phone'             => $data['phone'] ?? null,
-            'role'              => 'seller_staff',
-            'sub_role'          => $data['sub_role'],
-            'store_id'          => $store->id,
-            'password'          => Hash::make($data['password']),
-            'is_active'         => true,
-            'email_verified_at' => now(), // Admin-created accounts are pre-verified
+        $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
+        $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
+
+        $fullName     = trim("{$data['first_name']} {$data['last_name']}");
+        $tempPassword = strtolower($data['last_name']);
+        if (strlen($tempPassword) < 8) {
+            $tempPassword .= '123';
+        }
+
+        $user = User::create([
+            'name'                => $fullName,
+            'first_name'          => $data['first_name'],
+            'middle_name'         => $data['middle_name'] ?? null,
+            'last_name'           => $data['last_name'],
+            'email'               => $data['email'],
+            'phone'               => $data['phone'] ?? null,
+            'role'                => 'seller_staff',
+            'sub_role'            => $data['sub_role'],
+            'store_id'            => $store->id,
+            'schedule_start'      => $data['schedule_start'] ?? null,
+            'schedule_end'        => $data['schedule_end'] ?? null,
+            'password'            => Hash::make($tempPassword),
+            'must_change_password' => true,
+            'is_active'           => true,
+            'email_verified_at'   => now(),
         ]);
 
-        return back()->with('success', "{$data['name']} added as {$data['sub_role']}.");
+        Mail::to($user->email)->send(new StaffAccountCreated($user, $store->store_name, $tempPassword));
+
+        return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$data['sub_role']}. Login credentials sent to {$data['email']}.");
     }
 
     public function show(User $user): Response
@@ -134,13 +160,18 @@ class StaffController extends Controller
 
         return Inertia::render('seller/staff-show', [
             'staff' => [
-                'id'         => $user->id,
-                'name'       => $user->name,
-                'email'      => $user->email,
-                'phone'      => $user->phone,
-                'sub_role'   => $user->sub_role,
-                'is_active'  => (bool) $user->is_active,
-                'created_at' => $user->created_at->format('M d, Y'),
+                'id'             => $user->id,
+                'name'           => $user->name,
+                'first_name'     => $user->first_name,
+                'middle_name'    => $user->middle_name,
+                'last_name'      => $user->last_name,
+                'email'          => $user->email,
+                'phone'          => $user->phone,
+                'sub_role'       => $user->sub_role,
+                'schedule_start' => $user->schedule_start,
+                'schedule_end'   => $user->schedule_end,
+                'is_active'      => (bool) $user->is_active,
+                'created_at'     => $user->created_at->format('M d, Y'),
             ],
             'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
@@ -154,26 +185,35 @@ class StaffController extends Controller
         if ($user->store_id !== $store->id) abort(403);
 
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => "required|email|unique:users,email,{$user->id}",
-            'phone'    => 'nullable|string|max:20',
-            'sub_role' => 'required|in:cashier,warehouse,rider',
-            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
+            'first_name'     => 'required|string|max:100',
+            'middle_name'    => 'nullable|string|max:100',
+            'last_name'      => 'required|string|max:100',
+            'email'          => "required|email|unique:users,email,{$user->id}",
+            'phone'          => 'nullable|string|max:20',
+            'sub_role'       => 'required|in:cashier,warehouse,rider,hr',
+            'schedule_start' => 'nullable|string|max:10',
+            'schedule_end'   => 'nullable|string|max:10',
         ]);
 
+        $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
+        $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
+
+        $fullName = trim("{$data['first_name']} {$data['last_name']}");
+
         $updates = [
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'phone'    => $data['phone'] ?? null,
-            'sub_role' => $data['sub_role'],
+            'name'           => $fullName,
+            'first_name'     => $data['first_name'],
+            'middle_name'    => $data['middle_name'] ?? null,
+            'last_name'      => $data['last_name'],
+            'email'          => $data['email'],
+            'phone'          => $data['phone'] ?? null,
+            'sub_role'       => $data['sub_role'],
+            'schedule_start' => $data['schedule_start'] ?? null,
+            'schedule_end'   => $data['schedule_end'] ?? null,
         ];
 
-        if (! empty($data['password'])) {
-            $updates['password'] = Hash::make($data['password']);
-        }
-
         $user->update($updates);
-        return back()->with('success', "{$user->name} updated.");
+        return back()->with('success', "{$fullName} updated.");
     }
 
     public function updatePermissions(Request $request, User $user): RedirectResponse
@@ -318,5 +358,15 @@ class StaffController extends Controller
         ]);
 
         return back()->with('success', "{$user->name} activated.");
+    }
+
+    private function parseTime(?string $value): ?string
+    {
+        if (! $value) return null;
+        foreach (['H:i', 'g:i A', 'h:i A', 'G:i'] as $format) {
+            $dt = \DateTime::createFromFormat($format, trim($value));
+            if ($dt) return $dt->format('H:i');
+        }
+        return null;
     }
 }

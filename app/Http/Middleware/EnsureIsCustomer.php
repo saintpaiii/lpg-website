@@ -16,8 +16,9 @@ class EnsureIsCustomer
 
         $user = $request->user();
 
-        // Sellers can also access the customer portal (they were customers first)
-        if (! in_array($user->role, ['customer', 'seller'])) {
+        // Sellers can also access the customer portal (they were customers first).
+        // Platform admins can access for preview/banner management.
+        if (! in_array($user->role, ['customer', 'seller', 'platform_admin', 'admin'])) {
             abort(403, 'Access denied.');
         }
 

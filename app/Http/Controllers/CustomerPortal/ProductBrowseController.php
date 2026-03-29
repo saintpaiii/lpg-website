@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Banner;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Product;
@@ -94,12 +95,45 @@ class ProductBrowseController extends Controller
             ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
             ->distinct()->orderBy('weight')->whereNotNull('weight')->pluck('weight');
 
+        $isAdminPreview = $request->user() &&
+            in_array($request->user()->role, ['platform_admin', 'admin']);
+
+        // Active banners for the carousel (all users)
+        $banners = Banner::where('is_active', true)
+            ->orderBy('display_order')
+            ->get()
+            ->map(fn ($b) => [
+                'id'        => $b->id,
+                'title'     => $b->title,
+                'subtitle'  => $b->subtitle,
+                'image_url' => $b->image_url,
+                'cta_text'  => $b->cta_text,
+                'cta_url'   => $b->cta_url,
+            ]);
+
+        // All (non-deleted) banners for admin management panel
+        $adminBanners = $isAdminPreview
+            ? Banner::orderBy('display_order')->orderByDesc('created_at')->get()->map(fn ($b) => [
+                'id'            => $b->id,
+                'title'         => $b->title,
+                'subtitle'      => $b->subtitle,
+                'image_url'     => $b->image_url,
+                'cta_text'      => $b->cta_text,
+                'cta_url'       => $b->cta_url,
+                'is_active'     => $b->is_active,
+                'display_order' => $b->display_order,
+            ])
+            : collect();
+
         return Inertia::render('customer/products', [
-            'products' => $products,
-            'filters'  => (object) $request->only(['search', 'city', 'brand', 'weight', 'min_price', 'max_price', 'sort']),
-            'cities'   => $cities,
-            'brands'   => $brands,
-            'weights'  => $weights,
+            'products'       => $products,
+            'filters'        => (object) $request->only(['search', 'city', 'brand', 'weight', 'min_price', 'max_price', 'sort']),
+            'cities'         => $cities,
+            'brands'         => $brands,
+            'weights'        => $weights,
+            'banners'        => $banners,
+            'adminBanners'   => $adminBanners,
+            'isAdminPreview' => $isAdminPreview,
         ]);
     }
 

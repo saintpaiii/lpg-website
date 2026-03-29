@@ -48,7 +48,7 @@ class LoginResponse implements LoginResponseContract
                 => route('rider.deliveries'),
 
             $user->role === 'customer'
-                => route('customer.dashboard'),
+                => route('customer.products'),
 
             default => route('home'),
         };

@@ -10,11 +10,14 @@ use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use App\Http\Controllers\Seller\ReviewController;
 use App\Http\Controllers\Seller\SettingsController;
+use App\Http\Controllers\Seller\AttendanceController;
+use App\Http\Controllers\Seller\WalletController;
+use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use Illuminate\Support\Facades\Route;
 
 // ── Seller Portal (authenticated, verified, approved seller or seller_staff) ─
-Route::middleware(['auth', 'verified', 'seller'])
+Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
     ->prefix('seller')
     ->name('seller.')
     ->group(function () {
@@ -40,12 +43,14 @@ Route::middleware(['auth', 'verified', 'seller'])
         // ── Orders ───────────────────────────────────────────────────────────
         Route::middleware('permission:orders.view')->group(function () {
             Route::get('orders', [OrderController::class, 'index'])->name('orders');
+            Route::get('orders/export', [OrderController::class, 'export'])->name('orders.export');
             Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
 
             Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
             Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
             Route::patch('orders/{order}/payment', [OrderController::class, 'updatePayment'])->name('orders.payment');
+            Route::patch('orders/{order}/refunded', [OrderController::class, 'markRefunded'])->name('orders.refunded');
             Route::post('orders/{order}/assign-delivery', [OrderController::class, 'assignDelivery'])->name('orders.assign-delivery');
             Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         });
@@ -60,6 +65,7 @@ Route::middleware(['auth', 'verified', 'seller'])
         // ── Invoices ─────────────────────────────────────────────────────────
         Route::middleware('permission:invoices.view')->group(function () {
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
+            Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/record-payment', [InvoiceController::class, 'recordPayment'])->name('invoices.record-payment');
         });
@@ -88,15 +94,48 @@ Route::middleware(['auth', 'verified', 'seller'])
                 ->withTrashed()->name('staff.force-delete');
         });
 
+        // ── Attendance (seller owner + HR staff) ─────────────────────────────
+        Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance');
+        Route::get('attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
+        Route::post('attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clock-in');
+        Route::post('attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clock-out');
+
+        // ── My Payslips (self — all seller_staff) ────────────────────────────
+        Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('my-payslips');
+
+        // ── My Attendance (self — all seller_staff except rider) ──────────────
+        Route::get('my-attendance', [AttendanceController::class, 'myAttendance'])->name('my-attendance');
+        Route::post('my-attendance/clock-in', [AttendanceController::class, 'myClockIn'])->name('my-attendance.clock-in');
+        Route::post('my-attendance/clock-out', [AttendanceController::class, 'myClockOut'])->name('my-attendance.clock-out');
+
+        // ── Payroll (seller owner + HR can view; owner-only for settings/actions)
+        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll');
+        Route::get('payroll/export', [PayrollController::class, 'export'])->name('payroll.export');
+        Route::post('payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
+        Route::patch('payroll/{payroll}/release', [PayrollController::class, 'markReleased'])->name('payroll.release');
+        Route::patch('payroll/{payroll}/paid', [PayrollController::class, 'markPaid'])->name('payroll.paid');
+        Route::get('payroll/settings', [PayrollController::class, 'settings'])->name('payroll.settings');
+        Route::post('payroll/settings', [PayrollController::class, 'updateSettings'])->name('payroll.settings.update');
+        Route::patch('payroll/staff/{user}/rate', [PayrollController::class, 'updateStaffRate'])->name('payroll.staff-rate');
+
+        // ── Wallet (seller owner only) ────────────────────────────────────────
+        Route::middleware('seller_owner')->group(function () {
+            Route::get('wallet', [WalletController::class, 'index'])->name('wallet');
+            Route::get('wallet/export', [WalletController::class, 'export'])->name('wallet.export');
+            Route::post('wallet/withdraw', [WalletController::class, 'requestWithdrawal'])->name('wallet.withdraw');
+            Route::patch('wallet/requests/{withdrawal}/received', [WalletController::class, 'markReceived'])->name('wallet.received');
+        });
+
         // ── Reviews ──────────────────────────────────────────────────────────
         Route::get('reviews', [ReviewController::class, 'index'])
             ->middleware('permission:products.view')
             ->name('reviews');
 
         // ── Reports ──────────────────────────────────────────────────────────
-        Route::get('reports', [ReportsController::class, 'index'])
-            ->middleware('permission:reports.view')
-            ->name('reports');
+        Route::middleware('permission:reports.view')->group(function () {
+            Route::get('reports', [ReportsController::class, 'index'])->name('reports');
+            Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
+        });
 
         // ── DSS ──────────────────────────────────────────────────────────────
         Route::get('dss', [DssController::class, 'index'])

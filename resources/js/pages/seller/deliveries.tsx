@@ -52,6 +52,8 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    date_from: string;
+    date_to: string;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -151,8 +153,10 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
     );
 }
 
-export default function SellerDeliveries({ deliveries, riders, unassigned, counts, tab, search }: Props) {
+export default function SellerDeliveries({ deliveries, riders, unassigned, counts, tab, search, date_from, date_to }: Props) {
     const [searchVal, setSearchVal]           = useState(search);
+    const [dateFrom,  setDateFrom]            = useState(date_from);
+    const [dateTo,    setDateTo]              = useState(date_to);
     const [assignOrderId, setAssignOrderId]   = useState('');
     const [assignRiderId, setAssignRiderId]   = useState('');
     const [showAssign, setShowAssign]         = useState(false);
@@ -160,13 +164,25 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
     const [newStatus, setNewStatus]           = useState('');
     const [expanded, setExpanded]             = useState<number | null>(null);
 
+    function navigate(overrides: Record<string, string> = {}) {
+        router.get('/seller/deliveries', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, ...overrides }, { preserveState: true, replace: true });
+    }
+
     function goTab(t: string) {
-        router.get('/seller/deliveries', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+        navigate({ tab: t });
     }
 
     function doSearch(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
-        router.get('/seller/deliveries', { tab, search: searchVal }, { preserveState: true, replace: true });
+        navigate();
+    }
+
+    function applyDates() { navigate(); }
+
+    function clearDates() {
+        setDateFrom('');
+        setDateTo('');
+        router.get('/seller/deliveries', { tab, search: searchVal, date_from: '', date_to: '' }, { preserveState: true, replace: true });
     }
 
     function submitAssign() {
@@ -230,6 +246,20 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
                             )}
                         </button>
                     ))}
+                </div>
+
+                {/* Date filter */}
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">From</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-muted-foreground font-medium">To</label>
+                        <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={applyDates}>Apply</Button>
+                    {(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={clearDates}>Clear</Button>}
                 </div>
 
                 <Card>

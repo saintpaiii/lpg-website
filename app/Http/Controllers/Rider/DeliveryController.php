@@ -204,6 +204,9 @@ class DeliveryController extends Controller
                     'status'       => 'delivered',
                     'delivered_at' => now(),
                 ]);
+                if ($delivery->order) {
+                    \App\Services\WalletService::creditOrder($delivery->order->fresh());
+                }
             }
 
             if ($newStatus === 'failed') {

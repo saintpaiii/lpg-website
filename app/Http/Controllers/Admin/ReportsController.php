@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Rating;
@@ -16,6 +17,7 @@ use Inertia\Response;
 
 class ReportsController extends Controller
 {
+    use GeneratesExport;
     private function parseDateRange(Request $request): array
     {
         $from = $request->input('date_from')
@@ -331,5 +333,140 @@ class ReportsController extends Controller
                 'monthly_chart' => $monthlyChart,
             ],
         ];
+    }
+
+    public function export(Request $request)
+    {
+        $tab    = $request->input('tab', 'commission');
+        $format = $request->get('format', 'csv');
+        [$from, $to] = $this->parseDateRange($request);
+        $dateLabel = $from->format('M d, Y') . ' – ' . $to->format('M d, Y');
+        $filename  = $this->exportFilename("platform_report_{$tab}", 'LPG_Portal', $from->toDateString(), $to->toDateString(), $format);
+
+        switch ($tab) {
+            case 'commission':
+                $data   = $this->commissionData($from, $to);
+                $rows   = collect($data['commission']['store_breakdown'])->map(fn ($s) => [
+                    'store_name'      => $s['store_name'],
+                    'city'            => $s['city'],
+                    'commission_rate' => $s['commission_rate'] . '%',
+                    'orders'          => $s['orders'],
+                    'gmv'             => $this->peso($s['gmv']),
+                    'commission'      => $this->peso($s['commission']),
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'store_name',      'label' => 'Store'],
+                    ['key' => 'city',            'label' => 'City'],
+                    ['key' => 'commission_rate', 'label' => 'Rate', 'align' => 'right'],
+                    ['key' => 'orders',          'label' => 'Orders', 'align' => 'right'],
+                    ['key' => 'gmv',             'label' => 'GMV',    'align' => 'right'],
+                    ['key' => 'commission',      'label' => 'Commission', 'align' => 'right'],
+                ];
+                $totalComm = collect($data['commission']['store_breakdown'])->sum('commission');
+                $totalGmv  = collect($data['commission']['store_breakdown'])->sum('gmv');
+                $totalsRow = ['store_name' => 'TOTAL', 'city' => '', 'commission_rate' => '', 'orders' => collect($data['commission']['store_breakdown'])->sum('orders'), 'gmv' => $this->peso($totalGmv), 'commission' => $this->peso($totalComm)];
+                $summaryItems = [
+                    ['label' => 'Total GMV',        'value' => $this->peso($data['commission']['total_gmv'])],
+                    ['label' => 'Total Commission', 'value' => $this->peso($data['commission']['total_commission'])],
+                ];
+                $title = 'Platform Commission Report';
+                break;
+
+            case 'stores':
+                $data   = $this->storesData($from, $to);
+                $rows   = collect($data['stores']['top_stores'])->map(fn ($s) => [
+                    'rank'         => $s['rank'],
+                    'store_name'   => $s['store_name'],
+                    'city'         => $s['city'],
+                    'status'       => $s['status'],
+                    'orders_count' => $s['orders_count'],
+                    'gmv'          => $this->peso($s['gmv']),
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'rank',         'label' => '#',      'align' => 'right'],
+                    ['key' => 'store_name',   'label' => 'Store'],
+                    ['key' => 'city',         'label' => 'City'],
+                    ['key' => 'status',       'label' => 'Status'],
+                    ['key' => 'orders_count', 'label' => 'Orders', 'align' => 'right'],
+                    ['key' => 'gmv',          'label' => 'GMV',    'align' => 'right'],
+                ];
+                $totalsRow = null; $summaryItems = [['label' => 'Total Stores', 'value' => $data['stores']['total']], ['label' => 'Approved', 'value' => $data['stores']['approved']]];
+                $title = 'Top Stores Report';
+                break;
+
+            case 'orders':
+                $data   = $this->ordersData($from, $to);
+                $rows   = collect($data['orders']['daily_trend'])->map(fn ($r) => [
+                    'date'   => $r['date'],
+                    'orders' => $r['orders'],
+                    'gmv'    => $this->peso($r['gmv']),
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'date',   'label' => 'Date'],
+                    ['key' => 'orders', 'label' => 'Orders', 'align' => 'right'],
+                    ['key' => 'gmv',    'label' => 'GMV',    'align' => 'right'],
+                ];
+                $totalOrd = collect($data['orders']['daily_trend'])->sum('orders');
+                $totalGmv = collect($data['orders']['daily_trend'])->sum('gmv');
+                $totalsRow = ['date' => 'TOTAL', 'orders' => $totalOrd, 'gmv' => $this->peso($totalGmv)];
+                $summaryItems = [['label' => 'Total Orders', 'value' => $data['orders']['total_orders']]];
+                $title = 'Orders Trend Report';
+                break;
+
+            case 'ratings':
+                $data   = $this->ratingsData($from, $to);
+                $rows   = collect($data['ratings']['top_rated'])->map(fn ($s) => [
+                    'rank'         => $s['rank'],
+                    'store_name'   => $s['store_name'],
+                    'city'         => $s['city'],
+                    'avg_rating'   => number_format($s['avg_rating'], 2),
+                    'review_count' => $s['review_count'],
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'rank',         'label' => '#',          'align' => 'right'],
+                    ['key' => 'store_name',   'label' => 'Store'],
+                    ['key' => 'city',         'label' => 'City'],
+                    ['key' => 'avg_rating',   'label' => 'Avg Rating', 'align' => 'right'],
+                    ['key' => 'review_count', 'label' => 'Reviews',    'align' => 'right'],
+                ];
+                $totalsRow = null; $summaryItems = [['label' => 'Platform Avg', 'value' => number_format($data['ratings']['platform_avg'], 2)], ['label' => 'Total Reviews', 'value' => $data['ratings']['total_reviews']]];
+                $title = 'Top-Rated Stores Report';
+                break;
+
+            default: // users
+                $data   = $this->usersData($from, $to);
+                $rows   = collect($data['users']['by_role'])->map(fn ($r) => [
+                    'role'  => $r['role'],
+                    'count' => $r['count'],
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'role',  'label' => 'Role'],
+                    ['key' => 'count', 'label' => 'Count', 'align' => 'right'],
+                ];
+                $totalsRow = null; $summaryItems = [['label' => 'Total Users', 'value' => $data['users']['total_users']], ['label' => 'New in Range', 'value' => $data['users']['new_in_range']]];
+                $title = 'Users Report';
+                break;
+        }
+
+        if ($format === 'pdf') {
+            return $this->pdfResponse($filename, [
+                'title'        => $title,
+                'orgName'      => 'LPG Portal — Platform Admin',
+                'orgSub'       => 'Cavite, Philippines',
+                'dateRange'    => $dateLabel,
+                'summaryItems' => $summaryItems,
+                'columns'      => $columns,
+                'rows'         => $rows,
+                'totalsRow'    => $totalsRow ?? null,
+            ]);
+        }
+
+        $headings = array_column($columns, 'label');
+        $keys     = array_column($columns, 'key');
+        $csvRows  = array_map(fn ($r) => array_map(fn ($k) => $r[$k] ?? '', $keys), $rows);
+        if (!empty($totalsRow)) {
+            $csvRows[] = array_map(fn ($k) => $totalsRow[$k] ?? '', $keys);
+        }
+        return $this->csvResponse($filename, $headings, $csvRows);
     }
 }

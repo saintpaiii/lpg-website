@@ -23,6 +23,11 @@ export function fmtDateTime(date: string | null | undefined): string {
     return new Date(date).toLocaleString('en-PH', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+/** Format a status string: "out_for_delivery" → "Out For Delivery" */
+export function fmtStatus(status: string): string {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** Format a peso amount: ₱1,600.00 */
 export function fmtMoney(amount: number): string {
     return '₱' + amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

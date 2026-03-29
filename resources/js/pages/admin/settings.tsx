@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
-import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle, PhilippinePeso, Store, Truck } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle, Percent, Store } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,6 @@ interface Settings {
     default_reorder_level: string;
     lead_time_days: string;
     default_commission_rate: string;
-    default_delivery_fee: string;
 }
 
 interface Props {
@@ -38,7 +37,6 @@ export default function AdminSettings({ settings }: Props) {
         default_reorder_level:    settings.default_reorder_level,
         lead_time_days:           settings.lead_time_days,
         default_commission_rate:  settings.default_commission_rate,
-        default_delivery_fee:     settings.default_delivery_fee,
     });
 
     const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -229,55 +227,29 @@ export default function AdminSettings({ settings }: Props) {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                {/* Default Commission Rate */}
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="default_commission_rate">
-                                        Commission Rate (%) <span className="text-red-500">*</span>
-                                    </Label>
-                                    <div className="relative">
-                                        <PhilippinePeso className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="default_commission_rate"
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            step="0.01"
-                                            className="pl-9"
-                                            value={data.default_commission_rate}
-                                            onChange={(e) => setData('default_commission_rate', e.target.value)}
-                                            placeholder="5.00"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Default % of order total earned by the platform. Can be overridden per store.
-                                    </p>
-                                    <InputError message={errors.default_commission_rate} />
+                            {/* Default Commission Rate */}
+                            <div className="grid gap-1.5 max-w-xs">
+                                <Label htmlFor="default_commission_rate">
+                                    Commission Rate (%) <span className="text-red-500">*</span>
+                                </Label>
+                                <div className="relative">
+                                    <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        id="default_commission_rate"
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.01"
+                                        className="pl-9"
+                                        value={data.default_commission_rate}
+                                        onChange={(e) => setData('default_commission_rate', e.target.value)}
+                                        placeholder="5.00"
+                                    />
                                 </div>
-
-                                {/* Default Delivery Fee */}
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="default_delivery_fee">
-                                        Delivery Fee (₱) <span className="text-red-500">*</span>
-                                    </Label>
-                                    <div className="relative">
-                                        <Truck className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="default_delivery_fee"
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            className="pl-9"
-                                            value={data.default_delivery_fee}
-                                            onChange={(e) => setData('default_delivery_fee', e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Default delivery fee per order (0 = free).
-                                    </p>
-                                    <InputError message={errors.default_delivery_fee} />
-                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Default % of order total earned by the platform. Can be overridden per store.
+                                </p>
+                                <InputError message={errors.default_commission_rate} />
                             </div>
                         </CardContent>
                     </Card>

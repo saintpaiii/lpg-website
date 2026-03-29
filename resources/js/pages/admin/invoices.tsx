@@ -1,8 +1,9 @@
 import { Head, router } from '@inertiajs/react';
 import {
     BarChart3,
-    Filter,
+    FileDown,
     FileText,
+    Filter,
     Search,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -16,7 +17,7 @@ import type { BreadcrumbItem } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-type PaymentStatus = 'unpaid' | 'paid' | 'partial';
+type PaymentStatus = 'unpaid' | 'paid' | 'partial' | 'to_refund' | 'refunded';
 
 type InvoiceRow = {
     id: number;
@@ -76,15 +77,19 @@ type Props = {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Invoices', href: '/admin/invoices' }];
 
 const STATUS_STYLES: Record<PaymentStatus, string> = {
-    unpaid:  'bg-red-100 text-red-700',
-    partial: 'bg-amber-100 text-amber-700',
-    paid:    'bg-emerald-100 text-emerald-700',
+    unpaid:    'bg-red-100 text-red-700',
+    partial:   'bg-amber-100 text-amber-700',
+    paid:      'bg-emerald-100 text-emerald-700',
+    to_refund: 'bg-orange-100 text-orange-700',
+    refunded:  'bg-gray-100 text-gray-600',
 };
 
 const STATUS_LABELS: Record<PaymentStatus, string> = {
-    unpaid:  'Unpaid',
-    partial: 'Partial',
-    paid:    'Paid',
+    unpaid:    'Unpaid',
+    partial:   'Partial',
+    paid:      'Paid',
+    to_refund: 'To Refund',
+    refunded:  'Refunded',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -166,9 +171,21 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
             <div className="flex flex-1 flex-col gap-6 p-6">
 
                 {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-                    <p className="mt-0.5 text-sm text-gray-500">Platform-wide invoice monitoring. Payment recording is handled by each seller.</p>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
+                        <p className="mt-0.5 text-sm text-gray-500">Platform-wide invoice monitoring. Payment recording is handled by each seller.</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <a href={`/admin/invoices/export?format=csv&payment_status=${encodeURIComponent(payStatus)}&search=${encodeURIComponent(search)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> CSV
+                        </a>
+                        <a href={`/admin/invoices/export?format=pdf&payment_status=${encodeURIComponent(payStatus)}&search=${encodeURIComponent(search)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
+                            <FileDown className="h-4 w-4" /> PDF
+                        </a>
+                    </div>
                 </div>
 
                 {/* Summary cards */}

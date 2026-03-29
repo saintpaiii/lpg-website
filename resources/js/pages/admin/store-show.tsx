@@ -203,7 +203,7 @@ export default function StoreShow({ store, stats, history }: Props) {
                             <div className="flex items-center gap-3">
                                 <h1 className="text-2xl font-bold tracking-tight">{store.store_name}</h1>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                    {store.status}
+                                    {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                 </span>
                             </div>
                             <p className="text-muted-foreground text-sm mt-0.5">

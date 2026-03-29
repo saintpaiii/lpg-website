@@ -36,6 +36,11 @@ class DeliveryController extends Controller
             });
         }
 
+        $dateFrom = $request->get('date_from');
+        $dateTo   = $request->get('date_to');
+        if ($dateFrom) $query->whereDate('assigned_at', '>=', $dateFrom);
+        if ($dateTo)   $query->whereDate('assigned_at', '<=', $dateTo);
+
         $deliveries = $query->latest()->paginate(20)->withQueryString()
             ->through(fn ($d) => [
                 'id'           => $d->id,
@@ -98,8 +103,10 @@ class DeliveryController extends Controller
             'riders'     => $riders,
             'unassigned' => $unassigned,
             'counts'     => $counts,
-            'tab'        => $tab,
-            'search'     => $search ?? '',
+            'tab'       => $tab,
+            'search'    => $search ?? '',
+            'date_from' => $request->get('date_from') ?: '',
+            'date_to'   => $request->get('date_to')   ?: '',
         ]);
     }
 

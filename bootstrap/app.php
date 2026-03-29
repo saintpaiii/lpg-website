@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureIsCustomer;
 use App\Http\Middleware\EnsureIsRider;
 use App\Http\Middleware\EnsureIsSeller;
 use App\Http\Middleware\EnsureIsSellerOwner;
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -37,8 +38,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer'   => EnsureIsCustomer::class,
             'seller'       => EnsureIsSeller::class,
             'seller_owner' => EnsureIsSellerOwner::class,
-            'guest'        => RedirectIfAuthenticated::class,
-            'permission' => RequirePermission::class,
+            'guest'            => RedirectIfAuthenticated::class,
+            'permission'       => RequirePermission::class,
+            'password.changed' => EnsurePasswordChanged::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -62,15 +62,24 @@ class OrderController extends Controller
             }
         }
 
+        $dateFrom     = $request->get('date_from');
+        $dateTo       = $request->get('date_to');
+        $statusFilter = $request->get('status');
+
         $orders = collect();
         if ($customer) {
-            $orders = $customer->orders()
-                ->with(['items.product', 'invoice'])
-                ->orderByDesc('created_at')
+            $ordersQuery = $customer->orders()->with(['items.product', 'invoice', 'store'])->orderByDesc('created_at');
+            if ($dateFrom)     $ordersQuery->whereDate('created_at', '>=', $dateFrom);
+            if ($dateTo)       $ordersQuery->whereDate('created_at', '<=', $dateTo);
+            if ($statusFilter) $ordersQuery->where('status', $statusFilter);
+
+            $orders = $ordersQuery
                 ->paginate(15)
+                ->withQueryString()
                 ->through(fn ($o) => [
                     'id'             => $o->id,
                     'order_number'   => $o->order_number,
+                    'store_name'     => $o->store?->store_name ?? '—',
                     'status'         => $o->status,
                     'total_amount'   => (float) $o->total_amount,
                     'payment_method' => $o->payment_method,
@@ -84,7 +93,10 @@ class OrderController extends Controller
         }
 
         return Inertia::render('customer/orders', [
-            'orders' => $orders,
+            'orders'    => $orders,
+            'date_from' => $request->get('date_from') ?: '',
+            'date_to'   => $request->get('date_to')   ?: '',
+            'status'    => $request->get('status') ?: '',
         ]);
     }
 
@@ -339,13 +351,20 @@ class OrderController extends Controller
                 }
             }
 
-            $order->update([
+            $cancelUpdates = [
                 'status'              => 'cancelled',
                 'cancellation_reason' => $data['cancellation_reason'],
                 'cancellation_notes'  => $data['cancellation_notes'] ?? null,
                 'cancelled_by'        => 'customer',
                 'cancelled_at'        => now(),
-            ]);
+            ];
+
+            // If already paid, flag for refund instead of leaving as paid
+            if ($order->payment_status === 'paid') {
+                $cancelUpdates['payment_status'] = 'to_refund';
+            }
+
+            $order->update($cancelUpdates);
 
             // Void invoice if one exists
             if ($order->invoice) {
@@ -367,20 +386,21 @@ class OrderController extends Controller
             abort(403);
         }
 
-        $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments']);
+        $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments', 'store']);
 
         // Auto-verify when returning from PayMongo success URL
         if ($request->query('payment') === 'success' && $order->payment_status !== 'paid') {
             $this->attemptVerifyPayment($order);
             // Refresh model so the response reflects any updates just made
             $order->refresh();
-            $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments']);
+            $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments', 'store']);
         }
 
         return Inertia::render('customer/order-show', [
             'order' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
+                'store_name'       => $order->store?->store_name ?? '—',
                 'status'           => $order->status,
                 'transaction_type' => $order->transaction_type,
                 'total_amount'     => (float) $order->total_amount,

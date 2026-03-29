@@ -55,12 +55,14 @@ export default function InvoiceShow({ invoice }: Props) {
                             {invoice.payment_status.charAt(0).toUpperCase() + invoice.payment_status.slice(1)}
                         </span>
                     </div>
-                    <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <Printer className="h-4 w-4" />
-                            Print Receipt
-                        </Button>
-                    </a>
+                    {invoice.payment_status === 'paid' && (
+                        <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
+                            <Button variant="outline" size="sm" className="gap-1.5">
+                                <Printer className="h-4 w-4" />
+                                Print Receipt
+                            </Button>
+                        </a>
+                    )}
                 </div>
 
                 {/* Invoice details */}
