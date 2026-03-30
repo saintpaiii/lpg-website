@@ -1,12 +1,17 @@
 <?php
 
 use App\Http\Controllers\InvoicePrintController;
+use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OtpController;
 use App\Http\Controllers\SellerRegistrationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+
+// Google OAuth
+Route::get('/auth/google',          [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
+Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 
 // OTP email verification — auth required, verified NOT required (to avoid redirect loop)
 Route::middleware('auth')->group(function () {

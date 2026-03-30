@@ -45,6 +45,9 @@ class StaffController extends Controller
             ->through(fn ($u) => [
                 'id'               => $u->id,
                 'name'             => $u->name,
+                'first_name'       => $u->first_name,
+                'middle_name'      => $u->middle_name,
+                'last_name'        => $u->last_name,
                 'email'            => $u->email,
                 'phone'            => $u->phone,
                 'sub_role'         => $u->sub_role,
@@ -72,15 +75,22 @@ class StaffController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => 'required|email|unique:users,email',
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
-            'phone'    => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
+            'first_name'  => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name'   => 'required|string|max:255',
+            'email'       => 'required|email|unique:users,email',
+            'password'    => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
+            'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
+            'sub_role'    => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
+        $fullName = trim($data['first_name'] . ' ' . ($data['middle_name'] ? $data['middle_name'] . ' ' : '') . $data['last_name']);
+
         $user = User::create([
-            'name'              => $data['name'],
+            'first_name'        => $data['first_name'],
+            'middle_name'       => $data['middle_name'] ?? null,
+            'last_name'         => $data['last_name'],
+            'name'              => $fullName,
             'email'             => $data['email'],
             'password'          => Hash::make($data['password']),
             'phone'             => $data['phone'] ?? null,
@@ -148,6 +158,9 @@ class StaffController extends Controller
             'staff' => [
                 'id'                  => $user->id,
                 'name'                => $user->name,
+                'first_name'          => $user->first_name,
+                'middle_name'         => $user->middle_name,
+                'last_name'           => $user->last_name,
                 'email'               => $user->email,
                 'phone'               => $user->phone,
                 'sub_role'            => $user->sub_role,
@@ -169,18 +182,25 @@ class StaffController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'email'    => "required|email|unique:users,email,{$user->id}",
-            'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
-            'phone'    => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
+            'first_name'  => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name'   => 'required|string|max:255',
+            'email'       => "required|email|unique:users,email,{$user->id}",
+            'password'    => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
+            'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
+            'sub_role'    => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
+        $fullName = trim($data['first_name'] . ' ' . ($data['middle_name'] ? $data['middle_name'] . ' ' : '') . $data['last_name']);
+
         $updates = [
-            'name'     => $data['name'],
-            'email'    => $data['email'],
-            'phone'    => $data['phone'] ?? null,
-            'sub_role' => $data['sub_role'],
+            'first_name'  => $data['first_name'],
+            'middle_name' => $data['middle_name'] ?? null,
+            'last_name'   => $data['last_name'],
+            'name'        => $fullName,
+            'email'       => $data['email'],
+            'phone'       => $data['phone'] ?? null,
+            'sub_role'    => $data['sub_role'],
         ];
 
         if (! empty($data['password'])) {

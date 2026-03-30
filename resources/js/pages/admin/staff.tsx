@@ -64,6 +64,9 @@ const POSITION_STYLES: Record<string, string> = {
 type StaffMember = {
     id: number;
     name: string;
+    first_name: string;
+    middle_name: string | null;
+    last_name: string;
     email: string;
     phone: string | null;
     sub_role: string | null;
@@ -159,23 +162,27 @@ function StaffFormDialog({
     const isEdit = !!editTarget;
 
     const { data, setData, post, put, processing, errors, reset } = useForm<{
-        name: string;
+        first_name: string;
+        middle_name: string;
+        last_name: string;
         email: string;
         password: string;
         password_confirmation: string;
         phone: string;
         sub_role: string;
     }>({
-        name:                  editTarget?.name     ?? '',
-        email:                 editTarget?.email    ?? '',
+        first_name:            editTarget?.first_name  ?? '',
+        middle_name:           editTarget?.middle_name ?? '',
+        last_name:             editTarget?.last_name   ?? '',
+        email:                 editTarget?.email       ?? '',
         password:              '',
         password_confirmation: '',
-        phone:                 editTarget?.phone    ?? '',
-        sub_role:              editTarget?.sub_role ?? '',
+        phone:                 editTarget?.phone       ?? '',
+        sub_role:              editTarget?.sub_role    ?? '',
     });
 
-    if (isEdit && data.name !== editTarget.name && data.email !== editTarget.email) {
-        setData({ name: editTarget.name, email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
+    if (isEdit && data.first_name !== editTarget.first_name && data.email !== editTarget.email) {
+        setData({ first_name: editTarget.first_name, middle_name: editTarget.middle_name ?? '', last_name: editTarget.last_name, email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
     }
 
     function handleSubmit(e: { preventDefault(): void }) {
@@ -207,14 +214,34 @@ function StaffFormDialog({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="grid gap-4">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="grid gap-1.5">
+                            <Label>First Name <span className="text-red-500">*</span></Label>
+                            <Input
+                                value={data.first_name}
+                                onChange={(e) => setData('first_name', e.target.value)}
+                                placeholder="Juan"
+                            />
+                            {errors.first_name && <p className="text-xs text-red-500">{errors.first_name}</p>}
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label>Last Name <span className="text-red-500">*</span></Label>
+                            <Input
+                                value={data.last_name}
+                                onChange={(e) => setData('last_name', e.target.value)}
+                                placeholder="Dela Cruz"
+                            />
+                            {errors.last_name && <p className="text-xs text-red-500">{errors.last_name}</p>}
+                        </div>
+                    </div>
                     <div className="grid gap-1.5">
-                        <Label>Full Name <span className="text-red-500">*</span></Label>
+                        <Label>Middle Name <span className="text-xs text-muted-foreground">(optional)</span></Label>
                         <Input
-                            value={data.name}
-                            onChange={(e) => setData('name', e.target.value)}
-                            placeholder="Juan Dela Cruz"
+                            value={data.middle_name}
+                            onChange={(e) => setData('middle_name', e.target.value)}
+                            placeholder="Santos"
                         />
-                        {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
+                        {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
                     </div>
 
                     <div className="grid gap-1.5">
