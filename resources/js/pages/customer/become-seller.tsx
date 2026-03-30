@@ -285,9 +285,10 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                             <input
                                                 type="text"
                                                 value={data.store_phone}
-                                                onChange={e => setData('store_phone', e.target.value)}
+                                                onChange={e => setData('store_phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
                                                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                                placeholder="09XX-XXX-XXXX"
+                                                placeholder="09xxxxxxxxx"
+                                                maxLength={11}
                                             />
                                             {(errors.store_phone || step1Errors.store_phone) && <p className="mt-1 text-xs text-red-600">{errors.store_phone || step1Errors.store_phone}</p>}
                                         </div>
@@ -606,7 +607,7 @@ function FileField({
     hint?: string;
     file: File | null;
     error?: string;
-    inputRef: React.RefObject<HTMLInputElement>;
+    inputRef: React.RefObject<HTMLInputElement | null>;
     onChange: (f: File | null) => void;
     hideLabel?: boolean;
 }) {

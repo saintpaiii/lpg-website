@@ -95,7 +95,9 @@ export default function CustomerProfile({ profile }: Props) {
                                         id="phone"
                                         type="tel"
                                         value={profileForm.data.phone}
-                                        onChange={(e) => profileForm.setData('phone', e.target.value)}
+                                        onChange={(e) => profileForm.setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                        placeholder="09xxxxxxxxx"
+                                        maxLength={11}
                                     />
                                     {profileForm.errors.phone && (
                                         <p className="text-xs text-red-500">{profileForm.errors.phone}</p>

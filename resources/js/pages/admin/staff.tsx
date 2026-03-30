@@ -254,9 +254,11 @@ function StaffFormDialog({
                     <div className="grid gap-1.5">
                         <Label>Phone</Label>
                         <Input
+                            type="tel"
                             value={data.phone}
-                            onChange={(e) => setData('phone', e.target.value)}
-                            placeholder="09XXXXXXXXX"
+                            onChange={(e) => setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                            placeholder="09xxxxxxxxx"
+                            maxLength={11}
                         />
                         {errors.phone && <p className="text-xs text-red-500">{errors.phone}</p>}
                     </div>

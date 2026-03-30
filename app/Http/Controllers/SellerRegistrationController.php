@@ -36,7 +36,7 @@ class SellerRegistrationController extends Controller
             // Owner account
             'name'                  => ['required', 'string', 'max:255'],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone'                 => ['required', 'string', 'max:20'],
+            'phone'                 => ['required', 'string', 'regex:/^09\d{9}$/'],
             'password'              => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
 
             // Store info

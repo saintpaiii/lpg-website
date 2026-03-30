@@ -16,7 +16,9 @@ export default function Register() {
     const [errors, setErrors]         = useState<Record<string, string>>({});
 
     const [fields, setFields] = useState({
-        name:                  '',
+        first_name:            '',
+        middle_name:           '',
+        last_name:             '',
         email:                 '',
         phone:                 '',
         address:               '',
@@ -123,27 +125,50 @@ export default function Register() {
                         </div>
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                            {/* Name + Phone */}
-                            <div className="grid gap-5 sm:grid-cols-2">
+                            {/* First / Middle / Last Name */}
+                            <div className="grid gap-5 sm:grid-cols-3">
                                 <div className="grid gap-2">
-                                    <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Full name <span className="text-red-500">*</span>
+                                    <Label htmlFor="first_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        First name <span className="text-red-500">*</span>
                                     </Label>
-                                    <Input id="name" type="text" required autoFocus autoComplete="name"
-                                        placeholder="Juan dela Cruz" className="h-11"
-                                        value={fields.name} onChange={(e) => set('name', e.target.value)} />
-                                    <InputError message={errors.name} />
+                                    <Input id="first_name" type="text" required autoFocus autoComplete="given-name"
+                                        placeholder="Juan" className="h-11"
+                                        value={fields.first_name} onChange={(e) => set('first_name', e.target.value)} />
+                                    <InputError message={errors.first_name} />
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Phone number <span className="text-red-500">*</span>
+                                    <Label htmlFor="middle_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Middle name
                                     </Label>
-                                    <Input id="phone" type="tel" required autoComplete="tel"
-                                        placeholder="09xx-xxx-xxxx" className="h-11"
-                                        value={fields.phone} onChange={(e) => set('phone', e.target.value)} />
-                                    <InputError message={errors.phone} />
+                                    <Input id="middle_name" type="text" autoComplete="additional-name"
+                                        placeholder="Santos (optional)" className="h-11"
+                                        value={fields.middle_name} onChange={(e) => set('middle_name', e.target.value)} />
+                                    <InputError message={errors.middle_name} />
                                 </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="last_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Last name <span className="text-red-500">*</span>
+                                    </Label>
+                                    <Input id="last_name" type="text" required autoComplete="family-name"
+                                        placeholder="dela Cruz" className="h-11"
+                                        value={fields.last_name} onChange={(e) => set('last_name', e.target.value)} />
+                                    <InputError message={errors.last_name} />
+                                </div>
+                            </div>
+
+                            {/* Phone */}
+                            <div className="grid gap-2">
+                                <Label htmlFor="phone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Phone number <span className="text-red-500">*</span>
+                                </Label>
+                                <Input id="phone" type="tel" required autoComplete="tel"
+                                    placeholder="09xxxxxxxxx" className="h-11"
+                                    maxLength={11}
+                                    value={fields.phone}
+                                    onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 11))} />
+                                <InputError message={errors.phone} />
                             </div>
 
                             {/* Email */}

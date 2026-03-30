@@ -44,7 +44,7 @@ class SettingsController extends Controller
             'city'        => 'required|string|max:100',
             'barangay'    => 'nullable|string|max:100',
             'province'    => 'required|string|max:100',
-            'phone'        => 'nullable|string|max:20',
+            'phone'        => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'email'        => 'nullable|email|max:255',
             'delivery_fee' => 'nullable|numeric|min:0|max:9999.99',
             'logo'         => 'nullable|image|mimes:jpg,jpeg,png|max:2048',

@@ -116,8 +116,9 @@ export default function AdminSettings({ settings }: Props) {
                                             type="tel"
                                             className="pl-9"
                                             value={data.company_phone}
-                                            onChange={(e) => setData('company_phone', e.target.value)}
-                                            placeholder="09XX-XXX-XXXX"
+                                            onChange={(e) => setData('company_phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                            placeholder="09xxxxxxxxx"
+                                            maxLength={11}
                                         />
                                     </div>
                                     <InputError message={errors.company_phone} />

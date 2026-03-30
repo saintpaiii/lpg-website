@@ -39,7 +39,7 @@ class ProfileController extends Controller
     {
         $data = $request->validate([
             'name'     => 'required|string|max:255',
-            'phone'    => 'required|string|max:20',
+            'phone'    => ['required', 'string', 'regex:/^09\d{9}$/'],
             'address'  => 'required|string|max:500',
             'city'     => 'required|string|max:100',
             'barangay' => 'nullable|string|max:100',

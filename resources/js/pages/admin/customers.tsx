@@ -468,8 +468,11 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                 <Label htmlFor="phone">Phone</Label>
                                 <Input
                                     id="phone"
+                                    type="tel"
                                     value={data.phone}
-                                    onChange={(e) => setData('phone', e.target.value)}
+                                    onChange={(e) => setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                    placeholder="09xxxxxxxxx"
+                                    maxLength={11}
                                 />
                                 {errors.phone && (
                                     <p className="text-xs text-red-500">{errors.phone}</p>

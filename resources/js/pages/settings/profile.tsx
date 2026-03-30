@@ -112,9 +112,10 @@ export default function Profile() {
                                 id="phone"
                                 type="tel"
                                 value={profileForm.data.phone}
-                                onChange={(e) => profileForm.setData('phone', e.target.value)}
+                                onChange={(e) => profileForm.setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
                                 autoComplete="tel"
-                                placeholder="e.g. 09XX-XXX-XXXX"
+                                placeholder="09xxxxxxxxx"
+                                maxLength={11}
                             />
                             <InputError message={profileForm.errors.phone} />
                         </div>

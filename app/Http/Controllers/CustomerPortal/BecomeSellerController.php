@@ -96,7 +96,7 @@ class BecomeSellerController extends Controller
             'store_city'        => ['required', 'string', 'max:100'],
             'store_barangay'    => ['required', 'string', 'max:100'],
             'store_province'    => ['required', 'string', 'max:100'],
-            'store_phone'       => ['required', 'string', 'max:20'],
+            'store_phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
             'bir_permit'        => $docRule(),
             'business_permit'   => $docRule(),
             'valid_id'          => ['nullable', $fileRule()],

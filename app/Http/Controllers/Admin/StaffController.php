@@ -75,7 +75,7 @@ class StaffController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
-            'phone'    => 'nullable|string|max:20',
+            'phone'    => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
@@ -172,7 +172,7 @@ class StaffController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => "required|email|unique:users,email,{$user->id}",
             'password' => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
-            'phone'    => 'nullable|string|max:20',
+            'phone'    => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'sub_role' => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 

@@ -23,27 +23,35 @@ class CreateNewUser implements CreatesNewUsers
     public function create(array $input): User
     {
         Validator::make($input, [
-            ...$this->profileRules(),
-            'phone'    => ['required', 'string', 'max:20'],
-            'address'  => ['required', 'string', 'max:500'],
-            'city'     => ['required', 'string', 'max:100'],
-            'barangay' => ['nullable', 'string', 'max:100'],
-            'password' => $this->passwordRules(),
+            'first_name'  => ['required', 'string', 'max:255'],
+            'middle_name' => ['nullable', 'string', 'max:255'],
+            'last_name'   => ['required', 'string', 'max:255'],
+            'email'       => $this->emailRules(),
+            'phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
+            'address'     => ['required', 'string', 'max:500'],
+            'city'        => ['required', 'string', 'max:100'],
+            'barangay'    => ['nullable', 'string', 'max:100'],
+            'password'    => $this->passwordRules(),
         ])->validate();
 
         return DB::transaction(function () use ($input) {
+            $fullName = trim($input['first_name'] . ' ' . ($input['middle_name'] ? $input['middle_name'] . ' ' : '') . $input['last_name']);
+
             $user = User::create([
-                'name'      => $input['name'],
-                'email'     => $input['email'],
-                'password'  => $input['password'],
-                'phone'     => $input['phone'],
-                'role'      => 'customer',
-                'is_active' => true,
+                'name'        => $fullName,
+                'first_name'  => $input['first_name'],
+                'middle_name' => $input['middle_name'] ?? null,
+                'last_name'   => $input['last_name'],
+                'email'       => $input['email'],
+                'password'    => $input['password'],
+                'phone'       => $input['phone'],
+                'role'        => 'customer',
+                'is_active'   => true,
             ]);
 
             Customer::create([
                 'user_id'       => $user->id,
-                'name'          => $input['name'],
+                'name'          => $fullName,
                 'phone'         => $input['phone'],
                 'email'         => $input['email'],
                 'address'       => $input['address'],

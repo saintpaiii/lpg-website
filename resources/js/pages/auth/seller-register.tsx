@@ -321,8 +321,9 @@ export default function SellerRegister() {
                                             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Phone number <span className="text-red-500">*</span>
                                             </Label>
-                                            <Input type="tel" required placeholder="09xx-xxx-xxxx" className="h-11"
-                                                value={fields.phone} onChange={(e) => set('phone', e.target.value)} />
+                                            <Input type="tel" required placeholder="09xxxxxxxxx" className="h-11"
+                                                maxLength={11}
+                                                value={fields.phone} onChange={(e) => set('phone', e.target.value.replace(/\D/g, '').slice(0, 11))} />
                                             <InputError message={errors.phone} />
                                         </div>
                                     </div>
