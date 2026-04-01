@@ -2,6 +2,7 @@
 
 namespace App\Http\Responses;
 
+use App\Models\Attendance;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
@@ -52,6 +53,25 @@ class LoginResponse implements LoginResponseContract
 
             default => route('home'),
         };
+
+        // ── Attendance reminder redirect ────────────────────────────────────────
+        // Non-HR seller_staff who haven't clocked in today are sent to My Attendance.
+        if (
+            $user->role === 'seller_staff'
+            && $user->sub_role !== 'hr'
+            && ! Attendance::where('user_id', $user->id)
+                ->where('date', now()->toDateString())
+                ->whereNotNull('clock_in')
+                ->exists()
+        ) {
+            $myAttendanceRoute = $user->sub_role === 'rider'
+                ? route('rider.my-attendance')
+                : route('seller.my-attendance');
+
+            return redirect()->intended($myAttendanceRoute)
+                ->with('success', 'Welcome back, ' . $user->name . '!')
+                ->with('attendance_reminder', true);
+        }
 
         return redirect()->intended($redirect)
             ->with('success', 'Welcome back, ' . $user->name . '!');

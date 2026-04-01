@@ -34,6 +34,7 @@ type Payslip = {
     overtime_pay: number;
     late_deduction: number;
     absent_deduction: number;
+    undertime_deduction: number;
     gross_pay: number;
     net_pay: number;
     status: 'released' | 'paid';
@@ -101,7 +102,7 @@ function PayslipModal({
 }) {
     if (!payslip) return null;
 
-    const totalDeductions = payslip.late_deduction + payslip.absent_deduction;
+    const totalDeductions = payslip.late_deduction + payslip.absent_deduction + (payslip.undertime_deduction ?? 0);
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
@@ -188,6 +189,12 @@ function PayslipModal({
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Absent Deduction ({payslip.days_absent} day{payslip.days_absent !== 1 ? 's' : ''})</span>
                                     <span className="font-medium text-red-600">−{peso(payslip.absent_deduction)}</span>
+                                </div>
+                            )}
+                            {(payslip.undertime_deduction ?? 0) > 0 && (
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Undertime Deduction</span>
+                                    <span className="font-medium text-red-500">−{peso(payslip.undertime_deduction)}</span>
                                 </div>
                             )}
                             <div className="flex justify-between border-t pt-1.5 font-semibold">
@@ -336,8 +343,8 @@ export default function MyPayslipsPage({ payslips, user_name, sub_role, is_rider
                                                     <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">{peso(p.daily_rate)}</td>
                                                     <td className="px-4 py-3 text-right font-mono text-gray-700">{peso(p.gross_pay)}</td>
                                                     <td className="px-4 py-3 text-right font-mono text-red-500">
-                                                        {p.late_deduction + p.absent_deduction > 0
-                                                            ? `−${peso(p.late_deduction + p.absent_deduction)}`
+                                                        {p.late_deduction + p.absent_deduction + (p.undertime_deduction ?? 0) > 0
+                                                            ? `−${peso(p.late_deduction + p.absent_deduction + (p.undertime_deduction ?? 0))}`
                                                             : <span className="text-gray-300">—</span>}
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-semibold text-blue-700">{peso(p.net_pay)}</td>

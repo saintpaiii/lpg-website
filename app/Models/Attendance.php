@@ -19,6 +19,7 @@ class Attendance extends Model
         'clock_out',
         'status',
         'overtime_hours',
+        'is_late',
         'notes',
     ];
 
@@ -29,6 +30,7 @@ class Attendance extends Model
             'clock_in'       => 'datetime',
             'clock_out'      => 'datetime',
             'overtime_hours' => 'decimal:2',
+            'is_late'        => 'boolean',
         ];
     }
 

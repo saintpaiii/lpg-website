@@ -99,6 +99,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::get('attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
         Route::post('attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clock-in');
         Route::post('attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clock-out');
+        Route::post('attendance/set-clock-out', [AttendanceController::class, 'setClockOut'])->name('attendance.set-clock-out');
 
         // ── My Payslips (self — all seller_staff) ────────────────────────────
         Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('my-payslips');

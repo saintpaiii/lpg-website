@@ -82,8 +82,8 @@ class StaffController extends Controller
             'email'          => 'required|email|unique:users,email',
             'phone'          => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'sub_role'       => 'required|in:cashier,warehouse,rider,hr',
-            'schedule_start' => 'nullable|string|max:10',
-            'schedule_end'   => 'nullable|string|max:10',
+            'schedule_start' => 'required|string|max:10',
+            'schedule_end'   => 'required|string|max:10',
         ]);
 
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);

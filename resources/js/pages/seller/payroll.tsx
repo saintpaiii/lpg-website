@@ -33,6 +33,7 @@ type PayrollRow = {
     overtime_pay: number;
     late_deduction: number;
     absent_deduction: number;
+    undertime_deduction: number;
     gross_pay: number;
     net_pay: number;
     status: 'draft' | 'released' | 'paid';
@@ -127,6 +128,10 @@ function ExpandedRow({ row }: { row: PayrollRow }) {
                     <div>
                         <p className="text-xs text-gray-400 uppercase tracking-wide">Absent Deduction</p>
                         <p className="font-semibold text-red-600">−{peso(row.absent_deduction)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide">Undertime Deduction</p>
+                        <p className="font-semibold text-red-500">−{peso(row.undertime_deduction)}</p>
                     </div>
                     <div>
                         <p className="text-xs text-gray-400 uppercase tracking-wide">OT Hours</p>

@@ -26,72 +26,78 @@ class AttendanceController extends Controller
     }
 
     /**
-     * Calculate status, hours worked, and overtime for an attendance record.
-     * All times are in Asia/Manila (app default).
+     * Calculate status, is_late flag, hours worked, and overtime.
      *
-     * @param  Attendance|null  $attendance
-     * @param  string|null      $scheduleStart  e.g. "08:00" or "08:00:00"
-     * @param  string|null      $scheduleEnd
-     * @return array{status:string, hours_worked:float, overtime:float}
+     * Status is based on ACTUAL hours worked (after clock-out):
+     *   >= 8h → present | 4–7.99h → half_day | < 4h → undertime | no clock_in → absent
+     * Provisional status while still clocked in (no clock_out):
+     *   on time → present | arrived late → late
+     * is_late is a SEPARATE flag: true when clock_in > schedule_start + 15 min.
+     * No schedule → no_schedule status.
+     *
+     * @return array{status:string, is_late:bool, hours_worked:float, overtime:float}
      */
     private function calcStats(?Attendance $attendance, ?string $scheduleStart, ?string $scheduleEnd): array
     {
+        $blank = ['status' => 'absent', 'is_late' => false, 'hours_worked' => 0.0, 'overtime' => 0.0];
+
         if (! $attendance || ! $attendance->clock_in) {
-            return ['status' => 'absent', 'hours_worked' => 0.0, 'overtime' => 0.0];
+            return $blank;
         }
 
-        $clockIn  = $attendance->clock_in;
-        $clockOut = $attendance->clock_out;
-
-        // Hours worked so far (or until clock-out)
-        $hoursWorked = $clockOut
-            ? round($clockIn->diffInMinutes($clockOut) / 60, 2)
-            : 0.0;
-
-        // Scheduled duration in hours
-        $scheduledHours = 0.0;
-        if ($scheduleStart && $scheduleEnd) {
-            $today          = $clockIn->format('Y-m-d');
-            $start          = Carbon::parse("{$today} {$scheduleStart}");
-            $end            = Carbon::parse("{$today} {$scheduleEnd}");
-            $scheduledHours = max(0.0, $start->diffInMinutes($end) / 60);
+        // day_off is a manual override — preserve it untouched
+        if ($attendance->status === 'day_off') {
+            return ['status' => 'day_off', 'is_late' => false, 'hours_worked' => 0.0, 'overtime' => 0.0];
         }
 
-        // Determine status
-        $status = $attendance->status; // keep existing if manually set to day_off
+        // No schedule → cannot determine status meaningfully
+        if (! $scheduleStart || ! $scheduleEnd) {
+            return ['status' => 'no_schedule', 'is_late' => false, 'hours_worked' => 0.0, 'overtime' => 0.0];
+        }
 
-        if ($status !== 'day_off') {
-            if ($scheduleStart) {
-                $today        = $clockIn->format('Y-m-d');
-                $scheduled    = Carbon::parse("{$today} {$scheduleStart}");
-                $lateThreshold = (clone $scheduled)->addMinutes(15);
+        $clockIn  = $attendance->clock_in;   // Carbon (full datetime)
+        $clockOut = $attendance->clock_out;  // Carbon|null
+        $today    = $clockIn->format('Y-m-d');
 
-                if ($clockIn->lte($lateThreshold)) {
-                    $status = 'present';
-                } else {
-                    $status = 'late';
-                }
+        $scheduledStart = Carbon::parse("{$today} {$scheduleStart}");
+        $scheduledEnd   = Carbon::parse("{$today} {$scheduleEnd}");
 
-                // Override to half_day if clocked out and worked < half of scheduled
-                if ($clockOut && $scheduledHours > 0 && $hoursWorked < ($scheduledHours / 2)) {
-                    $status = 'half_day';
-                }
+        // ── is_late: arrived more than 15 min after schedule start ──────────────
+        $lateThreshold = (clone $scheduledStart)->addMinutes(15);
+        $isLate = $clockIn->gt($lateThreshold);
+
+        // ── Hours worked using seconds for precision (avoids 0 on <1-min diff) ──
+        $hoursWorked = 0.0;
+        if ($clockOut) {
+            $hoursWorked = round($clockIn->diffInSeconds($clockOut) / 3600, 4);
+        }
+
+        // ── Status from actual hours (final when clocked out, provisional if not) ─
+        if ($clockOut) {
+            if ($hoursWorked >= 8.0) {
+                $status = 'present';        // full day
+            } elseif ($hoursWorked >= 4.0) {
+                $status = 'half_day';       // 4 – 7.99h
             } else {
-                // No schedule set — present if clocked in
-                $status = 'present';
+                $status = 'undertime';      // < 4h (including 0 = same-minute clock)
             }
+        } else {
+            // Not clocked out yet — provisional
+            $status = $isLate ? 'late' : 'present';
         }
 
-        // Overtime = hours beyond scheduled duration (only if clocked out)
+        // ── Overtime: hours beyond scheduled duration (only after clock-out) ────
         $overtime = 0.0;
-        if ($clockOut && $scheduledHours > 0) {
-            $overtime = max(0.0, round($hoursWorked - $scheduledHours, 2));
+        if ($clockOut) {
+            $scheduledHours = max(0.0, $scheduledStart->diffInMinutes($scheduledEnd) / 60);
+            $overtime = max(0.0, round($hoursWorked - $scheduledHours, 4));
         }
 
         return [
             'status'       => $status,
-            'hours_worked' => $hoursWorked,
-            'overtime'     => $overtime,
+            'is_late'      => $isLate,
+            'hours_worked' => round($hoursWorked, 4),
+            'overtime'     => round($overtime, 4),
         ];
     }
 
@@ -131,36 +137,47 @@ class AttendanceController extends Controller
             $att   = $records->get($staff->id);
             $stats = $this->calcStats($att, $staff->schedule_start, $staff->schedule_end);
 
-            // Persist calculated status back to DB if it has changed
-            if ($att && $att->status !== $stats['status'] && $att->status !== 'day_off') {
-                $att->update([
-                    'status'         => $stats['status'],
-                    'overtime_hours' => $stats['overtime'],
-                ]);
+            // Persist recalculated values to DB when they have changed
+            if ($att && $att->status !== 'day_off') {
+                $dirty = [];
+                if ($att->status !== $stats['status'])           $dirty['status']         = $stats['status'];
+                if ((float)$att->overtime_hours !== $stats['overtime'])  $dirty['overtime_hours'] = $stats['overtime'];
+                if ((bool)$att->is_late !== $stats['is_late'])   $dirty['is_late']        = $stats['is_late'];
+                if ($dirty) $att->update($dirty);
+            }
+
+            // Detect missing clock-out: clocked in, no clock-out, past 1h after schedule_end
+            $isMissingClockOut = false;
+            if ($att && $att->clock_in && ! $att->clock_out && $staff->schedule_end) {
+                $today  = $att->clock_in->format('Y-m-d');
+                $cutoff = Carbon::parse("{$today} {$staff->schedule_end}")->addHour();
+                $isMissingClockOut = now()->gt($cutoff);
             }
 
             return [
-                'user_id'        => $staff->id,
-                'name'           => $staff->name,
-                'sub_role'       => $staff->sub_role,
-                'schedule_start' => $staff->schedule_start,
-                'schedule_end'   => $staff->schedule_end,
-                'attendance_id'  => $att?->id,
-                'clock_in'       => $att?->clock_in?->format('h:i A'),
-                'clock_out'      => $att?->clock_out?->format('h:i A'),
-                'status'         => $stats['status'],
-                'hours_worked'   => $stats['hours_worked'],
-                'overtime_hours' => $stats['overtime'],
-                'notes'          => $att?->notes,
+                'user_id'           => $staff->id,
+                'name'              => $staff->name,
+                'sub_role'          => $staff->sub_role,
+                'schedule_start'    => $staff->schedule_start,
+                'schedule_end'      => $staff->schedule_end,
+                'attendance_id'     => $att?->id,
+                'clock_in'          => $att?->clock_in?->format('h:i A'),
+                'clock_out'         => $att?->clock_out?->format('h:i A'),
+                'status'            => $stats['status'],
+                'is_late'           => $stats['is_late'],
+                'hours_worked'      => $stats['hours_worked'],
+                'overtime_hours'    => $stats['overtime'],
+                'notes'             => $att?->notes,
+                'missing_clock_out' => $isMissingClockOut,
             ];
         })->values();
 
         $summary = [
             'total'    => $rows->count(),
-            'present'  => $rows->where('status', 'present')->count(),
-            'late'     => $rows->where('status', 'late')->count(),
-            'absent'   => $rows->where('status', 'absent')->count(),
-            'half_day' => $rows->where('status', 'half_day')->count(),
+            'present'  => $rows->whereIn('status', ['present'])->count(),
+            'late'     => $rows->where('is_late', true)->count(),           // arrived late (any final status)
+            'absent'   => $rows->whereIn('status', ['absent', 'no_schedule'])->count(),
+            'half_day' => $rows->whereIn('status', ['half_day', 'undertime'])->count(),
             'day_off'  => $rows->where('status', 'day_off')->count(),
         ];
 
@@ -269,6 +286,11 @@ class AttendanceController extends Controller
             ->where('role', 'seller_staff')
             ->firstOrFail();
 
+        // Block clock-in if no schedule assigned (BUG 1)
+        if (! $staff->schedule_start || ! $staff->schedule_end) {
+            return back()->with('error', "{$staff->name} cannot clock in — no schedule assigned.");
+        }
+
         $date = $request->date ?? now()->toDateString();
 
         $att = Attendance::firstOrCreate(
@@ -290,6 +312,7 @@ class AttendanceController extends Controller
         $att->update([
             'clock_in' => $clockIn,
             'status'   => $stats['status'],
+            'is_late'  => $stats['is_late'],
         ]);
 
         return back()->with('success', "{$staff->name} clocked in at {$clockIn->format('h:i A')}.");
@@ -334,17 +357,76 @@ class AttendanceController extends Controller
 
         $att->update([
             'status'         => $stats['status'],
+            'is_late'        => $stats['is_late'],
             'overtime_hours' => $stats['overtime'],
         ]);
 
         return back()->with('success', "{$staff->name} clocked out at {$clockOut->format('h:i A')}.");
     }
 
+    // ── Set clock-out manually (for missing clock-out records) ───────────────
+
+    public function setClockOut(Request $request): RedirectResponse
+    {
+        if (! $this->canManage()) {
+            abort(403);
+        }
+
+        $store = $request->attributes->get('seller_store');
+
+        $request->validate([
+            'user_id'    => ['required', 'integer'],
+            'date'       => ['required', 'date'],
+            'clock_out'  => ['required', 'date_format:H:i'],
+        ]);
+
+        $staff = User::where('id', $request->user_id)
+            ->where('store_id', $store->id)
+            ->where('role', 'seller_staff')
+            ->firstOrFail();
+
+        $att = Attendance::where('user_id', $staff->id)
+            ->where('date', $request->date)
+            ->first();
+
+        if (! $att || ! $att->clock_in) {
+            return back()->with('error', "{$staff->name} has no clock-in record for this date.");
+        }
+
+        if ($att->clock_out) {
+            return back()->with('error', "{$staff->name} already has a clock-out time.");
+        }
+
+        $clockOutTime = Carbon::parse("{$request->date} {$request->clock_out}");
+
+        if ($clockOutTime->lte($att->clock_in)) {
+            return back()->with('error', 'Clock-out time must be after clock-in time.');
+        }
+
+        $att->update(['clock_out' => $clockOutTime]);
+
+        $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end);
+
+        $att->update([
+            'status'         => $stats['status'],
+            'is_late'        => $stats['is_late'],
+            'overtime_hours' => $stats['overtime'],
+        ]);
+
+        return back()->with('success', "Clock-out set for {$staff->name} at {$clockOutTime->format('h:i A')}.");
+    }
+
     // ── Staff self-service ────────────────────────────────────────────────────
 
     public function myAttendance(Request $request): Response
     {
-        $user  = $request->user();
+        $user = $request->user();
+
+        // HR staff are managed by the Owner — they don't have a self-service attendance page
+        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+            abort(403, 'HR staff do not have a self-service attendance page.');
+        }
+
         $today = now()->toDateString();
 
         $att = Attendance::where('user_id', $user->id)
@@ -353,12 +435,13 @@ class AttendanceController extends Controller
 
         $stats = $this->calcStats($att, $user->schedule_start, $user->schedule_end);
 
-        // Recalculate and persist status if changed
-        if ($att && $att->status !== $stats['status'] && $att->status !== 'day_off') {
-            $att->update([
-                'status'         => $stats['status'],
-                'overtime_hours' => $stats['overtime'],
-            ]);
+        // Recalculate and persist values if changed
+        if ($att && $att->status !== 'day_off') {
+            $dirty = [];
+            if ($att->status !== $stats['status'])                   $dirty['status']         = $stats['status'];
+            if ((float)$att->overtime_hours !== $stats['overtime'])  $dirty['overtime_hours'] = $stats['overtime'];
+            if ((bool)$att->is_late !== $stats['is_late'])           $dirty['is_late']        = $stats['is_late'];
+            if ($dirty) $att->update($dirty);
         }
 
         // Last 7 days history
@@ -380,12 +463,13 @@ class AttendanceController extends Controller
             'schedule_start' => $user->schedule_start,
             'schedule_end'   => $user->schedule_end,
             'attendance'     => $att ? [
-                'id'        => $att->id,
-                'clock_in'  => $att->clock_in?->format('h:i A'),
-                'clock_out' => $att->clock_out?->format('h:i A'),
-                'status'    => $stats['status'],
-                'hours_worked'   => $stats['hours_worked'],
-                'overtime_hours' => $stats['overtime'],
+                'id'            => $att->id,
+                'clock_in'      => $att->clock_in?->format('h:i A'),
+                'clock_out'     => $att->clock_out?->format('h:i A'),
+                'status'        => $stats['status'],
+                'is_late'       => $stats['is_late'],
+                'hours_worked'  => $stats['hours_worked'],
+                'overtime_hours'=> $stats['overtime'],
             ] : null,
             'history' => $history,
         ]);
@@ -393,7 +477,18 @@ class AttendanceController extends Controller
 
     public function myClockIn(Request $request): RedirectResponse
     {
-        $user    = $request->user();
+        $user = $request->user();
+
+        // HR staff are clocked in by the Owner — they cannot self-clock
+        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+            abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
+        }
+
+        // Block clock-in if no schedule assigned (BUG 1)
+        if (! $user->schedule_start || ! $user->schedule_end) {
+            return back()->with('error', 'Cannot clock in — no schedule assigned. Contact your manager.');
+        }
+
         $storeId = $request->attributes->get('seller_store')?->id ?? $user->store_id;
         $today   = now()->toDateString();
 
@@ -416,6 +511,7 @@ class AttendanceController extends Controller
         $att->update([
             'clock_in' => $clockIn,
             'status'   => $stats['status'],
+            'is_late'  => $stats['is_late'],
         ]);
 
         return back()->with('success', "Clocked in at {$clockIn->format('h:i A')}.");
@@ -423,7 +519,13 @@ class AttendanceController extends Controller
 
     public function myClockOut(Request $request): RedirectResponse
     {
-        $user  = $request->user();
+        $user = $request->user();
+
+        // HR staff are clocked out by the Owner — they cannot self-clock
+        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+            abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
+        }
+
         $today = now()->toDateString();
 
         $att = Attendance::where('user_id', $user->id)
@@ -445,6 +547,7 @@ class AttendanceController extends Controller
 
         $att->update([
             'status'         => $stats['status'],
+            'is_late'        => $stats['is_late'],
             'overtime_hours' => $stats['overtime'],
         ]);
 

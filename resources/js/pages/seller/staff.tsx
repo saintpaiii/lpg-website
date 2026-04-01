@@ -300,18 +300,20 @@ function StaffFormDialog({
                     {/* Work schedule */}
                     <div className="grid grid-cols-2 gap-3">
                         <div className="grid gap-1.5">
-                            <Label>Schedule Start <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Label>Schedule Start <span className="text-red-500">*</span></Label>
                             <Input
                                 type="time"
+                                required
                                 value={data.schedule_start}
                                 onChange={(e) => setData('schedule_start', e.target.value)}
                             />
                             {errors.schedule_start && <p className="text-xs text-red-500">{errors.schedule_start}</p>}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label>Schedule End <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Label>Schedule End <span className="text-red-500">*</span></Label>
                             <Input
                                 type="time"
+                                required
                                 value={data.schedule_end}
                                 onChange={(e) => setData('schedule_end', e.target.value)}
                             />

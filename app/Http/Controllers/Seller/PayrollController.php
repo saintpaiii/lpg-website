@@ -49,6 +49,15 @@ class PayrollController extends Controller
 
     /**
      * Calculate payroll figures for a staff member over a date range.
+     *
+     * Basic pay is based on ACTUAL hours worked per day:
+     *   present (8+ h)     → full daily_rate
+     *   half_day (4–7.99h) → daily_rate × 0.5
+     *   undertime (< 4h)   → daily_rate × (hours_worked / 8)
+     *   absent / no_schedule / day_off → ₱0
+     *
+     * Late flag (is_late = true) triggers a separate deduction per day.
+     * Undertime is now baked into basic_pay — undertime_deduction is always 0.
      */
     private function calcPayroll(
         User $staff,
@@ -63,19 +72,43 @@ class PayrollController extends Controller
             ->whereBetween('date', [$periodStart, $periodEnd])
             ->get();
 
-        $daysPresent  = $records->whereIn('status', ['present'])->count();
-        $daysLate     = $records->where('status', 'late')->count();
-        $daysAbsent   = $records->where('status', 'absent')->count();
-        $daysHalfDay  = $records->where('status', 'half_day')->count();
-        $totalOT      = (float) $records->sum('overtime_hours');
+        $hourlyRate = $dailyRate / 8;
 
-        // Payroll formula
-        $basicPay       = $dailyRate * ($daysPresent + $daysLate + $daysHalfDay * 0.5);
-        $overtimePay    = $totalOT * ($dailyRate / 8 * (float) $settings->overtime_multiplier);
+        $basicPay      = 0.0;
+        $daysPresent   = 0;
+        $daysHalfDay   = 0;  // half_day + undertime combined for display
+        $daysAbsent    = $records->whereIn('status', ['absent', 'no_schedule'])->count();
+        $daysLate      = $records->where('is_late', true)->count();   // arrived late (any status)
+        $totalOT       = (float) $records->sum('overtime_hours');
+
+        // Calculate basic pay from actual hours worked per day
+        $payableStatuses = ['present', 'half_day', 'undertime', 'late'];
+        foreach ($records->whereIn('status', $payableStatuses) as $rec) {
+            if (! $rec->clock_in) continue;
+
+            // Use seconds for precision (matches calcStats)
+            $hoursWorked = $rec->clock_out
+                ? round($rec->clock_in->diffInSeconds($rec->clock_out) / 3600, 4)
+                : 0.0;
+
+            if ($hoursWorked >= 8.0) {
+                $daysPresent++;
+                $basicPay += $dailyRate;
+            } elseif ($hoursWorked >= 4.0) {
+                $daysHalfDay++;
+                $basicPay += $dailyRate * 0.5;
+            } else {
+                // undertime (< 4h) — proportional pay, including 0-minute edge case
+                $daysHalfDay++;  // counted in half_day column for display
+                $basicPay += $dailyRate * ($hoursWorked / 8.0);
+            }
+        }
+
+        $overtimePay    = $totalOT * ($hourlyRate * (float) $settings->overtime_multiplier);
         $lateDeduction  = $daysLate * (float) $settings->late_deduction_per_day;
-        $absentDeduction= $daysAbsent * $dailyRate;
+        $absentDeduction = $daysAbsent * $dailyRate;  // informational only
         $grossPay       = $basicPay + $overtimePay;
-        $netPay         = $grossPay - $lateDeduction - $absentDeduction;
+        $netPay         = $grossPay - $lateDeduction;  // absent days already contribute ₱0 to basicPay
 
         return [
             'days_present'         => $daysPresent,
@@ -88,6 +121,7 @@ class PayrollController extends Controller
             'overtime_pay'         => round($overtimePay, 2),
             'late_deduction'       => round($lateDeduction, 2),
             'absent_deduction'     => round($absentDeduction, 2),
+            'undertime_deduction'  => 0.00,  // now baked into basic_pay
             'gross_pay'            => round($grossPay, 2),
             'net_pay'              => round(max(0, $netPay), 2),
         ];
@@ -145,6 +179,7 @@ class PayrollController extends Controller
                 'overtime_pay'         => (float) $p->overtime_pay,
                 'late_deduction'       => (float) $p->late_deduction,
                 'absent_deduction'     => (float) $p->absent_deduction,
+                'undertime_deduction'  => (float) ($p->undertime_deduction ?? 0),
                 'gross_pay'            => (float) $p->gross_pay,
                 'net_pay'              => (float) $p->net_pay,
                 'status'               => $p->status,
@@ -211,7 +246,7 @@ class PayrollController extends Controller
             'daily_rate'    => $this->peso((float) $p->daily_rate),
             'basic_pay'     => $this->peso((float) $p->basic_pay),
             'overtime_pay'  => $this->peso((float) $p->overtime_pay),
-            'deductions'    => $this->peso((float) $p->late_deduction + (float) $p->absent_deduction),
+            'deductions'    => $this->peso((float) $p->late_deduction + (float) $p->absent_deduction + (float) ($p->undertime_deduction ?? 0)),
             'net_pay'       => $this->peso((float) $p->net_pay),
             'status'        => $p->status,
             '_net'          => (float) $p->net_pay,
@@ -484,6 +519,7 @@ class PayrollController extends Controller
                 'overtime_pay'         => (float) $p->overtime_pay,
                 'late_deduction'       => (float) $p->late_deduction,
                 'absent_deduction'     => (float) $p->absent_deduction,
+                'undertime_deduction'  => (float) ($p->undertime_deduction ?? 0),
                 'gross_pay'            => (float) $p->gross_pay,
                 'net_pay'              => (float) $p->net_pay,
                 'status'               => $p->status,
