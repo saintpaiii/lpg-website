@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { Clock, Flame, LogOut, Package, Receipt, Search, ShoppingBag, ShoppingCart, Store, User, XCircle } from 'lucide-react';
 import { useRef, useState, type ReactNode, type FormEvent } from 'react';
+import { InstallAppBanner } from '@/components/install-app-banner';
 import { Toaster } from 'sonner';
 import {
     AlertDialog,
@@ -254,6 +255,45 @@ export default function CustomerLayout({ children, title }: Props) {
                 {children}
             </main>
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
+
+            {/* Mobile bottom tab bar — visible only on mobile, hidden on md+ */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 dark:bg-gray-900 dark:border-gray-800 pb-safe">
+                <div className="flex items-center justify-around h-14">
+                    {[
+                        { label: 'Browse',  href: '/customer/products', icon: ShoppingBag },
+                        { label: 'Orders',  href: '/customer/orders',   icon: Package },
+                        { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart },
+                        { label: 'Profile', href: '/customer/profile',  icon: User },
+                    ].map(({ label, href, icon: Icon }) => {
+                        const active = currentPath === href || currentPath.startsWith(href + '/');
+                        return (
+                            <Link
+                                key={href}
+                                href={href}
+                                className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
+                                    active ? 'text-blue-600' : 'text-gray-400 dark:text-gray-500'
+                                }`}
+                            >
+                                <div className="relative">
+                                    <Icon className="h-5 w-5" />
+                                    {label === 'Cart' && cart_count > 0 && (
+                                        <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
+                                            {cart_count > 9 ? '9+' : cart_count}
+                                        </span>
+                                    )}
+                                </div>
+                                <span className="text-[10px] font-medium">{label}</span>
+                            </Link>
+                        );
+                    })}
+                </div>
+            </nav>
+
+            {/* Spacing so content isn't hidden behind bottom bar on mobile */}
+            <div className="h-14 md:hidden" />
+
+            {/* PWA install banner */}
+            <InstallAppBanner />
 
             {/* Logout confirmation */}
             <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>

@@ -1,1 +1,0 @@
-import{c as i,d as l,e as s,f as u}from"./leaflet-DDTJgcdf.js";function d(t,e,c){e.center!==c.center&&t.setLatLng(e.center),e.radius!=null&&e.radius!==c.radius&&t.setRadius(e.radius)}const C=i(function({center:e,children:c,...a},r){const n=new l.Circle(e,a);return s(n,u(r,{overlayContainer:n}))},d);export{C};

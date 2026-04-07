@@ -9,6 +9,7 @@ use App\Http\Controllers\SellerRegistrationController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+Route::get('/offline', fn() => response()->view('offline'))->name('offline');
 
 // Google OAuth
 Route::get('/auth/google',          [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
