@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InvoicePrintController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SocialAuthController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\OtpController;
@@ -24,6 +25,14 @@ Route::middleware('auth')->group(function () {
 Route::get('/invoices/{invoice}/print', [InvoicePrintController::class, 'show'])
     ->middleware(['auth', 'verified'])
     ->name('invoices.print');
+
+// ── Notifications — available to all authenticated users ──────────────────────
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/notifications',              [NotificationController::class, 'index'])        ->name('notifications.index');
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])  ->name('notifications.unread-count');
+    Route::post('/notifications/read-all',    [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::post('/notifications/{id}/read',   [NotificationController::class, 'markAsRead'])   ->name('notifications.mark-read');
+});
 
 // ── Seller Registration & Pending (accessible without seller middleware) ─────
 Route::get('/seller/register', [SellerRegistrationController::class, 'create'])->name('seller.register');

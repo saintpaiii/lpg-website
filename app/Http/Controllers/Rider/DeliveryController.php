@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Rider;
 use App\Http\Controllers\Controller;
 use App\Models\Delivery;
 use App\Models\DeliveryProof;
+use App\Models\RiderLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,14 +23,28 @@ class DeliveryController extends Controller
             'notes'        => $d->notes,
             'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
             'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
+            'vehicle' => $d->vehicle ? [
+                'vehicle_type' => $d->vehicle->vehicle_type,
+                'plate_number' => $d->vehicle->plate_number,
+            ] : null,
             'order' => $d->order ? [
-                'id'           => $d->order->id,
-                'order_number' => $d->order->order_number,
-                'status'       => $d->order->status,
-                'total_amount' => (float) $d->order->total_amount,
-                'transaction_type' => $d->order->transaction_type,
-                'payment_method'   => $d->order->payment_method,
-                'payment_status'   => $d->order->payment_status,
+                'id'                 => $d->order->id,
+                'order_number'       => $d->order->order_number,
+                'status'             => $d->order->status,
+                'total_amount'       => (float) $d->order->total_amount,
+                'shipping_fee'       => $d->order->shipping_fee ? (float) $d->order->shipping_fee : null,
+                'transaction_type'   => $d->order->transaction_type,
+                'payment_method'     => $d->order->payment_method,
+                'payment_status'     => $d->order->payment_status,
+                'delivery_latitude'           => $d->order->delivery_latitude  ? (float) $d->order->delivery_latitude  : null,
+                'delivery_longitude'          => $d->order->delivery_longitude ? (float) $d->order->delivery_longitude : null,
+                'delivery_distance_km'        => $d->order->delivery_distance_km       ? (float) $d->order->delivery_distance_km       : null,
+                'estimated_delivery_minutes'  => $d->order->estimated_delivery_minutes ? (int)   $d->order->estimated_delivery_minutes : null,
+                'store_location' => ($d->order->store?->latitude && $d->order->store?->longitude) ? [
+                    'lat'  => (float) $d->order->store->latitude,
+                    'lng'  => (float) $d->order->store->longitude,
+                    'name' => $d->order->store->store_name,
+                ] : null,
                 'customer' => $d->order->customer ? [
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,
@@ -60,7 +75,7 @@ class DeliveryController extends Controller
         $tab  = $request->input('tab', 'active');
         $user = auth()->user();
 
-        $query = Delivery::with(['order.customer', 'order.items.product'])
+        $query = Delivery::with(['order.customer', 'order.items.product', 'order.store', 'vehicle'])
             ->where('rider_id', $user->id);
 
         if ($tab === 'history') {
@@ -164,10 +179,13 @@ class DeliveryController extends Controller
         $needsPhoto = in_array($request->input('status'), ['picked_up', 'delivered', 'failed']);
 
         $data = $request->validate([
-            'status'        => 'required|in:picked_up,in_transit,delivered,failed',
-            'notes'         => 'nullable|string|max:500',
-            'location_note' => 'nullable|string|max:255',
-            'photo'         => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg|max:5120',
+            'status'            => 'required|in:picked_up,in_transit,delivered,failed',
+            'notes'             => 'nullable|string|max:500',
+            'location_note'     => 'nullable|string|max:255',
+            'photo'             => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg|max:5120',
+            'rider_latitude'    => 'nullable|numeric|between:-90,90',
+            'rider_longitude'   => 'nullable|numeric|between:-180,180',
+            'rider_accuracy'    => 'nullable|numeric|min:0',
         ]);
 
         $newStatus = $data['status'];
@@ -191,7 +209,8 @@ class DeliveryController extends Controller
             return back()->with('error', "Cannot move from {$delivery->status} to {$newStatus}.");
         }
 
-        DB::transaction(function () use ($delivery, $newStatus, $data, $request) {
+        $riderLocSaved = false;
+        DB::transaction(function () use ($delivery, $newStatus, $data, $request, &$riderLocSaved) {
             $updates = ['status' => $newStatus];
 
             if (! empty($data['notes'])) {
@@ -229,6 +248,18 @@ class DeliveryController extends Controller
                 'notes'         => $data['notes'] ?? null,
                 'location_note' => $data['location_note'] ?? null,
             ]);
+
+            // Save rider GPS snapshot (if provided)
+            if (! empty($data['rider_latitude']) && ! empty($data['rider_longitude'])) {
+                RiderLocation::create([
+                    'delivery_id' => $delivery->id,
+                    'rider_id'    => auth()->id(),
+                    'latitude'    => $data['rider_latitude'],
+                    'longitude'   => $data['rider_longitude'],
+                    'accuracy'    => $data['rider_accuracy'] ?? null,
+                ]);
+                $riderLocSaved = true;
+            }
         });
 
         $label = ucfirst(str_replace('_', ' ', $newStatus));

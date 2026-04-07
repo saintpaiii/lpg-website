@@ -40,6 +40,12 @@ class Store extends Model
         'suspension_notes',
         'suspended_at',
         'suspended_by',
+        'latitude',
+        'longitude',
+        'attendance_radius',
+        'base_delivery_fee',
+        'fee_per_km',
+        'max_delivery_radius_km',
     ];
 
     protected function casts(): array
@@ -50,6 +56,12 @@ class Store extends Model
             'is_featured'              => 'boolean',
             'approved_at'              => 'datetime',
             'subscription_expires_at'  => 'datetime',
+            'latitude'                 => 'decimal:7',
+            'longitude'                => 'decimal:7',
+            'attendance_radius'        => 'integer',
+            'base_delivery_fee'        => 'decimal:2',
+            'fee_per_km'               => 'decimal:2',
+            'max_delivery_radius_km'   => 'integer',
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\SellerWallet;
 use App\Models\WithdrawalRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -169,6 +170,15 @@ class WalletController extends Controller
             'requested_at'   => now(),
             'notes'          => $data['notes'] ?? null,
         ]);
+
+        // Notify platform admins about the new withdrawal request
+        NotificationService::sendToRole(
+            'platform_admin',
+            'payment',
+            'Withdrawal Request',
+            "{$store->store_name} requested a withdrawal of ₱" . number_format((float) $data['amount'], 2) . ' via ' . str_replace('_', ' ', $data['payment_method']) . '.',
+            ['link' => '/admin/withdrawals']
+        );
 
         return back()->with('success', 'Withdrawal request submitted. The admin will process it shortly.');
     }

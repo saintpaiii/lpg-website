@@ -12,6 +12,18 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+// ── Haversine distance (metres) ───────────────────────────────────────────────
+function haversineMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+{
+    $R   = 6371000; // Earth radius in metres
+    $phi1 = deg2rad($lat1);
+    $phi2 = deg2rad($lat2);
+    $dphi = deg2rad($lat2 - $lat1);
+    $dlam = deg2rad($lng2 - $lng1);
+    $a    = sin($dphi / 2) ** 2 + cos($phi1) * cos($phi2) * sin($dlam / 2) ** 2;
+    return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
+}
+
 class AttendanceController extends Controller
 {
     use GeneratesExport;
@@ -154,6 +166,15 @@ class AttendanceController extends Controller
                 $isMissingClockOut = now()->gt($cutoff);
             }
 
+            // Distance from store (only if both store and attendance have coordinates)
+            $clockInDistance = null;
+            if ($att?->clock_in_latitude && $att?->clock_in_longitude && $store->latitude && $store->longitude) {
+                $clockInDistance = (int) round(haversineMeters(
+                    (float) $att->clock_in_latitude, (float) $att->clock_in_longitude,
+                    (float) $store->latitude, (float) $store->longitude
+                ));
+            }
+
             return [
                 'user_id'           => $staff->id,
                 'name'              => $staff->name,
@@ -169,6 +190,8 @@ class AttendanceController extends Controller
                 'overtime_hours'    => $stats['overtime'],
                 'notes'             => $att?->notes,
                 'missing_clock_out' => $isMissingClockOut,
+                'clock_in_distance' => $clockInDistance,
+                'clock_in_manual'   => str_contains($att?->notes ?? '', 'Manual clock-in'),
             ];
         })->values();
 
@@ -182,9 +205,14 @@ class AttendanceController extends Controller
         ];
 
         return Inertia::render('seller/attendance', [
-            'rows'    => $rows,
-            'date'    => $targetDate,
-            'summary' => $summary,
+            'rows'           => $rows,
+            'date'           => $targetDate,
+            'summary'        => $summary,
+            'store_location' => $store->latitude ? [
+                'latitude'  => (float) $store->latitude,
+                'longitude' => (float) $store->longitude,
+                'radius'    => $store->attendance_radius ?? 500,
+            ] : null,
         ]);
     }
 
@@ -313,6 +341,7 @@ class AttendanceController extends Controller
             'clock_in' => $clockIn,
             'status'   => $stats['status'],
             'is_late'  => $stats['is_late'],
+            'notes'    => 'Manual clock-in by owner/HR',
         ]);
 
         return back()->with('success', "{$staff->name} clocked in at {$clockIn->format('h:i A')}.");
@@ -458,11 +487,18 @@ class AttendanceController extends Controller
             ])
             ->values();
 
+        $store = \App\Models\Store::find($user->store_id);
+
         return Inertia::render('seller/my-attendance', [
             'today'          => now()->format('M d, Y'),
             'schedule_start' => $user->schedule_start,
             'schedule_end'   => $user->schedule_end,
-            'attendance'     => $att ? [
+            'store_location' => ($store && $store->latitude && $store->longitude) ? [
+                'latitude'  => (float) $store->latitude,
+                'longitude' => (float) $store->longitude,
+                'radius'    => $store->attendance_radius ?? 500,
+            ] : null,
+            'attendance'         => $att ? [
                 'id'            => $att->id,
                 'clock_in'      => $att->clock_in?->format('h:i A'),
                 'clock_out'     => $att->clock_out?->format('h:i A'),
@@ -484,13 +520,43 @@ class AttendanceController extends Controller
             abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
         }
 
-        // Block clock-in if no schedule assigned (BUG 1)
+        // Block clock-in if no schedule assigned
         if (! $user->schedule_start || ! $user->schedule_end) {
             return back()->with('error', 'Cannot clock in — no schedule assigned. Contact your manager.');
         }
 
-        $storeId = $request->attributes->get('seller_store')?->id ?? $user->store_id;
-        $today   = now()->toDateString();
+        $request->validate([
+            'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $store   = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
+        $storeId = $store?->id ?? $user->store_id;
+
+        // ── Geolocation check (only when store has coordinates set) ──────────────
+        if ($store && $store->latitude && $store->longitude) {
+            $lat = $request->input('latitude');
+            $lng = $request->input('longitude');
+
+            if ($lat === null || $lng === null) {
+                return back()->with('error', 'Location access is required to clock in. Please allow location access and try again.');
+            }
+
+            $distance = haversineMeters(
+                (float) $lat, (float) $lng,
+                (float) $store->latitude, (float) $store->longitude
+            );
+
+            $radius = $store->attendance_radius ?? 500;
+            if ($distance > $radius) {
+                $distanceFormatted = $distance >= 1000
+                    ? number_format($distance / 1000, 1) . ' km'
+                    : round($distance) . ' m';
+                return back()->with('error', "You are too far from the store ({$distanceFormatted} away, limit: {$radius}m). Please clock in from within the store area.");
+            }
+        }
+
+        $today = now()->toDateString();
 
         $att = Attendance::firstOrCreate(
             ['user_id' => $user->id, 'date' => $today],
@@ -509,9 +575,11 @@ class AttendanceController extends Controller
         );
 
         $att->update([
-            'clock_in' => $clockIn,
-            'status'   => $stats['status'],
-            'is_late'  => $stats['is_late'],
+            'clock_in'           => $clockIn,
+            'clock_in_latitude'  => $request->input('latitude'),
+            'clock_in_longitude' => $request->input('longitude'),
+            'status'             => $stats['status'],
+            'is_late'            => $stats['is_late'],
         ]);
 
         return back()->with('success', "Clocked in at {$clockIn->format('h:i A')}.");
@@ -524,6 +592,36 @@ class AttendanceController extends Controller
         // HR staff are clocked out by the Owner — they cannot self-clock
         if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
             abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
+        }
+
+        $request->validate([
+            'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $store = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
+
+        // ── Geolocation check (only when store has coordinates set) ──────────────
+        if ($store && $store->latitude && $store->longitude) {
+            $lat = $request->input('latitude');
+            $lng = $request->input('longitude');
+
+            if ($lat === null || $lng === null) {
+                return back()->with('error', 'Location access is required to clock out. Please allow location access and try again.');
+            }
+
+            $distance = haversineMeters(
+                (float) $lat, (float) $lng,
+                (float) $store->latitude, (float) $store->longitude
+            );
+
+            $radius = $store->attendance_radius ?? 500;
+            if ($distance > $radius) {
+                $distanceFormatted = $distance >= 1000
+                    ? number_format($distance / 1000, 1) . ' km'
+                    : round($distance) . ' m';
+                return back()->with('error', "You are too far from the store ({$distanceFormatted} away, limit: {$radius}m). Please clock out from within the store area.");
+            }
         }
 
         $today = now()->toDateString();
@@ -541,7 +639,11 @@ class AttendanceController extends Controller
         }
 
         $clockOut = now();
-        $att->update(['clock_out' => $clockOut]);
+        $att->update([
+            'clock_out'           => $clockOut,
+            'clock_out_latitude'  => $request->input('latitude'),
+            'clock_out_longitude' => $request->input('longitude'),
+        ]);
 
         $stats = $this->calcStats($att->fresh(), $user->schedule_start, $user->schedule_end);
 

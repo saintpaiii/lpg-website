@@ -16,6 +16,7 @@ class Delivery extends Model
         'store_id',
         'order_id',
         'rider_id',
+        'vehicle_id',
         'status',
         'notes',
         'assigned_at',
@@ -43,6 +44,11 @@ class Delivery extends Model
     public function rider(): BelongsTo
     {
         return $this->belongsTo(User::class, 'rider_id');
+    }
+
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class);
     }
 
     public function proofs(): HasMany

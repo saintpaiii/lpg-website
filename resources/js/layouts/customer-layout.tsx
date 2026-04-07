@@ -12,6 +12,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { NotificationBell } from '@/components/notification-bell';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import type { SharedData } from '@/types';
 
@@ -148,6 +149,8 @@ export default function CustomerLayout({ children, title }: Props) {
                                     <Search className="h-4 w-4" />
                                 </button>
                             )}
+                            {/* Notification bell */}
+                            <NotificationBell />
                             {/* Cart icon — hidden for admin */}
                             {!isAdmin && (
                                 <Link

@@ -16,7 +16,11 @@ class Attendance extends Model
         'store_id',
         'date',
         'clock_in',
+        'clock_in_latitude',
+        'clock_in_longitude',
         'clock_out',
+        'clock_out_latitude',
+        'clock_out_longitude',
         'status',
         'overtime_hours',
         'is_late',
@@ -29,8 +33,12 @@ class Attendance extends Model
             'date'           => 'date',
             'clock_in'       => 'datetime',
             'clock_out'      => 'datetime',
-            'overtime_hours' => 'decimal:2',
-            'is_late'        => 'boolean',
+            'overtime_hours'      => 'decimal:2',
+            'is_late'             => 'boolean',
+            'clock_in_latitude'   => 'decimal:7',
+            'clock_in_longitude'  => 'decimal:7',
+            'clock_out_latitude'  => 'decimal:7',
+            'clock_out_longitude' => 'decimal:7',
         ];
     }
 

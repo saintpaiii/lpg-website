@@ -6,6 +6,7 @@ import {
     ClockArrowDown,
     ClockArrowUp,
     FileDown,
+    MapPin,
     Users,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -24,6 +25,12 @@ import type { BreadcrumbItem, SharedData } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+type StoreLocation = {
+    latitude: number;
+    longitude: number;
+    radius: number;
+};
+
 type AttendanceRow = {
     user_id: number;
     name: string;
@@ -39,6 +46,8 @@ type AttendanceRow = {
     overtime_hours: number;
     notes: string | null;
     missing_clock_out: boolean;
+    clock_in_distance: number | null;
+    clock_in_manual: boolean;
 };
 
 type Summary = {
@@ -54,6 +63,7 @@ type Props = {
     rows: AttendanceRow[];
     date: string;
     summary: Summary;
+    store_location: StoreLocation | null;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -242,7 +252,7 @@ function SetClockOutDialog({ row, date, onClose }: { row: AttendanceRow; date: s
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function AttendancePage({ rows, date, summary }: Props) {
+export default function AttendancePage({ rows, date, summary, store_location }: Props) {
     const { auth } = usePage<SharedData>().props;
     const canManage = auth.user.role === 'seller'
         || (auth.user.role === 'seller_staff' && (auth.user as any).sub_role === 'hr');
@@ -345,7 +355,26 @@ export default function AttendancePage({ rows, date, summary }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm font-mono">
                                                     {row.clock_in ? (
-                                                        <span className="text-emerald-700 font-medium">{row.clock_in}</span>
+                                                        <div className="flex flex-col items-center gap-0.5">
+                                                            <span className="text-emerald-700 font-medium">{row.clock_in}</span>
+                                                            {row.clock_in_manual && (
+                                                                <span title="Manual clock-in by owner" className="flex items-center gap-0.5 text-xs text-amber-600 font-normal font-sans">
+                                                                    <MapPin className="h-3 w-3" /> Manual
+                                                                </span>
+                                                            )}
+                                                            {!row.clock_in_manual && row.clock_in_distance !== null && store_location && (
+                                                                <span
+                                                                    title={`Clocked in ${row.clock_in_distance}m from store`}
+                                                                    className={`flex items-center gap-0.5 text-xs font-normal font-sans ${row.clock_in_distance <= store_location.radius ? 'text-emerald-600' : 'text-red-500'}`}
+                                                                >
+                                                                    <MapPin className="h-3 w-3" />
+                                                                    {row.clock_in_distance >= 1000
+                                                                        ? `${(row.clock_in_distance / 1000).toFixed(1)}km`
+                                                                        : `${row.clock_in_distance}m`
+                                                                    }
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     ) : (
                                                         <span className="text-gray-300">—</span>
                                                     )}

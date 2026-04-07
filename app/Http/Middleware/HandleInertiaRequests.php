@@ -3,7 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Models\CartItem;
+use App\Models\Notification;
 use App\Models\Store;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -83,6 +85,22 @@ class HandleInertiaRequests extends Middleware
             'cart_count' => $user && in_array($user->role, ['customer', 'seller'])
                 ? CartItem::where('user_id', $user->id)->count()
                 : 0,
+            'unreadNotifications' => fn () => $user ? NotificationService::getUnreadCount($user->id) : 0,
+            'recentNotifications' => fn () => $user
+                ? Notification::where('user_id', $user->id)
+                    ->whereNull('read_at')
+                    ->latest()
+                    ->limit(5)
+                    ->get()
+                    ->map(fn ($n) => [
+                        'id'         => $n->id,
+                        'type'       => $n->type,
+                        'title'      => $n->title,
+                        'message'    => $n->message,
+                        'data'       => $n->data,
+                        'created_at' => $n->created_at->diffForHumans(),
+                    ])->values()->toArray()
+                : [],
         ];
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\SellerWallet;
 use App\Models\WalletTransaction;
 use App\Models\WithdrawalRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -216,6 +217,18 @@ class WithdrawalController extends Controller
                 'reference_number' => $data['reference_number'],
             ]);
         });
+
+        // Notify the store owner that their withdrawal was released
+        $ownerId = $withdrawal->store?->user_id ?? null;
+        if ($ownerId) {
+            NotificationService::send(
+                $ownerId,
+                'payment',
+                'Withdrawal Released',
+                '₱' . number_format((float) $withdrawal->amount, 2) . ' withdrawal has been released via ' . str_replace('_', ' ', $withdrawal->payment_method) . '.',
+                ['link' => '/seller/wallet']
+            );
+        }
 
         return back()->with('success', 'Withdrawal marked as released. Wallet balance updated.');
     }

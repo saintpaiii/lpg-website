@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Models\VerificationRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -134,6 +135,16 @@ class VerificationController extends Controller
                 'approved_by' => $request->user()->id,
             ]);
 
+            if ($verification->user_id) {
+                NotificationService::send(
+                    $verification->user_id,
+                    'system',
+                    'Your store has been approved!',
+                    'Congratulations! Your seller application has been approved. You can now access the Seller Portal.',
+                    ['link' => '/seller/dashboard']
+                );
+            }
+
             return back()->with('success', "{$verification->user?->name} has been approved as a seller. They can now access the seller portal.");
         }
 
@@ -159,6 +170,16 @@ class VerificationController extends Controller
         // Mark the seller's store as rejected too
         if ($verification->type === 'seller_application') {
             Store::where('user_id', $verification->user_id)->update(['status' => 'rejected']);
+
+            if ($verification->user_id) {
+                NotificationService::send(
+                    $verification->user_id,
+                    'system',
+                    'Your seller application was not approved',
+                    'Unfortunately your seller application was rejected. Reason: ' . $request->reason,
+                    ['link' => '/customer/become-seller']
+                );
+            }
         }
 
         return back()->with('success', "Verification for {$verification->user?->name} rejected.");

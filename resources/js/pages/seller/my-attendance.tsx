@@ -1,6 +1,20 @@
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { AlertCircle, CalendarDays, Clock, LogIn, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { Head, router, usePage } from '@inertiajs/react';
+import {
+    AlertCircle,
+    CalendarDays,
+    CheckCircle2,
+    Clock,
+    Loader2,
+    LogIn,
+    LogOut,
+    MapPin,
+    Navigation,
+    XCircle,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -14,14 +28,19 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import AppLayout from '@/layouts/app-layout';
-import { Spinner } from '@/components/ui/spinner';
 import type { BreadcrumbItem, SharedData } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+type StoreLocation = {
+    latitude: number;
+    longitude: number;
+    radius: number;
+};
+
 type AttendanceToday = {
     id: number;
-    clock_in: string | null;   // formatted "h:ii A"
+    clock_in: string | null;
     clock_out: string | null;
     status: 'present' | 'late' | 'absent' | 'half_day' | 'day_off' | 'undertime' | 'no_schedule';
     is_late: boolean;
@@ -42,7 +61,10 @@ type Props = {
     schedule_end: string | null;
     attendance: AttendanceToday;
     history: HistoryRow[];
+    store_location: StoreLocation | null;
 };
+
+type LocStatus = 'loading' | 'granted' | 'denied' | 'unavailable';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -68,12 +90,22 @@ const STATUS_STYLE: Record<string, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R    = 6371000;
+    const phi1 = (lat1 * Math.PI) / 180;
+    const phi2 = (lat2 * Math.PI) / 180;
+    const dphi = ((lat2 - lat1) * Math.PI) / 180;
+    const dlam = ((lng2 - lng1) * Math.PI) / 180;
+    const a = Math.sin(dphi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dlam / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function fmtSchedule(start: string | null, end: string | null): string {
     if (!start || !end) return 'No schedule set';
     const fmt = (t: string) => {
         const [h, m] = t.split(':').map(Number);
         const ampm = h >= 12 ? 'PM' : 'AM';
-        return `${((h % 12) || 12)}:${String(m).padStart(2, '0')} ${ampm}`;
+        return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${ampm}`;
     };
     return `${fmt(start)} – ${fmt(end)}`;
 }
@@ -87,20 +119,50 @@ function fmtHours(h: number, hasClockOut = false): string {
     return `${hrs}h ${mins}m`;
 }
 
-/** Parse "8:30 AM" / "12:05 PM" into decimal hours from now. */
 function liveHoursWorked(clockInStr: string): number {
     const match = clockInStr.match(/^(\d+):(\d+)\s*(AM|PM)$/i);
     if (!match) return 0;
     let h = parseInt(match[1], 10);
     const m = parseInt(match[2], 10);
-    const ampm = match[3].toUpperCase();
-    if (ampm === 'PM' && h !== 12) h += 12;
-    if (ampm === 'AM' && h === 12) h = 0;
+    if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
     const now = new Date();
     const clockIn = new Date(now);
     clockIn.setHours(h, m, 0, 0);
-    const diffMs = now.getTime() - clockIn.getTime();
-    return Math.max(0, diffMs / (1000 * 60 * 60));
+    return Math.max(0, (now.getTime() - clockIn.getTime()) / 3_600_000);
+}
+
+function fmtDistance(m: number): string {
+    if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
+    return `${Math.round(m)} m`;
+}
+
+// ── Leaflet icon setup ─────────────────────────────────────────────────────────
+
+function makeIcon(color: string) {
+    return L.divIcon({
+        html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.45)"></div>`,
+        className: '',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+    });
+}
+
+// ── Map auto-fit ───────────────────────────────────────────────────────────────
+
+function MapFitter({ positions }: { positions: [number, number][] }) {
+    const map = useMap();
+    const fitted = useRef(false);
+    useEffect(() => {
+        if (!fitted.current && positions.length > 1) {
+            map.fitBounds(L.latLngBounds(positions), { padding: [40, 40] });
+            fitted.current = true;
+        } else if (!fitted.current && positions.length === 1) {
+            map.setView(positions[0], 16);
+            fitted.current = true;
+        }
+    }, [map, positions]);
+    return null;
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -115,28 +177,96 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function MyAttendancePage({ today, schedule_start, schedule_end, attendance, history }: Props) {
+export default function MyAttendancePage({
+    today,
+    schedule_start,
+    schedule_end,
+    attendance,
+    history,
+    store_location,
+}: Props) {
     const { auth } = usePage<SharedData>().props;
-    const isRider   = auth.user.role === 'rider'
+    const isRider = auth.user.role === 'rider'
         || (auth.user.role === 'seller_staff' && (auth.user as any).sub_role === 'rider');
 
-    const clockInBase  = isRider ? '/rider/my-attendance' : '/seller/my-attendance';
-    const clockOutBase = clockInBase;
-
-    const clockInForm  = useForm({});
-    const clockOutForm = useForm({});
-
-    const [showClockInConfirm,  setShowClockInConfirm]  = useState(false);
-    const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+    const clockBase = isRider ? '/rider/my-attendance' : '/seller/my-attendance';
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: isRider ? 'Deliveries' : 'Dashboard', href: isRider ? '/rider/deliveries' : '/seller/dashboard' },
-        { title: 'My Attendance', href: `${clockInBase}` },
+        { title: 'My Attendance', href: clockBase },
     ];
+
+    // ── Geolocation state ────────────────────────────────────────────────────
+    const [myCoords, setMyCoords]   = useState<{ lat: number; lng: number } | null>(null);
+    const [locStatus, setLocStatus] = useState<LocStatus>('loading');
+
+    useEffect(() => {
+        if (!navigator.geolocation) {
+            setLocStatus('unavailable');
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setMyCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                setLocStatus('granted');
+            },
+            () => setLocStatus('denied'),
+            { timeout: 10000, maximumAge: 60000 },
+        );
+    }, []);
+
+    // ── Distance computation ─────────────────────────────────────────────────
+    const distance: number | null = useMemo(() => {
+        if (!myCoords || !store_location) return null;
+        return haversineMeters(myCoords.lat, myCoords.lng, store_location.latitude, store_location.longitude);
+    }, [myCoords, store_location]);
+
+    // Within radius: allow if no store location, or coords not yet received, or within range
+    const withinRadius = !store_location || locStatus === 'loading' || (distance !== null && distance <= store_location.radius);
+
+    // ── Submission ───────────────────────────────────────────────────────────
+    const [submitting, setSubmitting] = useState<'in' | 'out' | null>(null);
+    const [showClockInConfirm,  setShowClockInConfirm]  = useState(false);
+    const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
+
+    function submitClockIn() {
+        setSubmitting('in');
+        router.post(`${clockBase}/clock-in`, {
+            latitude:  myCoords?.lat ?? null,
+            longitude: myCoords?.lng ?? null,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSubmitting(null),
+        });
+    }
+
+    function submitClockOut() {
+        setSubmitting('out');
+        router.post(`${clockBase}/clock-out`, {
+            latitude:  myCoords?.lat ?? null,
+            longitude: myCoords?.lng ?? null,
+        }, {
+            preserveScroll: true,
+            onFinish: () => setSubmitting(null),
+        });
+    }
+
+    // ── Map data ─────────────────────────────────────────────────────────────
+    const storeIcon = useMemo(() => makeIcon('#ef4444'), []);
+    const myIcon    = useMemo(() => makeIcon('#3b82f6'), []);
+
+    const mapPositions: [number, number][] = useMemo(() => {
+        const pts: [number, number][] = [];
+        if (store_location) pts.push([store_location.latitude, store_location.longitude]);
+        if (myCoords)       pts.push([myCoords.lat, myCoords.lng]);
+        return pts;
+    }, [store_location, myCoords]);
 
     const hasClockIn  = !!attendance?.clock_in;
     const hasClockOut = !!attendance?.clock_out;
     const isDone      = hasClockIn && hasClockOut;
+
+    const clockInBlocked = locStatus === 'denied' || (!withinRadius && !!store_location);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -159,6 +289,114 @@ export default function MyAttendancePage({ today, schedule_start, schedule_end, 
                         <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                         <span>You haven't clocked in yet today! Please clock in below to record your attendance.</span>
                     </div>
+                )}
+
+                {/* Location Status Card — always shown */}
+                {!isDone && (
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Navigation className="h-4 w-4 text-blue-600" />
+                                Your Location
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {/* Map (only when we have at least one pin to show) */}
+                            {(store_location || myCoords) && (
+                                <div className="rounded-lg overflow-hidden border border-gray-200 h-48">
+                                    <MapContainer
+                                        center={store_location
+                                            ? [store_location.latitude, store_location.longitude]
+                                            : [myCoords!.lat, myCoords!.lng]}
+                                        zoom={15}
+                                        style={{ height: '100%', width: '100%' }}
+                                        zoomControl={false}
+                                        scrollWheelZoom={false}
+                                        dragging={false}
+                                        doubleClickZoom={false}
+                                    >
+                                        <TileLayer
+                                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                        />
+                                        {store_location && (
+                                            <>
+                                                <Marker position={[store_location.latitude, store_location.longitude]} icon={storeIcon} />
+                                                <Circle
+                                                    center={[store_location.latitude, store_location.longitude]}
+                                                    radius={store_location.radius}
+                                                    pathOptions={{ color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.1, weight: 1.5 }}
+                                                />
+                                            </>
+                                        )}
+                                        {myCoords && (
+                                            <Marker position={[myCoords.lat, myCoords.lng]} icon={myIcon} />
+                                        )}
+                                        <MapFitter positions={mapPositions} />
+                                    </MapContainer>
+                                </div>
+                            )}
+
+                            {/* Legend */}
+                            {(store_location || myCoords) && (
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                    {store_location && (
+                                        <span className="flex items-center gap-1">
+                                            <span className="inline-block w-3 h-3 rounded-full bg-red-500 border border-white shadow-sm" /> Store
+                                        </span>
+                                    )}
+                                    {myCoords && (
+                                        <span className="flex items-center gap-1">
+                                            <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border border-white shadow-sm" /> You
+                                        </span>
+                                    )}
+                                    {store_location && (
+                                        <span className="flex items-center gap-1">
+                                            <span className="inline-block w-3 h-3 rounded-full border border-blue-400 bg-blue-100" /> {store_location.radius}m radius
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Status messages */}
+                            {locStatus === 'loading' && (
+                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Getting your location…
+                                </div>
+                            )}
+                            {locStatus === 'unavailable' && (
+                                <div className="flex items-start gap-2 text-sm text-red-700">
+                                    <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                    Geolocation is not supported by your browser.
+                                </div>
+                            )}
+                            {locStatus === 'denied' && (
+                                <div className="flex items-start gap-2 text-sm text-red-700">
+                                    <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                    Location access denied. Please enable location in your browser settings and reload the page.
+                                </div>
+                            )}
+                            {locStatus === 'granted' && !store_location && (
+                                <div className="flex items-start gap-2 text-sm text-blue-700">
+                                    <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
+                                    Location captured. No store pin configured — ask your owner to set it in Settings. Clock in is allowed.
+                                </div>
+                            )}
+                            {locStatus === 'granted' && store_location && distance !== null && (
+                                <div className={`flex items-center gap-2 text-sm font-medium ${withinRadius ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {withinRadius
+                                        ? <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                        : <XCircle className="h-4 w-4 shrink-0" />
+                                    }
+                                    {withinRadius
+                                        ? `✓ You are ${fmtDistance(distance)} from the store — within range`
+                                        : `✗ You are ${fmtDistance(distance)} from the store — must be within ${fmtDistance(store_location.radius)}`
+                                    }
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Today's card */}
@@ -234,21 +472,37 @@ export default function MyAttendancePage({ today, schedule_start, schedule_end, 
                                     Shift complete. See you tomorrow!
                                 </div>
                             ) : !hasClockIn ? (
-                                <Button
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-8"
-                                    disabled={clockInForm.processing}
-                                    onClick={() => setShowClockInConfirm(true)}
-                                >
-                                    {clockInForm.processing ? <Spinner className="mr-1" /> : <LogIn className="h-4 w-4" />}
-                                    Clock In
-                                </Button>
+                                <div className="flex flex-col items-center gap-2">
+                                    <Button
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 px-8 disabled:opacity-50"
+                                        disabled={submitting !== null || clockInBlocked}
+                                        onClick={() => setShowClockInConfirm(true)}
+                                    >
+                                        {submitting === 'in'
+                                            ? <Loader2 className="h-4 w-4 animate-spin" />
+                                            : <LogIn className="h-4 w-4" />
+                                        }
+                                        Clock In
+                                    </Button>
+                                    {clockInBlocked && locStatus === 'denied' && (
+                                        <p className="text-xs text-red-600 text-center">Enable location access to clock in</p>
+                                    )}
+                                    {clockInBlocked && !withinRadius && store_location && (
+                                        <p className="text-xs text-red-600 text-center">
+                                            Move closer to the store ({fmtDistance(store_location.radius)} radius)
+                                        </p>
+                                    )}
+                                </div>
                             ) : (
                                 <Button
                                     className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-8"
-                                    disabled={clockOutForm.processing}
+                                    disabled={submitting !== null}
                                     onClick={() => setShowClockOutConfirm(true)}
                                 >
-                                    {clockOutForm.processing ? <Spinner className="mr-1" /> : <LogOut className="h-4 w-4" />}
+                                    {submitting === 'out'
+                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                        : <LogOut className="h-4 w-4" />
+                                    }
                                     Clock Out
                                 </Button>
                             )}
@@ -305,17 +559,18 @@ export default function MyAttendancePage({ today, schedule_start, schedule_end, 
                     <AlertDialogHeader>
                         <AlertDialogTitle>Clock In?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            You are about to clock in. Confirm?
+                            {store_location && distance !== null
+                                ? `You are ${fmtDistance(distance)} from the store. Confirm clock-in?`
+                                : 'You are about to clock in. Confirm?'
+                            }
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                            onClick={() => {
-                                setShowClockInConfirm(false);
-                                clockInForm.post(`${clockInBase}/clock-in`, { preserveScroll: true });
-                            }}
+                            onClick={() => { setShowClockInConfirm(false); submitClockIn(); }}
+                            disabled={submitting !== null}
                         >
                             Clock In
                         </AlertDialogAction>
@@ -333,11 +588,12 @@ export default function MyAttendancePage({ today, schedule_start, schedule_end, 
                                 const worked = attendance?.clock_in ? liveHoursWorked(attendance.clock_in) : 0;
                                 const hrs  = Math.floor(worked);
                                 const mins = Math.round((worked - hrs) * 60);
-                                const label = hrs > 0 ? `${hrs} hour${hrs !== 1 ? 's' : ''} and ${mins} minute${mins !== 1 ? 's' : ''}` : `${mins} minute${mins !== 1 ? 's' : ''}`;
-                                if (worked < 8) {
-                                    return `You have worked ${label}. Since this is less than 8 hours, your salary will be deducted proportionally for the undertime. Continue?`;
-                                }
-                                return `You have worked ${label}. Ready to clock out?`;
+                                const label = hrs > 0
+                                    ? `${hrs}h ${mins}m`
+                                    : `${mins} minute${mins !== 1 ? 's' : ''}`;
+                                return worked < 8
+                                    ? `You have worked ${label} (less than 8h). Your pay will be proportionally deducted for undertime. Continue?`
+                                    : `You have worked ${label}. Ready to clock out?`;
                             })()}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -345,10 +601,8 @@ export default function MyAttendancePage({ today, schedule_start, schedule_end, 
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => {
-                                setShowClockOutConfirm(false);
-                                clockOutForm.post(`${clockOutBase}/clock-out`, { preserveScroll: true });
-                            }}
+                            onClick={() => { setShowClockOutConfirm(false); submitClockOut(); }}
+                            disabled={submitting !== null}
                         >
                             Clock Out
                         </AlertDialogAction>

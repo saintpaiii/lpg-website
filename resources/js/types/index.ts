@@ -13,6 +13,16 @@ export type CartConflict = {
     transaction_type: string;
 };
 
+export type AppNotification = {
+    id: number;
+    type: string;
+    title: string;
+    message: string;
+    data: Record<string, unknown> | null;
+    created_at: string;
+    read_at?: string | null;
+};
+
 export type SharedData = {
     name: string;
     auth: Auth;
@@ -25,5 +35,7 @@ export type SharedData = {
         store_suspension_info?: { reason: string | null; notes: string | null } | null;
     };
     cart_count: number;
+    unreadNotifications: number;
+    recentNotifications: AppNotification[];
     [key: string]: unknown;
 };

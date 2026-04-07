@@ -72,4 +72,58 @@ class PaymentController extends Controller
             return response()->json(['error' => 'Could not start payment. Please try again later.'], 422);
         }
     }
+
+    /**
+     * Pay the remaining installment balance for a partially-paid order.
+     */
+    public function payBalance(Request $request, Order $order): \Illuminate\Http\JsonResponse
+    {
+        $customer = $this->getCustomer($request);
+
+        if (! $customer || $order->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        if ($order->payment_mode !== 'installment' || $order->payment_status !== 'partial') {
+            return response()->json(['error' => 'This order is not eligible for balance payment.'], 422);
+        }
+
+        $remaining = (float) $order->remaining_balance;
+        if ($remaining <= 0) {
+            return response()->json(['error' => 'No remaining balance.'], 422);
+        }
+
+        try {
+            $paymongo = app(PayMongoService::class);
+            $user     = $request->user();
+
+            $session = $paymongo->createCheckoutSession([
+                'reference_number' => $order->order_number . '-BAL',
+                'description'      => "Balance Payment — Order {$order->order_number}",
+                'line_items'       => [[
+                    'name'        => "Remaining Balance — Order {$order->order_number}",
+                    'description' => 'Full balance settlement',
+                    'amount'      => (int) round($remaining * 100),
+                    'currency'    => 'PHP',
+                    'quantity'    => 1,
+                ]],
+                'success_url'      => url("/customer/orders/{$order->id}?payment=success"),
+                'cancel_url'       => url("/customer/orders/{$order->id}?payment=cancelled"),
+                'customer_name'    => $user->name,
+                'customer_email'   => $user->email,
+                'customer_phone'   => $user->phone ?? '',
+            ]);
+
+            Payment::create([
+                'order_id'             => $order->id,
+                'paymongo_checkout_id' => $session['id'],
+                'amount'               => $remaining,
+                'status'               => 'pending',
+            ]);
+
+            return response()->json(['checkout_url' => $session['checkout_url']]);
+        } catch (\Throwable $e) {
+            return response()->json(['error' => 'Could not start balance payment. Please try again later.'], 422);
+        }
+    }
 }

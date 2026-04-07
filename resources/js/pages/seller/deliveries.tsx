@@ -37,17 +37,30 @@ type Delivery = {
     notes: string | null;
     order: { id: number; order_number: string; customer: string; address: string; total_amount: number } | null;
     rider: { id: number; name: string; phone: string | null } | null;
+    vehicle: { id: number; vehicle_type: string; plate_number: string } | null;
     proofs: DeliveryProof[];
 };
 
 type Rider = { id: number; name: string; phone: string | null };
+type Vehicle = { id: number; vehicle_type: string; plate_number: string; max_capacity_kg: number; max_tanks: number; status: string };
 type Unassigned = { id: number; order_number: string; customer: string; status: string };
 type Counts = { active: number; completed: number };
 type Paginated = { data: Delivery[]; current_page: number; last_page: number; total: number };
 
+const VEHICLE_TYPE_LABELS: Record<string, string> = {
+    motorcycle:   'Motorcycle',
+    tricycle:     'Tricycle',
+    multicab:     'Multicab',
+    van:          'Van',
+    pickup_truck: 'Pickup Truck',
+    small_truck:  'Small Truck',
+    large_truck:  'Large Truck',
+};
+
 type Props = {
     deliveries: Paginated;
     riders: Rider[];
+    vehicles: Vehicle[];
     unassigned: Unassigned[];
     counts: Counts;
     tab: string;
@@ -153,12 +166,13 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
     );
 }
 
-export default function SellerDeliveries({ deliveries, riders, unassigned, counts, tab, search, date_from, date_to }: Props) {
+export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to }: Props) {
     const [searchVal, setSearchVal]           = useState(search);
     const [dateFrom,  setDateFrom]            = useState(date_from);
     const [dateTo,    setDateTo]              = useState(date_to);
     const [assignOrderId, setAssignOrderId]   = useState('');
     const [assignRiderId, setAssignRiderId]   = useState('');
+    const [assignVehicleId, setAssignVehicleId] = useState('');
     const [showAssign, setShowAssign]         = useState(false);
     const [statusTarget, setStatusTarget]     = useState<Delivery | null>(null);
     const [newStatus, setNewStatus]           = useState('');
@@ -187,8 +201,12 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
 
     function submitAssign() {
         if (!assignOrderId || !assignRiderId) return;
-        router.post('/seller/deliveries/assign', { order_id: assignOrderId, rider_id: assignRiderId }, {
-            onSuccess: () => { setShowAssign(false); setAssignOrderId(''); setAssignRiderId(''); },
+        router.post('/seller/deliveries/assign', {
+            order_id: assignOrderId,
+            rider_id: assignRiderId,
+            vehicle_id: assignVehicleId || null,
+        }, {
+            onSuccess: () => { setShowAssign(false); setAssignOrderId(''); setAssignRiderId(''); setAssignVehicleId(''); },
         });
     }
 
@@ -270,7 +288,7 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Order</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Customer / Address</th>
-                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Rider</th>
+                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Rider / Vehicle</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Assigned</th>
                                         <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">Actions</th>
@@ -297,6 +315,12 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
                                                 <td className="px-4 py-3 hidden sm:table-cell">
                                                     <p className="text-sm">{d.rider?.name ?? '—'}</p>
                                                     {d.rider?.phone && <p className="text-xs text-muted-foreground">{d.rider.phone}</p>}
+                                                    {d.vehicle && (
+                                                        <p className="text-xs text-blue-600 mt-0.5 flex items-center gap-1">
+                                                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                                            {VEHICLE_TYPE_LABELS[d.vehicle.vehicle_type] ?? d.vehicle.vehicle_type} · {d.vehicle.plate_number}
+                                                        </p>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -397,6 +421,26 @@ export default function SellerDeliveries({ deliveries, riders, unassigned, count
                                         {riders.map((r) => (
                                             <SelectItem key={r.id} value={String(r.id)}>
                                                 {r.name}{r.phone ? ` · ${r.phone}` : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                        <div className="grid gap-1.5">
+                            <p className="text-sm font-medium">Vehicle <span className="text-muted-foreground font-normal">(optional)</span></p>
+                            {vehicles.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">No vehicles available. Add one in Vehicles.</p>
+                            ) : (
+                                <Select value={assignVehicleId || 'none'} onValueChange={(v) => setAssignVehicleId(v === 'none' ? '' : v)}>
+                                    <SelectTrigger><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">None</SelectItem>
+                                        {vehicles.map((v) => (
+                                            <SelectItem key={v.id} value={String(v.id)}>
+                                                {VEHICLE_TYPE_LABELS[v.vehicle_type] ?? v.vehicle_type} · {v.plate_number}
+                                                {' '}— {v.max_tanks} tanks / {v.max_capacity_kg} kg
+                                                {v.status === 'in_use' ? ' (in use)' : ''}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

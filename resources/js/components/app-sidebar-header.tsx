@@ -1,6 +1,7 @@
 import { router, usePage } from '@inertiajs/react';
-import { Bell, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useState } from 'react';
+import { NotificationBell } from '@/components/notification-bell';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -91,16 +92,7 @@ export function AppSidebarHeader({ breadcrumbs = [] }: Props) {
             {/* Right: notifications + user + logout */}
             <div className="flex shrink-0 items-center gap-1">
                 {/* Notification bell */}
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="relative h-8 w-8 text-muted-foreground hover:text-foreground"
-                    aria-label="Notifications"
-                >
-                    <Bell className="size-4" />
-                    {/* Unread dot — wire to real count later */}
-                    <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-blue-600" />
-                </Button>
+                <NotificationBell />
 
                 <Separator orientation="vertical" className="mx-1 h-4" />
 

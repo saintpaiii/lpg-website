@@ -11,6 +11,8 @@ use App\Http\Controllers\CustomerPortal\RatingController;
 use App\Http\Controllers\CustomerPortal\StoreController;
 use App\Http\Controllers\CustomerPortal\BecomeSellerController;
 use App\Http\Controllers\CustomerPortal\ProfileController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\Rider\LocationController as RiderLocationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'customer'])
@@ -18,6 +20,7 @@ Route::middleware(['auth', 'verified', 'customer'])
     ->name('customer.')
     ->group(function () {
         Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('notifications', [NotificationController::class, 'index'])->name('notifications');
 
         // Product browsing
         Route::get('products', [ProductBrowseController::class, 'index'])->name('products');
@@ -39,9 +42,11 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::redirect('orders/create', '/customer/products')->name('orders.create');
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');
         Route::post('orders/{order}/pay', [PaymentController::class, 'payNow'])->name('orders.pay');
+        Route::post('orders/{order}/pay-balance', [PaymentController::class, 'payBalance'])->name('orders.pay-balance');
         Route::post('orders/{order}/verify-payment', [OrderController::class, 'verifyPayment'])->name('orders.verify-payment');
         Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/rate', [RatingController::class, 'store'])->name('orders.rate');
+        Route::get('orders/{order}/rider-location', [RiderLocationController::class, 'showForOrder'])->name('orders.rider-location');
 
         // Store pages
         Route::get('store/{store}', [StoreController::class, 'show'])->name('store.show');

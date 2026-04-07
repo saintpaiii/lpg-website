@@ -12,6 +12,7 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -45,9 +46,12 @@ class OrderController extends Controller
             'status'           => $o->status,
             'transaction_type' => $o->transaction_type,
             'total_amount'     => (float) $o->total_amount,
-            'payment_method'   => $o->payment_method,
-            'payment_status'   => $o->payment_status,
-            'notes'            => $o->notes,
+            'payment_method'      => $o->payment_method,
+            'payment_status'      => $o->payment_status,
+            'payment_mode'        => $o->payment_mode ?? 'full',
+            'down_payment_amount' => $o->down_payment_amount ? (float) $o->down_payment_amount : null,
+            'remaining_balance'   => $o->remaining_balance ? (float) $o->remaining_balance : null,
+            'notes'               => $o->notes,
             'ordered_at'       => $o->ordered_at?->format('M d, Y g:i A'),
             'delivered_at'     => $o->delivered_at?->format('M d, Y g:i A'),
             'created_at'       => $o->created_at->format('M d, Y g:i A'),
@@ -458,6 +462,23 @@ class OrderController extends Controller
                 \App\Services\WalletService::creditOrder($order->fresh());
             }
         });
+
+        // Notify customer on meaningful status changes
+        $order->loadMissing('customer');
+        $customerUserId = $order->customer?->user_id ?? null;
+        if ($customerUserId) {
+            $statusNotifs = [
+                'confirmed'        => ['Your order has been confirmed!',     "Order {$order->order_number} has been confirmed and is being processed."],
+                'preparing'        => ['Your order is being prepared',       "We are now preparing your order {$order->order_number}."],
+                'out_for_delivery' => ['Your order is on its way!',          "Order {$order->order_number} is out for delivery."],
+                'delivered'        => ['Your order has been delivered!',     "Order {$order->order_number} has been successfully delivered."],
+                'cancelled'        => ['Your order has been cancelled',      "Order {$order->order_number} was cancelled by the store."],
+            ];
+            if (isset($statusNotifs[$newStatus])) {
+                [$title, $message] = $statusNotifs[$newStatus];
+                NotificationService::send($customerUserId, 'order_update', $title, $message, ['order_id' => $order->id, 'order_number' => $order->order_number]);
+            }
+        }
 
         $label = str_replace('_', ' ', $newStatus);
         return back()->with('success', "Order {$order->order_number} marked as " . ucfirst($label) . '.');

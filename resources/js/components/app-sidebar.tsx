@@ -4,8 +4,10 @@ import {
     BadgeDollarSign,
     Banknote,
     BarChart3,
+    Bell,
     Brain,
     CalendarDays,
+    Car,
     ClipboardList,
     History,
     Image,
@@ -61,6 +63,7 @@ export function AppSidebar() {
             (isActualSeller || can('products.view'))    && { title: 'Products',     href: '/seller/products',   icon: Package         },
             (isActualSeller || can('orders.view'))      && { title: 'Orders',       href: '/seller/orders',     icon: ShoppingCart    },
             (isActualSeller || can('deliveries.view'))  && { title: 'Deliveries',   href: '/seller/deliveries', icon: Truck           },
+            isActualSeller                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
             (isActualSeller || can('invoices.view'))    && { title: 'Invoices',     href: '/seller/invoices',   icon: Receipt         },
             (isActualSeller || can('inventory.view'))   && { title: 'Inventory',    href: '/seller/inventory',  icon: Warehouse       },
             isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog         },
@@ -72,7 +75,8 @@ export function AppSidebar() {
             (isActualSeller || can('reports.view'))     && { title: 'Reports',      href: '/seller/reports',    icon: LineChart       },
             (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain           },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
-            { title: 'Profile', href: '/settings/profile', icon: User },
+            { title: 'Notifications', href: '/notifications', icon: Bell   },
+            { title: 'Profile',       href: '/settings/profile', icon: User },
         ].filter(Boolean) as NavItem[];
 
         return (
@@ -147,6 +151,7 @@ export function AppSidebar() {
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
 isPlatformAdmin        && { title: 'Withdrawals',         href: '/admin/withdrawals',                                  icon: Banknote        },
         isPlatformAdmin        && { title: 'Auth Logs',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },
+        { title: 'Notifications', href: '/notifications', icon: Bell },
         { title: 'Profile', href: '/settings/profile', icon: User },
     ].filter(Boolean) as NavItem[];
 

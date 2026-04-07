@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,6 +123,14 @@ class SellerRegistrationController extends Controller
             // Send email verification
             $user->sendEmailVerificationNotification();
         });
+
+        NotificationService::sendToRole(
+            'admin',
+            'system',
+            'New seller application',
+            "{$validated['name']} submitted a seller application for \"{$validated['store_name']}\".",
+            []
+        );
 
         return redirect()->route('seller.pending');
     }

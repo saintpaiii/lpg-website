@@ -45,6 +45,9 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
+    payment_mode: 'full' | 'installment';
+    down_payment_amount: number | null;
+    remaining_balance: number | null;
     notes: string | null;
     cancellation_reason: string | null;
     cancellation_notes: string | null;
@@ -129,12 +132,14 @@ export default function SellerOrderShow({ order, riders }: Props) {
         patchPay(`/seller/orders/${order.id}/payment`);
     }
 
-    const isFinal    = ['cancelled', 'delivered'].includes(order.status);
-    const stepIndex  = STATUS_STEPS.indexOf(order.status);
-    const canConfirm = order.status === 'pending';
-    const canPrepare = order.status === 'confirmed';
-    const canAssign  = ['confirmed', 'preparing'].includes(order.status);
-    const canCancel  = !isFinal;
+    const isFinal       = ['cancelled', 'delivered'].includes(order.status);
+    const stepIndex     = STATUS_STEPS.indexOf(order.status);
+    const canConfirm    = order.status === 'pending';
+    const canPrepare    = order.status === 'confirmed';
+    const isFullyPaid   = order.payment_status === 'paid';
+    // Installment orders can only be assigned a rider when fully paid
+    const canAssign     = ['confirmed', 'preparing'].includes(order.status) && isFullyPaid;
+    const canCancel     = !isFinal;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -174,8 +179,14 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                 <Package className="h-3.5 w-3.5 mr-1" /> Mark Preparing
                             </Button>
                         )}
-                        {canAssign && (
-                            <Button onClick={() => setShowAssign(true)} size="sm" variant="outline">
+                        {['confirmed', 'preparing'].includes(order.status) && (
+                            <Button
+                                onClick={() => canAssign ? setShowAssign(true) : undefined}
+                                size="sm"
+                                variant="outline"
+                                disabled={!canAssign}
+                                title={!isFullyPaid ? 'Awaiting full payment before rider can be assigned' : undefined}
+                            >
                                 <Truck className="h-3.5 w-3.5 mr-1" /> Assign Rider
                             </Button>
                         )}
@@ -270,26 +281,20 @@ export default function SellerOrderShow({ order, riders }: Props) {
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm">Payment</CardTitle></CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                                {/* Online vs COD indicator */}
+                                {/* Payment mode badge */}
                                 <div className="flex items-center gap-2">
-                                    {order.payment_record ? (
-                                        <>
-                                            <CreditCard className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                            <span className="text-muted-foreground text-xs">Online (PayMongo)</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Banknote className="h-3.5 w-3.5 text-gray-500 shrink-0" />
-                                            <span className="text-muted-foreground text-xs">Cash on Delivery</span>
-                                        </>
-                                    )}
+                                    <CreditCard className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                    <span className="text-muted-foreground text-xs">
+                                        {order.payment_mode === 'installment' ? 'Installment (PayMongo)' : 'Full Payment (PayMongo)'}
+                                    </span>
                                 </div>
 
-                                {/* Status + method (read-only display) */}
+                                {/* Status */}
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Status</span>
                                     <span className={`font-medium capitalize ${
                                         order.payment_status === 'paid'      ? 'text-emerald-600' :
+                                        order.payment_status === 'partial'   ? 'text-amber-600' :
                                         order.payment_status === 'unpaid'    ? 'text-red-600' :
                                         order.payment_status === 'to_refund' ? 'text-orange-600' :
                                         order.payment_status === 'refunded'  ? 'text-gray-500' : ''
@@ -297,9 +302,37 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                         {order.payment_status === 'paid'      && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                          order.payment_status === 'refunded'  ? 'Refunded' :
+                                         order.payment_status === 'partial'   ? 'Partial (Down Paid)' :
                                          order.payment_status}
                                     </span>
                                 </div>
+
+                                {/* Installment breakdown */}
+                                {order.payment_mode === 'installment' && (
+                                    <div className="rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1 text-xs">
+                                        <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                                            <span>Order Total</span>
+                                            <span className="font-medium">{fmt(order.total_amount)}</span>
+                                        </div>
+                                        {order.down_payment_amount !== null && (
+                                            <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                                <span>Down Payment</span>
+                                                <span className="font-medium">{fmt(order.down_payment_amount)}</span>
+                                            </div>
+                                        )}
+                                        {order.payment_status !== 'paid' && order.remaining_balance !== null && order.remaining_balance > 0 && (
+                                            <div className="flex justify-between text-amber-700 dark:text-amber-400 font-semibold border-t border-amber-200 dark:border-amber-800 pt-1 mt-1">
+                                                <span>Balance Due</span>
+                                                <span>{fmt(order.remaining_balance)}</span>
+                                            </div>
+                                        )}
+                                        {order.payment_status === 'partial' && (
+                                            <p className="text-amber-700 dark:text-amber-400 pt-0.5">
+                                                Awaiting balance payment — rider cannot be assigned yet.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Mark as Refunded button */}
                                 {order.payment_status === 'to_refund' && (
@@ -318,7 +351,6 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                     </div>
                                 )}
 
-                                {/* PayMongo details */}
                                 {order.payment_record?.paid_at && (
                                     <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
                                         Paid via PayMongo on {order.payment_record.paid_at}
@@ -331,37 +363,6 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                             {order.payment_record.pay_ref}
                                         </p>
                                     </div>
-                                )}
-
-                                {/* COD: editable form for non-final, non-online orders */}
-                                {!isFinal && !order.payment_record && (
-                                    <form onSubmit={updatePayment} className="space-y-2 pt-2 border-t mt-2">
-                                        <div className="grid gap-1">
-                                            <p className="text-xs font-medium text-muted-foreground">Update Method</p>
-                                            <Select value={payData.payment_method} onValueChange={(v) => setPayData('payment_method', v)}>
-                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {['cash', 'gcash', 'bank_transfer', 'maya'].map((m) => (
-                                                        <SelectItem key={m} value={m} className="text-xs capitalize">{m.replace('_', ' ')}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="grid gap-1">
-                                            <p className="text-xs font-medium text-muted-foreground">Update Status</p>
-                                            <Select value={payData.payment_status} onValueChange={(v) => setPayData('payment_status', v)}>
-                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                <SelectContent>
-                                                    {['unpaid', 'paid', 'partial'].map((s) => (
-                                                        <SelectItem key={s} value={s} className="text-xs capitalize">{s}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <Button type="submit" size="sm" variant="outline" className="w-full h-7 text-xs" disabled={payProcessing}>
-                                            Update Payment
-                                        </Button>
-                                    </form>
                                 )}
                             </CardContent>
                         </Card>

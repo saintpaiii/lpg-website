@@ -32,6 +32,13 @@ class Order extends Model
         'ordered_at',
         'delivered_at',
         'created_by',
+        'payment_mode',
+        'down_payment_amount',
+        'remaining_balance',
+        'delivery_latitude',
+        'delivery_longitude',
+        'delivery_distance_km',
+        'estimated_delivery_minutes',
     ];
 
     protected function casts(): array
@@ -40,9 +47,15 @@ class Order extends Model
             'total_amount' => 'decimal:2',
             'shipping_fee' => 'decimal:2',
             'platform_fee' => 'decimal:2',
-            'ordered_at'   => 'datetime',
-            'delivered_at' => 'datetime',
-            'cancelled_at' => 'datetime',
+            'ordered_at'           => 'datetime',
+            'delivered_at'         => 'datetime',
+            'cancelled_at'         => 'datetime',
+            'down_payment_amount'  => 'decimal:2',
+            'remaining_balance'    => 'decimal:2',
+            'delivery_latitude'           => 'decimal:7',
+            'delivery_longitude'          => 'decimal:7',
+            'delivery_distance_km'        => 'decimal:2',
+            'estimated_delivery_minutes'  => 'integer',
         ];
     }
 

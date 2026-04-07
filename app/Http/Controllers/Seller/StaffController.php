@@ -9,6 +9,7 @@ use App\Models\Permission;
 use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermission;
+use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -114,6 +115,14 @@ class StaffController extends Controller
         ]);
 
         Mail::to($user->email)->send(new StaffAccountCreated($user, $store->store_name, $tempPassword));
+
+        NotificationService::send(
+            $user->id,
+            'system',
+            'Welcome to ' . $store->store_name,
+            'Your staff account has been created. Check your email for login credentials.',
+            ['store_id' => $store->id]
+        );
 
         return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$data['sub_role']}. Login credentials sent to {$data['email']}.");
     }

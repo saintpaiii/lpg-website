@@ -2,15 +2,23 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Camera,
+    Car,
     CheckCircle,
     ChevronDown,
+    ExternalLink,
+    Locate,
     MapPin,
+    Navigation,
     Package,
     Phone,
+    Radio,
     Truck,
     X,
 } from 'lucide-react';
-import { FormEvent, useRef, useState } from 'react';
+import L from 'leaflet';
+import { FormEvent, useEffect, useRef, useState } from 'react';
+import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -58,9 +66,15 @@ type OrderRef = {
     order_number: string;
     status: string;
     total_amount: number;
+    shipping_fee: number | null;
     transaction_type: string;
     payment_method: string;
     payment_status: string;
+    delivery_latitude: number | null;
+    delivery_longitude: number | null;
+    delivery_distance_km: number | null;
+    estimated_delivery_minutes: number | null;
+    store_location: { lat: number; lng: number; name: string } | null;
     customer: CustomerRef | null;
     items: OrderItem[];
 };
@@ -72,6 +86,7 @@ type DeliveryRow = {
     assigned_at: string | null;
     delivered_at: string | null;
     order: OrderRef | null;
+    vehicle: { vehicle_type: string; plate_number: string } | null;
 };
 
 type Counts = {
@@ -182,6 +197,21 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
 
 const PROOF_STATUSES: DeliveryStatus[] = ['picked_up', 'delivered', 'failed'];
 
+// GPS state helper
+type GpsState = 'idle' | 'capturing' | 'ok' | 'failed';
+
+// Green rider pin for modal map preview
+const riderPinIcon = L.divIcon({
+    html: `<svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg">
+        <path d="M10 0C4.477 0 0 4.477 0 10c0 7.5 10 18 10 18S20 17.5 20 10C20 4.477 15.523 0 10 0z"
+              fill="#22c55e" stroke="white" stroke-width="1.5"/>
+        <circle cx="10" cy="10" r="4" fill="white" opacity="0.95"/>
+    </svg>`,
+    className: '',
+    iconSize: [20, 28],
+    iconAnchor: [10, 28],
+});
+
 function UpdateStatusDialog({
     delivery,
     targetStatus,
@@ -196,15 +226,70 @@ function UpdateStatusDialog({
         notes: string;
         location_note: string;
         photo: File | null;
+        rider_latitude: string;
+        rider_longitude: string;
+        rider_accuracy: string;
     }>({
-        status: targetStatus ?? '',
-        notes: '',
-        location_note: '',
-        photo: null,
+        status:          targetStatus ?? '',
+        notes:           '',
+        location_note:   '',
+        photo:           null,
+        rider_latitude:  '',
+        rider_longitude: '',
+        rider_accuracy:  '',
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<string | null>(null);
+    const [preview, setPreview]       = useState<string | null>(null);
+    const [gpsState, setGpsState]     = useState<GpsState>('idle');
+    const [geocodeAddr, setGeocodeAddr] = useState<string | null>(null);
+
+    // Derived coords for convenience
+    const riderLat = data.rider_latitude  ? parseFloat(data.rider_latitude)  : null;
+    const riderLng = data.rider_longitude ? parseFloat(data.rider_longitude) : null;
+
+    // Auto-capture GPS + reverse-geocode when dialog opens
+    useEffect(() => {
+        if (!delivery || !targetStatus) return;
+        setGpsState('capturing');
+        setGeocodeAddr(null);
+        if (!navigator.geolocation) { setGpsState('failed'); return; }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setData((prev) => ({
+                    ...prev,
+                    rider_latitude:  String(lat),
+                    rider_longitude: String(lng),
+                    rider_accuracy:  pos.coords.accuracy ? String(pos.coords.accuracy) : '',
+                }));
+                setGpsState('ok');
+                // Reverse geocode via Nominatim
+                fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, {
+                    headers: { 'Accept-Language': 'en' },
+                })
+                    .then((r) => r.json())
+                    .then((geo) => {
+                        const addr = geo.address;
+                        const parts = [
+                            addr?.village || addr?.suburb || addr?.neighbourhood || addr?.hamlet,
+                            addr?.city || addr?.town || addr?.municipality,
+                            addr?.province || addr?.state,
+                        ].filter(Boolean);
+                        const readable = parts.length ? parts.join(', ') : geo.display_name?.split(',').slice(0, 3).join(',') ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        setGeocodeAddr(readable);
+                        // Auto-fill location_note for the proof record
+                        setData((prev) => ({ ...prev, location_note: readable }));
+                    })
+                    .catch(() => {
+                        setGeocodeAddr(`${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+                    });
+            },
+            () => setGpsState('failed'),
+            { enableHighAccuracy: true, timeout: 8000 },
+        );
+    }, [!!delivery, targetStatus]);
 
     if (data.status !== (targetStatus ?? '')) {
         setData('status', targetStatus ?? '');
@@ -236,6 +321,8 @@ function UpdateStatusDialog({
             onSuccess: () => {
                 reset();
                 setPreview(null);
+                setGpsState('idle');
+                setGeocodeAddr(null);
                 onClose();
             },
         });
@@ -244,15 +331,17 @@ function UpdateStatusDialog({
     function handleClose() {
         reset();
         setPreview(null);
+        setGpsState('idle');
+        setGeocodeAddr(null);
         onClose();
     }
 
-    const isFailed    = targetStatus === 'failed';
-    const needsPhoto  = targetStatus !== null && PROOF_STATUSES.includes(targetStatus);
+    const isFailed   = targetStatus === 'failed';
+    const needsPhoto = targetStatus !== null && PROOF_STATUSES.includes(targetStatus);
 
     return (
         <Dialog open={!!delivery && !!targetStatus} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className={`flex items-center gap-2 ${isFailed ? 'text-red-600' : ''}`}>
                         {isFailed
@@ -269,6 +358,58 @@ function UpdateStatusDialog({
                             : <>Confirm status update for <span className="font-semibold">{delivery?.order?.order_number}</span>?</>
                         }
                     </p>
+
+                    {/* GPS location block */}
+                    <div className={`rounded-lg border px-3 py-2.5 space-y-2 ${
+                        gpsState === 'ok'        ? 'bg-emerald-50 border-emerald-200' :
+                        gpsState === 'failed'    ? 'bg-amber-50 border-amber-200' :
+                        gpsState === 'capturing' ? 'bg-blue-50 border-blue-200' :
+                                                   'bg-gray-50 border-gray-200'
+                    }`}>
+                        <div className={`flex items-center gap-2 text-xs font-medium ${
+                            gpsState === 'ok'        ? 'text-emerald-700' :
+                            gpsState === 'failed'    ? 'text-amber-700' :
+                            gpsState === 'capturing' ? 'text-blue-600' :
+                                                       'text-gray-500'
+                        }`}>
+                            <Locate className={`h-3.5 w-3.5 shrink-0 ${gpsState === 'capturing' ? 'animate-pulse' : ''}`} />
+                            {gpsState === 'ok'        && 'Location captured — will be shared with this update'}
+                            {gpsState === 'failed'    && 'Location unavailable — update will proceed without location'}
+                            {gpsState === 'capturing' && 'Capturing your location…'}
+                            {gpsState === 'idle'      && 'Preparing location capture…'}
+                        </div>
+
+                        {/* Reverse-geocoded address */}
+                        {gpsState === 'ok' && (
+                            <p className="flex items-start gap-1.5 text-xs text-emerald-700">
+                                <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                                <span>
+                                    {geocodeAddr
+                                        ? <><strong>Detected location:</strong> {geocodeAddr}</>
+                                        : 'Looking up address…'
+                                    }
+                                </span>
+                            </p>
+                        )}
+
+                        {/* Small map preview */}
+                        {gpsState === 'ok' && riderLat !== null && riderLng !== null && (
+                            <div className="rounded-md overflow-hidden border border-emerald-200 mt-1">
+                                <MapContainer
+                                    center={[riderLat, riderLng]}
+                                    zoom={15}
+                                    style={{ height: 160, width: '100%' }}
+                                    scrollWheelZoom={false}
+                                    dragging={false}
+                                    zoomControl={false}
+                                    attributionControl={false}
+                                >
+                                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                    <Marker position={[riderLat, riderLng]} icon={riderPinIcon} />
+                                </MapContainer>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Photo proof — hidden for in_transit */}
                     {targetStatus !== 'in_transit' && (
@@ -318,22 +459,6 @@ function UpdateStatusDialog({
                         {errors.notes && <p className="text-xs text-red-500">{errors.notes}</p>}
                     </div>
 
-                    {/* Location note */}
-                    <div className="grid gap-1.5">
-                        <Label className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" />
-                            Location Note (optional)
-                        </Label>
-                        <input
-                            type="text"
-                            value={data.location_note}
-                            onChange={(e) => setData('location_note', e.target.value)}
-                            placeholder="e.g. In front of gate, left with guard…"
-                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        {errors.location_note && <p className="text-xs text-red-500">{errors.location_note}</p>}
-                    </div>
-
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
@@ -351,27 +476,267 @@ function UpdateStatusDialog({
     );
 }
 
+// ── FitBounds helper ──────────────────────────────────────────────────────────
+
+function FitBounds({ positions }: { positions: [number, number][] }) {
+    const map = useMap();
+    useEffect(() => {
+        if (positions.length >= 2) map.fitBounds(positions as any, { padding: [30, 30] });
+    }, [positions.map(p => p.join(',')).join('|')]);
+    return null;
+}
+
 // ── Delivery Detail Panel ──────────────────────────────────────────────────────
 
 function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
     const o = delivery.order;
     if (!o) return null;
 
+    const isActive = ['picked_up', 'in_transit'].includes(delivery.status);
+
+    const [osrmCoords, setOsrmCoords] = useState<[number, number][] | null>(null);
+    const [riderPos, setRiderPos]     = useState<[number, number] | null>(null);
+
+    // Share location state
+    const [shareLoading, setShareLoading]   = useState(false);
+    const [lastShared, setLastShared]       = useState<Date | null>(null);
+    const [autoShare, setAutoShare]         = useState(false);
+    const autoShareRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const watchIdRef   = useRef<number | null>(null);
+
+    async function sendLocation(lat: number, lng: number, accuracy?: number) {
+        try {
+            await fetch('/rider/location', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? '',
+                },
+                body: JSON.stringify({ delivery_id: delivery.id, latitude: lat, longitude: lng, accuracy }),
+            });
+            setLastShared(new Date());
+            setRiderPos([lat, lng]);
+        } catch { /* silent */ }
+    }
+
+    function shareOnce() {
+        if (!navigator.geolocation) return;
+        setShareLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                sendLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy).finally(() => setShareLoading(false));
+            },
+            () => setShareLoading(false),
+            { enableHighAccuracy: true, timeout: 8000 },
+        );
+    }
+
+    function toggleAutoShare(on: boolean) {
+        setAutoShare(on);
+        if (!on) {
+            // Stop
+            if (autoShareRef.current) clearInterval(autoShareRef.current);
+            if (watchIdRef.current !== null) navigator.geolocation?.clearWatch(watchIdRef.current);
+            autoShareRef.current = null;
+            watchIdRef.current   = null;
+            return;
+        }
+        // Start — share immediately then every 30s
+        shareOnce();
+        autoShareRef.current = setInterval(() => shareOnce(), 30_000);
+    }
+
+    // Cleanup auto-share on unmount
+    useEffect(() => {
+        return () => {
+            if (autoShareRef.current) clearInterval(autoShareRef.current);
+            if (watchIdRef.current !== null) navigator.geolocation?.clearWatch(watchIdRef.current);
+        };
+    }, []);
+
+    const hasCustomerLoc = o.delivery_latitude !== null && o.delivery_longitude !== null;
+    const hasStoreLoc    = o.store_location !== null;
+
+    // Fix Leaflet icons + get rider GPS + fetch OSRM
+    useEffect(() => {
+        import('leaflet').then((L) => {
+            delete (L.Icon.Default.prototype as any)._getIconUrl;
+            L.Icon.Default.mergeOptions({
+                iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+                iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+            });
+        });
+
+        // Rider's current GPS
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setRiderPos([pos.coords.latitude, pos.coords.longitude]),
+                () => {},
+                { timeout: 8000, enableHighAccuracy: true },
+            );
+        }
+
+        // OSRM route — store → customer
+        if (hasStoreLoc && hasCustomerLoc) {
+            const { lat: sLat, lng: sLng } = o.store_location!;
+            const custLat = o.delivery_latitude!;
+            const custLng = o.delivery_longitude!;
+            const url = `https://router.project-osrm.org/route/v1/driving/${sLng},${sLat};${custLng},${custLat}?overview=full&geometries=geojson`;
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.code === 'Ok' && data.routes?.[0]) {
+                        const coords = (data.routes[0].geometry.coordinates as [number, number][])
+                            .map(([lng, lat]) => [lat, lng] as [number, number]);
+                        setOsrmCoords(coords);
+                    }
+                })
+                .catch(() => {});
+        }
+    }, []);
+
+    // Determine map center
+    const mapCenter: [number, number] = hasCustomerLoc
+        ? [o.delivery_latitude!, o.delivery_longitude!]
+        : hasStoreLoc
+            ? [o.store_location!.lat, o.store_location!.lng]
+            : [14.28, 120.95];
+
+    // Positions for FitBounds
+    const fitPositions: [number, number][] = [];
+    if (hasStoreLoc)    fitPositions.push([o.store_location!.lat, o.store_location!.lng]);
+    if (hasCustomerLoc) fitPositions.push([o.delivery_latitude!, o.delivery_longitude!]);
+
+    const showMap = hasCustomerLoc || hasStoreLoc;
+
+    // Navigate with Google Maps
+    const navHref = hasStoreLoc && hasCustomerLoc
+        ? `https://www.google.com/maps/dir/?api=1&origin=${o.store_location!.lat},${o.store_location!.lng}&destination=${o.delivery_latitude},${o.delivery_longitude}`
+        : hasCustomerLoc
+            ? `https://www.google.com/maps/dir/?api=1&destination=${o.delivery_latitude},${o.delivery_longitude}`
+            : null;
+
     return (
         <div className="mt-3 grid gap-3 rounded-lg border bg-gray-50 p-3 text-sm">
-            {/* Customer */}
+            {/* Customer info + action buttons */}
             {o.customer && (
                 <div>
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Deliver to</p>
-                    <p className="font-semibold text-gray-900">{o.customer.name}</p>
-                    {o.customer.phone && (
-                        <p className="flex items-center gap-1 text-gray-500 mt-0.5">
-                            <Phone className="h-3 w-3" /> {o.customer.phone}
-                        </p>
-                    )}
-                    <p className="flex items-start gap-1 text-gray-500 mt-0.5">
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">Deliver to</p>
+                    <p className="font-semibold text-gray-900 text-base">{o.customer.name}</p>
+                    <p className="flex items-start gap-1 text-gray-500 mt-0.5 text-xs">
                         <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
                         {[o.customer.address, o.customer.barangay, o.customer.city].filter(Boolean).join(', ') || '—'}
+                    </p>
+                    {(o.delivery_distance_km || o.estimated_delivery_minutes) && (
+                        <p className="mt-0.5 text-xs text-blue-600">
+                            {o.delivery_distance_km ? `${o.delivery_distance_km.toFixed(1)} km` : ''}
+                            {o.delivery_distance_km && o.estimated_delivery_minutes ? ' · ' : ''}
+                            {o.estimated_delivery_minutes ? `~${o.estimated_delivery_minutes} min` : ''}
+                        </p>
+                    )}
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                        {o.customer.phone && (
+                            <a
+                                href={`tel:${o.customer.phone}`}
+                                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
+                            >
+                                <Phone className="h-3 w-3" />
+                                Call {o.customer.phone}
+                            </a>
+                        )}
+                        {navHref && (
+                            <a
+                                href={navHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                            >
+                                <ExternalLink className="h-3 w-3" />
+                                Navigate
+                            </a>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Share location (only for active deliveries) */}
+            {isActive && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 p-3">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                            <Navigation className="h-3.5 w-3.5" />
+                            Live Location
+                        </p>
+                        {autoShare && (
+                            <span className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 animate-pulse">
+                                <Radio className="h-3 w-3" /> Live tracking active
+                            </span>
+                        )}
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={shareOnce}
+                            disabled={shareLoading}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 transition-colors"
+                        >
+                            <Locate className={`h-3 w-3 ${shareLoading ? 'animate-spin' : ''}`} />
+                            {shareLoading ? 'Getting location…' : 'Share My Location'}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => toggleAutoShare(!autoShare)}
+                            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                autoShare
+                                    ? 'border-emerald-500 bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                            }`}
+                        >
+                            <Radio className="h-3 w-3" />
+                            {autoShare ? 'Stop Auto-share' : 'Auto-share every 30s'}
+                        </button>
+                    </div>
+                    {lastShared && (
+                        <p className="mt-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                            Last shared: {lastShared.toLocaleTimeString()}
+                        </p>
+                    )}
+                </div>
+            )}
+
+            {/* Route map */}
+            {showMap && (
+                <div>
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                        Route Map
+                        {riderPos && <span className="ml-1 text-emerald-600 normal-case font-normal">• Your location shown</span>}
+                    </p>
+                    <div className="rounded-lg overflow-hidden border border-gray-200 h-52">
+                        <MapContainer
+                            center={mapCenter}
+                            zoom={13}
+                            style={{ height: '100%', width: '100%' }}
+                            attributionControl={false}
+                        >
+                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                            {fitPositions.length >= 2 && <FitBounds positions={fitPositions} />}
+                            {/* Store pin */}
+                            {hasStoreLoc && <Marker position={[o.store_location!.lat, o.store_location!.lng]} />}
+                            {/* Customer pin */}
+                            {hasCustomerLoc && <Marker position={[o.delivery_latitude!, o.delivery_longitude!]} />}
+                            {/* Rider pin */}
+                            {riderPos && <Marker position={riderPos} />}
+                            {/* OSRM road route */}
+                            {osrmCoords && (
+                                <Polyline positions={osrmCoords} pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.75 }} />
+                            )}
+                        </MapContainer>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">
+                        {hasStoreLoc && hasCustomerLoc && '● Store → ● Customer'}
+                        {riderPos && ' · ● You'}
                     </p>
                 </div>
             )}
@@ -382,26 +747,30 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                 <ul className="space-y-1">
                     {o.items.map((item) => (
                         <li key={item.id} className="flex items-center justify-between">
-                            <span className="text-gray-700">
-                                {item.product?.name ?? 'Unknown'} × {item.quantity}
-                            </span>
+                            <span className="text-gray-700">{item.product?.name ?? 'Unknown'} × {item.quantity}</span>
                             <span className="tabular-nums text-gray-500">
                                 ₱{item.subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                             </span>
                         </li>
                     ))}
                 </ul>
-                <div className="mt-2 flex justify-between border-t pt-1.5 font-semibold text-gray-900">
-                    <span>Total</span>
-                    <span>₱{o.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                <div className="mt-2 pt-1.5 border-t space-y-1">
+                    {o.shipping_fee !== null && o.shipping_fee > 0 && (
+                        <div className="flex justify-between text-gray-500 text-xs">
+                            <span>Delivery fee</span>
+                            <span>₱{o.shipping_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                    )}
+                    <div className="flex justify-between font-semibold text-gray-900">
+                        <span>Total</span>
+                        <span>₱{o.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                    </div>
                 </div>
             </div>
 
             {/* Payment info */}
             <div className="flex items-center justify-between">
-                <span className="text-gray-500">
-                    {PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}
-                </span>
+                <span className="text-gray-500">{PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}</span>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_STYLES[o.payment_status] ?? ''}`}>
                     {o.payment_status.charAt(0).toUpperCase() + o.payment_status.slice(1)}
                 </span>
@@ -594,6 +963,12 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
                                                 <span className="text-emerald-600">Delivered: {fmtDate(d.delivered_at)}</span>
                                             )}
                                         </div>
+                                        {d.vehicle && (
+                                            <p className="mt-1 flex items-center gap-1 text-xs text-blue-600">
+                                                <Car className="h-3 w-3 shrink-0" />
+                                                {d.vehicle.vehicle_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} · {d.vehicle.plate_number}
+                                            </p>
+                                        )}
                                         {d.notes && d.status === 'failed' && (
                                             <p className="mt-1 flex items-start gap-1 text-xs text-red-500">
                                                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />

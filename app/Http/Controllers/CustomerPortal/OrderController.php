@@ -23,6 +23,16 @@ use Inertia\Response;
 
 class OrderController extends Controller
 {
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R    = 6371;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a    = sin($dLat / 2) ** 2
+              + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
     private function getCustomer(Request $request): ?Customer
     {
         return Customer::where('user_id', $request->user()->id)->first();
@@ -117,12 +127,24 @@ class OrderController extends Controller
 
         $customer = $this->getCustomer($request);
 
+        // Grab the first approved store for delivery fee settings
+        $store = \App\Models\Store::where('status', 'approved')->first();
+
         return Inertia::render('customer/order-create', [
             'products' => $products,
             'defaultAddress' => $customer ? [
                 'address'  => $customer->address,
                 'city'     => $customer->city,
                 'barangay' => $customer->barangay,
+                'lat'      => $customer->lat ? (float) $customer->lat : null,
+                'lng'      => $customer->lng ? (float) $customer->lng : null,
+            ] : null,
+            'storeDelivery' => $store ? [
+                'latitude'               => $store->latitude ? (float) $store->latitude : null,
+                'longitude'              => $store->longitude ? (float) $store->longitude : null,
+                'base_delivery_fee'      => (float) ($store->base_delivery_fee ?? 45),
+                'fee_per_km'             => (float) ($store->fee_per_km ?? 10),
+                'max_delivery_radius_km' => (int) ($store->max_delivery_radius_km ?? 20),
             ] : null,
         ]);
     }
@@ -135,25 +157,66 @@ class OrderController extends Controller
         }
 
         $data = $request->validate([
-            'transaction_type' => 'required|in:refill,new_purchase',
-            'payment_type'     => 'required|in:cod,online',
-            'notes'            => 'nullable|string|max:1000',
-            'items'            => 'required|array|min:1',
-            'items.*.product_id' => 'required|exists:products,id',
-            'items.*.quantity'   => 'required|integer|min:1',
+            'transaction_type'    => 'required|in:refill,new_purchase',
+            'payment_type'        => 'required|in:cod,online',
+            'notes'               => 'nullable|string|max:1000',
+            'delivery_latitude'          => 'nullable|numeric|between:-90,90',
+            'delivery_longitude'         => 'nullable|numeric|between:-180,180',
+            'delivery_distance_km'       => 'nullable|numeric|min:0|max:999',
+            'estimated_delivery_minutes' => 'nullable|integer|min:0|max:9999',
+            'items'               => 'required|array|min:1',
+            'items.*.product_id'  => 'required|exists:products,id',
+            'items.*.quantity'    => 'required|integer|min:1',
         ]);
 
         $isCod = $data['payment_type'] === 'cod';
 
-        $order = DB::transaction(function () use ($data, $customer, $request, $isCod) {
-            $totalAmount = 0;
-            $itemsData   = [];
+        // ── Delivery fee calculation ──────────────────────────────────────────
+        $deliveryFee = 0;
+        $deliveryLat = isset($data['delivery_latitude'])  ? (float) $data['delivery_latitude']  : null;
+        $deliveryLng = isset($data['delivery_longitude']) ? (float) $data['delivery_longitude'] : null;
+
+        $store = \App\Models\Store::where('status', 'approved')->first();
+
+        if ($store && $deliveryLat !== null && $deliveryLng !== null && $store->latitude && $store->longitude) {
+            $distKm = $this->haversineKm(
+                (float) $store->latitude, (float) $store->longitude,
+                $deliveryLat, $deliveryLng
+            );
+
+            $maxKm = (int) ($store->max_delivery_radius_km ?? 20);
+            if ($distKm > $maxKm) {
+                $msg = sprintf(
+                    'This store does not deliver to your area (%.1f km away, max %d km).',
+                    $distKm, $maxKm
+                );
+                if ($request->expectsJson()) {
+                    return response()->json(['error' => $msg], 422);
+                }
+                return back()->withErrors(['delivery_latitude' => $msg]);
+            }
+
+            $base    = (float) ($store->base_delivery_fee ?? 45);
+            $perKm   = (float) ($store->fee_per_km ?? 10);
+            $raw     = $base + $distKm * $perKm;
+            $deliveryFee = (int) (ceil($raw / 5) * 5); // round up to nearest ₱5
+        } elseif ($store) {
+            // No customer location — use base fee only
+            $deliveryFee = (float) ($store->base_delivery_fee ?? 45);
+        }
+
+        $deliveryDistKm = isset($data['delivery_distance_km']) ? (float) $data['delivery_distance_km'] : null;
+        $estimatedMins  = isset($data['estimated_delivery_minutes']) ? (int) $data['estimated_delivery_minutes'] : null;
+
+        $order = DB::transaction(function () use ($data, $customer, $request, $isCod, $deliveryFee, $deliveryLat, $deliveryLng, $deliveryDistKm, $estimatedMins) {
+            $productsTotal = 0;
+            $itemsData     = [];
 
             foreach ($data['items'] as $item) {
-                $product     = Product::findOrFail($item['product_id']);
-                $subtotal    = $product->selling_price * $item['quantity'];
-                $totalAmount += $subtotal;
-                $itemsData[] = [
+                $product        = Product::findOrFail($item['product_id']);
+                $subtotal       = $product->selling_price * $item['quantity'];
+                $productsTotal += $subtotal;
+                $itemsData[]    = [
                     'product_id' => $product->id,
                     'quantity'   => $item['quantity'],
                     'unit_price' => $product->selling_price,
@@ -161,17 +224,24 @@ class OrderController extends Controller
                 ];
             }
 
+            $totalAmount = $productsTotal + $deliveryFee;
+
             $order = Order::create([
-                'order_number'     => $this->generateOrderNumber(),
-                'customer_id'      => $customer->id,
-                'transaction_type' => $data['transaction_type'],
-                'status'           => 'pending',
-                'total_amount'     => $totalAmount,
-                'payment_method'   => $isCod ? 'cash' : null,
-                'payment_status'   => 'unpaid',
-                'notes'            => $data['notes'] ?? null,
-                'ordered_at'       => now(),
-                'created_by'       => $request->user()->id,
+                'order_number'       => $this->generateOrderNumber(),
+                'customer_id'        => $customer->id,
+                'transaction_type'   => $data['transaction_type'],
+                'status'             => 'pending',
+                'total_amount'       => $totalAmount,
+                'shipping_fee'       => $deliveryFee > 0 ? $deliveryFee : null,
+                'payment_method'     => $isCod ? 'cash' : null,
+                'payment_status'     => 'unpaid',
+                'notes'              => $data['notes'] ?? null,
+                'ordered_at'         => now(),
+                'created_by'         => $request->user()->id,
+                'delivery_latitude'           => $deliveryLat,
+                'delivery_longitude'          => $deliveryLng,
+                'delivery_distance_km'        => $deliveryDistKm,
+                'estimated_delivery_minutes'  => $estimatedMins,
             ]);
 
             foreach ($itemsData as $item) {
@@ -200,6 +270,16 @@ class OrderController extends Controller
                     'amount'      => (int) round((float) $item->unit_price * 100), // centavos
                     'currency'    => 'PHP',
                     'quantity'    => $item->quantity,
+                ];
+            }
+            // Add delivery fee as a line item if applicable
+            if ($order->shipping_fee && (float) $order->shipping_fee > 0) {
+                $lineItems[] = [
+                    'name'        => 'Delivery Fee',
+                    'description' => 'Distance-based delivery fee',
+                    'amount'      => (int) round((float) $order->shipping_fee * 100),
+                    'currency'    => 'PHP',
+                    'quantity'    => 1,
                 ];
             }
 
@@ -401,11 +481,24 @@ class OrderController extends Controller
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
                 'store_name'       => $order->store?->store_name ?? '—',
+                'store_location'   => ($order->store?->latitude && $order->store?->longitude) ? [
+                    'lat'  => (float) $order->store->latitude,
+                    'lng'  => (float) $order->store->longitude,
+                    'name' => $order->store->store_name,
+                ] : null,
                 'status'           => $order->status,
                 'transaction_type' => $order->transaction_type,
                 'total_amount'     => (float) $order->total_amount,
-                'payment_method'   => $order->payment_method,
-                'payment_status'   => $order->payment_status,
+                'shipping_fee'     => $order->shipping_fee ? (float) $order->shipping_fee : null,
+                'delivery_latitude'          => $order->delivery_latitude  ? (float) $order->delivery_latitude  : null,
+                'delivery_longitude'         => $order->delivery_longitude ? (float) $order->delivery_longitude : null,
+                'delivery_distance_km'       => $order->delivery_distance_km       ? (float) $order->delivery_distance_km       : null,
+                'estimated_delivery_minutes' => $order->estimated_delivery_minutes ? (int)   $order->estimated_delivery_minutes : null,
+                'payment_method'      => $order->payment_method,
+                'payment_status'      => $order->payment_status,
+                'payment_mode'        => $order->payment_mode ?? 'full',
+                'down_payment_amount' => $order->down_payment_amount ? (float) $order->down_payment_amount : null,
+                'remaining_balance'   => $order->remaining_balance ? (float) $order->remaining_balance : null,
                 'notes'                => $order->notes,
                 'cancellation_reason'  => $order->cancellation_reason,
                 'cancellation_notes'   => $order->cancellation_notes,

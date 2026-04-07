@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Rider\CustomerController as RiderCustomerController;
 use App\Http\Controllers\Rider\DeliveryController as RiderDeliveryController;
+use App\Http\Controllers\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\PayrollController;
 use Illuminate\Support\Facades\Route;
@@ -9,6 +10,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('deliveries', [RiderDeliveryController::class, 'index'])->name('deliveries');
     Route::patch('deliveries/{delivery}/status', [RiderDeliveryController::class, 'updateStatus'])->name('deliveries.status');
+    Route::get('deliveries/{delivery}/rider-location', [RiderLocationController::class, 'show'])->name('deliveries.rider-location');
+    Route::post('location', [RiderLocationController::class, 'store'])->name('location');
     Route::get('history', [RiderDeliveryController::class, 'history'])->name('history');
 
     // ── My Payslips ───────────────────────────────────────────────────────────

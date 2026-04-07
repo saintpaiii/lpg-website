@@ -14,6 +14,7 @@ use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\WalletController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
+use App\Http\Controllers\Seller\VehicleController;
 use Illuminate\Support\Facades\Route;
 
 // ── Seller Portal (authenticated, verified, approved seller or seller_staff) ─
@@ -61,6 +62,14 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::post('deliveries/assign', [DeliveryController::class, 'assign'])->name('deliveries.assign');
             Route::patch('deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->name('deliveries.status');
         });
+
+        // ── Vehicles ─────────────────────────────────────────────────────────
+        Route::get('vehicles', [VehicleController::class, 'index'])->name('vehicles');
+        Route::post('vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
+        Route::put('vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
+        Route::delete('vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+        Route::post('vehicles/{vehicle}/restore', [VehicleController::class, 'restore'])
+            ->withTrashed()->name('vehicles.restore');
 
         // ── Invoices ─────────────────────────────────────────────────────────
         Route::middleware('permission:invoices.view')->group(function () {
