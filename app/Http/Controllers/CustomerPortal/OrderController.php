@@ -8,6 +8,7 @@ use App\Models\Inventory;
 use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Order;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
 use App\Models\OrderItem;
 use App\Models\Payment;
@@ -76,7 +77,7 @@ class OrderController extends Controller
         $dateTo       = $request->get('date_to');
         $statusFilter = $request->get('status');
 
-        $orders = collect();
+        $orders = new LengthAwarePaginator([], 0, 15);
         if ($customer) {
             $ordersQuery = $customer->orders()->with(['items.product', 'invoice', 'store'])->orderByDesc('created_at');
             if ($dateFrom)     $ordersQuery->whereDate('created_at', '>=', $dateFrom);
@@ -87,18 +88,20 @@ class OrderController extends Controller
                 ->paginate(15)
                 ->withQueryString()
                 ->through(fn ($o) => [
-                    'id'             => $o->id,
-                    'order_number'   => $o->order_number,
-                    'store_name'     => $o->store?->store_name ?? '—',
-                    'status'         => $o->status,
-                    'total_amount'   => (float) $o->total_amount,
-                    'payment_method' => $o->payment_method,
-                    'payment_status' => $o->payment_status,
-                    'created_at'     => $o->created_at->format('M d, Y'),
-                    'items_count'    => $o->items->count(),
-                    'items_summary'  => $o->items->map(fn ($i) => $i->product?->name)->filter()->implode(', '),
-                    'invoice_id'     => $o->invoice?->id,
-                    'cancelled_by'   => $o->cancelled_by,
+                    'id'                => $o->id,
+                    'order_number'      => $o->order_number,
+                    'store_name'        => $o->store?->store_name ?? '—',
+                    'status'            => $o->status,
+                    'total_amount'      => (float) $o->total_amount,
+                    'payment_method'    => $o->payment_method,
+                    'payment_status'    => $o->payment_status,
+                    'payment_mode'      => $o->payment_mode ?? 'full',
+                    'remaining_balance' => $o->remaining_balance ? (float) $o->remaining_balance : null,
+                    'created_at'        => $o->created_at->format('M d, Y'),
+                    'items_count'       => $o->items->count(),
+                    'items_summary'     => $o->items->map(fn ($i) => $i->product?->name)->filter()->implode(', '),
+                    'invoice_id'        => $o->invoice?->id,
+                    'cancelled_by'      => $o->cancelled_by,
                 ]);
         }
 
@@ -355,6 +358,36 @@ class OrderController extends Controller
                 'paid_at'             => now(),
             ]);
 
+            $isInstallment = $order->payment_mode === 'installment';
+
+            if ($isInstallment && $order->payment_status === 'unpaid') {
+                // Down payment received — move to partial
+                $order->update([
+                    'payment_status' => 'partial',
+                    'payment_method' => $localMethod,
+                ]);
+                return ['status' => 'partial', 'message' => 'Down payment confirmed! Pay the remaining balance to proceed with delivery.'];
+            }
+
+            if ($isInstallment && $order->payment_status === 'partial') {
+                // Balance payment — fully paid
+                $order->update([
+                    'payment_status'    => 'paid',
+                    'payment_method'    => $localMethod,
+                    'remaining_balance' => 0,
+                ]);
+                if ($order->invoice) {
+                    $order->invoice->update([
+                        'payment_status' => 'paid',
+                        'paid_amount'    => $order->total_amount,
+                        'paid_at'        => now(),
+                        'payment_method' => $localMethod,
+                    ]);
+                }
+                return ['status' => 'paid', 'message' => 'Balance payment confirmed! Your order is fully paid.'];
+            }
+
+            // Full payment (non-installment)
             $order->update([
                 'payment_status' => 'paid',
                 'payment_method' => $localMethod,
@@ -480,6 +513,7 @@ class OrderController extends Controller
             'order' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
+                'store_id'         => $order->store_id,
                 'store_name'       => $order->store?->store_name ?? '—',
                 'store_location'   => ($order->store?->latitude && $order->store?->longitude) ? [
                     'lat'  => (float) $order->store->latitude,

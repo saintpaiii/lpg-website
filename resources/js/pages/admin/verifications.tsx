@@ -54,6 +54,7 @@ type VerificationRow = {
     reuploaded_docs: string[];
     // Document URLs
     valid_id_url: string | null;
+    selfie_url: string | null;
     bir_permit_url: string | null;
     business_permit_url: string | null;
     fsic_permit_url: string | null;
@@ -359,16 +360,53 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                             {/* 2. Documents */}
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Documents</h3>
-                                <div className="rounded-md border px-3 divide-y">
-                                    <DocRow label="Valid ID" url={v.valid_id_url} />
-                                    {v.type === 'seller_application' && <>
-                                        <DocRow label="BIR Certificate of Registration" url={v.bir_permit_url} />
-                                        <DocRow label="Business Permit / Mayor's Permit" url={v.business_permit_url} />
-                                        <DocRow label="FSIC (Fire Safety Inspection Certificate)" url={v.fsic_permit_url} />
-                                        <DocRow label="DOE LPG Retail License" url={v.doe_lpg_license_url} />
-                                        <DocRow label="LTO (License to Operate)" url={v.lto_permit_url} />
-                                    </>}
-                                </div>
+
+                                {/* Customer ID verification: side-by-side image comparison */}
+                                {v.type === 'customer_id_verification' ? (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Valid ID</p>
+                                            {v.valid_id_url ? (
+                                                <a href={v.valid_id_url} target="_blank" rel="noopener noreferrer">
+                                                    <img
+                                                        src={v.valid_id_url}
+                                                        alt="Valid ID"
+                                                        className="w-full rounded-lg border object-cover aspect-video hover:opacity-90 transition"
+                                                    />
+                                                </a>
+                                            ) : (
+                                                <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted text-xs text-muted-foreground">
+                                                    Not uploaded
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Selfie</p>
+                                            {v.selfie_url ? (
+                                                <img
+                                                    src={v.selfie_url}
+                                                    alt="Selfie"
+                                                    className="w-full rounded-lg border object-cover aspect-video"
+                                                />
+                                            ) : (
+                                                <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted text-xs text-muted-foreground">
+                                                    Not uploaded
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-md border px-3 divide-y">
+                                        <DocRow label="Valid ID" url={v.valid_id_url} />
+                                        {v.type === 'seller_application' && <>
+                                            <DocRow label="BIR Certificate of Registration" url={v.bir_permit_url} />
+                                            <DocRow label="Business Permit / Mayor's Permit" url={v.business_permit_url} />
+                                            <DocRow label="FSIC (Fire Safety Inspection Certificate)" url={v.fsic_permit_url} />
+                                            <DocRow label="DOE LPG Retail License" url={v.doe_lpg_license_url} />
+                                            <DocRow label="LTO (License to Operate)" url={v.lto_permit_url} />
+                                        </>}
+                                    </div>
+                                )}
                             </section>
 
                             {/* 3. Resubmission Info */}
@@ -480,8 +518,10 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                     <AlertDialogHeader>
                         <AlertDialogTitle>Approve Application</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Approve the seller application for <strong>{approveTarget?.user_name}</strong>?
-                            Their account will be promoted to seller and they can access the seller portal.
+                            {approveTarget?.type === 'customer_id_verification'
+                                ? <>Approve the identity verification for <strong>{approveTarget?.user_name}</strong>? They will be able to place orders on the platform.</>
+                                : <>Approve the seller application for <strong>{approveTarget?.user_name}</strong>? Their account will be promoted to seller and they can access the seller portal.</>
+                            }
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

@@ -94,10 +94,14 @@ const STATUS_LABELS: Record<PaymentStatus, string> = {
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    cash:          'Cash',
-    gcash:         'GCash',
-    maya:          'Maya',
-    bank_transfer: 'Bank Transfer',
+    cash:            'Cash',
+    gcash:           'GCash',
+    maya:            'Maya',
+    bank_transfer:   'Bank Transfer',
+    card:            'Card',
+    grab_pay:        'GrabPay',
+    credits:         'Platform Credits',
+    credits_partial: 'Credits + Online',
 };
 
 const TX_LABELS: Record<string, string> = {

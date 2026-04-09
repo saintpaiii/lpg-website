@@ -20,7 +20,7 @@ class VerificationController extends Controller
         $search = $request->get('search', '');
 
         $query = VerificationRequest::with(['user', 'reviewer'])
-            ->where('type', 'seller_application')
+            ->whereIn('type', ['seller_application', 'customer_id_verification'])
             ->when($search, fn ($q) => $q->whereHas('user', fn ($u) =>
                 $u->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
@@ -34,9 +34,9 @@ class VerificationController extends Controller
         };
 
         $counts = [
-            'pending'  => VerificationRequest::where('type', 'seller_application')->where('status', 'pending')->count(),
-            'approved' => VerificationRequest::where('type', 'seller_application')->where('status', 'approved')->count(),
-            'rejected' => VerificationRequest::where('type', 'seller_application')->where('status', 'rejected')->count(),
+            'pending'  => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'pending')->count(),
+            'approved' => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'approved')->count(),
+            'rejected' => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'rejected')->count(),
         ];
 
         $paginated = $items->paginate(25)->withQueryString();
@@ -102,8 +102,9 @@ class VerificationController extends Controller
                     'is_resubmission'            => $isResubmission,
                     'previous_rejection_reason'  => $isResubmission ? $prevApp?->rejection_reason : null,
                     'reuploaded_docs'            => $reuploadedDocs,
-                    // Document URLs — all 6
+                    // Document URLs — all 6 + selfie
                     'valid_id_url'          => $v->valid_id_path ? Storage::url($v->valid_id_path) : null,
+                    'selfie_url'            => $v->selfie_path   ? Storage::url($v->selfie_path)   : null,
                     'bir_permit_url'        => $v->bir_permit_path ? Storage::url($v->bir_permit_path) : null,
                     'business_permit_url'   => $v->business_permit_path ? Storage::url($v->business_permit_path) : null,
                     'fsic_permit_url'       => $v->fsic_permit_path ? Storage::url($v->fsic_permit_path) : null,
@@ -148,9 +149,29 @@ class VerificationController extends Controller
             return back()->with('success', "{$verification->user?->name} has been approved as a seller. They can now access the seller portal.");
         }
 
-        // Regular customer ID verification
-        $verification->user?->update(['id_verified' => true]);
+        if ($verification->type === 'customer_id_verification') {
+            $verification->user?->update([
+                'id_verification_status' => 'verified',
+                'id_verified_at'         => now(),
+                'id_rejection_reason'    => null,
+                'id_verified'            => true,
+            ]);
 
+            if ($verification->user_id) {
+                NotificationService::send(
+                    $verification->user_id,
+                    'system',
+                    'Identity Verified!',
+                    'Your identity has been verified. You can now place orders on the platform.',
+                    ['link' => '/customer/products']
+                );
+            }
+
+            return back()->with('success', "{$verification->user?->name}'s identity has been verified. They can now place orders.");
+        }
+
+        // Fallback
+        $verification->user?->update(['id_verified' => true]);
         return back()->with('success', "Verification for {$verification->user?->name} approved.");
     }
 
@@ -178,6 +199,23 @@ class VerificationController extends Controller
                     'Your seller application was not approved',
                     'Unfortunately your seller application was rejected. Reason: ' . $request->reason,
                     ['link' => '/customer/become-seller']
+                );
+            }
+        }
+
+        if ($verification->type === 'customer_id_verification') {
+            $verification->user?->update([
+                'id_verification_status' => 'rejected',
+                'id_rejection_reason'    => $request->reason,
+            ]);
+
+            if ($verification->user_id) {
+                NotificationService::send(
+                    $verification->user_id,
+                    'system',
+                    'Identity Verification Rejected',
+                    'Your ID verification was not approved. Reason: ' . $request->reason . '. Please re-upload your documents.',
+                    ['link' => '/customer/id-verification']
                 );
             }
         }

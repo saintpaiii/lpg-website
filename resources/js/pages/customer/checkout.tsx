@@ -1,6 +1,6 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import { Banknote, CreditCard, Crosshair, Loader2, MapPin, Navigation, ShoppingCart, Store } from 'lucide-react';
+import { Banknote, CreditCard, Crosshair, Loader2, MapPin, Navigation, ShieldCheck, ShoppingCart, Store, Wallet } from 'lucide-react';
 import { formatAddress } from '@/data/cavite-locations';
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
+import type { SharedData } from '@/types';
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
 if (typeof window !== 'undefined') {
@@ -60,6 +61,7 @@ type CustomerInfo = {
 type Props = {
     stores: StoreGroup[];
     customer: CustomerInfo;
+    platform_credits: number;
 };
 
 type PaymentMode = 'full' | 'installment';
@@ -136,8 +138,41 @@ async function fetchOsrmRoute(
     }
 }
 
-export default function CheckoutPage({ stores, customer }: Props) {
+export default function CheckoutPage({ stores, customer, platform_credits }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const idStatus = auth.user.id_verification_status;
+
+    // Guard: should not reach here (backend redirects), but block just in case
+    if (idStatus !== 'verified') {
+        return (
+            <CustomerLayout title="Checkout">
+                <Head title="Checkout — LPG Portal" />
+                <div className="max-w-lg mx-auto py-12 text-center">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 dark:border-amber-800 dark:bg-amber-900/20">
+                        <ShieldCheck className="mx-auto mb-4 h-12 w-12 text-amber-500" />
+                        <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200">
+                            Identity Verification Required
+                        </h2>
+                        <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                            You must verify your identity before placing orders.
+                            {idStatus === 'pending' && ' Your documents are currently under review.'}
+                            {idStatus === 'rejected' && ' Your verification was rejected — please re-upload your documents.'}
+                        </p>
+                        <Link
+                            href="/customer/id-verification"
+                            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-amber-700"
+                        >
+                            <ShieldCheck className="h-4 w-4" />
+                            {idStatus === 'rejected' ? 'Re-verify ID' : 'Verify Now'}
+                        </Link>
+                    </div>
+                </div>
+            </CustomerLayout>
+        );
+    }
+
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
+    const [useCredits, setUseCredits]   = useState(false);
     const [notes, setNotes]             = useState('');
     const [loading, setLoading]         = useState(false);
 
@@ -199,9 +234,11 @@ export default function CheckoutPage({ stores, customer }: Props) {
         const dynamic = distFees[sg.store_id];
         return sum + (dynamic ? dynamic.fee : sg.delivery_fee);
     }, 0);
-    const grandTotal    = grandSubtotal + grandDelivery;
-    const downPayment   = Math.round(grandTotal * 0.5 * 100) / 100;
-    const balance       = Math.round((grandTotal - downPayment) * 100) / 100;
+    const grandTotal      = grandSubtotal + grandDelivery;
+    const creditsApplied  = useCredits ? Math.min(platform_credits, paymentMode === 'installment' ? Math.round(grandTotal * 0.5 * 100) / 100 : grandTotal) : 0;
+    const amountDue       = Math.max(0, Math.round((paymentMode === 'installment' ? Math.round(grandTotal * 0.5 * 100) / 100 : grandTotal) - creditsApplied) * 100) / 100;
+    const downPayment     = Math.round(grandTotal * 0.5 * 100) / 100;
+    const balance         = Math.round((grandTotal - downPayment) * 100) / 100;
 
     // Estimated minutes (from OSRM, single store only)
     const estimatedMins = osrmRoute?.durationMin ?? null;
@@ -209,17 +246,20 @@ export default function CheckoutPage({ stores, customer }: Props) {
     async function placeOrder() {
         setLoading(true);
         try {
-            const res = await axios.post<{ checkout_url?: string; error?: string }>(
+            const res = await axios.post<{ checkout_url?: string; redirect_url?: string; error?: string }>(
                 '/customer/checkout',
                 {
                     payment_mode:               paymentMode,
+                    use_credits:                useCredits,
                     notes,
                     delivery_latitude:          pin?.lat  ?? null,
                     delivery_longitude:         pin?.lng  ?? null,
                     estimated_delivery_minutes: estimatedMins,
                 },
             );
-            if (res.data.checkout_url) {
+            if (res.data.redirect_url) {
+                window.location.href = res.data.redirect_url;
+            } else if (res.data.checkout_url) {
                 window.location.href = res.data.checkout_url;
             } else {
                 toast.error(res.data.error ?? 'Unexpected response from server.');
@@ -501,6 +541,56 @@ export default function CheckoutPage({ stores, customer }: Props) {
                     </CardContent>
                 </Card>
 
+                {/* Platform Credits */}
+                {platform_credits > 0 && (
+                    <Card className="border-green-200 dark:border-green-800">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Wallet className="h-4 w-4 text-green-600" />
+                                Platform Credits
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                                        Available: {peso(platform_credits)}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Earned from approved refunds — applies to any order.
+                                    </p>
+                                </div>
+                                <label className="flex items-center gap-2 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={useCredits}
+                                        onChange={(e) => setUseCredits(e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <span className="text-sm font-medium">Use Credits</span>
+                                </label>
+                            </div>
+                            {useCredits && creditsApplied > 0 && (
+                                <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-sm">
+                                    <div className="flex justify-between text-green-700 dark:text-green-400">
+                                        <span>Credits applied</span>
+                                        <span className="font-semibold">−{peso(creditsApplied)}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-green-800 dark:text-green-300 mt-1 pt-1 border-t border-green-200 dark:border-green-700">
+                                        <span>Amount to pay</span>
+                                        <span>{amountDue <= 0 ? 'FREE' : peso(amountDue)}</span>
+                                    </div>
+                                    {amountDue <= 0 && (
+                                        <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+                                            Your credits fully cover this order — no payment needed!
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Notes */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -536,10 +626,14 @@ export default function CheckoutPage({ stores, customer }: Props) {
                             </>
                         ) : (
                             <>
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                {paymentMode === 'installment'
-                                    ? `Pay Down Payment ${peso(downPayment)}`
-                                    : `Pay ${peso(grandTotal)} — Full Payment`}
+                                {useCredits && amountDue <= 0
+                                    ? <><Wallet className="h-4 w-4 mr-2" />Place Order (Free with Credits)</>
+                                    : <><CreditCard className="h-4 w-4 mr-2" />
+                                        {paymentMode === 'installment'
+                                            ? `Pay Down Payment ${peso(Math.max(0, downPayment - creditsApplied))}`
+                                            : `Pay ${peso(amountDue)} ${useCredits && creditsApplied > 0 ? '(after credits)' : '— Full Payment'}`}
+                                      </>
+                                }
                             </>
                         )}
                     </Button>

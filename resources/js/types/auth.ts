@@ -10,6 +10,11 @@ export type User = {
     is_admin: boolean;
     is_platform_staff: boolean;
     id_verified?: boolean;
+    id_verification_status?: 'pending' | 'verified' | 'rejected';
+    valid_id_path?: string | null;
+    first_name?: string | null;
+    middle_name?: string | null;
+    last_name?: string | null;
     store_id?: number | null;
     sub_role?: string | null;
     avatar?: string;

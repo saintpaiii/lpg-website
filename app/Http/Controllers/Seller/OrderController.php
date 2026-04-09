@@ -375,6 +375,11 @@ class OrderController extends Controller
             return back()->with('error', "Cannot change status of a {$oldStatus} order.");
         }
 
+        // Block confirming an installment order that hasn't been fully paid
+        if ($newStatus === 'confirmed' && $oldStatus === 'pending' && $order->payment_status === 'partial') {
+            return back()->with('error', 'Cannot confirm order until the customer pays the remaining balance.');
+        }
+
         DB::transaction(function () use ($order, $newStatus, $oldStatus, $store) {
             if ($newStatus === 'confirmed' && $oldStatus === 'pending') {
                 $order->load('items.product.inventory');

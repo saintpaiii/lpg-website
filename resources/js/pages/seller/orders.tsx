@@ -278,7 +278,12 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             </td>
                                             <td className="px-4 py-3 text-center hidden md:table-cell">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[o.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                                    {o.payment_status === 'to_refund' ? 'To Refund' : o.payment_status === 'refunded' ? 'Refunded' : o.payment_status}
+                                                    {o.payment_status === 'to_refund' ? 'To Refund' :
+                                                     o.payment_status === 'refunded'  ? 'Refunded'  :
+                                                     o.payment_status === 'partial'   ? 'Partial'   :
+                                                     o.payment_status === 'paid'      ? 'Paid'      :
+                                                     o.payment_status === 'unpaid'    ? 'Unpaid'    :
+                                                     o.payment_status}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
@@ -465,13 +470,18 @@ function OrderActions({
             {/* Active-tab action buttons */}
             {tab === 'active' && !isFinal && (
                 <>
-                    {order.status === 'pending' && (
+                    {order.status === 'pending' && order.payment_status !== 'partial' && (
                         <Button size="sm"
                             className="h-7 px-2.5 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
                             onClick={() => onOpen({ type: 'confirm', order })}>
                             <CheckCircle className="h-3 w-3" />
                             Confirm
                         </Button>
+                    )}
+                    {order.status === 'pending' && order.payment_status === 'partial' && (
+                        <span className="h-7 px-2.5 text-xs text-amber-600 flex items-center gap-1">
+                            ⏳ Awaiting payment
+                        </span>
                     )}
                     {order.status === 'confirmed' && (
                         <Button size="sm"

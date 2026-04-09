@@ -15,6 +15,7 @@ use App\Http\Controllers\Seller\WalletController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use App\Http\Controllers\Seller\VehicleController;
+use App\Http\Controllers\Seller\UserReportController as SellerUserReportController;
 use Illuminate\Support\Facades\Route;
 
 // ── Seller Portal (authenticated, verified, approved seller or seller_staff) ─
@@ -146,6 +147,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('reports', [ReportsController::class, 'index'])->name('reports');
             Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
         });
+
+        // ── User Reports (seller reports a buyer) ────────────────────────────
+        Route::post('reports/user', [SellerUserReportController::class, 'store'])->name('reports.user.store');
 
         // ── DSS ──────────────────────────────────────────────────────────────
         Route::get('dss', [DssController::class, 'index'])

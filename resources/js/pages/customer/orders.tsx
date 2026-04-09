@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { Package, Printer, XCircle } from 'lucide-react';
+import axios from 'axios';
+import { CreditCard, Loader2, Package, Printer, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,8 @@ type Order = {
     total_amount: number;
     payment_method: string;
     payment_status: string;
+    payment_mode: 'full' | 'installment';
+    remaining_balance: number | null;
     created_at: string;
     items_count: number;
     items_summary: string;
@@ -88,6 +91,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
     const [cancelReason, setCancelReason] = useState('');
     const [cancelNotes, setCancelNotes] = useState('');
     const [cancelling, setCancelling] = useState(false);
+    const [payingBalanceId, setPayingBalanceId] = useState<number | null>(null);
     const [dateFrom, setDateFrom] = useState(date_from);
     const [dateTo,   setDateTo]   = useState(date_to);
 
@@ -131,6 +135,24 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
 
     function applyStatus(s: string) {
         router.get('/customer/orders', { date_from: dateFrom, date_to: dateTo, status: s }, { preserveState: false, replace: true });
+    }
+
+    async function payBalance(order: Order) {
+        setPayingBalanceId(order.id);
+        try {
+            const res = await axios.post<{ checkout_url?: string; error?: string }>(
+                `/customer/orders/${order.id}/pay-balance`,
+            );
+            if (res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+            } else {
+                toast.error(res.data.error ?? 'Could not start payment.');
+                setPayingBalanceId(null);
+            }
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? 'Could not start balance payment.');
+            setPayingBalanceId(null);
+        }
     }
 
     function submitCancel() {
@@ -256,8 +278,16 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                        {order.payment_status === 'to_refund' ? 'To Refund' : order.payment_status === 'refunded' ? 'Refunded' : order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+                                                        {order.payment_status === 'to_refund' ? 'To Refund' :
+                                                         order.payment_status === 'refunded'  ? 'Refunded' :
+                                                         order.payment_status === 'partial'   ? 'Partial' :
+                                                         order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                                                     </span>
+                                                    {order.payment_mode === 'installment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
+                                                        <p className="text-[10px] text-amber-600 font-medium mt-0.5">
+                                                            Balance: ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                        </p>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
@@ -266,6 +296,19 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                                 View
                                                             </Button>
                                                         </Link>
+                                                        {order.payment_mode === 'installment' && order.payment_status === 'partial' && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1"
+                                                                onClick={() => payBalance(order)}
+                                                                disabled={payingBalanceId === order.id}
+                                                            >
+                                                                {payingBalanceId === order.id
+                                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                    : <CreditCard className="h-3 w-3" />}
+                                                                Pay Balance
+                                                            </Button>
+                                                        )}
                                                         {order.invoice_id && order.status === 'delivered' && order.payment_status === 'paid' && (
                                                             <a
                                                                 href={`/invoices/${order.invoice_id}/print`}

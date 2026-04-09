@@ -10,7 +10,10 @@ use App\Http\Controllers\CustomerPortal\ProductBrowseController;
 use App\Http\Controllers\CustomerPortal\RatingController;
 use App\Http\Controllers\CustomerPortal\StoreController;
 use App\Http\Controllers\CustomerPortal\BecomeSellerController;
+use App\Http\Controllers\CustomerPortal\IdVerificationController;
 use App\Http\Controllers\CustomerPortal\ProfileController;
+use App\Http\Controllers\CustomerPortal\RefundController;
+use App\Http\Controllers\CustomerPortal\UserReportController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Rider\LocationController as RiderLocationController;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +60,18 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile');
         Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+
+        // Identity verification
+        Route::get('id-verification',  [IdVerificationController::class, 'create'])->name('id-verification');
+        Route::post('id-verification', [IdVerificationController::class, 'store'])->name('id-verification.store');
+
+        // Refund requests
+        Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
+        Route::post('orders/{order}/refund', [RefundController::class, 'store'])->name('orders.refund');
+
+        // User reports (customer reports a seller / view own reports)
+        Route::get('reports', [UserReportController::class, 'index'])->name('reports');
+        Route::post('reports', [UserReportController::class, 'store'])->name('reports.store');
 
         // Seller application (for customers who want to become sellers)
         Route::get('become-seller', [BecomeSellerController::class, 'create'])->name('become-seller');

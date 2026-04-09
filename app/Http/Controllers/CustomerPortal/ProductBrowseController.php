@@ -19,12 +19,18 @@ class ProductBrowseController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Exclude own store's products (sellers should not buy from themselves)
+        $ownStoreId = $request->user()
+            ? Store::where('user_id', $request->user()->id)->value('id')
+            : null;
+
         $query = Product::with(['store', 'inventory'])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('is_active', true)
             ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
-            ->whereNotNull('refill_price');
+            ->whereNotNull('refill_price')
+            ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId));
 
         // Search
         if ($search = $request->get('search')) {

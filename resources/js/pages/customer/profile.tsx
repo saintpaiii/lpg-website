@@ -11,7 +11,9 @@ import CustomerLayout from '@/layouts/customer-layout';
 import type { FormEvent } from 'react';
 
 type Profile = {
-    name: string;
+    first_name: string;
+    middle_name: string;
+    last_name: string;
     email: string;
     phone: string;
     address: string;
@@ -23,10 +25,12 @@ type Props = { profile: Profile };
 
 export default function CustomerProfile({ profile }: Props) {
     const profileForm = useForm({
-        name: profile.name,
-        phone: profile.phone,
+        first_name:  profile.first_name,
+        middle_name: profile.middle_name,
+        last_name:   profile.last_name,
+        phone:   profile.phone,
         address: profile.address,
-        city: profile.city,
+        city:    profile.city,
         barangay: profile.barangay,
     });
 
@@ -76,33 +80,61 @@ export default function CustomerProfile({ profile }: Props) {
                                 <p className="text-xs text-gray-400">Email cannot be changed. Contact support if needed.</p>
                             </div>
 
-                            <div className="grid gap-4 sm:grid-cols-2">
+                            {/* Name fields — 3 columns */}
+                            <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="name" className="text-sm font-medium">Full name <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="first_name" className="text-sm font-medium">First name <span className="text-red-500">*</span></Label>
                                     <Input
-                                        id="name"
-                                        value={profileForm.data.name}
-                                        onChange={(e) => profileForm.setData('name', e.target.value)}
+                                        id="first_name"
+                                        autoComplete="given-name"
+                                        value={profileForm.data.first_name}
+                                        onChange={(e) => profileForm.setData('first_name', e.target.value)}
                                     />
-                                    {profileForm.errors.name && (
-                                        <p className="text-xs text-red-500">{profileForm.errors.name}</p>
+                                    {profileForm.errors.first_name && (
+                                        <p className="text-xs text-red-500">{profileForm.errors.first_name}</p>
                                     )}
                                 </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="middle_name" className="text-sm font-medium">Middle name</Label>
+                                    <Input
+                                        id="middle_name"
+                                        autoComplete="additional-name"
+                                        placeholder="Optional"
+                                        value={profileForm.data.middle_name}
+                                        onChange={(e) => profileForm.setData('middle_name', e.target.value)}
+                                    />
+                                    {profileForm.errors.middle_name && (
+                                        <p className="text-xs text-red-500">{profileForm.errors.middle_name}</p>
+                                    )}
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="last_name" className="text-sm font-medium">Last name <span className="text-red-500">*</span></Label>
+                                    <Input
+                                        id="last_name"
+                                        autoComplete="family-name"
+                                        value={profileForm.data.last_name}
+                                        onChange={(e) => profileForm.setData('last_name', e.target.value)}
+                                    />
+                                    {profileForm.errors.last_name && (
+                                        <p className="text-xs text-red-500">{profileForm.errors.last_name}</p>
+                                    )}
+                                </div>
+                            </div>
 
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="phone" className="text-sm font-medium">Phone number <span className="text-red-500">*</span></Label>
-                                    <Input
-                                        id="phone"
-                                        type="tel"
-                                        value={profileForm.data.phone}
-                                        onChange={(e) => profileForm.setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
-                                        placeholder="09xxxxxxxxx"
-                                        maxLength={11}
-                                    />
-                                    {profileForm.errors.phone && (
-                                        <p className="text-xs text-red-500">{profileForm.errors.phone}</p>
-                                    )}
-                                </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="phone" className="text-sm font-medium">Phone number</Label>
+                                <Input
+                                    id="phone"
+                                    type="tel"
+                                    value={profileForm.data.phone}
+                                    onChange={(e) => profileForm.setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                    placeholder="09xxxxxxxxx"
+                                    maxLength={11}
+                                    className="max-w-xs"
+                                />
+                                {profileForm.errors.phone && (
+                                    <p className="text-xs text-red-500">{profileForm.errors.phone}</p>
+                                )}
                             </div>
 
                             <AddressFields

@@ -92,6 +92,12 @@ class CartController extends Controller
             ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
             ->firstOrFail();
 
+        // Block purchasing from own store
+        $ownStoreId = \App\Models\Store::where('user_id', auth()->id())->value('id');
+        if ($ownStoreId && $product->store_id === $ownStoreId) {
+            return back()->with('error', 'You cannot purchase products from your own store.');
+        }
+
         $stock = $product->inventory?->quantity ?? 0;
         if ($stock === 0) {
             return back()->with('error', "{$product->name} is out of stock.");

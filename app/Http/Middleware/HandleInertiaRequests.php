@@ -73,6 +73,7 @@ class HandleInertiaRequests extends Middleware
                 'permissions'        => $user ? $user->getPermissions() : [],
                 'store'              => $store ? ['id' => $store->id, 'store_name' => $store->store_name, 'status' => $store->status] : null,
                 'seller_application' => $sellerApplication,
+                'platform_credits'   => $user ? (float) $user->platform_credits : 0,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [

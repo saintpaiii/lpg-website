@@ -1,11 +1,14 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Package, Truck, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Flag, Package, Truck, XCircle } from 'lucide-react';
+import { useRef, useState } from 'react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -96,6 +99,13 @@ export default function SellerOrderShow({ order, riders }: Props) {
 
     const [showCancel,    setShowCancel]    = useState(false);
     const [showAssign,    setShowAssign]    = useState(false);
+    const [showReport,    setShowReport]    = useState(false);
+    const [reportCategory, setReportCategory] = useState('');
+    const [reportSubject,   setReportSubject]  = useState('');
+    const [reportDesc,      setReportDesc]     = useState('');
+    const [reportFiles,     setReportFiles]    = useState<File[]>([]);
+    const [reportSubmitting, setReportSubmitting] = useState(false);
+    const reportFileRef = useRef<HTMLInputElement>(null);
     const [selectedRider, setSelectedRider] = useState('');
     const [cancelReason,  setCancelReason]  = useState('');
     const [cancelNotes,   setCancelNotes]   = useState('');
@@ -127,6 +137,27 @@ export default function SellerOrderShow({ order, riders }: Props) {
         });
     }
 
+    function submitReport() {
+        if (!reportCategory || !reportSubject.trim() || !reportDesc.trim() || !order.customer) return;
+        setReportSubmitting(true);
+        const fd = new FormData();
+        fd.append('reported_id', String(order.customer.id));
+        if (order.id) fd.append('order_id', String(order.id));
+        fd.append('category', reportCategory);
+        fd.append('subject', reportSubject);
+        fd.append('description', reportDesc);
+        reportFiles.forEach((f) => fd.append('evidence[]', f));
+        router.post('/seller/reports/user', fd as any, {
+            onSuccess: () => {
+                toast.success('Report submitted successfully.');
+                setShowReport(false);
+                setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]);
+            },
+            onError: () => toast.error('Failed to submit report.'),
+            onFinish: () => setReportSubmitting(false),
+        });
+    }
+
     function updatePayment(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
         patchPay(`/seller/orders/${order.id}/payment`);
@@ -134,7 +165,8 @@ export default function SellerOrderShow({ order, riders }: Props) {
 
     const isFinal       = ['cancelled', 'delivered'].includes(order.status);
     const stepIndex     = STATUS_STEPS.indexOf(order.status);
-    const canConfirm    = order.status === 'pending';
+    const isPartialPay  = order.payment_status === 'partial';
+    const canConfirm    = order.status === 'pending' && !isPartialPay;
     const canPrepare    = order.status === 'confirmed';
     const isFullyPaid   = order.payment_status === 'paid';
     // Installment orders can only be assigned a rider when fully paid
@@ -169,6 +201,13 @@ export default function SellerOrderShow({ order, riders }: Props) {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
+                        {order.status === 'pending' && isPartialPay && (
+                            <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
+                                <Banknote className="h-3.5 w-3.5 shrink-0" />
+                                Awaiting full payment
+                                {order.remaining_balance ? ` — ₱${order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })} remaining` : ''}
+                            </div>
+                        )}
                         {canConfirm && (
                             <Button onClick={() => moveStatus('confirmed')} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Confirm
@@ -199,6 +238,11 @@ export default function SellerOrderShow({ order, riders }: Props) {
                             <Link href={`/seller/invoices/${order.invoice_id}`}>
                                 <Button size="sm" variant="outline">View Invoice</Button>
                             </Link>
+                        )}
+                        {order.customer && (
+                            <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowReport(true)}>
+                                <Flag className="h-3.5 w-3.5 mr-1" /> Report Buyer
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -501,6 +545,69 @@ export default function SellerOrderShow({ order, riders }: Props) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            {/* Report Buyer dialog */}
+            <Dialog open={showReport} onOpenChange={(o) => { setShowReport(o); if (!o) { setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]); } }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Flag className="h-4 w-4 text-red-500" />
+                            Report Buyer — {order.customer?.name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm">
+                        <p className="text-muted-foreground text-xs">
+                            Regarding order <span className="font-mono font-semibold">{order.order_number}</span>
+                        </p>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Category <span className="text-red-500">*</span></label>
+                            <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option value="">Select a category…</option>
+                                <option value="fraud">Fraud</option>
+                                <option value="rude_behavior">Rude Behavior</option>
+                                <option value="harassment">Harassment</option>
+                                <option value="non_delivery">Refused to Receive</option>
+                                <option value="counterfeit">Counterfeit Claim</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Subject <span className="text-red-500">*</span></label>
+                            <input value={reportSubject} onChange={(e) => setReportSubject(e.target.value)}
+                                placeholder="Brief title…"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
+                            <textarea value={reportDesc} onChange={(e) => setReportDesc(e.target.value)}
+                                rows={4} placeholder="Describe what happened…"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Evidence (optional, max 5 files)</label>
+                            <input ref={reportFileRef} type="file" multiple accept="image/*,video/mp4,application/pdf"
+                                className="hidden"
+                                onChange={(e) => setReportFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
+                            <Button type="button" variant="outline" size="sm" onClick={() => reportFileRef.current?.click()}>
+                                Attach Files
+                            </Button>
+                            {reportFiles.length > 0 && (
+                                <p className="text-xs text-muted-foreground">{reportFiles.map((f) => f.name).join(', ')}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowReport(false)}>Cancel</Button>
+                        <Button
+                            onClick={submitReport}
+                            disabled={reportSubmitting || !reportCategory || !reportSubject.trim() || !reportDesc.trim()}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {reportSubmitting ? 'Submitting…' : 'Submit Report'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

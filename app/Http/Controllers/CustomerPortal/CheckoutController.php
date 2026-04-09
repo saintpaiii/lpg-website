@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\Store;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
+use App\Services\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -103,6 +104,12 @@ class CheckoutController extends Controller
 
     public function index(Request $request): Response|RedirectResponse
     {
+        // Block unverified customers from reaching checkout
+        if ($request->user()->id_verification_status !== 'verified') {
+            return redirect('/customer/cart')
+                ->with('error', 'Identity verification required. Please complete your ID verification to place orders.');
+        }
+
         $userId = auth()->id();
 
         // Accept selected IDs from query string (GET nav from cart page) or fall back to session
@@ -124,9 +131,11 @@ class CheckoutController extends Controller
         }
 
         $customer = Customer::where('user_id', $userId)->first();
+        $user     = $request->user();
 
         return Inertia::render('customer/checkout', [
-            'stores'   => $checkoutStores,
+            'stores'           => $checkoutStores,
+            'platform_credits' => (float) $user->platform_credits,
             'customer' => $customer ? [
                 'name'     => $customer->name,
                 'phone'    => $customer->phone,
@@ -157,6 +166,11 @@ class CheckoutController extends Controller
                 return $error('No items selected. Please go back to the cart and select items.');
             }
 
+            // Block unverified customers (also enforced in index(), but guard store() too)
+            if (auth()->user()->id_verification_status !== 'verified') {
+                return $error('Identity verification required. Please complete your ID verification to place orders.', 403);
+            }
+
             $customer = Customer::where('user_id', auth()->id())->first();
             if (! $customer) {
                 return $error('Customer profile not found. Please complete your profile first.');
@@ -164,6 +178,7 @@ class CheckoutController extends Controller
 
             $data = $request->validate([
                 'payment_mode'               => 'required|in:full,installment',
+                'use_credits'                => 'nullable|boolean',
                 'notes'                      => 'nullable|string|max:1000',
                 'delivery_latitude'          => 'nullable|numeric|between:-90,90',
                 'delivery_longitude'         => 'nullable|numeric|between:-180,180',
@@ -207,6 +222,16 @@ class CheckoutController extends Controller
                 ];
             }
             $checkoutStores = array_values($checkoutStores);
+
+            // Block checkout if any selected items are from the user's own store
+            $ownStoreId = Store::where('user_id', auth()->id())->value('id');
+            if ($ownStoreId) {
+                foreach ($checkoutStores as $storeData) {
+                    if ((int) $storeData['store_id'] === (int) $ownStoreId) {
+                        return $error('You cannot place an order from your own store.');
+                    }
+                }
+            }
 
             // Create one order per store in a single DB transaction
             $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $isInstallment, $deliveryLat, $deliveryLng, $estimatedMin) {
@@ -335,9 +360,54 @@ class CheckoutController extends Controller
                 );
             }
 
+            // Apply platform credits if requested
+            $user           = $request->user();
+            $useCredits     = ! empty($data['use_credits']);
+            $creditsApplied = 0.0;
+
+            // Calculate grand total across all orders to know how much credits can cover
+            $grandTotal = array_sum(array_map(function ($entry) {
+                return $entry['is_installment'] && $entry['down_payment'] !== null
+                    ? $entry['down_payment']
+                    : ($entry['order']->total_amount + (float) $entry['delivery_fee']);
+            }, $orders));
+
+            if ($useCredits && (float) $user->platform_credits > 0) {
+                $creditsApplied = min((float) $user->platform_credits, $grandTotal);
+            }
+
+            $amountAfterCredits = max(0, round($grandTotal - $creditsApplied, 2));
+
+            // If fully covered by credits → skip PayMongo
+            if ($amountAfterCredits <= 0 && $creditsApplied > 0) {
+                DB::transaction(function () use ($orders, $user, $creditsApplied) {
+                    foreach ($orders as $entry) {
+                        $order      = $entry['order'];
+                        $perCredit  = round($creditsApplied / count($orders), 2);
+
+                        if ($entry['is_installment'] && $entry['down_payment'] !== null) {
+                            // Credits covered only the down payment — order is still partial
+                            $order->update([
+                                'payment_method' => 'credits',
+                                'payment_status' => 'partial',
+                                // remaining_balance already set at order creation
+                            ]);
+                        } else {
+                            // Full-payment order fully covered by credits
+                            $order->update([
+                                'payment_method' => 'credits',
+                                'payment_status' => 'paid',
+                            ]);
+                        }
+
+                        RefundService::deductCreditsForOrder($user, $perCredit, $order->id, $order->order_number);
+                    }
+                });
+                return response()->json(['redirect_url' => url('/customer/orders?payment=success')]);
+            }
+
             // Always pay via PayMongo (COD removed)
             $paymongo  = app(PayMongoService::class);
-            $user      = $request->user();
             $lineItems = [];
 
             foreach ($orders as $entry) {
@@ -377,6 +447,17 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Add credits discount line item if partially covered
+            if ($creditsApplied > 0) {
+                $lineItems[] = [
+                    'name'        => 'Platform Credits Applied',
+                    'description' => 'Discount from your platform credits',
+                    'amount'      => -(int) round($creditsApplied * 100),
+                    'currency'    => 'PHP',
+                    'quantity'    => 1,
+                ];
+            }
+
             $firstOrder = $orders[0]['order'];
             $storeNames = implode(', ', array_map(fn ($e) => $e['store']->store_name, $orders));
             $isInstallmentCheckout = $orders[0]['is_installment'];
@@ -400,11 +481,21 @@ class CheckoutController extends Controller
                 throw new \RuntimeException('PayMongo did not return a checkout URL.');
             }
 
+            // Deduct credits immediately after session created (before redirect)
+            if ($creditsApplied > 0) {
+                $perOrderCredit = round($creditsApplied / count($orders), 2);
+                foreach ($orders as $entry) {
+                    RefundService::deductCreditsForOrder($user, $perOrderCredit, $entry['order']->id, $entry['order']->order_number);
+                }
+            }
+
             // One Payment record per order
+            $perOrderCreditDeducted = $creditsApplied > 0 ? round($creditsApplied / count($orders), 2) : 0;
             foreach ($orders as $entry) {
-                $paymentAmount = $entry['is_installment'] && $entry['down_payment'] !== null
+                $rawAmount = $entry['is_installment'] && $entry['down_payment'] !== null
                     ? $entry['down_payment']
                     : $entry['order']->total_amount + (float) $entry['delivery_fee'];
+                $paymentAmount = max(0, round($rawAmount - $perOrderCreditDeducted, 2));
 
                 Payment::create([
                     'order_id'             => $entry['order']->id,

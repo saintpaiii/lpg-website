@@ -25,12 +25,14 @@ class ProfileController extends Controller
 
         return Inertia::render('customer/profile', [
             'profile' => [
-                'name'     => $user->name,
-                'email'    => $user->email,
-                'phone'    => $customer?->phone ?? $user->phone,
-                'address'  => $customer?->address ?? '',
-                'city'     => $customer?->city ?? '',
-                'barangay' => $customer?->barangay ?? '',
+                'first_name'  => $user->first_name ?? '',
+                'middle_name' => $user->middle_name ?? '',
+                'last_name'   => $user->last_name ?? '',
+                'email'       => $user->email,
+                'phone'       => $customer?->phone ?? $user->phone,
+                'address'     => $customer?->address ?? '',
+                'city'        => $customer?->city ?? '',
+                'barangay'    => $customer?->barangay ?? '',
             ],
         ]);
     }
@@ -38,24 +40,50 @@ class ProfileController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'name'     => 'required|string|max:255',
-            'phone'    => ['required', 'string', 'regex:/^09\d{9}$/'],
-            'address'  => 'required|string|max:500',
-            'city'     => 'required|string|max:100',
-            'barangay' => 'nullable|string|max:100',
+            'first_name'  => 'required|string|max:255',
+            'middle_name' => 'nullable|string|max:255',
+            'last_name'   => 'required|string|max:255',
+            'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
+            'address'     => 'required|string|max:500',
+            'city'        => 'required|string|max:100',
+            'barangay'    => 'nullable|string|max:100',
         ]);
 
+        $fullName = trim(
+            $data['first_name']
+            . ($data['middle_name'] ? ' ' . $data['middle_name'] : '')
+            . ' ' . $data['last_name']
+        );
+
         $user = $request->user();
-        $user->update(['name' => $data['name'], 'phone' => $data['phone']]);
+        $user->update([
+            'name'        => $fullName,
+            'first_name'  => $data['first_name'],
+            'middle_name' => $data['middle_name'] ?? null,
+            'last_name'   => $data['last_name'],
+            'phone'       => $data['phone'] ?? null,
+        ]);
 
         $customer = $this->getCustomer($request);
         if ($customer) {
             $customer->update([
-                'name'     => $data['name'],
-                'phone'    => $data['phone'],
+                'name'     => $fullName,
+                'phone'    => $data['phone'] ?? $customer->phone,
                 'address'  => $data['address'],
                 'city'     => $data['city'],
                 'barangay' => $data['barangay'] ?? '',
+            ]);
+        } else {
+            // Google-registered users have no Customer record yet — create one now
+            Customer::create([
+                'user_id'       => $user->id,
+                'name'          => $fullName,
+                'email'         => $user->email,
+                'phone'         => $data['phone'] ?? '',
+                'address'       => $data['address'],
+                'city'          => $data['city'],
+                'barangay'      => $data['barangay'] ?? '',
+                'customer_type' => 'household',
             ]);
         }
 

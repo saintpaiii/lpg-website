@@ -15,6 +15,7 @@ class VerificationRequest extends Model
         'user_id',
         'type',
         'valid_id_path',
+        'selfie_path',
         'bir_permit_path',
         'business_permit_path',
         'fsic_permit_path',

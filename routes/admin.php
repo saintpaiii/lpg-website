@@ -14,6 +14,8 @@ use App\Http\Controllers\Admin\StaffController;
 use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\VerificationController;
+use App\Http\Controllers\Admin\RefundController;
+use App\Http\Controllers\Admin\UserReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -105,6 +107,16 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::patch('withdrawals/{withdrawal}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
     Route::patch('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
     Route::patch('withdrawals/{withdrawal}/release', [WithdrawalController::class, 'markReleased'])->name('withdrawals.release');
+
+    // Refunds
+    Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
+    Route::patch('refunds/{refund}/approve', [RefundController::class, 'approve'])->name('refunds.approve');
+    Route::patch('refunds/{refund}/reject', [RefundController::class, 'reject'])->name('refunds.reject');
+
+    // User Reports
+    Route::get('user-reports', [UserReportController::class, 'index'])->name('user-reports');
+    Route::patch('user-reports/{userReport}', [UserReportController::class, 'update'])->name('user-reports.update');
+    Route::get('user-reports/export', [UserReportController::class, 'export'])->name('user-reports.export');
 
     // Auth Logs — platform admin only
     Route::get('auth-logs', [AuthLogController::class, 'index'])

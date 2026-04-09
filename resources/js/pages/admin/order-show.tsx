@@ -105,12 +105,14 @@ const PAY_STYLES: Record<PaymentStatus, string> = {
 };
 
 const PAY_LABELS: Record<string, string> = {
-    cash:          'Cash',
-    gcash:         'GCash',
-    bank_transfer: 'Bank Transfer',
-    maya:          'Maya',
-    card:          'Card',
-    grab_pay:      'GrabPay',
+    cash:            'Cash',
+    gcash:           'GCash',
+    bank_transfer:   'Bank Transfer',
+    maya:            'Maya',
+    card:            'Card',
+    grab_pay:        'GrabPay',
+    credits:         'Platform Credits',
+    credits_partial: 'Credits + Online',
 };
 
 // ── Page ───────────────────────────────────────────────────────────────────────

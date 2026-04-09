@@ -1,5 +1,5 @@
-import { Head, Link, router } from '@inertiajs/react';
-import { Minus, Plus, ShoppingBag, ShoppingCart, Store, Trash2 } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Store, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     AlertDialog,
@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
+import type { SharedData } from '@/types';
 
 type CartItem = {
     product_id: number;
@@ -44,6 +45,8 @@ type Props = {
 };
 
 export default function CartPage({ cart }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const idStatus  = (auth.user as any)?.id_verification_status as string | undefined;
     const storeGroups: StoreGroup[] = cart?.stores ? Object.values(cart.stores) : [];
     const allProductIds = storeGroups.flatMap(s => s.items.map(i => i.product_id));
 
@@ -91,6 +94,10 @@ export default function CartPage({ cart }: Props) {
     }
 
     function proceedToCheckout() {
+        if (idStatus !== 'verified') {
+            router.visit('/customer/id-verification');
+            return;
+        }
         router.get('/customer/checkout', {
             selected: Array.from(selected),
         });
@@ -145,6 +152,44 @@ export default function CartPage({ cart }: Props) {
                         Clear cart
                     </button>
                 </div>
+
+                {/* Identity verification banner */}
+                {idStatus !== 'verified' && (
+                    <div className={`flex items-start gap-3 rounded-lg border p-4 ${
+                        idStatus === 'rejected'
+                            ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+                            : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
+                    }`}>
+                        {idStatus === 'rejected'
+                            ? <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                            : <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+                        }
+                        <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${idStatus === 'rejected' ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                {idStatus === 'rejected'
+                                    ? 'Identity Verification Rejected'
+                                    : idStatus === 'pending' && (auth.user as any)?.valid_id_path
+                                    ? 'Verification Under Review'
+                                    : 'Identity Verification Required'}
+                            </p>
+                            <p className={`mt-0.5 text-xs ${idStatus === 'rejected' ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                {idStatus === 'rejected'
+                                    ? 'Your documents were rejected. Please re-upload to proceed with orders.'
+                                    : idStatus === 'pending' && (auth.user as any)?.valid_id_path
+                                    ? 'Your documents are under review. You can still browse, but orders require verified identity.'
+                                    : 'Complete identity verification to place orders.'}
+                            </p>
+                        </div>
+                        <Link
+                            href="/customer/id-verification"
+                            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium text-white ${
+                                idStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
+                            }`}
+                        >
+                            {idStatus === 'rejected' ? 'Re-upload' : 'Verify Now'}
+                        </Link>
+                    </div>
+                )}
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     {/* Store groups */}
@@ -311,10 +356,23 @@ export default function CartPage({ cart }: Props) {
                                 <Button
                                     onClick={proceedToCheckout}
                                     disabled={selectedCount === 0}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 disabled:opacity-50"
+                                    className={`w-full font-semibold py-2.5 disabled:opacity-50 text-white ${
+                                        idStatus !== 'verified'
+                                            ? 'bg-orange-500 hover:bg-orange-600'
+                                            : 'bg-blue-600 hover:bg-blue-700'
+                                    }`}
                                 >
-                                    Proceed to Checkout
-                                    {selectedStores.length > 1 && ` (${selectedStores.length} stores)`}
+                                    {idStatus !== 'verified' ? (
+                                        <span className="flex items-center justify-center gap-1.5">
+                                            <ShieldCheck className="h-4 w-4" />
+                                            Verify ID to Checkout
+                                        </span>
+                                    ) : (
+                                        <>
+                                            Proceed to Checkout
+                                            {selectedStores.length > 1 && ` (${selectedStores.length} stores)`}
+                                        </>
+                                    )}
                                 </Button>
                                 <Link href="/customer/products" className="block">
                                     <Button variant="outline" className="w-full">

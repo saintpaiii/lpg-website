@@ -1,8 +1,42 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Clock, Flame, LogOut, Package, Receipt, Search, ShoppingBag, ShoppingCart, Store, User, XCircle } from 'lucide-react';
-import { useRef, useState, type ReactNode, type FormEvent } from 'react';
+import {
+    Clock,
+    Flag,
+    Flame,
+    LogOut,
+    Package,
+    Receipt,
+    RotateCcw,
+    Search,
+    ShieldCheck,
+    ShoppingBag,
+    ShoppingCart,
+    Store,
+    User,
+    Wallet,
+    X,
+    XCircle,
+} from 'lucide-react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { InstallAppBanner } from '@/components/install-app-banner';
-import { Toaster } from 'sonner';
+import { NavMain } from '@/components/nav-main';
+import { NavUser } from '@/components/nav-user';
+import { NotificationBell } from '@/components/notification-bell';
+import { AppContent } from '@/components/app-content';
+import { AppShell } from '@/components/app-shell';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarSeparator,
+    SidebarTrigger,
+} from '@/components/ui/sidebar';
+import { Separator } from '@/components/ui/separator';
+import { Button } from '@/components/ui/button';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -13,34 +47,32 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { NotificationBell } from '@/components/notification-bell';
 import { useFlashToast } from '@/hooks/use-flash-toast';
-import type { SharedData } from '@/types';
+import type { NavItem, SharedData } from '@/types';
+import { Toaster } from 'sonner';
 
 type Props = {
     children: ReactNode;
     title?: string;
 };
 
-const navItems = [
-    { label: 'Browse',       href: '/customer/products',  icon: ShoppingBag },
-    { label: 'My Orders',    href: '/customer/orders',    icon: Package },
-    { label: 'My Invoices',  href: '/customer/invoices',  icon: Receipt },
-    { label: 'Profile',      href: '/customer/profile',   icon: User },
-];
-
 export default function CustomerLayout({ children, title }: Props) {
-    const { auth, cart_count } = usePage<SharedData>().props;
+    const { auth, cart_count, platform_credits } = usePage<SharedData>().props;
     const isSeller = auth.user.role === 'seller';
     const isAdmin  = ['platform_admin', 'admin'].includes(auth.user.role);
     const sellerApp = auth.seller_application;
-    const visibleNavItems = isAdmin ? navItems.slice(0, 1) : navItems; // Admin only sees Browse
     useFlashToast();
 
-    const [logoutOpen, setLogoutOpen] = useState(false);
-    const [searchOpen, setSearchOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const idStatus     = auth.user.id_verification_status;
+    const hasSubmittedId = !!(auth.user as any).valid_id_path;
+    const isVerified   = idStatus === 'verified';
+
+    const [logoutOpen, setLogoutOpen]         = useState(false);
+    const [searchOpen, setSearchOpen]         = useState(false);
+    const [bannerDismissed, setBannerDismissed] = useState(false);
+    const [searchQuery, setSearchQuery]       = useState('');
     const searchRef = useRef<HTMLInputElement>(null);
+
     const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
 
     function handleSearch(e: FormEvent) {
@@ -52,174 +84,177 @@ export default function CustomerLayout({ children, title }: Props) {
         }
     }
 
-    return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
-            {/* Top navbar */}
-            <nav className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm dark:bg-gray-900 dark:border-gray-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        {/* Logo */}
-                        <Link href="/customer/products" className="flex items-center gap-2.5 font-bold text-base">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-                                <Flame className="h-5 w-5 text-white" />
-                            </div>
-                            <span className="text-slate-800 dark:text-white">
-                                LPG <span className="text-blue-600">Customer</span>
-                            </span>
-                        </Link>
+    // ── Sidebar nav items ───────────────────────────────────────────────────
+    const mainNavItems: NavItem[] = [
+        { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag },
+        { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
+        { title: 'My Invoices', href: '/customer/invoices',       icon: Receipt     },
+        { title: 'My Refunds',  href: '/customer/refunds',        icon: RotateCcw   },
+        { title: 'My Reports',  href: '/customer/reports',        icon: Flag        },
+    ];
 
-                        {/* Desktop nav links */}
-                        <div className="hidden md:flex items-center gap-1">
-                            {visibleNavItems.map(({ label, href, icon: Icon }) => {
-                                const active = currentPath === href || currentPath.startsWith(href + '/');
-                                return (
-                                    <Link
-                                        key={href}
-                                        href={href}
-                                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                            active
-                                                ? 'bg-blue-100 text-blue-700 font-semibold dark:bg-blue-900/40 dark:text-blue-300'
-                                                : 'font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800'
-                                        }`}
-                                    >
-                                        <Icon className="h-4 w-4" />
-                                        {label}
-                                    </Link>
-                                );
-                            })}
-                            {isAdmin && (
+    const accountNavItems: NavItem[] = [
+        {
+            title: 'Verify ID',
+            href:  '/customer/id-verification',
+            icon:  ShieldCheck,
+            badge: !isVerified ? (idStatus === 'pending' && hasSubmittedId ? 'Pending' : '!') : undefined,
+        },
+        { title: 'Profile', href: '/customer/profile', icon: User },
+    ];
+
+    // Seller / become-seller link
+    let sellerNavItem: NavItem | null = null;
+    if (isSeller) {
+        sellerNavItem = { title: 'Seller Dashboard', href: '/seller/dashboard', icon: Store };
+    } else if (sellerApp?.status === 'pending') {
+        sellerNavItem = { title: 'Application Pending', href: '/customer/become-seller', icon: Clock as any };
+    } else if (sellerApp?.status === 'rejected') {
+        sellerNavItem = { title: 'Reapply as Seller', href: '/customer/become-seller', icon: XCircle as any };
+    } else {
+        sellerNavItem = { title: 'Start Selling', href: '/customer/become-seller', icon: Store };
+    }
+
+    // Derive page title from nav items or the prop
+    const pageTitle = title ??
+        [...mainNavItems, ...accountNavItems].find(i => currentPath === i.href || currentPath.startsWith(i.href + '/'))?.title ??
+        'Customer Portal';
+
+    return (
+        <AppShell variant="sidebar">
+            {/* ── Sidebar ──────────────────────────────────────────────────── */}
+            <Sidebar collapsible="icon" variant="inset">
+                {/* Logo */}
+                <SidebarHeader>
+                    <SidebarMenu>
+                        <SidebarMenuItem>
+                            <SidebarMenuButton size="lg" asChild>
+                                <Link href="/customer/products" prefetch>
+                                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shrink-0">
+                                        <Flame className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+                                        <p className="text-sm font-semibold truncate leading-tight">LPG Customer</p>
+                                        <p className="text-xs text-muted-foreground">Customer Portal</p>
+                                    </div>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    </SidebarMenu>
+                </SidebarHeader>
+
+                {/* Nav links */}
+                <SidebarContent>
+                    {/* Show all items for customers; only Browse for admins previewing */}
+                    <NavMain items={isAdmin ? mainNavItems.slice(0, 1) : mainNavItems} />
+
+                    {!isAdmin && (
+                        <>
+                            <SidebarSeparator className="mx-3 my-1" />
+                            <NavMain items={accountNavItems} />
+                            {sellerNavItem && (
                                 <>
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 px-2 select-none">Admin Preview</span>
-                                    <Link
-                                        href="/admin/dashboard"
-                                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
-                                    >
-                                        ← Back to Admin
-                                    </Link>
+                                    <SidebarSeparator className="mx-3 my-1" />
+                                    <NavMain items={[sellerNavItem]} />
                                 </>
                             )}
-                        </div>
+                        </>
+                    )}
 
-                        {/* User + actions */}
-                        <div className="flex items-center gap-1">
-                            {/* Admin preview label + back link */}
-                            {isAdmin ? null : isSeller ? (
-                                <Link
-                                    href="/seller/dashboard"
-                                    className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors dark:text-emerald-400 dark:bg-emerald-900/20"
-                                    title="Switch to Seller Dashboard"
-                                >
-                                    <Store className="h-4 w-4" />
-                                    <span className="hidden md:block">Seller Dashboard</span>
-                                </Link>
-                            ) : sellerApp?.status === 'pending' ? (
-                                <Link
-                                    href="/customer/become-seller"
-                                    className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors dark:text-amber-400 dark:bg-amber-900/20"
-                                    title="Application under review"
-                                >
-                                    <Clock className="h-4 w-4" />
-                                    <span className="hidden md:block">Application Pending</span>
-                                </Link>
-                            ) : sellerApp?.status === 'rejected' ? (
-                                <Link
-                                    href="/customer/become-seller"
-                                    className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 transition-colors dark:text-red-400 dark:bg-red-900/20"
-                                    title="Application rejected — reapply"
-                                >
-                                    <XCircle className="h-4 w-4" />
-                                    <span className="hidden md:block">Application Rejected</span>
-                                </Link>
-                            ) : (
-                                <Link
-                                    href="/customer/become-seller"
-                                    className="hidden sm:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors dark:text-blue-400 dark:bg-blue-900/20"
-                                    title="Apply to become a seller"
-                                >
-                                    <Store className="h-4 w-4" />
-                                    <span className="hidden md:block">Start Selling</span>
-                                </Link>
-                            )}
-                            {/* Search button — hidden for admin (search bar on browse page itself) */}
-                            {!isAdmin && (
-                                <button
-                                    onClick={() => { setSearchOpen(v => !v); setTimeout(() => searchRef.current?.focus(), 50); }}
-                                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
-                                    title="Search products"
-                                >
-                                    <Search className="h-4 w-4" />
-                                </button>
-                            )}
-                            {/* Notification bell */}
-                            <NotificationBell />
-                            {/* Cart icon — hidden for admin */}
-                            {!isAdmin && (
-                                <Link
-                                    href="/customer/cart"
-                                    className="relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-blue-600 hover:bg-gray-50 transition-colors dark:text-gray-400 dark:hover:bg-gray-800"
-                                    title="Cart"
-                                >
-                                    <ShoppingCart className="h-4 w-4" />
+                    {isAdmin && (
+                        <NavMain items={[{ title: '← Back to Admin', href: '/admin/dashboard', icon: null as any }]} />
+                    )}
+                </SidebarContent>
+
+                {/* Credits + user footer */}
+                <SidebarFooter>
+                    {/* Platform credits — shown when balance > 0 */}
+                    {!isAdmin && platform_credits > 0 && (
+                        <>
+                            <SidebarSeparator />
+                            <SidebarMenu>
+                                <SidebarMenuItem>
+                                    <SidebarMenuButton asChild tooltip="Platform Credits">
+                                        <Link href="/customer/refunds">
+                                            <Wallet className="h-4 w-4 text-green-500 shrink-0" />
+                                            <span className="truncate text-green-600 dark:text-green-400 font-medium group-data-[collapsible=icon]:hidden">
+                                                ₱{platform_credits.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </Link>
+                                    </SidebarMenuButton>
+                                </SidebarMenuItem>
+                            </SidebarMenu>
+                        </>
+                    )}
+                    <SidebarSeparator />
+                    <NavUser />
+                </SidebarFooter>
+            </Sidebar>
+
+            {/* ── Main content area ─────────────────────────────────────────── */}
+            <AppContent variant="sidebar" className="overflow-x-hidden">
+                {/* Top header bar */}
+                <header className="flex h-14 shrink-0 items-center gap-3 border-b border-sidebar-border/50 bg-background px-4 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+                    {/* Left: sidebar toggle + page title */}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <SidebarTrigger className="-ml-1 shrink-0 text-muted-foreground hover:text-foreground" />
+                        <Separator orientation="vertical" className="h-4 shrink-0" />
+                        <h1 className="truncate text-sm font-semibold text-foreground">{pageTitle}</h1>
+                    </div>
+
+                    {/* Right: search, cart, notifications, logout */}
+                    <div className="flex shrink-0 items-center gap-1">
+                        {/* Search toggle */}
+                        {!isAdmin && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                title="Search products"
+                                onClick={() => {
+                                    setSearchOpen(v => !v);
+                                    setTimeout(() => searchRef.current?.focus(), 50);
+                                }}
+                            >
+                                <Search className="size-4" />
+                            </Button>
+                        )}
+
+                        {/* Notification bell */}
+                        <NotificationBell />
+
+                        {/* Cart */}
+                        {!isAdmin && (
+                            <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
+                                <Link href="/customer/cart" title="Cart">
+                                    <ShoppingCart className="size-4" />
                                     {cart_count > 0 && (
-                                        <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                                        <span className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center leading-none">
                                             {cart_count > 9 ? '9+' : cart_count}
                                         </span>
                                     )}
                                 </Link>
-                            )}
-                            <span className="hidden sm:block text-sm text-gray-600 dark:text-gray-400 px-2">
-                                {auth.user?.name}
-                            </span>
-                            <button
-                                onClick={() => setLogoutOpen(true)}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors dark:text-gray-400 dark:hover:bg-red-900/20"
-                            >
-                                <LogOut className="h-4 w-4" />
-                                <span className="hidden sm:block">Logout</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Mobile nav */}
-                <div className="md:hidden border-t border-gray-100 dark:border-gray-800 overflow-x-auto">
-                    <div className="flex px-4 py-2 gap-1 min-w-max">
-                        {visibleNavItems.map(({ label, href, icon: Icon }) => {
-                            const active = currentPath === href || currentPath.startsWith(href + '/');
-                            return (
-                                <Link
-                                    key={href}
-                                    href={href}
-                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${
-                                        active
-                                            ? 'bg-blue-100 text-blue-700 font-semibold dark:bg-blue-900/40 dark:text-blue-300'
-                                            : 'font-medium text-gray-600 hover:text-blue-600 dark:text-gray-400'
-                                    }`}
-                                >
-                                    <Icon className="h-3.5 w-3.5" />
-                                    {label}
-                                </Link>
-                            );
-                        })}
-                        {isAdmin && (
-                            <>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 px-2 flex items-center select-none">Admin Preview</span>
-                                <Link
-                                    href="/admin/dashboard"
-                                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:text-blue-600 whitespace-nowrap transition-colors dark:text-gray-400"
-                                >
-                                    ← Back to Admin
-                                </Link>
-                            </>
+                            </Button>
                         )}
-                    </div>
-                </div>
-            </nav>
 
-            {/* Search overlay */}
-            {searchOpen && (
-                <div className="sticky top-16 z-30 bg-white border-b border-gray-200 shadow-md dark:bg-gray-900 dark:border-gray-800">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+                        <Separator orientation="vertical" className="mx-1 h-4" />
+
+                        {/* Logout */}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                            title="Log out"
+                            onClick={() => setLogoutOpen(true)}
+                        >
+                            <LogOut className="size-4" />
+                        </Button>
+                    </div>
+                </header>
+
+                {/* Search bar (drops below header) */}
+                {searchOpen && (
+                    <div className="border-b bg-background px-4 py-3">
                         <form onSubmit={handleSearch} className="flex gap-2">
                             <input
                                 ref={searchRef}
@@ -227,75 +262,103 @@ export default function CustomerLayout({ children, title }: Props) {
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 placeholder="Search products by name, brand, or weight…"
-                                className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                                className="flex-1 rounded-lg border border-input bg-background px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                            <button
-                                type="submit"
-                                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
-                            >
+                            <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
                                 Search
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setSearchOpen(false)}
-                                className="px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-gray-50 transition-colors dark:border-gray-700 dark:text-gray-400"
+                                className="px-3 py-2 rounded-lg border border-input text-sm text-muted-foreground hover:bg-muted transition-colors"
                             >
                                 Cancel
                             </button>
                         </form>
                     </div>
-                </div>
-            )}
-
-            {/* Page content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {title && (
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">{title}</h1>
                 )}
-                {children}
-            </main>
-            <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
 
-            {/* Mobile bottom tab bar — visible only on mobile, hidden on md+ */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 dark:bg-gray-900 dark:border-gray-800 pb-safe">
-                <div className="flex items-center justify-around h-14">
-                    {[
-                        { label: 'Browse',  href: '/customer/products', icon: ShoppingBag },
-                        { label: 'Orders',  href: '/customer/orders',   icon: Package },
-                        { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart },
-                        { label: 'Profile', href: '/customer/profile',  icon: User },
-                    ].map(({ label, href, icon: Icon }) => {
-                        const active = currentPath === href || currentPath.startsWith(href + '/');
-                        return (
+                {/* ID verification banner */}
+                {!isAdmin && auth.user.role === 'customer' && !isVerified && !bannerDismissed && (
+                    <div className={`border-b px-4 py-2.5 ${
+                        idStatus === 'rejected'
+                            ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+                            : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'
+                    }`}>
+                        <div className="flex items-center gap-3">
+                            <ShieldCheck className={`h-4 w-4 shrink-0 ${idStatus === 'rejected' ? 'text-red-500' : 'text-amber-500'}`} />
+                            <p className={`flex-1 text-xs font-medium ${idStatus === 'rejected' ? 'text-red-700 dark:text-red-300' : 'text-amber-700 dark:text-amber-300'}`}>
+                                {idStatus === 'rejected'
+                                    ? 'Your identity verification was rejected. Please re-upload your documents to place orders.'
+                                    : idStatus === 'pending' && hasSubmittedId
+                                    ? 'Your identity is being verified. Orders will be enabled once approved.'
+                                    : '⚠️ Your identity is not verified. Verify now to start ordering.'}
+                            </p>
                             <Link
-                                key={href}
-                                href={href}
-                                className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
-                                    active ? 'text-blue-600' : 'text-gray-400 dark:text-gray-500'
+                                href="/customer/id-verification"
+                                className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white ${
+                                    idStatus === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'
                                 }`}
                             >
-                                <div className="relative">
-                                    <Icon className="h-5 w-5" />
-                                    {label === 'Cart' && cart_count > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
-                                            {cart_count > 9 ? '9+' : cart_count}
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-[10px] font-medium">{label}</span>
+                                {idStatus === 'rejected' ? 'Re-upload' : idStatus === 'pending' && hasSubmittedId ? 'View Status' : 'Verify Now'}
                             </Link>
-                        );
-                    })}
-                </div>
-            </nav>
+                            <button
+                                onClick={() => setBannerDismissed(true)}
+                                className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                aria-label="Dismiss"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                )}
 
-            {/* Spacing so content isn't hidden behind bottom bar on mobile */}
-            <div className="h-14 md:hidden" />
+                {/* Page content */}
+                <div className="flex flex-1 flex-col gap-4 p-6 pb-20 md:pb-6">
+                    {children}
+                </div>
+
+                {/* Mobile bottom tab bar */}
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-sidebar-border pb-safe">
+                    <div className="flex items-center justify-around h-14">
+                        {[
+                            { label: 'Browse',  href: '/customer/products', icon: ShoppingBag },
+                            { label: 'Orders',  href: '/customer/orders',   icon: Package     },
+                            { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart },
+                            { label: 'Profile', href: '/customer/profile',  icon: User        },
+                        ].map(({ label, href, icon: Icon }) => {
+                            const active = currentPath === href || currentPath.startsWith(href + '/');
+                            return (
+                                <Link
+                                    key={href}
+                                    href={href}
+                                    className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
+                                        active ? 'text-blue-600' : 'text-muted-foreground'
+                                    }`}
+                                >
+                                    <div className="relative">
+                                        <Icon className="h-5 w-5" />
+                                        {label === 'Cart' && cart_count > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
+                                                {cart_count > 9 ? '9+' : cart_count}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="text-[10px] font-medium">{label}</span>
+                                </Link>
+                            );
+                        })}
+                    </div>
+                </nav>
+            </AppContent>
+
+            {/* Toasts */}
+            <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
 
             {/* PWA install banner */}
             <InstallAppBanner />
 
-            {/* Logout confirmation */}
+            {/* Logout dialog */}
             <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -315,6 +378,6 @@ export default function CustomerLayout({ children, title }: Props) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </AppShell>
     );
 }

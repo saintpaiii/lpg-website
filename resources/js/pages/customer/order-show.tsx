@@ -1,8 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, Banknote, Camera, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Loader2, MapPin, Navigation, Star, XCircle } from 'lucide-react';
+import { ArrowLeft, Banknote, Camera, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, Navigation, RefreshCcw, Star, XCircle } from 'lucide-react';
 import L from 'leaflet';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
@@ -239,6 +239,7 @@ type StoreLocation = { lat: number; lng: number; name: string };
 type Order = {
     id: number;
     order_number: string;
+    store_id: number | null;
     store_name: string;
     status: string;
     store_location: StoreLocation | null;
@@ -491,6 +492,7 @@ function peso(n: number) {
 
 export default function OrderShow({ order }: Props) {
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
+    const canRefund = order.status === 'delivered' && order.payment_status === 'paid';
     const [cancelOpen,     setCancelOpen]      = useState(false);
     const [cancelReason,   setCancelReason]    = useState('');
     const [cancelNotes,    setCancelNotes]     = useState('');
@@ -575,6 +577,64 @@ export default function OrderShow({ order }: Props) {
         });
     }
 
+    // Refund state
+    const [refundOpen,       setRefundOpen]       = useState(false);
+    const [refundAmount,     setRefundAmount]     = useState('');
+    const [refundReason,     setRefundReason]     = useState('');
+    const [refundDesc,       setRefundDesc]       = useState('');
+    const [refundFiles,      setRefundFiles]      = useState<File[]>([]);
+    const [refundSubmitting, setRefundSubmitting] = useState(false);
+    const refundFileRef = useRef<HTMLInputElement>(null);
+
+    function submitRefund() {
+        if (!refundReason || !refundDesc.trim() || !refundAmount) return;
+        setRefundSubmitting(true);
+        const fd = new FormData();
+        fd.append('amount', refundAmount);
+        fd.append('reason', refundReason);
+        fd.append('description', refundDesc);
+        refundFiles.forEach((f) => fd.append('evidence[]', f));
+        router.post(`/customer/orders/${order.id}/refund`, fd as any, {
+            onSuccess: () => {
+                toast.success('Refund request submitted.');
+                setRefundOpen(false);
+                setRefundAmount(''); setRefundReason(''); setRefundDesc(''); setRefundFiles([]);
+            },
+            onError: () => toast.error('Failed to submit refund request.'),
+            onFinish: () => setRefundSubmitting(false),
+        });
+    }
+
+    // Report state
+    const [reportOpen,     setReportOpen]     = useState(false);
+    const [reportCategory, setReportCategory] = useState('');
+    const [reportSubject,  setReportSubject]  = useState('');
+    const [reportDesc,     setReportDesc]     = useState('');
+    const [reportFiles,    setReportFiles]    = useState<File[]>([]);
+    const [reportSubmitting, setReportSubmitting] = useState(false);
+    const reportFileRef = useRef<HTMLInputElement>(null);
+
+    const submitReport = useCallback(() => {
+        if (!reportCategory || !reportSubject.trim() || !reportDesc.trim() || !order.store_id) return;
+        setReportSubmitting(true);
+        const fd = new FormData();
+        fd.append('reported_store_id', String(order.store_id));
+        fd.append('order_id', String(order.id));
+        fd.append('category', reportCategory);
+        fd.append('subject', reportSubject);
+        fd.append('description', reportDesc);
+        reportFiles.forEach((f) => fd.append('evidence[]', f));
+        router.post('/customer/reports', fd as any, {
+            onSuccess: () => {
+                toast.success('Report submitted. We will review it shortly.');
+                setReportOpen(false);
+                setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]);
+            },
+            onError: () => toast.error('Failed to submit report.'),
+            onFinish: () => setReportSubmitting(false),
+        });
+    }, [reportCategory, reportSubject, reportDesc, reportFiles, order.store_id, order.id]);
+
     // Show toast for ?payment=success|cancelled query param
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -645,6 +705,28 @@ export default function OrderShow({ order }: Props) {
                             >
                                 <XCircle className="h-4 w-4" />
                                 Cancel Order
+                            </Button>
+                        )}
+                        {canRefund && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
+                                onClick={() => { setRefundAmount(String(order.total_amount)); setRefundOpen(true); }}
+                            >
+                                <RefreshCcw className="h-4 w-4" />
+                                Request Refund
+                            </Button>
+                        )}
+                        {order.store_id && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50"
+                                onClick={() => setReportOpen(true)}
+                            >
+                                <Flag className="h-4 w-4" />
+                                Report Seller
                             </Button>
                         )}
                     </div>
@@ -985,6 +1067,139 @@ export default function OrderShow({ order }: Props) {
                             onClick={submitRatings}
                         >
                             {ratingSubmitting ? 'Submitting…' : 'Submit Review'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Request Refund dialog */}
+            <Dialog open={refundOpen} onOpenChange={(o) => { setRefundOpen(o); if (!o) { setRefundReason(''); setRefundDesc(''); setRefundFiles([]); } }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <RefreshCcw className="h-4 w-4 text-blue-500" />
+                            Request Refund — {order.order_number}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm">
+                        <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2">
+                            <p className="text-xs text-blue-700 dark:text-blue-400">
+                                Approved refunds are issued as <strong>platform credits</strong> that can be used on future orders.
+                            </p>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Refund Amount (₱) <span className="text-red-500">*</span></label>
+                            <input type="number" min="1" max={order.total_amount} step="0.01"
+                                value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                            <p className="text-xs text-muted-foreground">Max: ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Reason <span className="text-red-500">*</span></label>
+                            <select value={refundReason} onChange={(e) => setRefundReason(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option value="">Select a reason…</option>
+                                <option value="damaged_product">Damaged Product</option>
+                                <option value="leaking_tank">Leaking Tank</option>
+                                <option value="wrong_product">Wrong Product Received</option>
+                                <option value="missing_items">Missing Items</option>
+                                <option value="quality_issue">Quality Issue</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
+                            <textarea value={refundDesc} onChange={(e) => setRefundDesc(e.target.value)}
+                                rows={3} placeholder="Describe the issue in detail…"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Evidence Photos (optional, max 5)</label>
+                            <input ref={refundFileRef} type="file" multiple accept="image/*"
+                                className="hidden"
+                                onChange={(e) => setRefundFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
+                            <Button type="button" variant="outline" size="sm" onClick={() => refundFileRef.current?.click()}>
+                                Attach Photos
+                            </Button>
+                            {refundFiles.length > 0 && (
+                                <p className="text-xs text-muted-foreground">{refundFiles.map((f) => f.name).join(', ')}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRefundOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={submitRefund}
+                            disabled={refundSubmitting || !refundReason || !refundDesc.trim() || !refundAmount}
+                            className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                            {refundSubmitting ? 'Submitting…' : 'Submit Request'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Report Seller dialog */}
+            <Dialog open={reportOpen} onOpenChange={(o) => { setReportOpen(o); if (!o) { setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]); } }}>
+                <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Flag className="h-4 w-4 text-red-500" />
+                            Report Seller — {order.store_name}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 text-sm">
+                        <p className="text-muted-foreground text-xs">
+                            Regarding order <span className="font-mono font-semibold">{order.order_number}</span>
+                        </p>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Category <span className="text-red-500">*</span></label>
+                            <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option value="">Select a category…</option>
+                                <option value="fraud">Fraud</option>
+                                <option value="fake_product">Fake / Wrong Product</option>
+                                <option value="non_delivery">Non-Delivery</option>
+                                <option value="overpricing">Overpricing</option>
+                                <option value="rude_behavior">Rude Behavior</option>
+                                <option value="harassment">Harassment</option>
+                                <option value="counterfeit">Counterfeit Product</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Subject <span className="text-red-500">*</span></label>
+                            <input value={reportSubject} onChange={(e) => setReportSubject(e.target.value)}
+                                placeholder="Brief title…"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
+                            <textarea value={reportDesc} onChange={(e) => setReportDesc(e.target.value)}
+                                rows={4} placeholder="Describe what happened…"
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Evidence (optional, max 5 files)</label>
+                            <input ref={reportFileRef} type="file" multiple accept="image/*,video/mp4,application/pdf"
+                                className="hidden"
+                                onChange={(e) => setReportFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
+                            <Button type="button" variant="outline" size="sm" onClick={() => reportFileRef.current?.click()}>
+                                Attach Files
+                            </Button>
+                            {reportFiles.length > 0 && (
+                                <p className="text-xs text-muted-foreground">{reportFiles.map((f) => f.name).join(', ')}</p>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setReportOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={submitReport}
+                            disabled={reportSubmitting || !reportCategory || !reportSubject.trim() || !reportDesc.trim()}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            {reportSubmitting ? 'Submitting…' : 'Submit Report'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

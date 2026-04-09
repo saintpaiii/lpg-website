@@ -47,7 +47,7 @@ import type { BreadcrumbItem } from '@/types';
 
 type OrderStatus = 'pending' | 'confirmed' | 'preparing' | 'out_for_delivery' | 'delivered' | 'cancelled';
 type PaymentStatus = 'unpaid' | 'paid' | 'partial';
-type PaymentMethod = 'cash' | 'gcash' | 'bank_transfer' | 'maya';
+type PaymentMethod = 'cash' | 'gcash' | 'bank_transfer' | 'maya' | 'card' | 'grab_pay' | 'credits' | 'credits_partial';
 type TransactionType = 'refill' | 'new_purchase';
 
 type OrderItem = {
@@ -146,10 +146,14 @@ const PAY_STYLES: Record<PaymentStatus, string> = {
 };
 
 const PAY_LABELS: Record<PaymentMethod, string> = {
-    cash:          'Cash',
-    gcash:         'GCash',
-    bank_transfer: 'Bank Transfer',
-    maya:          'Maya',
+    cash:            'Cash',
+    gcash:           'GCash',
+    bank_transfer:   'Bank Transfer',
+    maya:            'Maya',
+    card:            'Card',
+    grab_pay:        'GrabPay',
+    credits:         'Platform Credits',
+    credits_partial: 'Credits + Online',
 };
 
 // ── Small components ───────────────────────────────────────────────────────────

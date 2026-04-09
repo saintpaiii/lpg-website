@@ -36,23 +36,19 @@
             }
 
             /* Splash screen — fades out once React mounts */
-            #splash {
-                position: fixed; inset: 0; z-index: 9999;
+            #splash-screen {
+                position: fixed;
+                top: 0; left: 0;
+                width: 100%; height: 100%;
                 background: #2563eb;
                 display: flex; flex-direction: column;
                 align-items: center; justify-content: center;
-                gap: 20px;
-                transition: opacity 0.4s ease;
+                z-index: 9999;
+                transition: opacity 0.3s ease;
             }
-            #splash.hidden { opacity: 0; pointer-events: none; }
-            #splash svg { width: 80px; height: 80px; }
-            #splash p { color: white; font-family: sans-serif; font-size: 18px; font-weight: 600; margin: 0; }
-            #splash .spinner {
-                width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.3);
-                border-top-color: white; border-radius: 50%;
-                animation: spin 0.8s linear infinite;
-            }
-            @keyframes spin { to { transform: rotate(360deg); } }
+            #splash-screen.fade-out { opacity: 0; pointer-events: none; }
+            #splash-screen svg { width: 80px; height: 80px; margin-bottom: 16px; }
+            #splash-screen p { color: white; font-family: sans-serif; font-size: 20px; font-weight: 600; margin: 0; }
         </style>
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
@@ -69,31 +65,34 @@
         @inertiaHead
     </head>
     <body class="font-sans antialiased">
-        {{-- Splash screen (hidden once React hydrates) --}}
-        <div id="splash">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill="white" fill-opacity="0.15"/>
-                <path d="M16 6C16 6 10 11 10 17C10 20.3137 12.6863 23 16 23C19.3137 23 22 20.3137 22 17C22 14 20 12 20 12C20 12 20 15 18 16C18 16 19 13 16 6Z" fill="white"/>
-                <path d="M16 18C16 18 13 16.5 13 19C13 20.6569 14.3431 22 16 22C17.6569 22 19 20.6569 19 19C19 16.5 16 18 16 18Z" fill="#93C5FD"/>
+        {{-- Splash screen — shows immediately on load, hides once React is ready --}}
+        <div id="splash-screen">
+            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="45" fill="white" opacity="0.2"/>
+                <path d="M50 20 C50 20 30 45 30 60 C30 72 39 80 50 80 C61 80 70 72 70 60 C70 45 50 20 50 20Z" fill="white"/>
             </svg>
             <p>LPG Marketplace Cavite</p>
-            <div class="spinner"></div>
         </div>
 
         @inertia
 
-        {{-- Service Worker registration --}}
+        {{-- Service Worker registration + splash hide --}}
         <script>
-            // Hide splash once page is ready
-            document.addEventListener('inertia:finish', function() {
-                var s = document.getElementById('splash');
-                if (s) { s.classList.add('hidden'); setTimeout(function() { s.remove(); }, 500); }
+            // Hide splash after DOM is ready (500ms gives React time to paint)
+            document.addEventListener('DOMContentLoaded', function() {
+                setTimeout(function() {
+                    var splash = document.getElementById('splash-screen');
+                    if (splash) {
+                        splash.classList.add('fade-out');
+                        setTimeout(function() { if (splash.parentNode) splash.remove(); }, 300);
+                    }
+                }, 500);
             });
-            // Fallback: hide after 3s even if Inertia event doesn't fire
-            setTimeout(function() {
-                var s = document.getElementById('splash');
-                if (s) { s.classList.add('hidden'); setTimeout(function() { if(s.parentNode) s.remove(); }, 500); }
-            }, 3000);
+            // Also hide on Inertia navigation (subsequent page loads)
+            document.addEventListener('inertia:finish', function() {
+                var splash = document.getElementById('splash-screen');
+                if (splash) { splash.classList.add('fade-out'); setTimeout(function() { if (splash.parentNode) splash.remove(); }, 300); }
+            });
 
             // Register Service Worker
             if ('serviceWorker' in navigator) {
