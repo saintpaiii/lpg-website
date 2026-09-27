@@ -35,7 +35,6 @@ export type SharedData = {
         store_suspension_info?: { reason: string | null; notes: string | null } | null;
     };
     cart_count: number;
-    platform_credits: number;
     unreadNotifications: number;
     recentNotifications: AppNotification[];
     [key: string]: unknown;

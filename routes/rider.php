@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('deliveries', [RiderDeliveryController::class, 'index'])->name('deliveries');
     Route::patch('deliveries/{delivery}/status', [RiderDeliveryController::class, 'updateStatus'])->name('deliveries.status');
+    Route::patch('deliveries/{delivery}/collect-payment', [RiderDeliveryController::class, 'collectPayment'])->name('deliveries.collect-payment');
     Route::get('deliveries/{delivery}/rider-location', [RiderLocationController::class, 'show'])->name('deliveries.rider-location');
     Route::post('location', [RiderLocationController::class, 'store'])->name('location');
     Route::get('history', [RiderDeliveryController::class, 'history'])->name('history');

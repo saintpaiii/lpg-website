@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
-use App\Services\NotificationService;
+use App\Services\OrderPaymentService;
 use App\Services\PayMongoService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -72,72 +72,7 @@ class PayMongoWebhookController extends Controller
                 continue;
             }
 
-            $isInstallment = $order->payment_mode === 'installment';
-
-            if ($isInstallment && $order->payment_status === 'unpaid') {
-                // This is the down payment arriving — move to partial
-                $order->update([
-                    'payment_status' => 'partial',
-                    'payment_method' => $localMethod,
-                ]);
-
-                // Notify store about down payment received
-                $store = $order->store;
-                if ($store) {
-                    NotificationService::sendToStore(
-                        $store->id,
-                        'payment',
-                        'Down Payment Received',
-                        "Order {$order->order_number} — down payment received. ₱" . number_format((float) $order->remaining_balance, 2) . ' balance remaining before delivery.',
-                        ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
-                    );
-                }
-            } elseif ($isInstallment && $order->payment_status === 'partial') {
-                // This is the balance payment — fully paid
-                $order->update([
-                    'payment_status'    => 'paid',
-                    'payment_method'    => $localMethod,
-                    'remaining_balance' => 0,
-                ]);
-
-                $invoice = $order->invoice;
-                if ($invoice) {
-                    $invoice->update([
-                        'payment_status' => 'paid',
-                        'paid_amount'    => $order->total_amount,
-                        'paid_at'        => now(),
-                        'payment_method' => $localMethod,
-                    ]);
-                }
-
-                // Notify store order is fully paid and ready for delivery
-                $store = $order->store;
-                if ($store) {
-                    NotificationService::sendToStore(
-                        $store->id,
-                        'payment',
-                        'Order Fully Paid — Ready for Delivery',
-                        "Order {$order->order_number} has been fully paid. You can now assign a rider.",
-                        ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
-                    );
-                }
-            } else {
-                // Full payment — existing behavior
-                $order->update([
-                    'payment_status' => 'paid',
-                    'payment_method' => $localMethod,
-                ]);
-
-                $invoice = $order->invoice;
-                if ($invoice) {
-                    $invoice->update([
-                        'payment_status' => 'paid',
-                        'paid_amount'    => $order->total_amount,
-                        'paid_at'        => now(),
-                        'payment_method' => $localMethod,
-                    ]);
-                }
-            }
+            OrderPaymentService::applyOnlinePayment($order, $localMethod);
         }
     }
 }

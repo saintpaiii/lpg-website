@@ -68,6 +68,7 @@ Route::middleware(['auth', 'verified', 'customer'])
         // Refund requests
         Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
         Route::post('orders/{order}/refund', [RefundController::class, 'store'])->name('orders.refund');
+        Route::post('refunds/{refund}/escalate', [RefundController::class, 'escalate'])->name('refunds.escalate');
 
         // User reports (customer reports a seller / view own reports)
         Route::get('reports', [UserReportController::class, 'index'])->name('reports');

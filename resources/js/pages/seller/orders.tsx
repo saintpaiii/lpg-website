@@ -28,20 +28,25 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
+    payment_mode: 'full' | 'consignment' | 'cod';
+    remaining_balance: number | null;
+    balance_due_date: string | null;
+    is_overdue: boolean;
+    shipping_fee: number | null;
     customer: { id: number; name: string } | null;
     created_at: string;
     cancelled_by: 'customer' | 'seller' | null;
 };
 
 type Rider  = { id: number; name: string };
-type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number };
+type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number; outstanding_balance: number; overdue_balance: number };
 type Paginated = { data: Order[]; current_page: number; last_page: number; total: number };
 
 type Props = {
     orders:  Paginated;
     counts:  Counts;
     tab:     string;
-    filters: { status?: string; search?: string; date_from?: string; date_to?: string };
+    filters: { status?: string; search?: string; date_from?: string; date_to?: string; balance?: string };
     riders:  Rider[];
 };
 
@@ -80,7 +85,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
     const [loading,      setLoading]      = useState(false);
 
     function navigate(overrides: Record<string, string> = {}) {
-        router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, ...overrides }, { preserveState: true, replace: true });
+        router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, balance: filters.balance ?? '', ...overrides }, { preserveState: true, replace: true });
     }
 
     function goTab(t: string) {
@@ -223,8 +228,26 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                     ))}
                 </div>
 
-                {/* Date filter */}
+                {/* Date + consignment balance filter */}
                 <div className="flex flex-wrap items-end gap-3">
+                    {(counts.outstanding_balance > 0 || filters.balance) && (
+                        <div className="flex items-center gap-1.5 mr-2">
+                            {([
+                                ['', 'All orders', null],
+                                ['outstanding', 'Unpaid balances', counts.outstanding_balance],
+                                ['overdue', 'Overdue', counts.overdue_balance],
+                            ] as [string, string, number | null][]).map(([key, label, n]) => (
+                                <button key={key || 'all'} type="button" onClick={() => navigate({ balance: key })}
+                                    className={`h-8 rounded-full border px-3 text-xs font-medium transition-colors ${
+                                        (filters.balance ?? '') === key
+                                            ? key === 'overdue' ? 'border-red-600 bg-red-600 text-white' : 'border-blue-600 bg-blue-600 text-white'
+                                            : 'border-input bg-background hover:bg-muted'
+                                    }`}>
+                                    {label}{n !== null && ` (${n})`}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-muted-foreground font-medium">From</label>
                         <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
@@ -285,6 +308,20 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                      o.payment_status === 'unpaid'    ? 'Unpaid'    :
                                                      o.payment_status}
                                                 </span>
+                                                {o.payment_mode !== 'full' && (
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">{o.payment_mode === 'cod' ? 'COD' : 'Consignment'}</p>
+                                                )}
+                                                {o.payment_mode === 'consignment' && o.payment_status === 'partial' && o.remaining_balance !== null && (
+                                                    <div className="mt-0.5 flex flex-col items-center gap-0.5">
+                                                        <span className={`text-[10px] font-medium ${o.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
+                                                            Balance: ₱{o.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                            {o.balance_due_date && ` due ${o.balance_due_date}`}
+                                                        </span>
+                                                        {o.is_overdue && (
+                                                            <span className="rounded bg-red-600 px-1.5 py-px text-[9px] font-bold tracking-wide text-white">OVERDUE</span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
                                                 {fmtDate(o.created_at)}
@@ -455,6 +492,7 @@ function OrderActions({
     onOpen: (d: ActionDialog) => void;
 }) {
     const isFinal = ['delivered', 'cancelled'].includes(order.status);
+    const awaitingDownPayment = order.payment_mode === 'consignment' && order.payment_status === 'unpaid';
 
     return (
         <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -470,7 +508,7 @@ function OrderActions({
             {/* Active-tab action buttons */}
             {tab === 'active' && !isFinal && (
                 <>
-                    {order.status === 'pending' && order.payment_status !== 'partial' && (
+                    {order.status === 'pending' && !awaitingDownPayment && (
                         <Button size="sm"
                             className="h-7 px-2.5 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
                             onClick={() => onOpen({ type: 'confirm', order })}>
@@ -478,9 +516,9 @@ function OrderActions({
                             Confirm
                         </Button>
                     )}
-                    {order.status === 'pending' && order.payment_status === 'partial' && (
+                    {order.status === 'pending' && awaitingDownPayment && (
                         <span className="h-7 px-2.5 text-xs text-amber-600 flex items-center gap-1">
-                            ⏳ Awaiting payment
+                            ⏳ Awaiting down payment
                         </span>
                     )}
                     {order.status === 'confirmed' && (

@@ -229,6 +229,7 @@ class DeliveryController extends Controller
         // Sync order status
         if ($data['status'] === 'delivered') {
             $delivery->order->update(['status' => 'delivered', 'delivered_at' => now()]);
+            \App\Services\OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
             // Free the vehicle
             if ($delivery->vehicle_id) {
                 Vehicle::find($delivery->vehicle_id)?->update(['status' => 'available']);

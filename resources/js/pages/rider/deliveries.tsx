@@ -1,6 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Banknote,
     Camera,
     Car,
     CheckCircle,
@@ -70,6 +71,9 @@ type OrderRef = {
     transaction_type: string;
     payment_method: string;
     payment_status: string;
+    payment_mode: 'full' | 'consignment' | 'cod';
+    amount_to_collect: number;
+    remaining_balance: number | null;
     delivery_latitude: number | null;
     delivery_longitude: number | null;
     delivery_distance_km: number | null;
@@ -774,7 +778,11 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 
             {/* Payment info */}
             <div className="flex items-center justify-between">
-                <span className="text-gray-500">{PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method}</span>
+                <span className="text-gray-500">
+                    {o.payment_mode === 'cod' ? 'Cash on Delivery'
+                        : o.payment_mode === 'consignment' ? 'Consignment (balance paid online later)'
+                        : (PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method)}
+                </span>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_STYLES[o.payment_status] ?? ''}`}>
                     {o.payment_status.charAt(0).toUpperCase() + o.payment_status.slice(1)}
                 </span>
@@ -801,6 +809,16 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
     function openStatusDialog(delivery: DeliveryRow, next: DeliveryStatus) {
         setStatusTarget(delivery);
         setTargetStatus(next);
+    }
+
+    const [collectingId, setCollectingId] = useState<number | null>(null);
+
+    function collectPayment(d: DeliveryRow) {
+        setCollectingId(d.id);
+        router.patch(`/rider/deliveries/${d.id}/collect-payment`, {}, {
+            preserveScroll: true,
+            onFinish: () => setCollectingId(null),
+        });
     }
 
     function closeStatusDialog() {
@@ -986,6 +1004,29 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
                                         <span className="font-semibold tabular-nums text-gray-900">
                                             ₱{(d.order?.total_amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </span>
+
+                                        {/* COD: amount to collect + Payment Collected */}
+                                        {d.order && d.order.amount_to_collect > 0 && (
+                                            <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                    Collect ₱{d.order.amount_to_collect.toLocaleString('en-PH', { minimumFractionDigits: 2 })} cash
+                                                </span>
+                                                {d.status === 'delivered' && (
+                                                    <Button
+                                                        size="sm"
+                                                        className="h-7 bg-emerald-600 text-xs text-white hover:bg-emerald-700"
+                                                        disabled={collectingId === d.id}
+                                                        onClick={() => collectPayment(d)}
+                                                    >
+                                                        <Banknote className="mr-1 h-3 w-3" />
+                                                        Payment Collected
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
+                                        {d.order?.payment_mode === 'cod' && d.order.payment_status === 'paid' && (
+                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Cash collected</span>
+                                        )}
 
                                         {/* Status actions */}
                                         {!isHistory && STATUS_NEXT[d.status].length > 0 && (

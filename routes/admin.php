@@ -3,7 +3,7 @@
 use App\Http\Controllers\Admin\AuthLogController;
 use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CustomerController;
-use App\Http\Controllers\Admin\WithdrawalController;
+use App\Http\Controllers\Admin\CommissionController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -101,17 +101,14 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::patch('verifications/{verification}/reject', [VerificationController::class, 'reject'])->name('verifications.reject');
     });
 
-    // Seller Withdrawal Requests (platform admin only)
-    Route::get('withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals');
-    Route::get('withdrawals/export', [WithdrawalController::class, 'export'])->name('withdrawals.export');
-    Route::patch('withdrawals/{withdrawal}/approve', [WithdrawalController::class, 'approve'])->name('withdrawals.approve');
-    Route::patch('withdrawals/{withdrawal}/reject', [WithdrawalController::class, 'reject'])->name('withdrawals.reject');
-    Route::patch('withdrawals/{withdrawal}/release', [WithdrawalController::class, 'markReleased'])->name('withdrawals.release');
+    // Platform commissions (platform admin only)
+    Route::get('commissions', [CommissionController::class, 'index'])->name('commissions');
+    Route::get('commissions/export', [CommissionController::class, 'export'])->name('commissions.export');
+    Route::patch('commissions/{commission}/status', [CommissionController::class, 'updateStatus'])->name('commissions.status');
 
-    // Refunds
+    // Refund disputes (escalated by customers)
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
-    Route::patch('refunds/{refund}/approve', [RefundController::class, 'approve'])->name('refunds.approve');
-    Route::patch('refunds/{refund}/reject', [RefundController::class, 'reject'])->name('refunds.reject');
+    Route::patch('refunds/{refund}/decide', [RefundController::class, 'decide'])->name('refunds.decide');
 
     // User Reports
     Route::get('user-reports', [UserReportController::class, 'index'])->name('user-reports');

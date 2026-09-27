@@ -7,7 +7,7 @@ use App\Models\Customer;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Services\PayMongoService;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class PaymentController extends Controller
@@ -20,7 +20,7 @@ class PaymentController extends Controller
     /**
      * Create (or re-create) a PayMongo Checkout Session for an unpaid order.
      */
-    public function payNow(Request $request, Order $order): RedirectResponse
+    public function payNow(Request $request, Order $order): JsonResponse
     {
         $customer = $this->getCustomer($request);
 
@@ -28,26 +28,23 @@ class PaymentController extends Controller
             abort(403);
         }
 
-        if ($order->payment_status === 'paid') {
-            return redirect()->route('customer.orders.show', $order)
-                ->with('error', 'This order has already been paid.');
+        if ($order->payment_status !== 'unpaid') {
+            return response()->json(['error' => 'This order has no unpaid amount to settle here.'], 422);
         }
 
         try {
             $paymongo  = app(PayMongoService::class);
             $user      = $request->user();
-            $lineItems = [];
+            $isConsign = $order->payment_mode === 'consignment' && (float) $order->down_payment_amount > 0;
+            $amount    = $isConsign ? (float) $order->down_payment_amount : $order->grandTotal();
 
-            $order->load('items.product');
-            foreach ($order->items as $item) {
-                $lineItems[] = [
-                    'name'        => $item->product?->name ?? 'LPG Product',
-                    'description' => $item->product?->brand ?? '',
-                    'amount'      => (int) round((float) $item->unit_price * 100),
-                    'currency'    => 'PHP',
-                    'quantity'    => $item->quantity,
-                ];
-            }
+            $lineItems = [[
+                'name'        => $isConsign ? "Down Payment — Order {$order->order_number}" : "LPG Order {$order->order_number}",
+                'description' => $isConsign ? 'Consignment down payment' : 'Items + delivery fee',
+                'amount'      => (int) round($amount * 100),
+                'currency'    => 'PHP',
+                'quantity'    => 1,
+            ]];
 
             $session = $paymongo->createCheckoutSession([
                 'reference_number' => $order->order_number,
@@ -63,7 +60,7 @@ class PaymentController extends Controller
             Payment::create([
                 'order_id'             => $order->id,
                 'paymongo_checkout_id' => $session['id'],
-                'amount'               => $order->total_amount,
+                'amount'               => $amount,
                 'status'               => 'pending',
             ]);
 
@@ -74,7 +71,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Pay the remaining installment balance for a partially-paid order.
+     * Pay the remaining consignment balance for a partially-paid order.
      */
     public function payBalance(Request $request, Order $order): \Illuminate\Http\JsonResponse
     {
@@ -84,7 +81,7 @@ class PaymentController extends Controller
             abort(403);
         }
 
-        if ($order->payment_mode !== 'installment' || $order->payment_status !== 'partial') {
+        if ($order->payment_mode !== 'consignment' || $order->payment_status !== 'partial') {
             return response()->json(['error' => 'This order is not eligible for balance payment.'], 422);
         }
 

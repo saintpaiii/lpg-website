@@ -35,6 +35,10 @@ class Order extends Model
         'payment_mode',
         'down_payment_amount',
         'remaining_balance',
+        'balance_due_date',
+        'balance_reminder_sent_at',
+        'balance_overdue_notified_at',
+        'discount_amount',
         'delivery_latitude',
         'delivery_longitude',
         'delivery_distance_km',
@@ -52,6 +56,10 @@ class Order extends Model
             'cancelled_at'         => 'datetime',
             'down_payment_amount'  => 'decimal:2',
             'remaining_balance'    => 'decimal:2',
+            'discount_amount'      => 'decimal:2',
+            'balance_due_date'            => 'date',
+            'balance_reminder_sent_at'    => 'datetime',
+            'balance_overdue_notified_at' => 'datetime',
             'delivery_latitude'           => 'decimal:7',
             'delivery_longitude'          => 'decimal:7',
             'delivery_distance_km'        => 'decimal:2',
@@ -92,5 +100,30 @@ class Order extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function commission(): HasOne
+    {
+        return $this->hasOne(Commission::class);
+    }
+
+    public function refundRequests(): HasMany
+    {
+        return $this->hasMany(RefundRequest::class);
+    }
+
+    /** Amount the customer owes in total (items after discount + delivery fee). */
+    public function grandTotal(): float
+    {
+        return round((float) $this->total_amount + (float) ($this->shipping_fee ?? 0), 2);
+    }
+
+    /** Consignment order with an unpaid balance that is past its due date. */
+    public function isBalanceOverdue(): bool
+    {
+        return $this->payment_mode === 'consignment'
+            && $this->payment_status === 'partial'
+            && $this->balance_due_date !== null
+            && $this->balance_due_date->lt(now()->startOfDay());
     }
 }

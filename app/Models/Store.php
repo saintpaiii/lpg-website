@@ -46,6 +46,10 @@ class Store extends Model
         'base_delivery_fee',
         'fee_per_km',
         'max_delivery_radius_km',
+        'allow_cod',
+        'allow_consignment',
+        'min_down_payment_percent',
+        'consignment_due_days',
     ];
 
     protected function casts(): array
@@ -62,6 +66,10 @@ class Store extends Model
             'base_delivery_fee'        => 'decimal:2',
             'fee_per_km'               => 'decimal:2',
             'max_delivery_radius_km'   => 'integer',
+            'allow_cod'                => 'boolean',
+            'allow_consignment'        => 'boolean',
+            'min_down_payment_percent' => 'integer',
+            'consignment_due_days'     => 'integer',
         ];
     }
 

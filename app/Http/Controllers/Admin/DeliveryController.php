@@ -206,7 +206,7 @@ class DeliveryController extends Controller
                     'delivered_at' => now(),
                 ]);
                 if ($delivery->order) {
-                    \App\Services\WalletService::creditOrder($delivery->order->fresh());
+                    \App\Services\OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
                 }
             }
 

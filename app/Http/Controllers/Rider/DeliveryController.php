@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Delivery;
 use App\Models\DeliveryProof;
 use App\Models\RiderLocation;
+use App\Services\NotificationService;
+use App\Services\OrderPaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +38,11 @@ class DeliveryController extends Controller
                 'transaction_type'   => $d->order->transaction_type,
                 'payment_method'     => $d->order->payment_method,
                 'payment_status'     => $d->order->payment_status,
+                'payment_mode'       => $d->order->payment_mode ?? 'full',
+                'amount_to_collect'  => $d->order->payment_mode === 'cod' && $d->order->payment_status === 'unpaid'
+                    ? $d->order->grandTotal()
+                    : 0,
+                'remaining_balance'  => $d->order->remaining_balance ? (float) $d->order->remaining_balance : null,
                 'delivery_latitude'           => $d->order->delivery_latitude  ? (float) $d->order->delivery_latitude  : null,
                 'delivery_longitude'          => $d->order->delivery_longitude ? (float) $d->order->delivery_longitude : null,
                 'delivery_distance_km'        => $d->order->delivery_distance_km       ? (float) $d->order->delivery_distance_km       : null,
@@ -224,7 +231,7 @@ class DeliveryController extends Controller
                     'delivered_at' => now(),
                 ]);
                 if ($delivery->order) {
-                    \App\Services\WalletService::creditOrder($delivery->order->fresh());
+                    OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
                 }
             }
 
@@ -264,5 +271,40 @@ class DeliveryController extends Controller
 
         $label = ucfirst(str_replace('_', ' ', $newStatus));
         return back()->with('success', "Delivery marked as {$label}.");
+    }
+
+    // ── COD: Payment Collected ────────────────────────────────────────────────
+
+    public function collectPayment(Delivery $delivery): RedirectResponse
+    {
+        if ($delivery->rider_id !== auth()->id()) {
+            abort(403, 'Unauthorized.');
+        }
+
+        $order = $delivery->order;
+
+        if (! $order || $order->payment_mode !== 'cod') {
+            return back()->with('error', 'This is not a Cash on Delivery order.');
+        }
+        if ($delivery->status !== 'delivered') {
+            return back()->with('error', 'Mark the order as delivered before recording the payment.');
+        }
+        if ($order->payment_status === 'paid') {
+            return back()->with('error', 'Payment was already recorded for this order.');
+        }
+
+        DB::transaction(fn () => OrderPaymentService::markPaid($order, 'cash'));
+
+        if ($order->store_id) {
+            NotificationService::sendToStore(
+                $order->store_id,
+                'payment',
+                'COD Payment Collected',
+                'Rider ' . auth()->user()->name . " collected ₱" . number_format($order->grandTotal(), 2) . " cash for order {$order->order_number}.",
+                ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
+            );
+        }
+
+        return back()->with('success', "Cash payment recorded for {$order->order_number}.");
     }
 }

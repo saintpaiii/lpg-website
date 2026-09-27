@@ -33,6 +33,10 @@ class DeliveryController extends Controller
                 'transaction_type' => $d->order->transaction_type,
                 'payment_method'   => $d->order->payment_method,
                 'payment_status'   => $d->order->payment_status,
+                'payment_mode'     => $d->order->payment_mode ?? 'full',
+                'amount_to_collect'=> $d->order->payment_mode === 'cod' && $d->order->payment_status === 'unpaid'
+                    ? $d->order->grandTotal()
+                    : 0,
                 'customer' => $d->order->customer ? [
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,
@@ -101,6 +105,33 @@ class DeliveryController extends Controller
 
     // ── PUT /api/deliveries/{delivery}/status ─────────────────────────────────
 
+    /** COD: rider confirms the cash was collected on delivery. */
+    public function collectPayment(Request $request, Delivery $delivery): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->role === 'rider' && $delivery->rider_id !== $user->id) {
+            return response()->json(['message' => 'Unauthorized.'], 403);
+        }
+
+        $order = $delivery->order;
+        if (! $order || $order->payment_mode !== 'cod') {
+            return response()->json(['message' => 'This is not a Cash on Delivery order.'], 422);
+        }
+        if ($delivery->status !== 'delivered') {
+            return response()->json(['message' => 'Mark the order as delivered before recording the payment.'], 422);
+        }
+        if ($order->payment_status === 'paid') {
+            return response()->json(['message' => 'Payment was already recorded for this order.'], 422);
+        }
+
+        DB::transaction(fn () => \App\Services\OrderPaymentService::markPaid($order, 'cash'));
+
+        $delivery->load(['order.customer', 'order.items.product', 'rider']);
+
+        return response()->json($this->formatDelivery($delivery));
+    }
+
     public function updateStatus(Request $request, Delivery $delivery): JsonResponse
     {
         $user = $request->user();
@@ -150,6 +181,9 @@ class DeliveryController extends Controller
                     'status'       => 'delivered',
                     'delivered_at' => now(),
                 ]);
+                if ($delivery->order) {
+                    \App\Services\OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
+                }
             }
 
             if ($newStatus === 'failed') {

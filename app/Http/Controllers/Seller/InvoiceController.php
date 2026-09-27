@@ -249,7 +249,11 @@ class InvoiceController extends Controller
             $invoice->order->update([
                 'payment_status' => $status,
                 'payment_method' => $data['payment_method'],
-            ]);
+            ] + ($status === 'paid' && $invoice->order->payment_mode === 'consignment' ? ['remaining_balance' => 0] : []));
+
+            if ($status === 'paid') {
+                \App\Services\OrderPaymentService::recordCommission($invoice->order->fresh());
+            }
         }
 
         return back()->with('success', 'Payment recorded successfully.');

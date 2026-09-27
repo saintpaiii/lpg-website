@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, Banknote, Camera, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, Navigation, RefreshCcw, Star, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Banknote, Camera, Handshake, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, Navigation, RefreshCcw, Star, XCircle } from 'lucide-react';
 import L from 'leaflet';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
@@ -251,9 +251,15 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
-    payment_mode: 'full' | 'installment';
+    payment_mode: 'full' | 'consignment' | 'cod';
     down_payment_amount: number | null;
     remaining_balance: number | null;
+    balance_due_date: string | null;
+    balance_days_remaining: number | null;
+    is_overdue: boolean;
+    shipping_fee: number | null;
+    discount_amount: number;
+    refund_request: { id: number; status: string } | null;
     notes: string | null;
     cancellation_reason: string | null;
     cancellation_notes: string | null;
@@ -492,14 +498,16 @@ function peso(n: number) {
 
 export default function OrderShow({ order }: Props) {
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
-    const canRefund = order.status === 'delivered' && order.payment_status === 'paid';
+    const hasActiveRefund = !!order.refund_request && ['pending', 'approved', 'processed'].includes(order.refund_request.status);
+    const canRefund = order.status === 'delivered' && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund;
+    const grandTotal = order.total_amount + (order.shipping_fee ?? 0);
     const [cancelOpen,     setCancelOpen]      = useState(false);
     const [cancelReason,   setCancelReason]    = useState('');
     const [cancelNotes,    setCancelNotes]     = useState('');
     const [cancelling,     setCancelling]      = useState(false);
     const [payingBalance,  setPayingBalance]   = useState(false);
 
-    const canPayBalance = order.payment_mode === 'installment' && order.payment_status === 'partial';
+    const canPayBalance = order.payment_mode === 'consignment' && order.payment_status === 'partial';
 
     async function payBalance() {
         setPayingBalance(true);
@@ -581,24 +589,26 @@ export default function OrderShow({ order }: Props) {
     const [refundOpen,       setRefundOpen]       = useState(false);
     const [refundAmount,     setRefundAmount]     = useState('');
     const [refundReason,     setRefundReason]     = useState('');
+    const [refundResolution, setRefundResolution] = useState('');
     const [refundDesc,       setRefundDesc]       = useState('');
     const [refundFiles,      setRefundFiles]      = useState<File[]>([]);
     const [refundSubmitting, setRefundSubmitting] = useState(false);
     const refundFileRef = useRef<HTMLInputElement>(null);
 
     function submitRefund() {
-        if (!refundReason || !refundDesc.trim() || !refundAmount) return;
+        if (!refundReason || !refundResolution || !refundDesc.trim() || !refundAmount) return;
         setRefundSubmitting(true);
         const fd = new FormData();
         fd.append('amount', refundAmount);
         fd.append('reason', refundReason);
+        fd.append('preferred_resolution', refundResolution);
         fd.append('description', refundDesc);
         refundFiles.forEach((f) => fd.append('evidence[]', f));
         router.post(`/customer/orders/${order.id}/refund`, fd as any, {
             onSuccess: () => {
                 toast.success('Refund request submitted.');
                 setRefundOpen(false);
-                setRefundAmount(''); setRefundReason(''); setRefundDesc(''); setRefundFiles([]);
+                setRefundAmount(''); setRefundReason(''); setRefundResolution(''); setRefundDesc(''); setRefundFiles([]);
             },
             onError: () => toast.error('Failed to submit refund request.'),
             onFinish: () => setRefundSubmitting(false),
@@ -712,11 +722,19 @@ export default function OrderShow({ order }: Props) {
                                 size="sm"
                                 variant="outline"
                                 className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
-                                onClick={() => { setRefundAmount(String(order.total_amount)); setRefundOpen(true); }}
+                                onClick={() => { setRefundAmount(String(grandTotal)); setRefundOpen(true); }}
                             >
                                 <RefreshCcw className="h-4 w-4" />
                                 Request Refund
                             </Button>
+                        )}
+                        {order.refund_request && (
+                            <Link href="/customer/refunds">
+                                <Button size="sm" variant="outline" className="gap-1.5">
+                                    <RefreshCcw className="h-4 w-4" />
+                                    Refund: {order.refund_request.status}
+                                </Button>
+                            </Link>
                         )}
                         {order.store_id && (
                             <Button
@@ -858,8 +876,10 @@ export default function OrderShow({ order }: Props) {
                                 <div className="flex justify-between items-center">
                                     <span className="text-gray-500">Mode</span>
                                     <span className="flex items-center gap-1 text-xs font-medium">
-                                        {order.payment_mode === 'installment' ? (
-                                            <><Banknote className="h-3.5 w-3.5 text-amber-500" /> Installment</>
+                                        {order.payment_mode === 'consignment' ? (
+                                            <><Handshake className="h-3.5 w-3.5 text-amber-500" /> Consignment</>
+                                        ) : order.payment_mode === 'cod' ? (
+                                            <><Banknote className="h-3.5 w-3.5 text-emerald-500" /> Cash on Delivery</>
                                         ) : (
                                             <><CreditCard className="h-3.5 w-3.5 text-blue-500" /> Full Payment</>
                                         )}
@@ -876,30 +896,85 @@ export default function OrderShow({ order }: Props) {
                                     </span>
                                 </div>
 
-                                {/* Installment breakdown */}
-                                {order.payment_mode === 'installment' && (
-                                    <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 px-3 py-2 space-y-1 text-xs">
-                                        <div className="flex justify-between text-gray-600 dark:text-gray-300">
-                                            <span>Total</span>
-                                            <span className="font-medium">{peso(order.total_amount)}</span>
+                                {/* Consignment breakdown */}
+                                {order.payment_mode === 'consignment' && (() => {
+                                    const outstanding = order.payment_status === 'partial' && (order.remaining_balance ?? 0) > 0;
+                                    const tone = order.is_overdue
+                                        ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-900/20'
+                                        : 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20';
+                                    return (
+                                        <div className={`rounded-lg border px-3 py-2.5 space-y-1.5 text-xs ${tone}`}>
+                                            <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                                                <span>Order Total</span>
+                                                <span className="font-medium">{peso(grandTotal)}</span>
+                                            </div>
+                                            {order.down_payment_amount !== null && (
+                                                <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                                    <span>Down Payment {order.payment_status === 'unpaid' ? '(unpaid)' : '(paid)'}</span>
+                                                    <span className="font-medium">{peso(order.down_payment_amount)}</span>
+                                                </div>
+                                            )}
+                                            {outstanding && (
+                                                <>
+                                                    <div className={`flex justify-between font-semibold border-t pt-1.5 mt-1 text-sm ${order.is_overdue ? 'border-red-200 text-red-700 dark:text-red-400' : 'border-amber-200 text-amber-800 dark:border-amber-800 dark:text-amber-300'}`}>
+                                                        <span>Remaining Balance</span>
+                                                        <span>{peso(order.remaining_balance ?? 0)}</span>
+                                                    </div>
+                                                    {order.balance_due_date ? (
+                                                        <>
+                                                            <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                                                                <span>Due by</span>
+                                                                <span className="font-medium">{order.balance_due_date}</span>
+                                                            </div>
+                                                            <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                                                                <span>Days remaining</span>
+                                                                <span className={`font-semibold ${order.is_overdue ? 'text-red-600' : ''}`}>
+                                                                    {order.is_overdue
+                                                                        ? `${Math.abs(order.balance_days_remaining ?? 0)} day(s) overdue`
+                                                                        : order.balance_days_remaining === 0 ? 'Due today' : `${order.balance_days_remaining} day(s)`}
+                                                                </span>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <p className="text-amber-700 dark:text-amber-400">
+                                                            The balance becomes due a few days after your order is delivered.
+                                                        </p>
+                                                    )}
+                                                    {order.is_overdue && (
+                                                        <div className="flex items-start gap-1.5 rounded-md bg-red-600 px-2 py-1.5 font-semibold text-white">
+                                                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px" />
+                                                            Your balance is overdue. Please pay as soon as possible.
+                                                        </div>
+                                                    )}
+                                                    <Button
+                                                        size="sm"
+                                                        className={`mt-1 w-full gap-1.5 text-white ${order.is_overdue ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                                                        onClick={payBalance}
+                                                        disabled={payingBalance}
+                                                    >
+                                                        {payingBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                                                        Pay Remaining Balance
+                                                    </Button>
+                                                </>
+                                            )}
+                                            {order.payment_status === 'paid' && (
+                                                <p className="text-emerald-700 dark:text-emerald-400 font-medium">Fully paid — thank you!</p>
+                                            )}
                                         </div>
-                                        {order.down_payment_amount !== null && (
-                                            <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
-                                                <span>Down Payment (paid)</span>
-                                                <span className="font-medium">{peso(order.down_payment_amount)}</span>
-                                            </div>
-                                        )}
-                                        {order.payment_status !== 'paid' && order.remaining_balance !== null && order.remaining_balance > 0 && (
-                                            <div className="flex justify-between text-amber-700 dark:text-amber-400 font-semibold border-t border-amber-200 dark:border-amber-800 pt-1 mt-1">
-                                                <span>Balance Due</span>
-                                                <span>{peso(order.remaining_balance)}</span>
-                                            </div>
-                                        )}
-                                        {order.payment_status === 'partial' && (
-                                            <p className="text-amber-600 dark:text-amber-400 pt-0.5">
-                                                Pay the balance to trigger delivery.
-                                            </p>
-                                        )}
+                                    );
+                                })()}
+
+                                {/* COD note */}
+                                {order.payment_mode === 'cod' && order.payment_status === 'unpaid' && order.status !== 'cancelled' && (
+                                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                                        Pay <strong>{peso(grandTotal)}</strong> in cash to the rider upon delivery.
+                                    </div>
+                                )}
+
+                                {order.discount_amount > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Store discount</span>
+                                        <span className="font-medium text-emerald-600">−{peso(order.discount_amount)}</span>
                                     </div>
                                 )}
 
@@ -1073,7 +1148,7 @@ export default function OrderShow({ order }: Props) {
             </Dialog>
 
             {/* Request Refund dialog */}
-            <Dialog open={refundOpen} onOpenChange={(o) => { setRefundOpen(o); if (!o) { setRefundReason(''); setRefundDesc(''); setRefundFiles([]); } }}>
+            <Dialog open={refundOpen} onOpenChange={(o) => { setRefundOpen(o); if (!o) { setRefundReason(''); setRefundResolution(''); setRefundDesc(''); setRefundFiles([]); } }}>
                 <DialogContent className="max-w-lg">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -1084,15 +1159,26 @@ export default function OrderShow({ order }: Props) {
                     <div className="space-y-3 text-sm">
                         <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2">
                             <p className="text-xs text-blue-700 dark:text-blue-400">
-                                Approved refunds are issued as <strong>platform credits</strong> that can be used on future orders.
+                                Your request goes directly to <strong>{order.store_name}</strong>. The seller can send a replacement,
+                                refund your money, or give you a store discount. If you disagree with their decision, you can escalate it to the platform admin.
                             </p>
                         </div>
                         <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Refund Amount (₱) <span className="text-red-500">*</span></label>
-                            <input type="number" min="1" max={order.total_amount} step="0.01"
+                            <label className="text-xs font-medium">Amount Concerned (₱) <span className="text-red-500">*</span></label>
+                            <input type="number" min="1" max={grandTotal} step="0.01"
                                 value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)}
                                 className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-                            <p className="text-xs text-muted-foreground">Max: ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                            <p className="text-xs text-muted-foreground">Max: {peso(grandTotal)}</p>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <label className="text-xs font-medium">Preferred Resolution <span className="text-red-500">*</span></label>
+                            <select value={refundResolution} onChange={(e) => setRefundResolution(e.target.value)}
+                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
+                                <option value="">Select a resolution…</option>
+                                <option value="replacement">Product Replacement</option>
+                                <option value="money_refund">Money Refund</option>
+                                <option value="store_discount">Store Discount</option>
+                            </select>
                         </div>
                         <div className="grid gap-1.5">
                             <label className="text-xs font-medium">Reason <span className="text-red-500">*</span></label>
@@ -1130,7 +1216,7 @@ export default function OrderShow({ order }: Props) {
                         <Button variant="outline" onClick={() => setRefundOpen(false)}>Cancel</Button>
                         <Button
                             onClick={submitRefund}
-                            disabled={refundSubmitting || !refundReason || !refundDesc.trim() || !refundAmount}
+                            disabled={refundSubmitting || !refundReason || !refundResolution || !refundDesc.trim() || !refundAmount}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
                             {refundSubmitting ? 'Submitting…' : 'Submit Request'}

@@ -4,6 +4,7 @@ import { AddressFields } from '@/components/address-fields';
 import {
     Building2,
     Camera,
+    CreditCard,
     Crosshair,
     Mail,
     MapPin,
@@ -43,10 +44,35 @@ interface StoreData {
     latitude: number | null;
     longitude: number | null;
     attendance_radius: number;
+    allow_cod: boolean;
+    allow_consignment: boolean;
+    min_down_payment_percent: number;
+    consignment_due_days: number;
 }
 
 interface Props {
     store: StoreData;
+}
+
+function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
+    return (
+        <div className="flex items-center justify-between gap-4">
+            <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-xs text-muted-foreground">{hint}</p>
+            </div>
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                aria-label={label}
+                onClick={() => onChange(!checked)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
+            >
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+        </div>
+    );
 }
 
 // ── Map click handler ──────────────────────────────────────────────────────────
@@ -111,6 +137,10 @@ export default function SellerSettings({ store }: Props) {
         base_delivery_fee: string;
         fee_per_km: string;
         max_delivery_radius_km: string;
+        allow_cod: boolean;
+        allow_consignment: boolean;
+        min_down_payment_percent: string;
+        consignment_due_days: string;
         logo: File | null;
     }>({
         store_name:   store.store_name,
@@ -125,6 +155,10 @@ export default function SellerSettings({ store }: Props) {
         base_delivery_fee:      String(store.base_delivery_fee ?? 45),
         fee_per_km:             String(store.fee_per_km ?? 10),
         max_delivery_radius_km: String(store.max_delivery_radius_km ?? 20),
+        allow_cod:                store.allow_cod,
+        allow_consignment:        store.allow_consignment,
+        min_down_payment_percent: String(store.min_down_payment_percent ?? 50),
+        consignment_due_days:     String(store.consignment_due_days ?? 7),
         logo:                   null,
     });
 
@@ -154,6 +188,10 @@ export default function SellerSettings({ store }: Props) {
         fd.append('base_delivery_fee',      data.base_delivery_fee || '45');
         fd.append('fee_per_km',             data.fee_per_km || '10');
         fd.append('max_delivery_radius_km', data.max_delivery_radius_km || '20');
+        fd.append('allow_cod',                data.allow_cod ? '1' : '0');
+        fd.append('allow_consignment',        data.allow_consignment ? '1' : '0');
+        fd.append('min_down_payment_percent', data.min_down_payment_percent || '50');
+        fd.append('consignment_due_days',     data.consignment_due_days || '7');
         // Location fields — sent as numeric strings or empty (→ null on backend)
         fd.append('latitude',          pin ? String(pin.lat) : '');
         fd.append('longitude',         pin ? String(pin.lng) : '');
@@ -357,6 +395,64 @@ export default function SellerSettings({ store }: Props) {
                                     </div>
                                 );
                             })()}
+                        </CardContent>
+                    </Card>
+
+                    {/* Payment Options */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <CreditCard className="h-4 w-4 text-blue-600" />
+                                Payment Options
+                            </CardTitle>
+                            <CardDescription>
+                                Full Payment (online) is always available. Choose which other options customers see at checkout.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <ToggleRow
+                                label="Cash on Delivery"
+                                hint="The rider collects cash when the order is delivered."
+                                checked={data.allow_cod}
+                                onChange={(v) => setData('allow_cod', v)}
+                            />
+                            <ToggleRow
+                                label="Consignment"
+                                hint="Customer pays a down payment online; the balance is due after delivery."
+                                checked={data.allow_consignment}
+                                onChange={(v) => setData('allow_consignment', v)}
+                            />
+
+                            {data.allow_consignment && (
+                                <div className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/30 p-3">
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="min_down_payment_percent">Min Down Payment (%)</Label>
+                                        <Input
+                                            id="min_down_payment_percent"
+                                            type="number"
+                                            min={20}
+                                            max={80}
+                                            value={data.min_down_payment_percent}
+                                            onChange={(e) => setData('min_down_payment_percent', e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Between 20% and 80%.</p>
+                                        {allErrors.min_down_payment_percent && <p className="text-xs text-red-500">{allErrors.min_down_payment_percent}</p>}
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="consignment_due_days">Payment Deadline (days after delivery)</Label>
+                                        <Input
+                                            id="consignment_due_days"
+                                            type="number"
+                                            min={1}
+                                            max={90}
+                                            value={data.consignment_due_days}
+                                            onChange={(e) => setData('consignment_due_days', e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Customers get a reminder 2 days before.</p>
+                                        {allErrors.consignment_due_days && <p className="text-xs text-red-500">{allErrors.consignment_due_days}</p>}
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

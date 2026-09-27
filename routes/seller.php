@@ -11,7 +11,8 @@ use App\Http\Controllers\Seller\ProductController;
 use App\Http\Controllers\Seller\ReviewController;
 use App\Http\Controllers\Seller\SettingsController;
 use App\Http\Controllers\Seller\AttendanceController;
-use App\Http\Controllers\Seller\WalletController;
+use App\Http\Controllers\Seller\RefundController as SellerRefundController;
+use App\Http\Controllers\Seller\RevenueController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use App\Http\Controllers\Seller\VehicleController;
@@ -129,12 +130,17 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::post('payroll/settings', [PayrollController::class, 'updateSettings'])->name('payroll.settings.update');
         Route::patch('payroll/staff/{user}/rate', [PayrollController::class, 'updateStaffRate'])->name('payroll.staff-rate');
 
-        // ── Wallet (seller owner only) ────────────────────────────────────────
+        // ── Revenue & commissions (seller owner only) ─────────────────────────
         Route::middleware('seller_owner')->group(function () {
-            Route::get('wallet', [WalletController::class, 'index'])->name('wallet');
-            Route::get('wallet/export', [WalletController::class, 'export'])->name('wallet.export');
-            Route::post('wallet/withdraw', [WalletController::class, 'requestWithdrawal'])->name('wallet.withdraw');
-            Route::patch('wallet/requests/{withdrawal}/received', [WalletController::class, 'markReceived'])->name('wallet.received');
+            Route::get('revenue', [RevenueController::class, 'index'])->name('revenue');
+            Route::get('revenue/export', [RevenueController::class, 'export'])->name('revenue.export');
+        });
+
+        // ── Refund requests (handled by the seller) ──────────────────────────
+        Route::middleware('permission:orders.view')->group(function () {
+            Route::get('refunds', [SellerRefundController::class, 'index'])->name('refunds');
+            Route::patch('refunds/{refund}/accept', [SellerRefundController::class, 'accept'])->name('refunds.accept');
+            Route::patch('refunds/{refund}/reject', [SellerRefundController::class, 'reject'])->name('refunds.reject');
         });
 
         // ── Reviews ──────────────────────────────────────────────────────────

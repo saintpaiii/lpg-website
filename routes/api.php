@@ -20,5 +20,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('deliveries', [ApiDeliveryController::class, 'index'])->name('api.deliveries.index');
     Route::get('deliveries/{delivery}', [ApiDeliveryController::class, 'show'])->name('api.deliveries.show');
     Route::put('deliveries/{delivery}/status', [ApiDeliveryController::class, 'updateStatus'])->name('api.deliveries.status');
+    Route::put('deliveries/{delivery}/collect-payment', [ApiDeliveryController::class, 'collectPayment'])->name('api.deliveries.collect-payment');
     Route::post('deliveries/assign', [ApiDeliveryController::class, 'assign'])->name('api.deliveries.assign');
 });

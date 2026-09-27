@@ -13,6 +13,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\OrderPaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,10 @@ class OrderController extends Controller
             'payment_mode'        => $o->payment_mode ?? 'full',
             'down_payment_amount' => $o->down_payment_amount ? (float) $o->down_payment_amount : null,
             'remaining_balance'   => $o->remaining_balance ? (float) $o->remaining_balance : null,
+            'balance_due_date'    => $o->balance_due_date?->format('M d, Y'),
+            'is_overdue'          => $o->isBalanceOverdue(),
+            'shipping_fee'        => $o->shipping_fee ? (float) $o->shipping_fee : null,
+            'discount_amount'     => (float) ($o->discount_amount ?? 0),
             'notes'               => $o->notes,
             'ordered_at'       => $o->ordered_at?->format('M d, Y g:i A'),
             'delivered_at'     => $o->delivered_at?->format('M d, Y g:i A'),
@@ -107,6 +112,14 @@ class OrderController extends Controller
             });
         }
 
+        // Consignment balance filter
+        if ($balance = $request->input('balance')) {
+            $query->where('payment_mode', 'consignment')->where('payment_status', 'partial');
+            if ($balance === 'overdue') {
+                $query->whereDate('balance_due_date', '<', now()->toDateString());
+            }
+        }
+
         $dateFrom = $request->get('date_from');
         $dateTo   = $request->get('date_to');
         if ($dateFrom) $query->whereDate('created_at', '>=', $dateFrom);
@@ -120,6 +133,11 @@ class OrderController extends Controller
             'confirmed'        => Order::where('store_id', $store->id)->where('status', 'confirmed')->count(),
             'preparing'        => Order::where('store_id', $store->id)->where('status', 'preparing')->count(),
             'out_for_delivery' => Order::where('store_id', $store->id)->where('status', 'out_for_delivery')->count(),
+            'outstanding_balance' => Order::where('store_id', $store->id)
+                ->where('payment_mode', 'consignment')->where('payment_status', 'partial')->count(),
+            'overdue_balance'  => Order::where('store_id', $store->id)
+                ->where('payment_mode', 'consignment')->where('payment_status', 'partial')
+                ->whereDate('balance_due_date', '<', now()->toDateString())->count(),
         ];
 
         $riders = User::where('store_id', $store->id)
@@ -136,7 +154,7 @@ class OrderController extends Controller
             'orders'  => $orders,
             'tab'     => $tab,
             'counts'  => $counts,
-            'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to'),
+            'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to', 'balance'),
             'riders'  => $riders,
         ]);
     }
@@ -375,9 +393,11 @@ class OrderController extends Controller
             return back()->with('error', "Cannot change status of a {$oldStatus} order.");
         }
 
-        // Block confirming an installment order that hasn't been fully paid
-        if ($newStatus === 'confirmed' && $oldStatus === 'pending' && $order->payment_status === 'partial') {
-            return back()->with('error', 'Cannot confirm order until the customer pays the remaining balance.');
+        // Consignment orders may proceed once the down payment is in (partial),
+        // but not before the customer has paid anything.
+        if ($newStatus === 'confirmed' && $oldStatus === 'pending'
+            && $order->payment_mode === 'consignment' && $order->payment_status === 'unpaid') {
+            return back()->with('error', 'Cannot confirm this consignment order until the customer pays the down payment.');
         }
 
         DB::transaction(function () use ($order, $newStatus, $oldStatus, $store) {
@@ -414,7 +434,11 @@ class OrderController extends Controller
                         'customer_id'        => $order->customer_id,
                         'total_amount'       => $order->total_amount,
                         'payment_status'     => $order->payment_status,
-                        'paid_amount'        => $order->payment_status === 'paid' ? $order->total_amount : 0,
+                        'paid_amount'        => match ($order->payment_status) {
+                            'paid'    => $order->total_amount,
+                            'partial' => (float) ($order->down_payment_amount ?? 0),
+                            default   => 0,
+                        },
                         'payment_method'     => $order->payment_method,
                         'paid_at'            => $order->payment_status === 'paid' ? now() : null,
                         'due_date'           => now()->addDays(7),
@@ -451,8 +475,8 @@ class OrderController extends Controller
                 $updates['cancelled_by']         = 'seller';
                 $updates['cancelled_at']         = now();
 
-                // If already paid, flag for refund instead of leaving as paid
-                if ($order->payment_status === 'paid') {
+                // If already paid (fully or a consignment down payment), flag for refund
+                if (in_array($order->payment_status, ['paid', 'partial'])) {
                     $updates['payment_status'] = 'to_refund';
                 }
 
@@ -464,7 +488,7 @@ class OrderController extends Controller
             $order->update($updates);
 
             if ($newStatus === 'delivered') {
-                \App\Services\WalletService::creditOrder($order->fresh());
+                OrderPaymentService::handleDelivered($order->fresh());
             }
         });
 
@@ -513,16 +537,17 @@ class OrderController extends Controller
             'payment_method' => 'required|in:cash,gcash,bank_transfer,maya',
         ]);
 
-        $order->update($data);
+        if ($data['payment_status'] === 'paid') {
+            OrderPaymentService::markPaid($order, $data['payment_method']);
+        } else {
+            $order->update($data);
 
-        if ($invoice = $order->invoice) {
-            $paid = $data['payment_status'] === 'paid' ? $order->total_amount : $invoice->paid_amount;
-            $invoice->update([
-                'payment_status' => $data['payment_status'],
-                'payment_method' => $data['payment_method'],
-                'paid_amount'    => $paid,
-                'paid_at'        => $data['payment_status'] === 'paid' ? ($invoice->paid_at ?? now()) : $invoice->paid_at,
-            ]);
+            if ($invoice = $order->invoice) {
+                $invoice->update([
+                    'payment_status' => $data['payment_status'],
+                    'payment_method' => $data['payment_method'],
+                ]);
+            }
         }
 
         return back()->with('success', "Payment updated for {$order->order_number}.");

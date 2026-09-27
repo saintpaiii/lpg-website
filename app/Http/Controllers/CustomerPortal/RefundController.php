@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Seller\RefundController as SellerRefundController;
 use App\Models\Customer;
 use App\Models\Order;
 use App\Models\RefundRequest;
+use App\Models\StoreCoupon;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,30 +27,30 @@ class RefundController extends Controller
         $customer = $this->getCustomer($request);
 
         $refunds = $customer
-            ? RefundRequest::with(['order', 'store'])
+            ? RefundRequest::with(['order', 'store', 'coupon', 'replacementOrder', 'replacementDelivery.rider'])
                 ->where('customer_id', $customer->id)
                 ->latest()
                 ->paginate(20)
-                ->through(fn (RefundRequest $r) => [
-                    'id'           => $r->id,
-                    'order_number' => $r->order?->order_number,
-                    'store_name'   => $r->store?->store_name,
-                    'amount'       => (float) $r->amount,
-                    'reason'       => $r->reason,
-                    'description'  => $r->description,
-                    'status'       => $r->status,
-                    'admin_notes'  => $r->admin_notes,
-                    'processed_at' => $r->processed_at?->format('M d, Y'),
-                    'created_at'   => $r->created_at->format('M d, Y'),
-                    'evidence_urls'=> collect($r->evidence_paths ?? [])->map(fn ($p) => Storage::url($p))->values()->all(),
-                ])
+                ->through(fn (RefundRequest $r) => SellerRefundController::format($r))
             : collect([]);
 
-        $user = $request->user();
+        $coupons = $customer
+            ? StoreCoupon::usable()->with('store')
+                ->where('customer_id', $customer->id)
+                ->orderBy('expires_at')
+                ->get()
+                ->map(fn (StoreCoupon $c) => [
+                    'id'         => $c->id,
+                    'code'       => $c->code,
+                    'amount'     => (float) $c->amount,
+                    'store_name' => $c->store?->store_name,
+                    'expires_at' => $c->expires_at?->format('M d, Y'),
+                ])->values()->all()
+            : [];
 
         return Inertia::render('customer/refunds', [
-            'refunds'         => $refunds,
-            'credits_balance' => (float) $user->platform_credits,
+            'refunds' => $refunds,
+            'coupons' => $coupons,
         ]);
     }
 
@@ -66,7 +68,7 @@ class RefundController extends Controller
             return back()->with('error', 'Refunds can only be requested for delivered orders.');
         }
 
-        // Prevent duplicate pending/approved refund for same order
+        // One active refund request per order
         $existing = RefundRequest::where('order_id', $order->id)
             ->whereIn('status', ['pending', 'approved', 'processed'])
             ->first();
@@ -75,11 +77,12 @@ class RefundController extends Controller
         }
 
         $data = $request->validate([
-            'amount'      => 'required|numeric|min:1|max:' . $order->total_amount,
-            'reason'      => 'required|in:damaged_product,leaking_tank,wrong_product,missing_items,quality_issue,other',
-            'description' => 'required|string|max:2000',
-            'evidence'    => 'nullable|array|max:5',
-            'evidence.*'  => 'file|mimes:jpg,jpeg,png,webp|max:10240',
+            'amount'               => 'required|numeric|min:1|max:' . max(1, $order->grandTotal()),
+            'reason'               => ['required', Rule::in(RefundRequest::REASONS)],
+            'preferred_resolution' => ['required', Rule::in(RefundRequest::RESOLUTIONS)],
+            'description'          => 'required|string|max:2000',
+            'evidence'             => 'nullable|array|max:5',
+            'evidence.*'           => 'file|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         $evidencePaths = [];
@@ -90,36 +93,70 @@ class RefundController extends Controller
         }
 
         $refund = RefundRequest::create([
-            'order_id'       => $order->id,
-            'customer_id'    => $customer->id,
-            'store_id'       => $order->store_id,
-            'amount'         => $data['amount'],
-            'reason'         => $data['reason'],
-            'description'    => $data['description'],
-            'evidence_paths' => $evidencePaths ?: null,
-            'status'         => 'pending',
+            'order_id'             => $order->id,
+            'customer_id'          => $customer->id,
+            'store_id'             => $order->store_id,
+            'amount'               => $data['amount'],
+            'reason'               => $data['reason'],
+            'preferred_resolution' => $data['preferred_resolution'],
+            'description'          => $data['description'],
+            'evidence_paths'       => $evidencePaths ?: null,
+            'status'               => 'pending',
         ]);
 
-        // Notify seller
+        // The seller handles the request directly
         if ($order->store_id) {
             NotificationService::sendToStore(
                 $order->store_id,
                 'refund_request',
                 'Refund Requested',
-                "A customer has requested a ₱" . number_format($data['amount'], 2) . " refund for order #{$order->order_number}.",
-                ['order_id' => $order->id, 'refund_id' => $refund->id]
+                "A customer requested a refund (₱" . number_format($data['amount'], 2) . ") for order #{$order->order_number}. Please review it.",
+                ['order_id' => $order->id, 'refund_id' => $refund->id, 'link' => '/seller/refunds']
             );
         }
 
-        // Notify platform admins
+        return back()->with('success', 'Refund request submitted. The seller will review it shortly.');
+    }
+
+    public function escalate(Request $request, RefundRequest $refund): RedirectResponse
+    {
+        $customer = $this->getCustomer($request);
+        if (! $customer || $refund->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        if (! $refund->canEscalate()) {
+            return back()->with('error', 'This refund request cannot be escalated.');
+        }
+
+        $data = $request->validate([
+            'escalation_reason' => 'required|string|max:2000',
+        ]);
+
+        $refund->update([
+            'escalated_to_admin' => true,
+            'escalation_reason'  => $data['escalation_reason'],
+            'escalated_at'       => now(),
+        ]);
+
+        $orderNo = $refund->order?->order_number;
+
         NotificationService::sendToRole(
             'platform_admin',
             'refund_request',
-            'New Refund Request',
-            "Customer requested ₱" . number_format($data['amount'], 2) . " refund for order #{$order->order_number}.",
-            ['order_id' => $order->id, 'refund_id' => $refund->id]
+            'Refund Dispute Escalated',
+            "A customer escalated the refund request for order #{$orderNo} ({$refund->store?->store_name}).",
+            ['refund_id' => $refund->id, 'link' => '/admin/refunds']
         );
 
-        return back()->with('success', 'Refund request submitted. We will review it shortly.');
+        NotificationService::sendToStore(
+            $refund->store_id,
+            'refund_request',
+            'Refund Escalated to Admin',
+            "The customer escalated the refund request for order #{$orderNo} to the platform admin.",
+            ['refund_id' => $refund->id, 'link' => '/seller/refunds']
+        );
+
+        return back()->with('success', 'Your dispute has been escalated to the platform admin.');
     }
 }

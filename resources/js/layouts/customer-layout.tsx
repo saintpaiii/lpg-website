@@ -13,7 +13,6 @@ import {
     ShoppingCart,
     Store,
     User,
-    Wallet,
     X,
     XCircle,
 } from 'lucide-react';
@@ -57,7 +56,7 @@ type Props = {
 };
 
 export default function CustomerLayout({ children, title }: Props) {
-    const { auth, cart_count, platform_credits } = usePage<SharedData>().props;
+    const { auth, cart_count } = usePage<SharedData>().props;
     const isSeller = auth.user.role === 'seller';
     const isAdmin  = ['platform_admin', 'admin'].includes(auth.user.role);
     const sellerApp = auth.seller_application;
@@ -166,26 +165,8 @@ export default function CustomerLayout({ children, title }: Props) {
                     )}
                 </SidebarContent>
 
-                {/* Credits + user footer */}
+                {/* User footer */}
                 <SidebarFooter>
-                    {/* Platform credits — shown when balance > 0 */}
-                    {!isAdmin && platform_credits > 0 && (
-                        <>
-                            <SidebarSeparator />
-                            <SidebarMenu>
-                                <SidebarMenuItem>
-                                    <SidebarMenuButton asChild tooltip="Platform Credits">
-                                        <Link href="/customer/refunds">
-                                            <Wallet className="h-4 w-4 text-green-500 shrink-0" />
-                                            <span className="truncate text-green-600 dark:text-green-400 font-medium group-data-[collapsible=icon]:hidden">
-                                                ₱{platform_credits.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </Link>
-                                    </SidebarMenuButton>
-                                </SidebarMenuItem>
-                            </SidebarMenu>
-                        </>
-                    )}
                     <SidebarSeparator />
                     <NavUser />
                 </SidebarFooter>

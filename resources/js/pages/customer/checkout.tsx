@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import { Banknote, CreditCard, Crosshair, Loader2, MapPin, Navigation, ShieldCheck, ShoppingCart, Store, Wallet } from 'lucide-react';
+import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, ShieldCheck, ShoppingCart, Store, TicketPercent } from 'lucide-react';
 import { formatAddress } from '@/data/cavite-locations';
 import { useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -45,7 +45,19 @@ type StoreGroup = {
     base_delivery_fee: number | null;
     fee_per_km: number | null;
     max_delivery_radius_km: number | null;
+    allow_cod: boolean;
+    allow_consignment: boolean;
+    min_down_payment_percent: number;
+    consignment_due_days: number;
+    coupons: StoreCouponOption[];
     items: CartItem[];
+};
+
+type StoreCouponOption = {
+    id: number;
+    code: string;
+    amount: number;
+    expires_at: string | null;
 };
 
 type CustomerInfo = {
@@ -61,25 +73,19 @@ type CustomerInfo = {
 type Props = {
     stores: StoreGroup[];
     customer: CustomerInfo;
-    platform_credits: number;
 };
 
-type PaymentMode = 'full' | 'installment';
+type PaymentMode = 'full' | 'consignment' | 'cod';
 
-const PAYMENT_MODES: { value: PaymentMode; label: string; description: string; icon: React.ElementType }[] = [
-    {
-        value: 'full',
-        label: 'Full Payment',
-        description: 'Pay 100% upfront via GCash, Maya, Card, or GrabPay',
-        icon: CreditCard,
-    },
-    {
-        value: 'installment',
-        label: 'Installment (50% Down)',
-        description: 'Pay 50% now, settle remaining balance before delivery',
-        icon: Banknote,
-    },
-];
+const PAYMENT_MODE_META: Record<PaymentMode, { label: string; icon: React.ElementType }> = {
+    full:        { label: 'Full Payment',     icon: CreditCard },
+    consignment: { label: 'Consignment',      icon: Handshake  },
+    cod:         { label: 'Cash on Delivery', icon: Banknote   },
+};
+
+function round2(n: number) {
+    return Math.round(n * 100) / 100;
+}
 
 function peso(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
@@ -138,7 +144,7 @@ async function fetchOsrmRoute(
     }
 }
 
-export default function CheckoutPage({ stores, customer, platform_credits }: Props) {
+export default function CheckoutPage({ stores, customer }: Props) {
     const { auth } = usePage<SharedData>().props;
     const idStatus = auth.user.id_verification_status;
 
@@ -172,8 +178,9 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
     }
 
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
-    const [useCredits, setUseCredits]   = useState(false);
     const [notes, setNotes]             = useState('');
+    // One optional store coupon per store (keyed by store_id)
+    const [selectedCoupons, setSelectedCoupons] = useState<Record<number, number | null>>({});
     const [loading, setLoading]         = useState(false);
 
     // Map state
@@ -224,21 +231,50 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
         );
     }
 
-    const grandSubtotal = stores.reduce((sum, sg) =>
-        sum + sg.items.reduce((s, item) => {
+    // Payment methods offered = those every store in this checkout allows
+    const availableModes: PaymentMode[] = [
+        'full',
+        ...(stores.every((sg) => sg.allow_consignment) ? (['consignment'] as const) : []),
+        ...(stores.every((sg) => sg.allow_cod) ? (['cod'] as const) : []),
+    ];
+    useEffect(() => {
+        if (!availableModes.includes(paymentMode)) setPaymentMode('full');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [availableModes.join(',')]);
+
+    // Per-store totals (mirrors CheckoutController@store)
+    const storeTotals = stores.map((sg) => {
+        const subtotal = sg.items.reduce((s, item) => {
             const price = item.transaction_type === 'refill' ? item.refill_price : item.purchase_price;
             return s + price * item.quantity;
-        }, 0), 0);
+        }, 0);
+        const dynamic  = distFees[sg.store_id];
+        const fee      = dynamic ? dynamic.fee : sg.delivery_fee;
+        const coupon   = sg.coupons.find((c) => c.id === selectedCoupons[sg.store_id]) ?? null;
+        const discount = coupon ? Math.min(coupon.amount, subtotal) : 0;
+        const total    = round2(subtotal - discount + fee);
+        const down     = round2(total * sg.min_down_payment_percent / 100);
+        return { store: sg, subtotal, fee, coupon, discount, total, down, balance: round2(total - down) };
+    });
 
-    const grandDelivery = stores.reduce((sum, sg) => {
-        const dynamic = distFees[sg.store_id];
-        return sum + (dynamic ? dynamic.fee : sg.delivery_fee);
-    }, 0);
-    const grandTotal      = grandSubtotal + grandDelivery;
-    const creditsApplied  = useCredits ? Math.min(platform_credits, paymentMode === 'installment' ? Math.round(grandTotal * 0.5 * 100) / 100 : grandTotal) : 0;
-    const amountDue       = Math.max(0, Math.round((paymentMode === 'installment' ? Math.round(grandTotal * 0.5 * 100) / 100 : grandTotal) - creditsApplied) * 100) / 100;
-    const downPayment     = Math.round(grandTotal * 0.5 * 100) / 100;
-    const balance         = Math.round((grandTotal - downPayment) * 100) / 100;
+    const grandSubtotal = storeTotals.reduce((s, t) => s + t.subtotal, 0);
+    const grandDelivery = storeTotals.reduce((s, t) => s + t.fee, 0);
+    const grandDiscount = storeTotals.reduce((s, t) => s + t.discount, 0);
+    const grandTotal    = round2(storeTotals.reduce((s, t) => s + t.total, 0));
+    const downPayment   = round2(storeTotals.reduce((s, t) => s + t.down, 0));
+    const balance       = round2(grandTotal - downPayment);
+    const amountDue     = paymentMode === 'consignment' ? downPayment : paymentMode === 'cod' ? 0 : grandTotal;
+
+    const pctValues  = [...new Set(stores.map((sg) => sg.min_down_payment_percent))];
+    const dueValues  = [...new Set(stores.map((sg) => sg.consignment_due_days))];
+    const pctLabel   = pctValues.length === 1 ? `${pctValues[0]}%` : `${Math.min(...pctValues)}–${Math.max(...pctValues)}%`;
+    const dueLabel   = dueValues.length === 1 ? `${dueValues[0]} days` : `${Math.min(...dueValues)}–${Math.max(...dueValues)} days`;
+
+    const modeDescriptions: Record<PaymentMode, string> = {
+        full:        'Pay 100% now via GCash, Maya, Card, or GrabPay',
+        consignment: `Pay ${pctLabel} down now, settle the balance within ${dueLabel} after delivery`,
+        cod:         'Pay in cash to the rider when your order arrives',
+    };
 
     // Estimated minutes (from OSRM, single store only)
     const estimatedMins = osrmRoute?.durationMin ?? null;
@@ -250,7 +286,7 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                 '/customer/checkout',
                 {
                     payment_mode:               paymentMode,
-                    use_credits:                useCredits,
+                    coupon_ids:                 Object.values(selectedCoupons).filter((id): id is number => !!id),
                     notes,
                     delivery_latitude:          pin?.lat  ?? null,
                     delivery_longitude:         pin?.lng  ?? null,
@@ -398,12 +434,7 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                 )}
 
                 {/* Per-store order summaries */}
-                {stores.map(sg => {
-                    const storeSubtotal = sg.items.reduce((sum, item) => {
-                        const price = item.transaction_type === 'refill' ? item.refill_price : item.purchase_price;
-                        return sum + price * item.quantity;
-                    }, 0);
-
+                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount }) => {
                     return (
                         <Card key={sg.store_id}>
                             <CardHeader className="pb-3">
@@ -446,15 +477,45 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                                         <span>Delivery fee</span>
-                                        <span>
-                                            {(() => {
-                                                const dynamic = distFees[sg.store_id];
-                                                const fee = dynamic ? dynamic.fee : sg.delivery_fee;
-                                                return fee > 0 ? peso(fee) : 'Free';
-                                            })()}
-                                        </span>
+                                        <span>{fee > 0 ? peso(fee) : 'Free'}</span>
                                     </div>
+                                    {discount > 0 && (
+                                        <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                            <span>Store discount</span>
+                                            <span>−{peso(discount)}</span>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Store coupons issued to this customer (refund resolutions) */}
+                                {sg.coupons.length > 0 && (
+                                    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 dark:border-emerald-800 dark:bg-emerald-900/10">
+                                        <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                                            <TicketPercent className="h-3.5 w-3.5" />
+                                            Your store coupons
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {sg.coupons.map((c) => {
+                                                const checked = selectedCoupons[sg.store_id] === c.id;
+                                                return (
+                                                    <label key={c.id} className="flex cursor-pointer items-center justify-between gap-2 text-sm">
+                                                        <span className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={checked}
+                                                                onChange={() => setSelectedCoupons((prev) => ({ ...prev, [sg.store_id]: checked ? null : c.id }))}
+                                                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                            />
+                                                            <span className="font-mono text-xs">{c.code}</span>
+                                                            {c.expires_at && <span className="text-xs text-gray-400">until {c.expires_at}</span>}
+                                                        </span>
+                                                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">−{peso(c.amount)}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     );
@@ -473,6 +534,12 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                                     <span>Total delivery fees</span>
                                     <span>{grandDelivery > 0 ? peso(grandDelivery) : 'Free'}</span>
                                 </div>
+                                {grandDiscount > 0 && (
+                                    <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                        <span>Store discounts</span>
+                                        <span>−{peso(grandDiscount)}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between font-bold text-gray-900 dark:text-white text-base pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">
                                     <span>Grand Total</span>
                                     <span>{peso(grandTotal)}</span>
@@ -482,7 +549,7 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                     </Card>
                 )}
 
-                {/* Payment mode */}
+                {/* Payment option */}
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
@@ -491,14 +558,15 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            {PAYMENT_MODES.map(m => {
-                                const Icon = m.icon;
-                                const active = paymentMode === m.value;
+                        <div className={`grid gap-3 ${availableModes.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                            {availableModes.map((mode) => {
+                                const { label, icon: Icon } = PAYMENT_MODE_META[mode];
+                                const active = paymentMode === mode;
                                 return (
                                     <button
-                                        key={m.value}
-                                        onClick={() => setPaymentMode(m.value)}
+                                        key={mode}
+                                        type="button"
+                                        onClick={() => setPaymentMode(mode)}
                                         className={`rounded-xl border-2 p-4 text-left transition-colors ${
                                             active
                                                 ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
@@ -508,25 +576,33 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                                         <div className="flex items-center gap-2 mb-1">
                                             <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
                                             <span className={`font-semibold text-sm ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                                                {m.label}
+                                                {label}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-gray-500">{m.description}</p>
+                                        <p className="text-xs text-gray-500">{modeDescriptions[mode]}</p>
                                     </button>
                                 );
                             })}
                         </div>
 
-                        {/* Installment breakdown */}
-                        {paymentMode === 'installment' && (
+                        {availableModes.length < 3 && (
+                            <p className="text-xs text-gray-400">
+                                {stores.length > 1
+                                    ? 'Some payment options are hidden because not every store in this checkout offers them.'
+                                    : 'Some payment options are not offered by this store.'}
+                            </p>
+                        )}
+
+                        {/* Consignment breakdown */}
+                        {paymentMode === 'consignment' && (
                             <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 space-y-2 text-sm">
-                                <p className="font-semibold text-amber-800 dark:text-amber-300">Installment Breakdown</p>
+                                <p className="font-semibold text-amber-800 dark:text-amber-300">Consignment Breakdown</p>
                                 <div className="flex justify-between text-gray-700 dark:text-gray-300">
                                     <span>Order Total</span>
                                     <span className="font-medium">{peso(grandTotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-blue-700 dark:text-blue-400 font-semibold">
-                                    <span>Down Payment (50%) — Pay Now</span>
+                                    <span>Down Payment ({pctLabel}) — Pay Now</span>
                                     <span>{peso(downPayment)}</span>
                                 </div>
                                 <div className="flex justify-between text-amber-700 dark:text-amber-400">
@@ -534,62 +610,25 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                                     <span className="font-medium">{peso(balance)}</span>
                                 </div>
                                 <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 border-t border-amber-200 dark:border-amber-800">
-                                    The remaining balance must be paid before the rider is dispatched.
+                                    Your order will be delivered after the down payment. Pay the remaining balance online within {dueLabel} after delivery.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* COD note */}
+                        {paymentMode === 'cod' && (
+                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 p-4 space-y-2 text-sm">
+                                <div className="flex justify-between font-semibold text-emerald-800 dark:text-emerald-300">
+                                    <span>Cash to prepare on delivery</span>
+                                    <span>{peso(grandTotal)}</span>
+                                </div>
+                                <p className="text-xs text-emerald-700 dark:text-emerald-400">
+                                    No online payment needed. Please prepare the exact amount for the rider.
                                 </p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
-
-                {/* Platform Credits */}
-                {platform_credits > 0 && (
-                    <Card className="border-green-200 dark:border-green-800">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base flex items-center gap-2">
-                                <Wallet className="h-4 w-4 text-green-600" />
-                                Platform Credits
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                                        Available: {peso(platform_credits)}
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-0.5">
-                                        Earned from approved refunds — applies to any order.
-                                    </p>
-                                </div>
-                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={useCredits}
-                                        onChange={(e) => setUseCredits(e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-                                    />
-                                    <span className="text-sm font-medium">Use Credits</span>
-                                </label>
-                            </div>
-                            {useCredits && creditsApplied > 0 && (
-                                <div className="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-sm">
-                                    <div className="flex justify-between text-green-700 dark:text-green-400">
-                                        <span>Credits applied</span>
-                                        <span className="font-semibold">−{peso(creditsApplied)}</span>
-                                    </div>
-                                    <div className="flex justify-between font-bold text-green-800 dark:text-green-300 mt-1 pt-1 border-t border-green-200 dark:border-green-700">
-                                        <span>Amount to pay</span>
-                                        <span>{amountDue <= 0 ? 'FREE' : peso(amountDue)}</span>
-                                    </div>
-                                    {amountDue <= 0 && (
-                                        <p className="text-xs text-green-600 dark:text-green-500 mt-1">
-                                            Your credits fully cover this order — no payment needed!
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                )}
 
                 {/* Notes */}
                 <Card>
@@ -622,18 +661,19 @@ export default function CheckoutPage({ stores, customer, platform_credits }: Pro
                         {loading ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Redirecting to payment…
+                                {paymentMode === 'cod' ? 'Placing order…' : 'Redirecting to payment…'}
+                            </>
+                        ) : paymentMode === 'cod' || amountDue <= 0 ? (
+                            <>
+                                <Banknote className="h-4 w-4 mr-2" />
+                                Place Order{paymentMode === 'cod' ? ` — Pay ${peso(grandTotal)} on Delivery` : ''}
                             </>
                         ) : (
                             <>
-                                {useCredits && amountDue <= 0
-                                    ? <><Wallet className="h-4 w-4 mr-2" />Place Order (Free with Credits)</>
-                                    : <><CreditCard className="h-4 w-4 mr-2" />
-                                        {paymentMode === 'installment'
-                                            ? `Pay Down Payment ${peso(Math.max(0, downPayment - creditsApplied))}`
-                                            : `Pay ${peso(amountDue)} ${useCredits && creditsApplied > 0 ? '(after credits)' : '— Full Payment'}`}
-                                      </>
-                                }
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                {paymentMode === 'consignment'
+                                    ? `Pay Down Payment ${peso(downPayment)}`
+                                    : `Pay ${peso(amountDue)} — Full Payment`}
                             </>
                         )}
                     </Button>

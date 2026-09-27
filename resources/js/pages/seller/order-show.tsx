@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Flag, Package, Truck, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -48,9 +49,13 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
-    payment_mode: 'full' | 'installment';
+    payment_mode: 'full' | 'consignment' | 'cod';
     down_payment_amount: number | null;
     remaining_balance: number | null;
+    balance_due_date: string | null;
+    is_overdue: boolean;
+    shipping_fee: number | null;
+    discount_amount: number;
     notes: string | null;
     cancellation_reason: string | null;
     cancellation_notes: string | null;
@@ -165,12 +170,16 @@ export default function SellerOrderShow({ order, riders }: Props) {
 
     const isFinal       = ['cancelled', 'delivered'].includes(order.status);
     const stepIndex     = STATUS_STEPS.indexOf(order.status);
-    const isPartialPay  = order.payment_status === 'partial';
-    const canConfirm    = order.status === 'pending' && !isPartialPay;
+    const isConsignment = order.payment_mode === 'consignment';
+    const awaitingDown  = isConsignment && order.payment_status === 'unpaid';
+    const canConfirm    = order.status === 'pending' && !awaitingDown;
     const canPrepare    = order.status === 'confirmed';
-    const isFullyPaid   = order.payment_status === 'paid';
-    // Installment orders can only be assigned a rider when fully paid
-    const canAssign     = ['confirmed', 'preparing'].includes(order.status) && isFullyPaid;
+    // Paid orders, COD orders and consignment orders with the down payment in can be dispatched
+    const canDispatch   = order.payment_status === 'paid'
+        || order.payment_mode === 'cod'
+        || (isConsignment && order.payment_status === 'partial');
+    const canAssign     = ['confirmed', 'preparing'].includes(order.status) && canDispatch;
+    const grandTotal    = order.total_amount + (order.shipping_fee ?? 0);
     const canCancel     = !isFinal;
 
     return (
@@ -201,11 +210,16 @@ export default function SellerOrderShow({ order, riders }: Props) {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                        {order.status === 'pending' && isPartialPay && (
+                        {order.status === 'pending' && awaitingDown && (
                             <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
                                 <Banknote className="h-3.5 w-3.5 shrink-0" />
-                                Awaiting full payment
-                                {order.remaining_balance ? ` — ₱${order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })} remaining` : ''}
+                                Awaiting consignment down payment
+                            </div>
+                        )}
+                        {order.is_overdue && (
+                            <div className="flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white">
+                                <Banknote className="h-3.5 w-3.5 shrink-0" />
+                                OVERDUE balance {order.remaining_balance ? fmt(order.remaining_balance) : ''}
                             </div>
                         )}
                         {canConfirm && (
@@ -224,7 +238,7 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                 size="sm"
                                 variant="outline"
                                 disabled={!canAssign}
-                                title={!isFullyPaid ? 'Awaiting full payment before rider can be assigned' : undefined}
+                                title={!canDispatch ? 'Awaiting payment before a rider can be assigned' : undefined}
                             >
                                 <Truck className="h-3.5 w-3.5 mr-1" /> Assign Rider
                             </Button>
@@ -329,7 +343,9 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                 <div className="flex items-center gap-2">
                                     <CreditCard className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                     <span className="text-muted-foreground text-xs">
-                                        {order.payment_mode === 'installment' ? 'Installment (PayMongo)' : 'Full Payment (PayMongo)'}
+                                        {order.payment_mode === 'consignment' ? 'Consignment (down payment via PayMongo)'
+                                            : order.payment_mode === 'cod' ? 'Cash on Delivery'
+                                            : 'Full Payment (PayMongo)'}
                                     </span>
                                 </div>
 
@@ -351,12 +367,12 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                     </span>
                                 </div>
 
-                                {/* Installment breakdown */}
-                                {order.payment_mode === 'installment' && (
-                                    <div className="rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-2 space-y-1 text-xs">
+                                {/* Consignment breakdown */}
+                                {order.payment_mode === 'consignment' && (
+                                    <div className={`rounded border px-3 py-2 space-y-1 text-xs ${order.is_overdue ? 'bg-red-50 border-red-300 dark:bg-red-900/20 dark:border-red-800' : 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800'}`}>
                                         <div className="flex justify-between text-gray-600 dark:text-gray-300">
                                             <span>Order Total</span>
-                                            <span className="font-medium">{fmt(order.total_amount)}</span>
+                                            <span className="font-medium">{fmt(grandTotal)}</span>
                                         </div>
                                         {order.down_payment_amount !== null && (
                                             <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
@@ -371,17 +387,40 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                             </div>
                                         )}
                                         {order.payment_status === 'partial' && (
-                                            <p className="text-amber-700 dark:text-amber-400 pt-0.5">
-                                                Awaiting balance payment — rider cannot be assigned yet.
-                                            </p>
+                                            order.balance_due_date ? (
+                                                <p className={`pt-0.5 font-medium ${order.is_overdue ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                                                    Balance: {fmt(order.remaining_balance ?? 0)} due {order.balance_due_date}
+                                                    {order.is_overdue && (
+                                                        <span className="ml-1.5 rounded bg-red-600 px-1.5 py-px text-[10px] font-bold text-white">OVERDUE</span>
+                                                    )}
+                                                </p>
+                                            ) : (
+                                                <p className="text-amber-700 dark:text-amber-400 pt-0.5">
+                                                    Down payment received — you can proceed. The balance becomes due after delivery.
+                                                </p>
+                                            )
                                         )}
+                                    </div>
+                                )}
+
+                                {/* COD */}
+                                {order.payment_mode === 'cod' && order.payment_status === 'unpaid' && (
+                                    <div className="rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                                        Rider collects {fmt(grandTotal)} cash on delivery.
+                                    </div>
+                                )}
+
+                                {order.discount_amount > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">Store discount applied</span>
+                                        <span className="text-emerald-600">−{fmt(order.discount_amount)}</span>
                                     </div>
                                 )}
 
                                 {/* Mark as Refunded button */}
                                 {order.payment_status === 'to_refund' && (
                                     <button
-                                        onClick={() => router.patch(route('seller.orders.refunded', { order: order.id }))}
+                                        onClick={() => router.patch(`/seller/orders/${order.id}/refunded`)}
                                         className="w-full mt-1 text-xs rounded border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 px-2 py-1.5 transition-colors"
                                     >
                                         Mark as Refunded

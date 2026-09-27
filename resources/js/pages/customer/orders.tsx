@@ -33,8 +33,10 @@ type Order = {
     total_amount: number;
     payment_method: string;
     payment_status: string;
-    payment_mode: 'full' | 'installment';
+    payment_mode: 'full' | 'consignment' | 'cod';
     remaining_balance: number | null;
+    balance_due_date: string | null;
+    is_overdue: boolean;
     created_at: string;
     items_count: number;
     items_summary: string;
@@ -99,14 +101,20 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const val = params.get('payment');
+        const placed = params.get('placed');
         if (val === 'success') {
             toast.success('Payment received! Your orders have been updated.');
         } else if (val === 'cancelled') {
             toast.error('Payment was cancelled.');
+        } else if (placed) {
+            toast.success(placed === 'cod'
+                ? 'Order placed! Please prepare cash for the rider on delivery.'
+                : 'Order placed!');
         }
-        if (val) {
+        if (val || placed) {
             const url = new URL(window.location.href);
             url.searchParams.delete('payment');
+            url.searchParams.delete('placed');
             window.history.replaceState({}, '', url.toString());
         }
     }, []);
@@ -283,9 +291,11 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                          order.payment_status === 'partial'   ? 'Partial' :
                                                          order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                                                     </span>
-                                                    {order.payment_mode === 'installment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
-                                                        <p className="text-[10px] text-amber-600 font-medium mt-0.5">
+                                                    {order.payment_mode === 'consignment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
+                                                        <p className={`text-[10px] font-medium mt-0.5 ${order.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
                                                             Balance: ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                            {order.balance_due_date && ` · due ${order.balance_due_date}`}
+                                                            {order.is_overdue && ' · OVERDUE'}
                                                         </p>
                                                     )}
                                                 </td>
@@ -296,7 +306,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                                 View
                                                             </Button>
                                                         </Link>
-                                                        {order.payment_mode === 'installment' && order.payment_status === 'partial' && (
+                                                        {order.payment_mode === 'consignment' && order.payment_status === 'partial' && (
                                                             <Button
                                                                 size="sm"
                                                                 className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1"

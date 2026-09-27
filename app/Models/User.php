@@ -45,7 +45,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'id_verified_at',
         'id_verification_status',
         'id_rejection_reason',
-        'platform_credits',
     ];
 
     protected $hidden = [
@@ -68,7 +67,6 @@ class User extends Authenticatable implements MustVerifyEmail
             'must_change_password'    => 'boolean',
             'daily_rate_override'     => 'decimal:2',
             'id_verified_at'          => 'datetime',
-            'platform_credits'        => 'decimal:2',
         ];
     }
 

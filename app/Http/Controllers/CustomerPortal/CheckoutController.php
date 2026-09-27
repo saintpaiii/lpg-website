@@ -10,9 +10,9 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Store;
+use App\Models\StoreCoupon;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
-use App\Services\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,6 +24,12 @@ use Inertia\Response;
 
 class CheckoutController extends Controller
 {
+    private const PAYMENT_MODE_LABELS = [
+        'full'        => 'Full Payment',
+        'consignment' => 'Consignment',
+        'cod'         => 'Cash on Delivery',
+    ];
+
     private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $R    = 6371;
@@ -50,10 +56,15 @@ class CheckoutController extends Controller
         return 'ORD-' . $year . '-' . str_pad($count + 1, 5, '0', STR_PAD_LEFT);
     }
 
+    private function downPaymentPercent(Store $store): int
+    {
+        return max(20, min(80, (int) ($store->min_down_payment_percent ?: 50)));
+    }
+
     /**
      * Build checkout store groups from DB cart_items, filtered to selected product IDs.
      */
-    private function buildCheckoutStores(int $userId, array $selectedProductIds): array
+    private function buildCheckoutStores(int $userId, array $selectedProductIds, ?Customer $customer): array
     {
         $cartItems = CartItem::with(['product.inventory', 'store'])
             ->where('user_id', $userId)
@@ -79,6 +90,23 @@ class CheckoutController extends Controller
                     'base_delivery_fee'      => $store->base_delivery_fee ? (float) $store->base_delivery_fee : null,
                     'fee_per_km'             => $store->fee_per_km        ? (float) $store->fee_per_km        : null,
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
+                    'allow_cod'              => (bool) ($store->allow_cod ?? true),
+                    'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
+                    'min_down_payment_percent' => $this->downPaymentPercent($store),
+                    'consignment_due_days'   => (int) ($store->consignment_due_days ?: 7),
+                    'coupons'                => $customer
+                        ? StoreCoupon::usable()
+                            ->where('customer_id', $customer->id)
+                            ->where('store_id', $storeId)
+                            ->orderBy('expires_at')
+                            ->get()
+                            ->map(fn (StoreCoupon $c) => [
+                                'id'         => $c->id,
+                                'code'       => $c->code,
+                                'amount'     => (float) $c->amount,
+                                'expires_at' => $c->expires_at?->format('M d, Y'),
+                            ])->values()->all()
+                        : [],
                     'items'                  => [],
                 ];
             }
@@ -124,18 +152,15 @@ class CheckoutController extends Controller
             return redirect('/customer/products')->with('error', 'No items selected. Please go back and select items.');
         }
 
-        $checkoutStores = $this->buildCheckoutStores($userId, $selected);
+        $customer       = Customer::where('user_id', $userId)->first();
+        $checkoutStores = $this->buildCheckoutStores($userId, $selected, $customer);
 
         if (empty($checkoutStores)) {
             return redirect('/customer/products')->with('error', 'Your cart is empty. Browse products to start shopping.');
         }
 
-        $customer = Customer::where('user_id', $userId)->first();
-        $user     = $request->user();
-
         return Inertia::render('customer/checkout', [
-            'stores'           => $checkoutStores,
-            'platform_credits' => (float) $user->platform_credits,
+            'stores'   => $checkoutStores,
             'customer' => $customer ? [
                 'name'     => $customer->name,
                 'phone'    => $customer->phone,
@@ -177,8 +202,9 @@ class CheckoutController extends Controller
             }
 
             $data = $request->validate([
-                'payment_mode'               => 'required|in:full,installment',
-                'use_credits'                => 'nullable|boolean',
+                'payment_mode'               => 'required|in:full,consignment,cod',
+                'coupon_ids'                 => 'nullable|array',
+                'coupon_ids.*'               => 'integer',
                 'notes'                      => 'nullable|string|max:1000',
                 'delivery_latitude'          => 'nullable|numeric|between:-90,90',
                 'delivery_longitude'         => 'nullable|numeric|between:-180,180',
@@ -189,7 +215,8 @@ class CheckoutController extends Controller
             $deliveryLng  = isset($data['delivery_longitude']) ? (float) $data['delivery_longitude'] : null;
             $estimatedMin = isset($data['estimated_delivery_minutes']) ? (int) $data['estimated_delivery_minutes'] : null;
 
-            $isInstallment = $data['payment_mode'] === 'installment';
+            $paymentMode = $data['payment_mode'];
+            $couponIds   = array_map('intval', $data['coupon_ids'] ?? []);
 
             // Read selected items from DB cart
             $cartItems = CartItem::with(['product.inventory', 'store'])
@@ -233,8 +260,19 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Every store in this checkout must accept the chosen payment method
+            foreach ($checkoutStores as $storeData) {
+                $s = $storeData['store_ref'];
+                if ($paymentMode === 'cod' && $s && ! $s->allow_cod) {
+                    return $error("{$s->store_name} does not accept Cash on Delivery.");
+                }
+                if ($paymentMode === 'consignment' && $s && ! $s->allow_consignment) {
+                    return $error("{$s->store_name} does not offer Consignment.");
+                }
+            }
+
             // Create one order per store in a single DB transaction
-            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $isInstallment, $deliveryLat, $deliveryLng, $estimatedMin) {
+            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $paymentMode, $couponIds, $deliveryLat, $deliveryLng, $estimatedMin) {
                 $createdOrders = [];
 
                 foreach ($checkoutStores as $storeData) {
@@ -246,7 +284,7 @@ class CheckoutController extends Controller
                         throw new \RuntimeException("Store '{$storeData['store_name']}' is no longer available.");
                     }
 
-                    $totalAmount  = 0;
+                    $subtotal     = 0;
                     $orderedItems = [];
                     $transTypes   = [];
 
@@ -271,7 +309,7 @@ class CheckoutController extends Controller
                             : (float) ($product->purchase_price ?? $product->refill_price);
                         $sub    = $price * $cartItem['quantity'];
 
-                        $totalAmount   += $sub;
+                        $subtotal      += $sub;
                         $transTypes[]   = $txType;
                         $orderedItems[] = [
                             'product'    => $product,
@@ -293,9 +331,31 @@ class CheckoutController extends Controller
                         $finalFee = $this->calcDeliveryFee($store, $distKm);
                     }
 
-                    // Installment: 50% down, 50% balance
-                    $downPayment      = $isInstallment ? round($totalAmount * 0.5, 2) : null;
-                    $remainingBalance = $isInstallment ? round($totalAmount - $downPayment, 2) : null;
+                    // Store discount coupon (issued by this store as a refund resolution)
+                    $coupon   = null;
+                    $discount = 0.0;
+                    if ($couponIds) {
+                        $coupon = StoreCoupon::usable()
+                            ->whereIn('id', $couponIds)
+                            ->where('customer_id', $customer->id)
+                            ->where('store_id', $store->id)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($coupon) {
+                            $discount = min((float) $coupon->amount, $subtotal);
+                        }
+                    }
+
+                    $totalAmount = round($subtotal - $discount, 2);
+                    $grandTotal  = round($totalAmount + $finalFee, 2);
+
+                    // Consignment: store-defined minimum down payment now, balance after delivery
+                    $downPayment      = null;
+                    $remainingBalance = null;
+                    if ($paymentMode === 'consignment') {
+                        $downPayment      = round($grandTotal * $this->downPaymentPercent($store) / 100, 2);
+                        $remainingBalance = round($grandTotal - $downPayment, 2);
+                    }
 
                     $order = Order::create([
                         'order_number'               => $this->generateOrderNumber(),
@@ -305,9 +365,10 @@ class CheckoutController extends Controller
                         'status'                     => 'pending',
                         'total_amount'               => $totalAmount,
                         'shipping_fee'               => $finalFee,
-                        'payment_method'             => null,
+                        'discount_amount'            => $discount,
+                        'payment_method'             => $paymentMode === 'cod' ? 'cash' : null,
                         'payment_status'             => 'unpaid',
-                        'payment_mode'               => $isInstallment ? 'installment' : 'full',
+                        'payment_mode'               => $paymentMode,
                         'down_payment_amount'        => $downPayment,
                         'remaining_balance'          => $remainingBalance,
                         'notes'                      => $data['notes'] ?? null,
@@ -329,12 +390,25 @@ class CheckoutController extends Controller
                         ]);
                     }
 
+                    if ($coupon) {
+                        $coupon->update([
+                            'status'        => 'used',
+                            'used_order_id' => $order->id,
+                            'used_at'       => now(),
+                        ]);
+                    }
+
                     $createdOrders[] = [
-                        'order'           => $order,
-                        'store'           => $store,
-                        'delivery_fee'    => $finalFee,
-                        'down_payment'    => $downPayment,
-                        'is_installment'  => $isInstallment,
+                        'order'        => $order,
+                        'store'        => $store,
+                        'delivery_fee' => $finalFee,
+                        'discount'     => $discount,
+                        // Amount collected online right now
+                        'pay_now'      => match ($paymentMode) {
+                            'consignment' => $downPayment,
+                            'cod'         => 0.0,
+                            default       => $grandTotal,
+                        },
                     ];
                 }
 
@@ -348,6 +422,7 @@ class CheckoutController extends Controller
             session()->forget('cart_selected');
 
             // Notify each store owner (and their staff) about the new order
+            $modeLabel = self::PAYMENT_MODE_LABELS[$paymentMode];
             foreach ($orders as $entry) {
                 $ord   = $entry['order'];
                 $store = $entry['store'];
@@ -355,72 +430,48 @@ class CheckoutController extends Controller
                     $store->id,
                     'order_update',
                     'New Order Received',
-                    "Order #{$ord->order_number} has been placed. Total: ₱" . number_format((float) $ord->total_amount, 2),
+                    "Order #{$ord->order_number} has been placed ({$modeLabel}). Total: ₱" . number_format($ord->grandTotal(), 2),
                     ['order_id' => $ord->id, 'link' => '/seller/orders/' . $ord->id]
                 );
             }
 
-            // Apply platform credits if requested
-            $user           = $request->user();
-            $useCredits     = ! empty($data['use_credits']);
-            $creditsApplied = 0.0;
-
-            // Calculate grand total across all orders to know how much credits can cover
-            $grandTotal = array_sum(array_map(function ($entry) {
-                return $entry['is_installment'] && $entry['down_payment'] !== null
-                    ? $entry['down_payment']
-                    : ($entry['order']->total_amount + (float) $entry['delivery_fee']);
-            }, $orders));
-
-            if ($useCredits && (float) $user->platform_credits > 0) {
-                $creditsApplied = min((float) $user->platform_credits, $grandTotal);
+            // Orders fully covered by a store coupon need no online payment
+            foreach ($orders as $entry) {
+                if ($paymentMode === 'full' && $entry['pay_now'] <= 0) {
+                    $entry['order']->update(['payment_status' => 'paid']);
+                }
             }
 
-            $amountAfterCredits = max(0, round($grandTotal - $creditsApplied, 2));
-
-            // If fully covered by credits → skip PayMongo
-            if ($amountAfterCredits <= 0 && $creditsApplied > 0) {
-                DB::transaction(function () use ($orders, $user, $creditsApplied) {
-                    foreach ($orders as $entry) {
-                        $order      = $entry['order'];
-                        $perCredit  = round($creditsApplied / count($orders), 2);
-
-                        if ($entry['is_installment'] && $entry['down_payment'] !== null) {
-                            // Credits covered only the down payment — order is still partial
-                            $order->update([
-                                'payment_method' => 'credits',
-                                'payment_status' => 'partial',
-                                // remaining_balance already set at order creation
-                            ]);
-                        } else {
-                            // Full-payment order fully covered by credits
-                            $order->update([
-                                'payment_method' => 'credits',
-                                'payment_status' => 'paid',
-                            ]);
-                        }
-
-                        RefundService::deductCreditsForOrder($user, $perCredit, $order->id, $order->order_number);
-                    }
-                });
-                return response()->json(['redirect_url' => url('/customer/orders?payment=success')]);
+            // Cash on Delivery — rider collects cash, no PayMongo session
+            $toCharge = array_values(array_filter($orders, fn ($e) => $e['pay_now'] > 0));
+            if ($paymentMode === 'cod' || empty($toCharge)) {
+                return response()->json(['redirect_url' => url('/customer/orders?placed=' . ($paymentMode === 'cod' ? 'cod' : '1'))]);
             }
 
-            // Always pay via PayMongo (COD removed)
             $paymongo  = app(PayMongoService::class);
+            $user      = $request->user();
             $lineItems = [];
 
-            foreach ($orders as $entry) {
+            foreach ($toCharge as $entry) {
                 $order = $entry['order'];
                 $store = $entry['store'];
                 $order->load('items.product');
 
-                if ($entry['is_installment'] && $entry['down_payment'] !== null) {
-                    // For installment: one line item = the down payment amount
+                if ($paymentMode === 'consignment') {
+                    $pct = $this->downPaymentPercent($store);
                     $lineItems[] = [
                         'name'        => "Down Payment — {$store->store_name}",
-                        'description' => "50% down payment for Order {$order->order_number}",
-                        'amount'      => (int) round($entry['down_payment'] * 100),
+                        'description' => "{$pct}% consignment down payment for Order {$order->order_number}",
+                        'amount'      => (int) round($entry['pay_now'] * 100),
+                        'currency'    => 'PHP',
+                        'quantity'    => 1,
+                    ];
+                } elseif ($entry['discount'] > 0) {
+                    // Discounted order: charge a single line so the total matches exactly
+                    $lineItems[] = [
+                        'name'        => "Order {$order->order_number} — {$store->store_name}",
+                        'description' => 'Items + delivery fee, less ₱' . number_format($entry['discount'], 2) . ' store discount',
+                        'amount'      => (int) round($entry['pay_now'] * 100),
                         'currency'    => 'PHP',
                         'quantity'    => 1,
                     ];
@@ -447,28 +498,16 @@ class CheckoutController extends Controller
                 }
             }
 
-            // Add credits discount line item if partially covered
-            if ($creditsApplied > 0) {
-                $lineItems[] = [
-                    'name'        => 'Platform Credits Applied',
-                    'description' => 'Discount from your platform credits',
-                    'amount'      => -(int) round($creditsApplied * 100),
-                    'currency'    => 'PHP',
-                    'quantity'    => 1,
-                ];
-            }
-
-            $firstOrder = $orders[0]['order'];
-            $storeNames = implode(', ', array_map(fn ($e) => $e['store']->store_name, $orders));
-            $isInstallmentCheckout = $orders[0]['is_installment'];
+            $firstOrder = $toCharge[0]['order'];
+            $storeNames = implode(', ', array_map(fn ($e) => $e['store']->store_name, $toCharge));
 
             $session = $paymongo->createCheckoutSession([
                 'reference_number' => $firstOrder->order_number,
-                'description'      => $isInstallmentCheckout
-                    ? "Down Payment — Order {$firstOrder->order_number}"
-                    : (count($orders) > 1
+                'description'      => $paymentMode === 'consignment'
+                    ? "Consignment Down Payment — Order {$firstOrder->order_number}"
+                    : (count($toCharge) > 1
                         ? 'LPG Orders from ' . $storeNames
-                        : "LPG Order {$firstOrder->order_number} from {$orders[0]['store']->store_name}"),
+                        : "LPG Order {$firstOrder->order_number} from {$toCharge[0]['store']->store_name}"),
                 'line_items'       => $lineItems,
                 'success_url'      => url('/customer/orders?payment=success'),
                 'cancel_url'       => url('/customer/orders?payment=cancelled'),
@@ -481,26 +520,12 @@ class CheckoutController extends Controller
                 throw new \RuntimeException('PayMongo did not return a checkout URL.');
             }
 
-            // Deduct credits immediately after session created (before redirect)
-            if ($creditsApplied > 0) {
-                $perOrderCredit = round($creditsApplied / count($orders), 2);
-                foreach ($orders as $entry) {
-                    RefundService::deductCreditsForOrder($user, $perOrderCredit, $entry['order']->id, $entry['order']->order_number);
-                }
-            }
-
             // One Payment record per order
-            $perOrderCreditDeducted = $creditsApplied > 0 ? round($creditsApplied / count($orders), 2) : 0;
-            foreach ($orders as $entry) {
-                $rawAmount = $entry['is_installment'] && $entry['down_payment'] !== null
-                    ? $entry['down_payment']
-                    : $entry['order']->total_amount + (float) $entry['delivery_fee'];
-                $paymentAmount = max(0, round($rawAmount - $perOrderCreditDeducted, 2));
-
+            foreach ($toCharge as $entry) {
                 Payment::create([
                     'order_id'             => $entry['order']->id,
                     'paymongo_checkout_id' => $session['id'],
-                    'amount'               => $paymentAmount,
+                    'amount'               => round($entry['pay_now'], 2),
                     'status'               => 'pending',
                 ]);
             }

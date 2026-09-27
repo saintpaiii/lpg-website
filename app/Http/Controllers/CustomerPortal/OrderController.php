@@ -14,6 +14,7 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Rating;
+use App\Services\OrderPaymentService;
 use App\Services\PayMongoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -97,6 +98,8 @@ class OrderController extends Controller
                     'payment_status'    => $o->payment_status,
                     'payment_mode'      => $o->payment_mode ?? 'full',
                     'remaining_balance' => $o->remaining_balance ? (float) $o->remaining_balance : null,
+                    'balance_due_date'  => $o->balance_due_date?->format('M d, Y'),
+                    'is_overdue'        => $o->isBalanceOverdue(),
                     'created_at'        => $o->created_at->format('M d, Y'),
                     'items_count'       => $o->items->count(),
                     'items_summary'     => $o->items->map(fn ($i) => $i->product?->name)->filter()->implode(', '),
@@ -358,51 +361,16 @@ class OrderController extends Controller
                 'paid_at'             => now(),
             ]);
 
-            $isInstallment = $order->payment_mode === 'installment';
+            $wasPartial = $order->payment_status === 'partial';
+            $newStatus  = OrderPaymentService::applyOnlinePayment($order, $localMethod);
 
-            if ($isInstallment && $order->payment_status === 'unpaid') {
-                // Down payment received — move to partial
-                $order->update([
-                    'payment_status' => 'partial',
-                    'payment_method' => $localMethod,
-                ]);
-                return ['status' => 'partial', 'message' => 'Down payment confirmed! Pay the remaining balance to proceed with delivery.'];
+            if ($newStatus === 'partial') {
+                return ['status' => 'partial', 'message' => 'Down payment confirmed! The remaining balance is due after delivery.'];
             }
 
-            if ($isInstallment && $order->payment_status === 'partial') {
-                // Balance payment — fully paid
-                $order->update([
-                    'payment_status'    => 'paid',
-                    'payment_method'    => $localMethod,
-                    'remaining_balance' => 0,
-                ]);
-                if ($order->invoice) {
-                    $order->invoice->update([
-                        'payment_status' => 'paid',
-                        'paid_amount'    => $order->total_amount,
-                        'paid_at'        => now(),
-                        'payment_method' => $localMethod,
-                    ]);
-                }
-                return ['status' => 'paid', 'message' => 'Balance payment confirmed! Your order is fully paid.'];
-            }
-
-            // Full payment (non-installment)
-            $order->update([
-                'payment_status' => 'paid',
-                'payment_method' => $localMethod,
-            ]);
-
-            if ($order->invoice) {
-                $order->invoice->update([
-                    'payment_status' => 'paid',
-                    'paid_amount'    => $order->total_amount,
-                    'paid_at'        => now(),
-                    'payment_method' => $localMethod,
-                ]);
-            }
-
-            return ['status' => 'paid', 'message' => 'Payment confirmed! Your order has been updated.'];
+            return $wasPartial
+                ? ['status' => 'paid', 'message' => 'Balance payment confirmed! Your order is fully paid.']
+                : ['status' => 'paid', 'message' => 'Payment confirmed! Your order has been updated.'];
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => 'Could not verify payment. Please try again.'];
         }
@@ -472,8 +440,8 @@ class OrderController extends Controller
                 'cancelled_at'        => now(),
             ];
 
-            // If already paid, flag for refund instead of leaving as paid
-            if ($order->payment_status === 'paid') {
+            // If already paid (fully or a consignment down payment), flag for refund
+            if (in_array($order->payment_status, ['paid', 'partial'])) {
                 $cancelUpdates['payment_status'] = 'to_refund';
             }
 
@@ -533,6 +501,16 @@ class OrderController extends Controller
                 'payment_mode'        => $order->payment_mode ?? 'full',
                 'down_payment_amount' => $order->down_payment_amount ? (float) $order->down_payment_amount : null,
                 'remaining_balance'   => $order->remaining_balance ? (float) $order->remaining_balance : null,
+                'balance_due_date'    => $order->balance_due_date?->format('M d, Y'),
+                'balance_days_remaining' => $order->balance_due_date
+                    ? (int) now()->startOfDay()->diffInDays($order->balance_due_date, false)
+                    : null,
+                'is_overdue'          => $order->isBalanceOverdue(),
+                'discount_amount'     => (float) ($order->discount_amount ?? 0),
+                'refund_request'      => ($r = $order->refundRequests()->latest()->first()) ? [
+                    'id'     => $r->id,
+                    'status' => $r->status,
+                ] : null,
                 'notes'                => $order->notes,
                 'cancellation_reason'  => $order->cancellation_reason,
                 'cancellation_notes'   => $order->cancellation_notes,
