@@ -29,6 +29,8 @@ export type SellerStore = {
     id: number;
     store_name: string;
     status: string;
+    commission_suspended?: boolean;
+    commission_owed?: number;
 };
 
 export type SellerApplication = {

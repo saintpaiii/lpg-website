@@ -277,7 +277,7 @@ class CheckoutController extends Controller
 
                 foreach ($checkoutStores as $storeData) {
                     $store = Store::where('id', $storeData['store_id'])
-                        ->where('status', 'approved')
+                        ->visibleToCustomers()
                         ->first();
 
                     if (! $store) {

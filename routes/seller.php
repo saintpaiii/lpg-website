@@ -13,6 +13,7 @@ use App\Http\Controllers\Seller\SettingsController;
 use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\RefundController as SellerRefundController;
 use App\Http\Controllers\Seller\RevenueController;
+use App\Http\Controllers\Seller\CommissionController as SellerCommissionController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use App\Http\Controllers\Seller\VehicleController;
@@ -134,6 +135,12 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::middleware('seller_owner')->group(function () {
             Route::get('revenue', [RevenueController::class, 'index'])->name('revenue');
             Route::get('revenue/export', [RevenueController::class, 'export'])->name('revenue.export');
+
+            // Platform commission invoices
+            Route::get('commission', [SellerCommissionController::class, 'index'])->name('commission');
+            Route::get('commission/{invoice}', [SellerCommissionController::class, 'show'])->name('commission.show');
+            Route::get('commission/{invoice}/pdf', [SellerCommissionController::class, 'pdf'])->name('commission.pdf');
+            Route::post('commission/{invoice}/pay', [SellerCommissionController::class, 'pay'])->name('commission.pay');
         });
 
         // ── Refund requests (handled by the seller) ──────────────────────────

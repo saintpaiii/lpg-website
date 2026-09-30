@@ -2,6 +2,7 @@ import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
     BarChart3,
+    HandCoins,
     Package,
     PhilippinePeso,
     ShoppingCart,
@@ -10,6 +11,7 @@ import {
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { PayCommissionButton } from '@/components/pay-commission-button';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
@@ -49,6 +51,14 @@ type Props = {
     ordersChart: ChartPoint[];
     recentOrders: RecentOrder[];
     lowStock: LowStockItem[];
+    commissionDue: {
+        amount: number;
+        overdue_amount: number;
+        is_overdue: boolean;
+        due_date: string;
+        invoice_id: number;
+        suspended: boolean;
+    } | null;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -64,7 +74,7 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock }: Props) {
+export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock, commissionDue }: Props) {
     const statCards = [
         {
             label: 'Products',
@@ -115,6 +125,30 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         Overview of your store's performance.
                     </p>
                 </div>
+
+                {/* Unpaid commission */}
+                {commissionDue && (commissionDue.is_overdue ? (
+                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-300 bg-red-600 px-4 py-3 text-white">
+                        <AlertTriangle className="h-5 w-5 shrink-0" />
+                        <p className="flex-1 text-sm font-semibold">
+                            OVERDUE: {fmt(commissionDue.overdue_amount)} commission unpaid.{' '}
+                            {commissionDue.suspended
+                                ? 'Your store is suspended and hidden from customers until it is paid.'
+                                : 'Your store will be suspended if it is not paid.'}
+                        </p>
+                        <PayCommissionButton invoiceId={commissionDue.invoice_id} label="Pay Immediately"
+                            className="bg-white text-red-700 hover:bg-red-50" />
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        <HandCoins className="h-5 w-5 shrink-0" />
+                        <p className="flex-1 text-sm">
+                            You have <strong>{fmt(commissionDue.amount)}</strong> in unpaid commission. Due by <strong>{commissionDue.due_date}</strong>.
+                        </p>
+                        <PayCommissionButton invoiceId={commissionDue.invoice_id} className="bg-amber-600 text-white hover:bg-amber-700" />
+                        <Link href="/seller/commission" className="text-xs font-medium underline">View invoices</Link>
+                    </div>
+                ))}
 
                 {/* Revenue breakdown cards */}
                 <div className="grid gap-4 sm:grid-cols-3">

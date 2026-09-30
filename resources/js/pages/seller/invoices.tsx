@@ -17,11 +17,10 @@ type Invoice = {
     id: number;
     invoice_number: string;
     total_amount: number;
+    grand_total: number;
     paid_amount: number;
     payment_status: string;
     payment_method: string | null;
-    platform_commission: number;
-    net_amount: number;
     due_date: string | null;
     paid_at: string | null;
     created_at: string;
@@ -82,8 +81,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
         router.get('/seller/invoices', { tab, search: searchVal, date_from: '', date_to: '' }, { preserveState: true, replace: true });
     }
 
-    const totalAmount = invoices.data.reduce((s, i) => s + i.total_amount, 0);
-    const totalNet    = invoices.data.reduce((s, i) => s + i.net_amount, 0);
+    const totalAmount = invoices.data.reduce((s, i) => s + i.grand_total, 0);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -98,7 +96,8 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                             Invoices
                         </h1>
                         <p className="text-muted-foreground text-sm mt-0.5">
-                            Revenue after platform commission.
+                            Sales invoices for your orders. The full amount is paid to your store — platform commission is billed separately via{' '}
+                            <Link href="/seller/commission" className="font-medium text-blue-600 hover:underline">Commission Invoices</Link>.
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -157,8 +156,6 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Invoice</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Customer</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Total</th>
-                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Commission</th>
-                                        <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Net</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Actions</th>
@@ -166,7 +163,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                 </thead>
                                 <tbody>
                                     {invoices.data.length === 0 ? (
-                                        <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No invoices found.</td></tr>
+                                        <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No invoices found.</td></tr>
                                     ) : invoices.data.map((inv) => (
                                         <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                             <td className="px-4 py-3">
@@ -175,13 +172,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{inv.customer}</td>
                                             <td className="px-4 py-3 text-right font-medium">
-                                                ₱{inv.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-red-600 hidden md:table-cell">
-                                                −₱{inv.platform_commission.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="px-4 py-3 text-right font-semibold text-emerald-700">
-                                                ₱{inv.net_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                ₱{inv.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -221,10 +212,6 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                             </td>
                                             <td className="px-4 py-2.5 text-right font-semibold">
                                                 ₱{totalAmount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                            <td className="px-4 py-2.5 hidden md:table-cell" />
-                                            <td className="px-4 py-2.5 text-right font-semibold text-emerald-700">
-                                                ₱{totalNet.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td colSpan={3} />
                                         </tr>

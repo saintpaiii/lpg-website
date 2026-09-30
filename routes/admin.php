@@ -104,7 +104,13 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     // Platform commissions (platform admin only)
     Route::get('commissions', [CommissionController::class, 'index'])->name('commissions');
     Route::get('commissions/export', [CommissionController::class, 'export'])->name('commissions.export');
-    Route::patch('commissions/{commission}/status', [CommissionController::class, 'updateStatus'])->name('commissions.status');
+    Route::get('commissions/preview', [CommissionController::class, 'preview'])->name('commissions.preview');
+    Route::post('commissions/generate', [CommissionController::class, 'generate'])->name('commissions.generate');
+    Route::get('commissions/{invoice}', [CommissionController::class, 'show'])->name('commissions.show');
+    Route::get('commissions/{invoice}/pdf', [CommissionController::class, 'pdf'])->name('commissions.pdf');
+    Route::patch('commissions/{invoice}/mark-paid', [CommissionController::class, 'markPaid'])->name('commissions.mark-paid');
+    Route::patch('commissions/{invoice}/waive', [CommissionController::class, 'waive'])->name('commissions.waive');
+    Route::post('commissions/{invoice}/remind', [CommissionController::class, 'remind'])->name('commissions.remind');
 
     // Refund disputes (escalated by customers)
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');

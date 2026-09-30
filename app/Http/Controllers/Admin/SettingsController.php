@@ -23,6 +23,10 @@ class SettingsController extends Controller
         // Platform / marketplace
         'default_commission_rate',
         'default_delivery_fee',
+        // Commission billing
+        'commission_invoice_due_days',
+        'commission_suspend_after_days',
+        'commission_billing_period',
     ];
 
     private array $defaults = [
@@ -34,6 +38,9 @@ class SettingsController extends Controller
         'lead_time_days'          => '3',
         'default_commission_rate' => '5.00',
         'default_delivery_fee'    => '0.00',
+        'commission_invoice_due_days'   => '7',
+        'commission_suspend_after_days' => '3',
+        'commission_billing_period'     => 'monthly',
     ];
 
     public function index(): Response
@@ -59,6 +66,9 @@ class SettingsController extends Controller
             'lead_time_days'          => 'required|integer|min:1|max:365',
             'default_commission_rate' => 'required|numeric|min:0|max:100',
             'default_delivery_fee'    => 'required|numeric|min:0',
+            'commission_invoice_due_days'   => 'required|integer|min:1|max:60',
+            'commission_suspend_after_days' => 'required|integer|min:0|max:60',
+            'commission_billing_period'     => 'required|in:weekly,monthly',
         ]);
 
         foreach ($data as $key => $value) {

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Models\CommissionInvoice;
 use App\Models\Inventory;
 use App\Models\Order;
+use App\Services\CommissionBillingService;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -97,6 +99,38 @@ class DashboardController extends Controller
             'ordersChart'  => $ordersChart,
             'recentOrders' => $recentOrders,
             'lowStock'     => $lowStock,
+            'commissionDue' => $this->commissionDue($store),
         ]);
+    }
+
+    /** Unpaid commission invoice summary for the dashboard banner (owner only). */
+    private function commissionDue($store): ?array
+    {
+        if (request()->user()->role !== 'seller') {
+            return null;
+        }
+
+        CommissionBillingService::markOverdue();
+
+        $unpaid = CommissionInvoice::where('store_id', $store->id)
+            ->whereIn('status', ['pending', 'overdue'])
+            ->orderBy('due_date')
+            ->get();
+
+        if ($unpaid->isEmpty()) {
+            return null;
+        }
+
+        $overdue = $unpaid->where('status', 'overdue');
+        $first   = $overdue->first() ?? $unpaid->first();
+
+        return [
+            'amount'         => round((float) $unpaid->sum('commission_amount'), 2),
+            'overdue_amount' => round((float) $overdue->sum('commission_amount'), 2),
+            'is_overdue'     => $overdue->isNotEmpty(),
+            'due_date'       => $first->due_date->format('M d, Y'),
+            'invoice_id'     => $first->id,
+            'suspended'      => (bool) $store->commission_suspended,
+        ];
     }
 }

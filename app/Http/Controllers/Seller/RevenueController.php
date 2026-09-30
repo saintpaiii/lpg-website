@@ -39,7 +39,7 @@ class RevenueController extends Controller
             ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
             ->sum('order_total');
         $commissionPaid = (float) Commission::where('store_id', $store->id)->where('status', 'collected')->sum('commission_amount');
-        $commissionDue  = (float) Commission::where('store_id', $store->id)->where('status', 'pending')->sum('commission_amount');
+        $commissionDue  = (float) Commission::where('store_id', $store->id)->whereIn('status', ['pending', 'invoiced'])->sum('commission_amount');
         $netRevenue     = (float) (clone $base)->sum('seller_amount');
 
         $commissions = $this->filteredQuery($request, $store->id)

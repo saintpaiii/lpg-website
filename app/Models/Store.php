@@ -50,6 +50,8 @@ class Store extends Model
         'allow_consignment',
         'min_down_payment_percent',
         'consignment_due_days',
+        'commission_suspended',
+        'commission_suspended_at',
     ];
 
     protected function casts(): array
@@ -66,6 +68,8 @@ class Store extends Model
             'base_delivery_fee'        => 'decimal:2',
             'fee_per_km'               => 'decimal:2',
             'max_delivery_radius_km'   => 'integer',
+            'commission_suspended'     => 'boolean',
+            'commission_suspended_at'  => 'datetime',
             'allow_cod'                => 'boolean',
             'allow_consignment'        => 'boolean',
             'min_down_payment_percent' => 'integer',
@@ -76,6 +80,17 @@ class Store extends Model
     // ── Relationships ─────────────────────────────────────────────────────────
 
     /** The seller/owner of this store */
+    /** Approved and not suspended for unpaid commission — safe to show to customers. */
+    public function scopeVisibleToCustomers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('status', 'approved')->where('commission_suspended', false);
+    }
+
+    public function commissionInvoices(): HasMany
+    {
+        return $this->hasMany(CommissionInvoice::class);
+    }
+
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

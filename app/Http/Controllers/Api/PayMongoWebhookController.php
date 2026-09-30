@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\CommissionInvoice;
+use App\Services\CommissionBillingService;
 use App\Services\OrderPaymentService;
 use App\Services\PayMongoService;
 use Illuminate\Http\Request;
@@ -45,6 +47,13 @@ class PayMongoWebhookController extends Controller
 
         $payments = Payment::where('paymongo_checkout_id', $sessionId)->get();
         if ($payments->isEmpty()) {
+            // Not a customer order — may be a seller paying a commission invoice
+            $invoice = CommissionInvoice::where('paymongo_checkout_id', $sessionId)->first();
+            if ($invoice && $invoice->isUnpaid()) {
+                $payId = ($attributes['payments'][0]['data']['id'] ?? null)
+                    ?? ($attributes['payments'][0]['id'] ?? null);
+                CommissionBillingService::markPaid($invoice, 'paymongo', $payId ?? $sessionId);
+            }
             return;
         }
 

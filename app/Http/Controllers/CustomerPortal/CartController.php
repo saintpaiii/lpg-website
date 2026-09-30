@@ -89,7 +89,7 @@ class CartController extends Controller
         $product = Product::with(['store', 'inventory'])
             ->where('id', $request->product_id)
             ->where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->firstOrFail();
 
         // Block purchasing from own store

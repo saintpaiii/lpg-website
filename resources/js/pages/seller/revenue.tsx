@@ -23,7 +23,7 @@ interface CommissionRow {
     commission_rate: number;
     commission_amount: number;
     seller_amount: number;
-    status: 'pending' | 'collected' | 'failed';
+    status: 'pending' | 'invoiced' | 'collected' | 'failed' | 'waived';
     collected_at: string | null;
     created_at: string;
 }
@@ -46,9 +46,19 @@ interface Props {
 const fmt = (n: number) => n.toLocaleString('en-PH', { style: 'currency', currency: 'PHP' });
 
 const STATUS_STYLES: Record<CommissionRow['status'], string> = {
-    pending:   'bg-yellow-100 text-yellow-800',
+    pending:   'bg-gray-100 text-gray-700',
+    invoiced:  'bg-yellow-100 text-yellow-800',
     collected: 'bg-green-100 text-green-800',
     failed:    'bg-red-100 text-red-700',
+    waived:    'bg-blue-100 text-blue-700',
+};
+
+const STATUS_LABELS: Record<CommissionRow['status'], string> = {
+    pending:   'Not yet invoiced',
+    invoiced:  'Invoiced',
+    collected: 'Paid',
+    failed:    'Failed',
+    waived:    'Waived',
 };
 
 const MODE_LABELS: Record<string, string> = {
@@ -145,7 +155,7 @@ export default function SellerRevenue({ summary, commissions, filters }: Props) 
                     <Info className="mt-0.5 h-4 w-4 shrink-0" />
                     <p>
                         The platform does not hold seller balances. A {summary.commission_rate}% commission is recorded for each
-                        delivered and fully paid order, and the admin marks it as collected once it has been settled.
+                        delivered and fully paid order and billed to you periodically — see <a href="/seller/commission" className="font-semibold underline">Commission</a> to pay your invoices.
                     </p>
                 </div>
 
@@ -160,9 +170,10 @@ export default function SellerRevenue({ summary, commissions, filters }: Props) 
                                     <select value={status} onChange={(e) => setStatus(e.target.value)}
                                         className="h-8 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                                         <option value="">All</option>
-                                        <option value="pending">Pending</option>
-                                        <option value="collected">Collected</option>
-                                        <option value="failed">Failed</option>
+                                        <option value="pending">Not yet invoiced</option>
+                                        <option value="invoiced">Invoiced</option>
+                                        <option value="collected">Paid</option>
+                                        <option value="waived">Waived</option>
                                     </select>
                                 </div>
                                 <div className="flex flex-col gap-1">
@@ -216,7 +227,7 @@ export default function SellerRevenue({ summary, commissions, filters }: Props) 
                                                     <td className="py-3 pr-4 text-right font-medium text-green-600">{fmt(c.seller_amount)}</td>
                                                     <td className="py-3">
                                                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[c.status]}`}>
-                                                            {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
+                                                            {STATUS_LABELS[c.status]}
                                                         </span>
                                                         {c.collected_at && <p className="text-xs text-muted-foreground mt-0.5">{c.collected_at}</p>}
                                                     </td>

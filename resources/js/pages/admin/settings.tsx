@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
-import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle, Percent, Store } from 'lucide-react';
+import { Building2, Phone, Mail, MapPin, Package, Clock, CheckCircle, HandCoins, Percent, Store } from 'lucide-react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,6 +20,10 @@ interface Settings {
     default_reorder_level: string;
     lead_time_days: string;
     default_commission_rate: string;
+    default_delivery_fee: string;
+    commission_invoice_due_days: string;
+    commission_suspend_after_days: string;
+    commission_billing_period: 'weekly' | 'monthly';
 }
 
 interface Props {
@@ -37,6 +41,10 @@ export default function AdminSettings({ settings }: Props) {
         default_reorder_level:    settings.default_reorder_level,
         lead_time_days:           settings.lead_time_days,
         default_commission_rate:  settings.default_commission_rate,
+        default_delivery_fee:     settings.default_delivery_fee,
+        commission_invoice_due_days:   settings.commission_invoice_due_days,
+        commission_suspend_after_days: settings.commission_suspend_after_days,
+        commission_billing_period:     settings.commission_billing_period,
     });
 
     const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {
@@ -251,6 +259,63 @@ export default function AdminSettings({ settings }: Props) {
                                     Default % of order total earned by the platform. Can be overridden per store.
                                 </p>
                                 <InputError message={errors.default_commission_rate} />
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* ── Commission Settings ─────────────────────────────── */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <HandCoins className="h-4 w-4 text-blue-600" />
+                                Commission Settings
+                            </CardTitle>
+                            <CardDescription>
+                                How stores are billed for platform commission and when unpaid stores are suspended.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="commission_billing_period">Billing Period</Label>
+                                    <select
+                                        id="commission_billing_period"
+                                        value={data.commission_billing_period}
+                                        onChange={(e) => setData('commission_billing_period', e.target.value as 'weekly' | 'monthly')}
+                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                        <option value="monthly">Monthly</option>
+                                        <option value="weekly">Weekly</option>
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">Invoices are generated automatically at the start of each period.</p>
+                                    <InputError message={errors.commission_billing_period} />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="commission_invoice_due_days">Invoice Due (days)</Label>
+                                    <Input
+                                        id="commission_invoice_due_days"
+                                        type="number"
+                                        min="1"
+                                        max="60"
+                                        value={data.commission_invoice_due_days}
+                                        onChange={(e) => setData('commission_invoice_due_days', e.target.value)}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Days after an invoice is issued.</p>
+                                    <InputError message={errors.commission_invoice_due_days} />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="commission_suspend_after_days">Auto-suspend after (days overdue)</Label>
+                                    <Input
+                                        id="commission_suspend_after_days"
+                                        type="number"
+                                        min="0"
+                                        max="60"
+                                        value={data.commission_suspend_after_days}
+                                        onChange={(e) => setData('commission_suspend_after_days', e.target.value)}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Products are hidden until the invoice is paid.</p>
+                                    <InputError message={errors.commission_suspend_after_days} />
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

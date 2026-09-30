@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Consignment: remind customers 2 days before the balance is due, flag overdue balances
 Schedule::command('consignment:balance-reminders')->dailyAt('08:00');
+
+// Commission billing: periodic invoices, reminders, overdue notices, auto-suspension
+Schedule::command('commissions:process-invoices')->dailyAt('07:00');

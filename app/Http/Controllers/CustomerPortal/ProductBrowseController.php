@@ -28,7 +28,7 @@ class ProductBrowseController extends Controller
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->whereNotNull('refill_price')
             ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId));
 
@@ -93,12 +93,12 @@ class ProductBrowseController extends Controller
         ]);
 
         // Filter option lists
-        $cities  = Store::where('status', 'approved')->distinct()->orderBy('city')->whereNotNull('city')->pluck('city');
+        $cities  = Store::visibleToCustomers()->distinct()->orderBy('city')->whereNotNull('city')->pluck('city');
         $brands  = Product::where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->distinct()->orderBy('brand')->whereNotNull('brand')->pluck('brand');
         $weights = Product::where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->distinct()->orderBy('weight')->whereNotNull('weight')->pluck('weight');
 
         $isAdminPreview = $request->user() &&
@@ -150,7 +150,7 @@ class ProductBrowseController extends Controller
             ->withCount('ratings')
             ->where('id', $id)
             ->where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->first();
 
         if (! $product) {
@@ -213,7 +213,7 @@ class ProductBrowseController extends Controller
             ->where('store_id', '!=', $product->store_id)
             ->where('id', '!=', $product->id)
             ->where('is_active', true)
-            ->whereHas('store', fn ($q) => $q->where('status', 'approved'))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->limit(4)
             ->get()
             ->map(fn ($p) => $this->mapRelated($p));

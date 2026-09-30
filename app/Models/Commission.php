@@ -12,6 +12,7 @@ class Commission extends Model
     protected $fillable = [
         'order_id',
         'store_id',
+        'commission_invoice_id',
         'order_total',
         'commission_rate',
         'commission_amount',
@@ -39,5 +40,10 @@ class Commission extends Model
     public function store(): BelongsTo
     {
         return $this->belongsTo(Store::class)->withTrashed();
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(CommissionInvoice::class, 'commission_invoice_id');
     }
 }

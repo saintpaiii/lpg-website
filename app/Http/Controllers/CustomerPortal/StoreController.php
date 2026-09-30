@@ -16,7 +16,7 @@ class StoreController extends Controller
 {
     public function show(Request $request, Store $store): Response
     {
-        if ($store->status !== 'approved') {
+        if ($store->status !== 'approved' || $store->commission_suspended) {
             abort(404);
         }
 

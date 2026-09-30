@@ -46,8 +46,8 @@ class HandleInertiaRequests extends Middleware
         if ($user && ($user->role === 'seller' || $user->role === 'seller_staff')) {
             $store = $request->attributes->get('seller_store')
                 ?? ($user->role === 'seller'
-                    ? Store::where('user_id', $user->id)->select('id', 'store_name', 'status')->first()
-                    : ($user->store_id ? Store::find($user->store_id, ['id', 'store_name', 'status']) : null));
+                    ? Store::where('user_id', $user->id)->select('id', 'store_name', 'status', 'commission_suspended')->first()
+                    : ($user->store_id ? Store::find($user->store_id, ['id', 'store_name', 'status', 'commission_suspended']) : null));
         }
 
         // Pending/rejected seller application — shown in customer portal for non-sellers
@@ -71,7 +71,16 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user'               => $user,
                 'permissions'        => $user ? $user->getPermissions() : [],
-                'store'              => $store ? ['id' => $store->id, 'store_name' => $store->store_name, 'status' => $store->status] : null,
+                'store'              => $store ? [
+                    'id'                   => $store->id,
+                    'store_name'           => $store->store_name,
+                    'status'               => $store->status,
+                    'commission_suspended' => (bool) $store->commission_suspended,
+                    // Amount needed to lift a commission suspension (only computed when suspended)
+                    'commission_owed'      => $store->commission_suspended
+                        ? \App\Services\CommissionBillingService::outstandingFor($store->id)
+                        : 0,
+                ] : null,
                 'seller_application' => $sellerApplication,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

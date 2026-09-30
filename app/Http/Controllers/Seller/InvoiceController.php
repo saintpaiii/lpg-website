@@ -47,11 +47,11 @@ class InvoiceController extends Controller
                 'id'                  => $i->id,
                 'invoice_number'      => $i->invoice_number,
                 'total_amount'        => (float) $i->total_amount,
+                // What the customer pays the store: items + delivery fee (commission is billed separately)
+                'grand_total'         => (float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0),
                 'paid_amount'         => (float) $i->paid_amount,
                 'payment_status'      => $i->payment_status,
                 'payment_method'      => $i->payment_method,
-                'platform_commission' => (float) ($i->platform_commission ?? 0),
-                'net_amount'          => (float) $i->total_amount - (float) ($i->platform_commission ?? 0),
                 'due_date'            => $i->due_date?->format('M d, Y'),
                 'paid_at'             => $i->paid_at?->format('M d, Y'),
                 'created_at'          => $i->created_at->format('M d, Y'),
@@ -109,8 +109,6 @@ class InvoiceController extends Controller
             ['key' => 'customer',       'label' => 'Customer'],
             ['key' => 'created_at',     'label' => 'Date'],
             ['key' => 'total_amount',   'label' => 'Total',        'align' => 'right'],
-            ['key' => 'commission',     'label' => 'Commission',   'align' => 'right'],
-            ['key' => 'net_amount',     'label' => 'Net',          'align' => 'right'],
             ['key' => 'status',         'label' => 'Status'],
             ['key' => 'method',         'label' => 'Method'],
         ];
@@ -120,18 +118,14 @@ class InvoiceController extends Controller
             'order_number'   => $i->order?->order_number ?? '—',
             'customer'       => $i->customer?->name ?? '—',
             'created_at'     => $i->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
-            'total_amount'   => $this->peso((float) $i->total_amount),
-            'commission'     => $this->peso((float) ($i->platform_commission ?? 0)),
-            'net_amount'     => $this->peso(max(0, (float) $i->total_amount - (float) ($i->platform_commission ?? 0))),
+            'total_amount'   => $this->peso((float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0)),
             'status'         => $i->payment_status,
             'method'         => $i->payment_method ?? '—',
             // raw for totals
-            '_total'  => (float) $i->total_amount,
-            '_comm'   => (float) ($i->platform_commission ?? 0),
+            '_total'  => (float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0),
         ])->values()->all();
 
         $grandTotal = collect($rows)->sum('_total');
-        $grandComm  = collect($rows)->sum('_comm');
 
         if ($format === 'pdf') {
             return $this->pdfResponse($filename, [
@@ -141,19 +135,18 @@ class InvoiceController extends Controller
                 'dateRange'    => \Carbon\Carbon::parse($from)->format('M d, Y') . ' – ' . \Carbon\Carbon::parse($to)->format('M d, Y'),
                 'summaryItems' => [
                     ['label' => 'Total Invoices', 'value' => count($rows)],
-                    ['label' => 'Gross Total',    'value' => $this->peso($grandTotal)],
-                    ['label' => 'Commission',     'value' => $this->peso($grandComm)],
-                    ['label' => 'Net Total',      'value' => $this->peso($grandTotal - $grandComm)],
+                    ['label' => 'Total',          'value' => $this->peso($grandTotal)],
+                    ['label' => 'Note',           'value' => 'Platform commission is billed separately'],
                 ],
                 'columns'   => $columns,
                 'rows'      => $rows,
-                'totalsRow' => ['invoice_number' => 'TOTAL', 'order_number' => '', 'customer' => '', 'created_at' => '', 'total_amount' => $this->peso($grandTotal), 'commission' => $this->peso($grandComm), 'net_amount' => $this->peso($grandTotal - $grandComm), 'status' => '', 'method' => ''],
+                'totalsRow' => ['invoice_number' => 'TOTAL', 'order_number' => '', 'customer' => '', 'created_at' => '', 'total_amount' => $this->peso($grandTotal), 'status' => '', 'method' => ''],
             ]);
         }
 
-        $headings = ['Invoice #', 'Order #', 'Customer', 'Date', 'Total', 'Commission', 'Net', 'Status', 'Method'];
-        $csvRows  = array_map(fn ($r) => [$r['invoice_number'], $r['order_number'], $r['customer'], $r['created_at'], $r['total_amount'], $r['commission'], $r['net_amount'], $r['status'], $r['method']], $rows);
-        $csvRows[] = ['TOTAL', '', '', '', $this->peso($grandTotal), $this->peso($grandComm), $this->peso($grandTotal - $grandComm), '', ''];
+        $headings = ['Invoice #', 'Order #', 'Customer', 'Date', 'Total', 'Status', 'Method'];
+        $csvRows  = array_map(fn ($r) => [$r['invoice_number'], $r['order_number'], $r['customer'], $r['created_at'], $r['total_amount'], $r['status'], $r['method']], $rows);
+        $csvRows[] = ['TOTAL', '', '', '', $this->peso($grandTotal), '', ''];
         return $this->csvResponse($filename, $headings, $csvRows);
     }
 
@@ -187,8 +180,8 @@ class InvoiceController extends Controller
                 'paid_amount'         => (float) $invoice->paid_amount,
                 'payment_status'      => $invoice->payment_status,
                 'payment_method'      => $invoice->payment_method,
-                'platform_commission' => (float) ($invoice->platform_commission ?? 0),
-                'net_amount'          => (float) $invoice->total_amount - (float) ($invoice->platform_commission ?? 0) + $shippingFee,
+                // Commission is owed to the platform and billed separately — never deducted here
+                'commission'          => $this->commissionInfo($invoice),
                 'due_date'            => $invoice->due_date?->format('M d, Y'),
                 'paid_at'             => $invoice->paid_at?->format('M d, Y'),
                 'created_at'          => $invoice->created_at->format('M d, Y g:i A'),
@@ -220,6 +213,40 @@ class InvoiceController extends Controller
     /**
      * Record a manual (COD) payment for an invoice.
      */
+    /**
+     * Commission the store owes the platform for this sale. Uses the recorded
+     * commission once the order is delivered + paid, otherwise an estimate.
+     */
+    private function commissionInfo(Invoice $invoice): array
+    {
+        $commission = $invoice->order_id
+            ? \App\Models\Commission::with('invoice')->where('order_id', $invoice->order_id)->first()
+            : null;
+
+        if ($commission) {
+            return [
+                'amount'         => (float) $commission->commission_amount,
+                'rate'           => (float) $commission->commission_rate,
+                'status'         => $commission->status,
+                'is_estimate'    => false,
+                'invoice_id'     => $commission->commission_invoice_id,
+                'invoice_number' => $commission->invoice?->invoice_number,
+            ];
+        }
+
+        $store = request()->attributes->get('seller_store');
+        $rate  = (float) ($store?->commission_rate ?: \App\Models\Commission::DEFAULT_RATE);
+
+        return [
+            'amount'         => round((float) $invoice->total_amount * $rate / 100, 2),
+            'rate'           => $rate,
+            'status'         => null,
+            'is_estimate'    => true,
+            'invoice_id'     => null,
+            'invoice_number' => null,
+        ];
+    }
+
     public function recordPayment(Request $request, Invoice $invoice): RedirectResponse
     {
         $store = request()->attributes->get('seller_store');
