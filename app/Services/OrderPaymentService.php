@@ -23,6 +23,8 @@ class OrderPaymentService
      */
     public static function markPaid(Order $order, ?string $method = null): void
     {
+        $settlesConsignment = $order->payment_mode === 'consignment' && $order->payment_status === 'partial';
+
         $updates = ['payment_status' => 'paid'];
         if ($method) {
             $updates['payment_method'] = $method;
@@ -42,6 +44,11 @@ class OrderPaymentService
         }
 
         static::recordCommission($order->fresh());
+
+        // Loyalty: consignment balance settled — on time or late
+        if ($settlesConsignment) {
+            LoyaltyService::recordBalancePaid($order->fresh());
+        }
     }
 
     /**
@@ -131,6 +138,9 @@ class OrderPaymentService
         }
 
         static::recordCommission($order->fresh());
+
+        // Loyalty: count the completed order toward the customer's tier at this store
+        LoyaltyService::recordDelivered($order->fresh());
 
         // A delivered replacement completes the refund it belongs to
         $deliveryId = $delivery?->id ?? $order->delivery?->id;

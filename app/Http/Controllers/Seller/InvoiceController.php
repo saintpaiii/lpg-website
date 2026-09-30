@@ -277,6 +277,9 @@ class InvoiceController extends Controller
         ]);
 
         if ($invoice->order) {
+            $settlesConsignment = $status === 'paid'
+                && $invoice->order->payment_mode === 'consignment' && $invoice->order->payment_status === 'partial';
+
             $invoice->order->update([
                 'payment_status' => $status,
                 'payment_method' => $data['payment_method'],
@@ -284,6 +287,9 @@ class InvoiceController extends Controller
 
             if ($status === 'paid') {
                 \App\Services\OrderPaymentService::recordCommission($invoice->order->fresh());
+            }
+            if ($settlesConsignment) {
+                \App\Services\LoyaltyService::recordBalancePaid($invoice->order->fresh());
             }
         }
 

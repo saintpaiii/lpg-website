@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
+import TierBadge, { type Tier } from '@/components/tier-badge';
+import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
@@ -99,7 +101,16 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function SellerOrderShow({ order, riders, breakdown }: Props & { breakdown: PriceBreakdown }) {
+type CustomerLoyaltyInfo = {
+    tier: Tier | null;
+    trust_score: number | null;
+    downpayment_percent: number | null;
+    consignment_allowed: boolean;
+    total_orders: number;
+    cancelled_orders: number;
+} | null;
+
+export default function SellerOrderShow({ order, riders, breakdown, loyalty }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Orders',    href: '/seller/orders'    },
@@ -329,9 +340,22 @@ export default function SellerOrderShow({ order, riders, breakdown }: Props & { 
                             <Card>
                                 <CardHeader className="pb-2"><CardTitle className="text-sm">Customer</CardTitle></CardHeader>
                                 <CardContent className="text-sm space-y-1">
-                                    <p className="font-semibold">{order.customer.name}</p>
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="font-semibold">{order.customer.name}</p>
+                                        {loyalty?.tier && <TierBadge tier={loyalty.tier} size="sm" />}
+                                    </div>
                                     {order.customer.phone && <p className="text-muted-foreground">{order.customer.phone}</p>}
                                     <p className="text-muted-foreground text-xs">{order.customer.address}, {order.customer.city}</p>
+                                    {loyalty && (
+                                        <div className="mt-2 space-y-1 border-t pt-2">
+                                            <p className="text-xs text-muted-foreground">Trust score at your store</p>
+                                            <TrustScoreBar score={loyalty.trust_score ?? 50} size="sm" />
+                                            <p className="text-xs text-muted-foreground">
+                                                {loyalty.total_orders} completed · {loyalty.cancelled_orders} cancelled ·{' '}
+                                                {loyalty.consignment_allowed ? `${loyalty.downpayment_percent}% consignment down payment` : 'consignment not allowed'}
+                                            </p>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}

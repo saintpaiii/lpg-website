@@ -66,6 +66,9 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::get('id-verification',  [IdVerificationController::class, 'create'])->name('id-verification');
         Route::post('id-verification', [IdVerificationController::class, 'store'])->name('id-verification.store');
 
+        // Loyalty status per store
+        Route::get('loyalty', [\App\Http\Controllers\LoyaltyController::class, 'getMyLoyalty'])->name('loyalty');
+
         // Refund requests
         Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
         Route::post('orders/{order}/refund', [RefundController::class, 'store'])->name('orders.refund');

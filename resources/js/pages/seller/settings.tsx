@@ -418,7 +418,7 @@ export default function SellerSettings({ store }: Props) {
                             />
                             <ToggleRow
                                 label="Consignment"
-                                hint="Customer pays a down payment online; the balance is due after delivery."
+                                hint="Customer pays a down payment online; the balance is due after delivery. Only offered while your Loyalty Program is on — the down payment is set by the customer's loyalty tier."
                                 checked={data.allow_consignment}
                                 onChange={(v) => setData('allow_consignment', v)}
                             />

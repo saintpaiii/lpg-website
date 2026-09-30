@@ -11,6 +11,7 @@ import {
     ShieldCheck,
     ShoppingBag,
     ShoppingCart,
+    Star,
     Store,
     User,
     X,
@@ -87,6 +88,7 @@ export default function CustomerLayout({ children, title }: Props) {
     const mainNavItems: NavItem[] = [
         { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag },
         { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
+        { title: 'My Loyalty',  href: '/customer/loyalty',        icon: Star        },
         { title: 'My Invoices', href: '/customer/invoices',       icon: Receipt     },
         { title: 'My Refunds',  href: '/customer/refunds',        icon: RotateCcw   },
         { title: 'My Reports',  href: '/customer/reports',        icon: Flag        },

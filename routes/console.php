@@ -16,3 +16,6 @@ Schedule::command('commissions:process-invoices')->dailyAt('07:00');
 
 // Coupons expiring within a day → remind customers who haven't used them
 Schedule::command('coupons:expiry-reminders')->dailyAt('09:00');
+
+// Loyalty: recency decay of trust scores + inactivity / low-trust tier demotions
+Schedule::command('loyalty:refresh')->dailyAt('02:00');

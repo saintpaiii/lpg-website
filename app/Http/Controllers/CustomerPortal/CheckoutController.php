@@ -14,6 +14,7 @@ use App\Models\CouponUse;
 use App\Models\StoreCoupon;
 use App\Services\CouponException;
 use App\Services\CouponService;
+use App\Services\LoyaltyService;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
 use Illuminate\Http\JsonResponse;
@@ -59,9 +60,39 @@ class CheckoutController extends Controller
         return 'ORD-' . $year . '-' . str_pad($count + 1, 5, '0', STR_PAD_LEFT);
     }
 
-    private function downPaymentPercent(Store $store): int
+    /**
+     * Consignment down payment % for this customer at this store: the loyalty tier
+     * rate when the store runs a loyalty program, otherwise the store's default.
+     */
+    private function downPaymentPercent(Store $store, ?int $userId = null): int
     {
-        return max(20, min(80, (int) ($store->min_down_payment_percent ?: 50)));
+        $tierPercent = $userId ? $this->loyaltyTerms($store->id, $userId)['downpayment_percent'] : null;
+
+        return max(20, min(80, (int) ($tierPercent ?? $store->min_down_payment_percent ?: 50)));
+    }
+
+    /** Consignment requires the store to allow it AND a loyalty program the customer qualifies under. */
+    private function consignmentAvailable(Store $store, int $userId): bool
+    {
+        return (bool) ($store->allow_consignment ?? true) && $this->loyaltyTerms($store->id, $userId)['consignment_allowed'];
+    }
+
+    /**
+     * Loyalty consignment terms, memoized on the current request (not the controller
+     * instance, which Laravel may reuse across requests in long-running processes).
+     */
+    private function loyaltyTerms(int $storeId, int $userId): array
+    {
+        $attrs = request()->attributes;
+        $cache = $attrs->get('loyalty_terms', []);
+        $key   = "{$userId}:{$storeId}";
+
+        if (! array_key_exists($key, $cache)) {
+            $cache[$key] = LoyaltyService::getConsignmentTerms($storeId, $userId);
+            $attrs->set('loyalty_terms', $cache);
+        }
+
+        return $cache[$key];
     }
 
     /**
@@ -95,7 +126,11 @@ class CheckoutController extends Controller
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
                     'allow_cod'              => (bool) ($store->allow_cod ?? true),
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
-                    'min_down_payment_percent' => $this->downPaymentPercent($store),
+                    // Consignment is a loyalty benefit: store must allow it, run a loyalty
+                    // program, and the customer's trust score must meet the store minimum
+                    'consignment_available'  => $this->consignmentAvailable($store, $userId),
+                    'min_down_payment_percent' => $this->downPaymentPercent($store, $userId),
+                    'loyalty'                => $this->loyaltyTerms($storeId, $userId),
                     'consignment_due_days'   => (int) ($store->consignment_due_days ?: 7),
                     'coupons'                => $customer
                         ? StoreCoupon::usable()
@@ -242,7 +277,13 @@ class CheckoutController extends Controller
             }
 
             $data = $request->validate([
-                'payment_mode'               => 'required|in:full,consignment,cod',
+                // Each store's order has its own payment option (payment_mode = legacy single choice)
+                'payment_modes'              => 'nullable|array',
+                'payment_modes.*'            => 'in:full,consignment,cod',
+                'payment_mode'               => 'nullable|in:full,consignment,cod',
+                // Optional consignment down payment per store (never below the tier minimum)
+                'down_payment_percents'      => 'nullable|array',
+                'down_payment_percents.*'    => 'integer|min:20|max:90',
                 'coupon_ids'                 => 'nullable|array',
                 'coupon_ids.*'               => 'integer',
                 'coupon_code'                => 'nullable|string|max:40',
@@ -256,7 +297,6 @@ class CheckoutController extends Controller
             $deliveryLng  = isset($data['delivery_longitude']) ? (float) $data['delivery_longitude'] : null;
             $estimatedMin = isset($data['estimated_delivery_minutes']) ? (int) $data['estimated_delivery_minutes'] : null;
 
-            $paymentMode = $data['payment_mode'];
             $couponIds   = array_map('intval', $data['coupon_ids'] ?? []);
             $couponCode  = trim((string) ($data['coupon_code'] ?? '')) ?: null;
 
@@ -302,19 +342,36 @@ class CheckoutController extends Controller
                 }
             }
 
-            // Every store in this checkout must accept the chosen payment method
+            // Resolve and validate each store's own payment option
+            $modes      = []; // store_id => full|consignment|cod
+            $dpPercents = []; // store_id => consignment down payment %
             foreach ($checkoutStores as $storeData) {
-                $s = $storeData['store_ref'];
-                if ($paymentMode === 'cod' && $s && ! $s->allow_cod) {
+                $s    = $storeData['store_ref'];
+                $sid  = (int) $storeData['store_id'];
+                $mode = $data['payment_modes'][$sid] ?? $data['payment_mode'] ?? null;
+
+                if (! $mode) {
+                    return $error("Please choose a payment option for {$storeData['store_name']}.");
+                }
+                if ($mode === 'cod' && $s && ! $s->allow_cod) {
                     return $error("{$s->store_name} does not accept Cash on Delivery.");
                 }
-                if ($paymentMode === 'consignment' && $s && ! $s->allow_consignment) {
-                    return $error("{$s->store_name} does not offer Consignment.");
+                if ($mode === 'consignment' && $s && ! $this->consignmentAvailable($s, auth()->id())) {
+                    return $error(($this->loyaltyTerms($s->id, auth()->id())['blocked_reason'] ?? null) === 'low_trust'
+                        ? "Consignment is not available for you at {$s->store_name}. Complete orders and pay on time to improve your trust score."
+                        : "{$s->store_name} does not offer Consignment.");
+                }
+
+                $modes[$sid] = $mode;
+                if ($mode === 'consignment') {
+                    $minPct = $this->downPaymentPercent($s, auth()->id());
+                    $chosen = (int) ($data['down_payment_percents'][$sid] ?? $minPct);
+                    $dpPercents[$sid] = max($minPct, min(90, $chosen));
                 }
             }
 
             // Create one order per store in a single DB transaction
-            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $paymentMode, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
+            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
                 // ── Pass 1: price every store's items and delivery fee ─────────
                 $prepared = [];
 
@@ -422,11 +479,13 @@ class CheckoutController extends Controller
                     $shippingFee = round($p['finalFee'] - $promoCut['shipping'], 2);
                     $grandTotal  = round($totalAmount + $shippingFee, 2);
 
-                    // Consignment: store-defined minimum down payment now, balance after delivery
+                    $paymentMode = $modes[$storeId];
+
+                    // Consignment: tier-based (or customer-raised) down payment now, balance after delivery
                     $downPayment      = null;
                     $remainingBalance = null;
                     if ($paymentMode === 'consignment') {
-                        $downPayment      = round($grandTotal * $this->downPaymentPercent($store) / 100, 2);
+                        $downPayment      = round($grandTotal * $dpPercents[$storeId] / 100, 2);
                         $remainingBalance = round($grandTotal - $downPayment, 2);
                     }
 
@@ -478,6 +537,8 @@ class CheckoutController extends Controller
                         'store'        => $store,
                         'delivery_fee' => $shippingFee,
                         'discount'     => round($p['discount'] + $promoCut['total'], 2),
+                        'mode'         => $paymentMode,
+                        'dp_percent'   => $dpPercents[$storeId] ?? null,
                         // Amount collected online right now
                         'pay_now'      => match ($paymentMode) {
                             'consignment' => $downPayment,
@@ -522,10 +583,10 @@ class CheckoutController extends Controller
             session()->forget('cart_selected');
 
             // Notify each store owner (and their staff) about the new order
-            $modeLabel = self::PAYMENT_MODE_LABELS[$paymentMode];
             foreach ($orders as $entry) {
-                $ord   = $entry['order'];
-                $store = $entry['store'];
+                $ord       = $entry['order'];
+                $store     = $entry['store'];
+                $modeLabel = self::PAYMENT_MODE_LABELS[$entry['mode']];
                 NotificationService::sendToStore(
                     $store->id,
                     'order_update',
@@ -537,15 +598,18 @@ class CheckoutController extends Controller
 
             // Orders fully covered by a store coupon need no online payment
             foreach ($orders as $entry) {
-                if ($paymentMode === 'full' && $entry['pay_now'] <= 0) {
+                if ($entry['mode'] === 'full' && $entry['pay_now'] <= 0) {
                     $entry['order']->update(['payment_status' => 'paid']);
                 }
             }
 
-            // Cash on Delivery — rider collects cash, no PayMongo session
+            // Only Full Payment / Consignment orders are charged online. COD orders are simply
+            // placed (the rider collects cash) — in a mixed checkout they stay placed even if
+            // the customer leaves the PayMongo page.
             $toCharge = array_values(array_filter($orders, fn ($e) => $e['pay_now'] > 0));
-            if ($paymentMode === 'cod' || empty($toCharge)) {
-                return response()->json(['redirect_url' => url('/customer/orders?placed=' . ($paymentMode === 'cod' ? 'cod' : '1'))]);
+            if (empty($toCharge)) {
+                $anyCod = collect($orders)->contains(fn ($e) => $e['mode'] === 'cod');
+                return response()->json(['redirect_url' => url('/customer/orders?placed=' . ($anyCod ? 'cod' : '1'))]);
             }
 
             $paymongo  = app(PayMongoService::class);
@@ -557,8 +621,8 @@ class CheckoutController extends Controller
                 $store = $entry['store'];
                 $order->load('items.product');
 
-                if ($paymentMode === 'consignment') {
-                    $pct = $this->downPaymentPercent($store);
+                if ($entry['mode'] === 'consignment') {
+                    $pct = $entry['dp_percent'];
                     $lineItems[] = [
                         'name'        => "Down Payment — {$store->store_name}",
                         'description' => "{$pct}% consignment down payment for Order {$order->order_number}",
@@ -603,7 +667,7 @@ class CheckoutController extends Controller
 
             $session = $paymongo->createCheckoutSession([
                 'reference_number' => $firstOrder->order_number,
-                'description'      => $paymentMode === 'consignment'
+                'description'      => collect($toCharge)->every(fn ($e) => $e['mode'] === 'consignment') && count($toCharge) === 1
                     ? "Consignment Down Payment — Order {$firstOrder->order_number}"
                     : (count($toCharge) > 1
                         ? 'LPG Orders from ' . $storeNames

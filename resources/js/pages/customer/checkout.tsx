@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import { allocateDiscount, type CouponRules } from '@/lib/coupons';
+import TierBadge, { TIER_LABELS, type Tier } from '@/components/tier-badge';
 import type { SharedData } from '@/types';
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
@@ -51,6 +52,16 @@ type StoreGroup = {
     min_down_payment_percent: number;
     consignment_due_days: number;
     coupons: StoreCouponOption[];
+    // Backend decides: store allows consignment + loyalty program on + customer's trust score qualifies
+    consignment_available: boolean;
+    loyalty: {
+        loyalty_enabled: boolean;
+        tier: Tier | null;
+        trust_score: number | null;
+        downpayment_percent: number | null;
+        consignment_allowed: boolean;
+        blocked_reason: 'loyalty_disabled' | 'low_trust' | null;
+    };
     items: CartItem[];
 };
 
@@ -178,7 +189,13 @@ export default function CheckoutPage({ stores, customer }: Props) {
         );
     }
 
-    const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
+    // Each store's order has its own payment option (and consignment down payment %)
+    const [paymentModes, setPaymentModes] = useState<Record<number, PaymentMode>>(
+        () => Object.fromEntries(stores.map((sg) => [sg.store_id, 'full' as PaymentMode])),
+    );
+    const [dpPercents, setDpPercents] = useState<Record<number, number>>(
+        () => Object.fromEntries(stores.map((sg) => [sg.store_id, sg.min_down_payment_percent])),
+    );
     const [notes, setNotes]             = useState('');
     // Promo coupon (platform or store)
     const [promo, setPromo]             = useState<CouponRules | null>(null);
@@ -253,16 +270,19 @@ export default function CheckoutPage({ stores, customer }: Props) {
         );
     }
 
-    // Payment methods offered = those every store in this checkout allows
-    const availableModes: PaymentMode[] = [
+    // Payment options per store. Consignment only when the backend marks it available for
+    // THIS store (loyalty program on + customer's trust score qualifies); COD if the store allows it.
+    const modesFor = (sg: StoreGroup): PaymentMode[] => [
         'full',
-        ...(stores.every((sg) => sg.allow_consignment) ? (['consignment'] as const) : []),
-        ...(stores.every((sg) => sg.allow_cod) ? (['cod'] as const) : []),
+        ...(sg.consignment_available ? (['consignment'] as const) : []),
+        ...(sg.allow_cod ? (['cod'] as const) : []),
     ];
-    useEffect(() => {
-        if (!availableModes.includes(paymentMode)) setPaymentMode('full');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableModes.join(',')]);
+    const modeOf = (sg: StoreGroup): PaymentMode => {
+        const m = paymentModes[sg.store_id] ?? 'full';
+        return modesFor(sg).includes(m) ? m : 'full';
+    };
+    // Down payment %: tier minimum from the backend, the customer may choose to pay more (max 90%)
+    const dpOf = (sg: StoreGroup) => Math.min(90, Math.max(sg.min_down_payment_percent, dpPercents[sg.store_id] ?? sg.min_down_payment_percent));
 
     // Per-store totals (mirrors CheckoutController@store)
     const baseTotals = stores.map((sg) => {
@@ -286,28 +306,27 @@ export default function CheckoutPage({ stores, customer }: Props) {
     const storeTotals = baseTotals.map((t) => {
         const promoCut = promoCuts[t.store.store_id] ?? { product: 0, shipping: 0, total: 0 };
         const total    = round2(t.subtotal - t.discount + t.fee - promoCut.total);
-        const down     = round2(total * t.store.min_down_payment_percent / 100);
-        return { ...t, promoCut, total, down, balance: round2(total - down) };
+        const mode     = modeOf(t.store);
+        const dpPct    = dpOf(t.store);
+        const down     = mode === 'consignment' ? round2(total * dpPct / 100) : 0;
+        // Charged online now: full → everything, consignment → down payment, COD → nothing
+        const payNow   = mode === 'full' ? total : mode === 'consignment' ? down : 0;
+        return { ...t, promoCut, total, mode, dpPct, down, balance: round2(total - down), payNow };
     });
 
     const grandSubtotal = storeTotals.reduce((s, t) => s + t.subtotal, 0);
     const grandDelivery = storeTotals.reduce((s, t) => s + t.fee, 0);
     const grandDiscount = storeTotals.reduce((s, t) => s + t.discount, 0);
     const grandTotal    = round2(storeTotals.reduce((s, t) => s + t.total, 0));
-    const downPayment   = round2(storeTotals.reduce((s, t) => s + t.down, 0));
-    const balance       = round2(grandTotal - downPayment);
-    const amountDue     = paymentMode === 'consignment' ? downPayment : paymentMode === 'cod' ? 0 : grandTotal;
+    const payNowTotal   = round2(storeTotals.reduce((s, t) => s + t.payNow, 0));
+    const codTotal      = round2(storeTotals.filter((t) => t.mode === 'cod').reduce((s, t) => s + t.total, 0));
+    const balanceTotal  = round2(storeTotals.filter((t) => t.mode === 'consignment').reduce((s, t) => s + t.balance, 0));
 
-    const pctValues  = [...new Set(stores.map((sg) => sg.min_down_payment_percent))];
-    const dueValues  = [...new Set(stores.map((sg) => sg.consignment_due_days))];
-    const pctLabel   = pctValues.length === 1 ? `${pctValues[0]}%` : `${Math.min(...pctValues)}–${Math.max(...pctValues)}%`;
-    const dueLabel   = dueValues.length === 1 ? `${dueValues[0]} days` : `${Math.min(...dueValues)}–${Math.max(...dueValues)} days`;
-
-    const modeDescriptions: Record<PaymentMode, string> = {
+    const modeDescription = (sg: StoreGroup, mode: PaymentMode) => ({
         full:        'Pay 100% now via GCash, Maya, Card, or GrabPay',
-        consignment: `Pay ${pctLabel} down now, settle the balance within ${dueLabel} after delivery`,
+        consignment: `Pay ${sg.min_down_payment_percent}% down now, settle the balance within ${sg.consignment_due_days} days after delivery`,
         cod:         'Pay in cash to the rider when your order arrives',
-    };
+    })[mode];
 
     // Estimated minutes (from OSRM, single store only)
     const estimatedMins = osrmRoute?.durationMin ?? null;
@@ -318,7 +337,8 @@ export default function CheckoutPage({ stores, customer }: Props) {
             const res = await axios.post<{ checkout_url?: string; redirect_url?: string; error?: string }>(
                 '/customer/checkout',
                 {
-                    payment_mode:               paymentMode,
+                    payment_modes:              Object.fromEntries(stores.map((sg) => [sg.store_id, modeOf(sg)])),
+                    down_payment_percents:      Object.fromEntries(stores.filter((sg) => modeOf(sg) === 'consignment').map((sg) => [sg.store_id, dpOf(sg)])),
                     coupon_ids:                 Object.values(selectedCoupons).filter((id): id is number => !!id),
                     coupon_code:                promo?.code ?? null,
                     notes,
@@ -468,7 +488,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
                 )}
 
                 {/* Per-store order summaries */}
-                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut }) => {
+                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance }) => {
                     return (
                         <Card key={sg.store_id}>
                             <CardHeader className="pb-3">
@@ -559,6 +579,82 @@ export default function CheckoutPage({ stores, customer }: Props) {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Payment option — per store */}
+                                <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                                    <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
+                                        <CreditCard className="h-4 w-4 text-blue-600" /> Payment Option
+                                    </p>
+                                    <div className={`grid gap-2 ${modesFor(sg).length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                                        {modesFor(sg).map((m) => {
+                                            const { label, icon: Icon } = PAYMENT_MODE_META[m];
+                                            const active = mode === m;
+                                            return (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    onClick={() => setPaymentModes((prev) => ({ ...prev, [sg.store_id]: m }))}
+                                                    className={`rounded-xl border-2 p-3 text-left transition-colors ${
+                                                        active ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    <div className="mb-1 flex items-center gap-2">
+                                                        <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
+                                                        <span className={`text-sm font-semibold ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{label}</span>
+                                                    </div>
+                                                    <p className="text-xs text-gray-500">{modeDescription(sg, m)}</p>
+                                                    {m === 'consignment' && sg.loyalty.tier && (
+                                                        <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+                                                            <TierBadge tier={sg.loyalty.tier} size="sm" />
+                                                            <span>Your tier: {TIER_LABELS[sg.loyalty.tier]} — Minimum down payment: <strong>{sg.min_down_payment_percent}%</strong></span>
+                                                        </p>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {sg.allow_consignment && sg.loyalty.blocked_reason === 'low_trust' && (
+                                        <p className="mt-2 text-xs text-gray-400">Consignment not available for this store.</p>
+                                    )}
+
+                                    {/* Consignment breakdown for THIS store */}
+                                    {mode === 'consignment' && (
+                                        <div className="mt-3 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-900/20">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <label htmlFor={`dp-${sg.store_id}`} className="font-medium text-amber-800 dark:text-amber-300">
+                                                    Down payment: {dpPct}%
+                                                </label>
+                                                <span className="text-xs text-amber-700 dark:text-amber-400">min {sg.min_down_payment_percent}% · max 90%</span>
+                                            </div>
+                                            <input
+                                                id={`dp-${sg.store_id}`}
+                                                type="range"
+                                                min={sg.min_down_payment_percent}
+                                                max={90}
+                                                step={5}
+                                                value={dpPct}
+                                                onChange={(e) => setDpPercents((prev) => ({ ...prev, [sg.store_id]: Number(e.target.value) }))}
+                                                className="w-full accent-amber-600"
+                                            />
+                                            <div className="flex justify-between text-gray-700 dark:text-gray-300">
+                                                <span>Order total</span><span className="font-medium">{peso(total)}</span>
+                                            </div>
+                                            <div className="flex justify-between font-semibold text-blue-700 dark:text-blue-400">
+                                                <span>Down payment — pay now</span><span>{peso(down)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                                                <span>Balance — due {sg.consignment_due_days} days after delivery</span><span className="font-medium">{peso(balance)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {mode === 'cod' && (
+                                        <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                                            Prepare <strong>{peso(total)}</strong> in cash for the rider.
+                                        </p>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     );
@@ -613,118 +709,55 @@ export default function CheckoutPage({ stores, customer }: Props) {
                     </CardContent>
                 </Card>
 
-                {/* Grand total */}
-                {stores.length > 1 && (
-                    <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10">
-                        <CardContent className="pt-5 pb-4">
-                            <div className="space-y-1.5">
-                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                    <span>All subtotals ({stores.length} stores)</span>
-                                    <span>{peso(grandSubtotal)}</span>
-                                </div>
-                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                    <span>Total delivery fees</span>
-                                    <span>{grandDelivery > 0 ? peso(grandDelivery) : 'Free'}</span>
-                                </div>
-                                {grandDiscount > 0 && (
-                                    <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
-                                        <span>Store discounts</span>
-                                        <span>−{peso(grandDiscount)}</span>
-                                    </div>
-                                )}
-                                {promo && promoTotal > 0 && (
-                                    <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
-                                        <span>Coupon {promo.code}</span>
-                                        <span>−{peso(promoTotal)}</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between font-bold text-gray-900 dark:text-white text-base pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">
-                                    <span>Grand Total</span>
-                                    <span>{peso(grandTotal)}</span>
-                                </div>
+                {/* Grand total — shared across all stores */}
+                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10">
+                    <CardContent className="pt-5 pb-4">
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>{stores.length > 1 ? `All subtotals (${stores.length} stores)` : 'Subtotal'}</span>
+                                <span>{peso(grandSubtotal)}</span>
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
+                                <span>Total delivery fees</span>
+                                <span>{grandDelivery > 0 ? peso(grandDelivery) : 'Free'}</span>
+                            </div>
+                            {grandDiscount > 0 && (
+                                <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                    <span>Store discounts</span>
+                                    <span>−{peso(grandDiscount)}</span>
+                                </div>
+                            )}
+                            {promo && promoTotal > 0 && (
+                                <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                    <span>Coupon {promo.code}</span>
+                                    <span>−{peso(promoTotal)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between font-bold text-gray-900 dark:text-white text-base pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">
+                                <span>Grand Total</span>
+                                <span>{peso(grandTotal)}</span>
+                            </div>
 
-                {/* Payment option */}
-                <Card>
-                    <CardHeader className="pb-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <CreditCard className="h-4 w-4 text-blue-600" />
-                            Payment Option
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className={`grid gap-3 ${availableModes.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                            {availableModes.map((mode) => {
-                                const { label, icon: Icon } = PAYMENT_MODE_META[mode];
-                                const active = paymentMode === mode;
-                                return (
-                                    <button
-                                        key={mode}
-                                        type="button"
-                                        onClick={() => setPaymentMode(mode)}
-                                        className={`rounded-xl border-2 p-4 text-left transition-colors ${
-                                            active
-                                                ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20'
-                                                : 'border-gray-200 hover:border-gray-300 dark:border-gray-700'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
-                                            <span className={`font-semibold text-sm ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>
-                                                {label}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500">{modeDescriptions[mode]}</p>
-                                    </button>
-                                );
-                            })}
+                            {/* How the grand total gets paid, given each store's payment option */}
+                            <div className="mt-2 space-y-1 border-t border-blue-200 pt-2 text-sm dark:border-blue-700">
+                                <div className="flex justify-between text-blue-700 dark:text-blue-400">
+                                    <span>Pay now online (PayMongo)</span>
+                                    <span className="font-semibold">{peso(payNowTotal)}</span>
+                                </div>
+                                {codTotal > 0 && (
+                                    <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                        <span>Cash on delivery</span>
+                                        <span>{peso(codTotal)}</span>
+                                    </div>
+                                )}
+                                {balanceTotal > 0 && (
+                                    <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                                        <span>Consignment balance (after delivery)</span>
+                                        <span>{peso(balanceTotal)}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-
-                        {availableModes.length < 3 && (
-                            <p className="text-xs text-gray-400">
-                                {stores.length > 1
-                                    ? 'Some payment options are hidden because not every store in this checkout offers them.'
-                                    : 'Some payment options are not offered by this store.'}
-                            </p>
-                        )}
-
-                        {/* Consignment breakdown */}
-                        {paymentMode === 'consignment' && (
-                            <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-4 space-y-2 text-sm">
-                                <p className="font-semibold text-amber-800 dark:text-amber-300">Consignment Breakdown</p>
-                                <div className="flex justify-between text-gray-700 dark:text-gray-300">
-                                    <span>Order Total</span>
-                                    <span className="font-medium">{peso(grandTotal)}</span>
-                                </div>
-                                <div className="flex justify-between text-blue-700 dark:text-blue-400 font-semibold">
-                                    <span>Down Payment ({pctLabel}) — Pay Now</span>
-                                    <span>{peso(downPayment)}</span>
-                                </div>
-                                <div className="flex justify-between text-amber-700 dark:text-amber-400">
-                                    <span>Remaining Balance</span>
-                                    <span className="font-medium">{peso(balance)}</span>
-                                </div>
-                                <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 border-t border-amber-200 dark:border-amber-800">
-                                    Your order will be delivered after the down payment. Pay the remaining balance online within {dueLabel} after delivery.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* COD note */}
-                        {paymentMode === 'cod' && (
-                            <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 p-4 space-y-2 text-sm">
-                                <div className="flex justify-between font-semibold text-emerald-800 dark:text-emerald-300">
-                                    <span>Cash to prepare on delivery</span>
-                                    <span>{peso(grandTotal)}</span>
-                                </div>
-                                <p className="text-xs text-emerald-700 dark:text-emerald-400">
-                                    No online payment needed. Please prepare the exact amount for the rider.
-                                </p>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
 
@@ -759,19 +792,12 @@ export default function CheckoutPage({ stores, customer }: Props) {
                         {loading ? (
                             <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                {paymentMode === 'cod' ? 'Placing order…' : 'Redirecting to payment…'}
-                            </>
-                        ) : paymentMode === 'cod' || amountDue <= 0 ? (
-                            <>
-                                <Banknote className="h-4 w-4 mr-2" />
-                                Place Order{paymentMode === 'cod' ? ` — Pay ${peso(grandTotal)} on Delivery` : ''}
+                                {payNowTotal > 0 ? 'Redirecting to payment…' : 'Placing order…'}
                             </>
                         ) : (
                             <>
-                                <CreditCard className="h-4 w-4 mr-2" />
-                                {paymentMode === 'consignment'
-                                    ? `Pay Down Payment ${peso(downPayment)}`
-                                    : `Pay ${peso(amountDue)} — Full Payment`}
+                                {payNowTotal > 0 ? <CreditCard className="h-4 w-4 mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+                                Place Order{stores.length > 1 ? 's' : ''} — {peso(grandTotal)}
                             </>
                         )}
                     </Button>

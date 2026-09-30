@@ -1,5 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Award,
     BadgeCheck,
     BadgeDollarSign,
     Banknote,
@@ -22,6 +23,7 @@ import {
     ShieldAlert,
     ShoppingBag,
     ShoppingCart,
+    Star,
     Store,
     TicketPercent,
     Truck,
@@ -81,6 +83,8 @@ export function AppSidebar() {
             isActualSeller                             && { title: 'Coupons',      href: '/seller/coupons',        icon: TicketPercent     },
             (isActualSeller || can('reports.view'))     && { title: 'Reports',      href: '/seller/reports',    icon: LineChart       },
             (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain           },
+            isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award     },
+            (isActualSeller || isHR)                    && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users     },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
             { title: 'Notifications', href: '/notifications', icon: Bell   },
             { title: 'Profile',       href: '/settings/profile', icon: User },
@@ -157,6 +161,7 @@ export function AppSidebar() {
         isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag            },
         isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw      },
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
+        isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
         isPlatformAdmin        && { title: 'Commissions',        href: '/admin/commissions',                                  icon: Banknote        },
         isPlatformAdmin        && { title: 'Coupons',            href: '/admin/coupons',                                      icon: TicketPercent   },

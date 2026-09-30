@@ -356,8 +356,20 @@ class OrderController extends Controller
 
         $latestPayment = $order->payments->sortByDesc('created_at')->first();
 
+        // Customer's loyalty standing at this store (only when the program is on)
+        $loyalty = null;
+        if (($userId = $order->customer?->user_id) && \App\Services\LoyaltyService::enabledSettings($store->id)) {
+            $terms   = \App\Services\LoyaltyService::getConsignmentTerms($store->id, $userId);
+            $record  = \App\Models\CustomerLoyalty::where('user_id', $userId)->where('store_id', $store->id)->first();
+            $loyalty = $terms + [
+                'total_orders'     => $record?->total_orders ?? 0,
+                'cancelled_orders' => $record?->cancelled_orders ?? 0,
+            ];
+        }
+
         return Inertia::render('seller/order-show', [
             'breakdown' => $order->priceBreakdown(),
+            'loyalty'   => $loyalty,
             'order' => $this->formatOrder($order) + [
                 'delivery' => $order->delivery ? [
                     'id'           => $order->delivery->id,

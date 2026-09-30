@@ -453,6 +453,9 @@ class OrderController extends Controller
             }
         });
 
+        // Loyalty: a customer cancellation lowers their trust score at this store
+        \App\Services\LoyaltyService::recordCancelled($order->fresh());
+
         return redirect()->route('customer.orders')->with('success', 'Order cancelled successfully.');
     }
 

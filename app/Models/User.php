@@ -248,4 +248,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasMany(VerificationRequest::class);
     }
+
+    public function customerLoyalties(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CustomerLoyalty::class);
+    }
 }

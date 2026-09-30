@@ -19,6 +19,7 @@ use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use App\Http\Controllers\Seller\VehicleController;
 use App\Http\Controllers\Seller\UserReportController as SellerUserReportController;
+use App\Http\Controllers\LoyaltyController;
 use Illuminate\Support\Facades\Route;
 
 // ── Seller Portal (authenticated, verified, approved seller or seller_staff) ─
@@ -172,6 +173,16 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── User Reports (seller reports a buyer) ────────────────────────────
         Route::post('reports/user', [SellerUserReportController::class, 'store'])->name('reports.user.store');
+
+        // ── Loyalty program ──────────────────────────────────────────────────
+        // Settings/toggle: store owner only. Customers: owner + HR (checked in controller).
+        Route::middleware('seller_owner')->group(function () {
+            Route::get('loyalty/settings', [LoyaltyController::class, 'getSettings'])->name('loyalty.settings');
+            Route::put('loyalty/settings', [LoyaltyController::class, 'updateSettings'])->name('loyalty.settings.update');
+            Route::post('loyalty/toggle', [LoyaltyController::class, 'toggleLoyalty'])->name('loyalty.toggle');
+        });
+        Route::get('loyalty/customers', [LoyaltyController::class, 'getCustomers'])->name('loyalty.customers');
+        Route::get('loyalty/customers/export', [LoyaltyController::class, 'exportCustomers'])->name('loyalty.customers.export');
 
         // ── DSS ──────────────────────────────────────────────────────────────
         Route::get('dss', [DssController::class, 'index'])

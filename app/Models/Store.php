@@ -86,6 +86,16 @@ class Store extends Model
         return $query->where('status', 'approved')->where('commission_suspended', false);
     }
 
+    public function loyaltySettings(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(StoreLoyaltySettings::class);
+    }
+
+    public function customerLoyalties(): HasMany
+    {
+        return $this->hasMany(CustomerLoyalty::class);
+    }
+
     public function commissionInvoices(): HasMany
     {
         return $this->hasMany(CommissionInvoice::class);

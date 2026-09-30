@@ -75,6 +75,9 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         ->middleware('permission:dss.view')
         ->name('dss');
 
+    // Customer loyalty monitoring (all stores)
+    Route::get('loyalty', [\App\Http\Controllers\LoyaltyController::class, 'adminOverview'])->name('loyalty');
+
     // Settings
     Route::middleware('permission:settings.view')->group(function () {
         Route::get('settings', [SettingsController::class, 'index'])->name('settings');
