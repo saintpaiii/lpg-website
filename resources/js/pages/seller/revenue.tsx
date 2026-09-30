@@ -221,7 +221,9 @@ export default function SellerRevenue({ summary, commissions, filters }: Props) 
                                                     <td className="py-3 pr-4 text-muted-foreground">{c.payment_mode ? MODE_LABELS[c.payment_mode] : '—'}</td>
                                                     <td className="py-3 pr-4 text-right">{fmt(c.order_total)}</td>
                                                     <td className="py-3 pr-4 text-right text-orange-600">
-                                                        −{fmt(c.commission_amount)}
+                                                        {c.commission_amount < 0
+                                                            ? <span className="text-green-700">+{fmt(Math.abs(c.commission_amount))} credit</span>
+                                                            : <>−{fmt(c.commission_amount)}</>}
                                                         <span className="ml-1 text-xs text-muted-foreground">({c.commission_rate}%)</span>
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-medium text-green-600">{fmt(c.seller_amount)}</td>

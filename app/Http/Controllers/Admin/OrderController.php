@@ -245,6 +245,7 @@ class OrderController extends Controller
             ->all();
 
         return Inertia::render('admin/order-show', [
+            'breakdown' => $order->priceBreakdown(),
             'order'    => $this->formatOrder($order) + [
                 'delivery' => $order->delivery ? [
                     'id'     => $order->delivery->id,

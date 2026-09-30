@@ -66,12 +66,16 @@ class InvoiceController extends Controller
         $invoice->load(['order.items.product', 'customer']);
 
         return Inertia::render('customer/invoice-show', [
+            'breakdown' => $invoice->order?->priceBreakdown()
+                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
             'invoice' => [
                 'id'             => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
                 'total_amount'   => (float) $invoice->total_amount,
                 'payment_status' => $invoice->payment_status,
-                'paid_amount'    => (float) $invoice->paid_amount,
+                'paid_amount'    => $invoice->payment_status === 'paid' && $invoice->order
+                    ? max($invoice->order->grandTotal(), (float) $invoice->paid_amount)
+                    : (float) $invoice->paid_amount,
                 'payment_method' => $invoice->payment_method,
                 'due_date'       => $invoice->due_date?->format('M d, Y'),
                 'paid_at'        => $invoice->paid_at?->format('M d, Y'),

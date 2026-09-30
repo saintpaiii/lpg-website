@@ -39,6 +39,8 @@ class Order extends Model
         'balance_reminder_sent_at',
         'balance_overdue_notified_at',
         'discount_amount',
+        'coupon_id',
+        'coupon_discount',
         'delivery_latitude',
         'delivery_longitude',
         'delivery_distance_km',
@@ -57,6 +59,7 @@ class Order extends Model
             'down_payment_amount'  => 'decimal:2',
             'remaining_balance'    => 'decimal:2',
             'discount_amount'      => 'decimal:2',
+            'coupon_discount'      => 'decimal:2',
             'balance_due_date'            => 'date',
             'balance_reminder_sent_at'    => 'datetime',
             'balance_overdue_notified_at' => 'datetime',
@@ -102,6 +105,11 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function coupon(): BelongsTo
+    {
+        return $this->belongsTo(Coupon::class)->withTrashed();
+    }
+
     public function commission(): HasOne
     {
         return $this->hasOne(Commission::class);
@@ -116,6 +124,40 @@ class Order extends Model
     public function grandTotal(): float
     {
         return round((float) $this->total_amount + (float) ($this->shipping_fee ?? 0), 2);
+    }
+
+    /**
+     * Full price breakdown for detail pages and invoices. Rows always add up to
+     * grandTotal() — the amount the customer pays (and the rider collects on COD).
+     *
+     * total_amount is stored after the product part of any discount and
+     * shipping_fee after the delivery part of a coupon, so the coupon's split is
+     * derived from the item subtotals.
+     */
+    public function priceBreakdown(): array
+    {
+        $this->loadMissing(['items', 'coupon']);
+
+        $total          = (float) $this->total_amount;
+        $shipping       = (float) ($this->shipping_fee ?? 0);
+        $storeDiscount  = (float) ($this->discount_amount ?? 0);
+        $couponDiscount = (float) ($this->coupon_discount ?? 0);
+        $itemsSum       = (float) $this->items->sum('subtotal');
+
+        $couponOnItems    = $couponDiscount > 0
+            ? round(min($couponDiscount, max(0, $itemsSum - $storeDiscount - $total)), 2)
+            : 0.0;
+        $couponOnDelivery = round($couponDiscount - $couponOnItems, 2);
+
+        return [
+            'subtotal'           => round($total + $storeDiscount + $couponOnItems, 2),
+            'delivery_fee'       => round($shipping + $couponOnDelivery, 2),
+            'store_discount'     => round($storeDiscount, 2),
+            'coupon_code'        => $couponDiscount > 0 ? $this->coupon?->code : null,
+            'coupon_discount'    => round($couponDiscount, 2),
+            'coupon_on_delivery' => $couponOnDelivery,
+            'grand_total'        => $this->grandTotal(),
+        ];
     }
 
     /** Consignment order with an unpaid balance that is past its due date. */

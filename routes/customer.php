@@ -39,6 +39,7 @@ Route::middleware(['auth', 'verified', 'customer'])
         // Checkout
         Route::get('checkout', [CheckoutController::class, 'index'])->name('checkout');
         Route::post('checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+        Route::post('checkout/coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.coupon');
 
         // Orders
         Route::get('orders', [OrderController::class, 'index'])->name('orders');

@@ -172,12 +172,16 @@ class InvoiceController extends Controller
         $shippingFee = (float) ($invoice->order?->shipping_fee ?? 0);
 
         return Inertia::render('seller/invoice-show', [
+            'breakdown' => $invoice->order?->priceBreakdown()
+                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
             'invoice' => [
                 'id'                  => $invoice->id,
                 'invoice_number'      => $invoice->invoice_number,
                 'total_amount'        => (float) $invoice->total_amount,
                 'shipping_fee'        => $shippingFee,
-                'paid_amount'         => (float) $invoice->paid_amount,
+                'paid_amount'         => $invoice->payment_status === 'paid' && $invoice->order
+                    ? max($invoice->order->grandTotal(), (float) $invoice->paid_amount)
+                    : (float) $invoice->paid_amount,
                 'payment_status'      => $invoice->payment_status,
                 'payment_method'      => $invoice->payment_method,
                 // Commission is owed to the platform and billed separately — never deducted here

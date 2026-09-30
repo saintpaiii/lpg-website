@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
@@ -117,7 +118,7 @@ const PAY_LABELS: Record<string, string> = {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function OrderShowPage({ order }: Props) {
+export default function OrderShowPage({ order, breakdown }: Props & { breakdown: PriceBreakdown }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Orders', href: '/admin/orders' },
         { title: order.order_number, href: `/admin/orders/${order.id}` },
@@ -241,12 +242,7 @@ export default function OrderShowPage({ order }: Props) {
                                         ))}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="border-t bg-gray-50">
-                                            <td colSpan={3} className="px-4 py-2.5 text-right font-semibold text-gray-700">Total</td>
-                                            <td className="px-4 py-2.5 text-right font-bold text-blue-700 text-base">
-                                                ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
+                                        <PriceBreakdownRows breakdown={breakdown} labelSpan={3} />
                                     </tfoot>
                                 </table>
                             </CardContent>

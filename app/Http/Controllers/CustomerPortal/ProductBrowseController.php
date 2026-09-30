@@ -12,6 +12,7 @@ use App\Models\Store;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Services\CouponService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -62,8 +63,14 @@ class ProductBrowseController extends Controller
             $query->where('refill_price', '<=', (float) $maxPrice);
         }
 
-        // Sort
-        $sort = $request->get('sort', 'newest');
+        // Sort — during a featured platform promo, participating stores come first
+        $sort       = $request->get('sort', 'newest');
+        $promoCodes = CouponService::promoStoreCodes();
+
+        if ($promoCodes && ! in_array($sort, ['price_asc', 'price_desc'])) {
+            $ids = implode(',', array_map('intval', array_keys($promoCodes)));
+            $query->orderByRaw("CASE WHEN products.store_id IN ({$ids}) THEN 0 ELSE 1 END");
+        }
 
         match ($sort) {
             'price_asc'  => $query->orderBy('refill_price', 'asc'),
@@ -90,6 +97,7 @@ class ProductBrowseController extends Controller
             'delivery_fee'   => (float) ($p->store?->delivery_fee ?? 0),
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
+            'promo_code'     => $promoCodes[$p->store_id] ?? null,
         ]);
 
         // Filter option lists
@@ -232,6 +240,7 @@ class ProductBrowseController extends Controller
                 'stock'          => $product->inventory?->quantity ?? 0,
                 'store_id'       => $product->store_id,
                 'store_name'     => $product->store?->store_name ?? '',
+                'promo_code'     => CouponService::promoStoreCodes()[$product->store_id] ?? null,
                 'store_city'     => $product->store?->city ?? '',
                 'store_barangay' => $product->store?->barangay ?? '',
                 'delivery_fee'   => (float) ($product->store?->delivery_fee ?? 0),
@@ -261,6 +270,7 @@ class ProductBrowseController extends Controller
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
+            'promo_code'     => CouponService::promoStoreCodes()[$p->store_id] ?? null,
         ];
     }
 }

@@ -13,3 +13,6 @@ Schedule::command('consignment:balance-reminders')->dailyAt('08:00');
 
 // Commission billing: periodic invoices, reminders, overdue notices, auto-suspension
 Schedule::command('commissions:process-invoices')->dailyAt('07:00');
+
+// Coupons expiring within a day → remind customers who haven't used them
+Schedule::command('coupons:expiry-reminders')->dailyAt('09:00');

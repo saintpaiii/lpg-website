@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
+import { allocateDiscount, type CouponRules } from '@/lib/coupons';
 import type { SharedData } from '@/types';
 
 // ── Leaflet icon fix ──────────────────────────────────────────────────────────
@@ -179,6 +180,27 @@ export default function CheckoutPage({ stores, customer }: Props) {
 
     const [paymentMode, setPaymentMode] = useState<PaymentMode>('full');
     const [notes, setNotes]             = useState('');
+    // Promo coupon (platform or store)
+    const [promo, setPromo]             = useState<CouponRules | null>(null);
+    const [couponInput, setCouponInput] = useState('');
+    const [couponError, setCouponError] = useState<string | null>(null);
+    const [applying, setApplying]       = useState(false);
+
+    async function applyCoupon() {
+        const code = couponInput.trim();
+        if (!code) return;
+        setApplying(true);
+        setCouponError(null);
+        try {
+            const res = await axios.post<{ coupon: CouponRules }>('/customer/checkout/coupon', { code });
+            setPromo(res.data.coupon);
+            setCouponInput('');
+        } catch (err) {
+            setPromo(null);
+            setCouponError(axios.isAxiosError(err) ? (err.response?.data?.error ?? err.response?.data?.message ?? 'Could not apply this coupon.') : 'Could not apply this coupon.');
+        }
+        setApplying(false);
+    }
     // One optional store coupon per store (keyed by store_id)
     const [selectedCoupons, setSelectedCoupons] = useState<Record<number, number | null>>({});
     const [loading, setLoading]         = useState(false);
@@ -243,7 +265,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
     }, [availableModes.join(',')]);
 
     // Per-store totals (mirrors CheckoutController@store)
-    const storeTotals = stores.map((sg) => {
+    const baseTotals = stores.map((sg) => {
         const subtotal = sg.items.reduce((s, item) => {
             const price = item.transaction_type === 'refill' ? item.refill_price : item.purchase_price;
             return s + price * item.quantity;
@@ -252,9 +274,20 @@ export default function CheckoutPage({ stores, customer }: Props) {
         const fee      = dynamic ? dynamic.fee : sg.delivery_fee;
         const coupon   = sg.coupons.find((c) => c.id === selectedCoupons[sg.store_id]) ?? null;
         const discount = coupon ? Math.min(coupon.amount, subtotal) : 0;
-        const total    = round2(subtotal - discount + fee);
-        const down     = round2(total * sg.min_down_payment_percent / 100);
-        return { store: sg, subtotal, fee, coupon, discount, total, down, balance: round2(total - down) };
+        return { store: sg, subtotal, fee, coupon, discount };
+    });
+
+    // Promo coupon spread across the orders (recomputed live as delivery fees change)
+    const promoCuts = promo
+        ? allocateDiscount(promo, Object.fromEntries(baseTotals.map((t) => [t.store.store_id, { product: round2(t.subtotal - t.discount), shipping: t.fee }])))
+        : {};
+    const promoTotal = round2(Object.values(promoCuts).reduce((s, d) => s + d.total, 0));
+
+    const storeTotals = baseTotals.map((t) => {
+        const promoCut = promoCuts[t.store.store_id] ?? { product: 0, shipping: 0, total: 0 };
+        const total    = round2(t.subtotal - t.discount + t.fee - promoCut.total);
+        const down     = round2(total * t.store.min_down_payment_percent / 100);
+        return { ...t, promoCut, total, down, balance: round2(total - down) };
     });
 
     const grandSubtotal = storeTotals.reduce((s, t) => s + t.subtotal, 0);
@@ -287,6 +320,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
                 {
                     payment_mode:               paymentMode,
                     coupon_ids:                 Object.values(selectedCoupons).filter((id): id is number => !!id),
+                    coupon_code:                promo?.code ?? null,
                     notes,
                     delivery_latitude:          pin?.lat  ?? null,
                     delivery_longitude:         pin?.lng  ?? null,
@@ -434,7 +468,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
                 )}
 
                 {/* Per-store order summaries */}
-                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount }) => {
+                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut }) => {
                     return (
                         <Card key={sg.store_id}>
                             <CardHeader className="pb-3">
@@ -485,6 +519,15 @@ export default function CheckoutPage({ stores, customer }: Props) {
                                             <span>−{peso(discount)}</span>
                                         </div>
                                     )}
+                                    {promo?.type === 'platform' && (promo.excluded_store_ids ?? []).includes(sg.store_id) && (
+                                        <p className="text-xs text-gray-400">This store isn't participating in {promo.code}.</p>
+                                    )}
+                                    {promo && promoCut.total > 0 && (
+                                        <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                            <span>Coupon {promo.code}{promoCut.shipping > 0 && promoCut.product === 0 ? ' (delivery)' : ''}</span>
+                                            <span>−{peso(promoCut.total)}</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Store coupons issued to this customer (refund resolutions) */}
@@ -521,6 +564,55 @@ export default function CheckoutPage({ stores, customer }: Props) {
                     );
                 })}
 
+                {/* Apply coupon */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <TicketPercent className="h-4 w-4 text-blue-600" />
+                            Apply Coupon
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {promo ? (
+                            <div className="flex items-start justify-between gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-900/20">
+                                <div className="text-sm">
+                                    {promoTotal > 0 ? (
+                                        <p className="font-semibold text-green-800 dark:text-green-300">
+                                            ✅ Coupon {promo.code} applied: −{peso(promoTotal)}
+                                        </p>
+                                    ) : (
+                                        <p className="font-semibold text-amber-700">Coupon {promo.code} doesn't reduce this order.</p>
+                                    )}
+                                    <p className="text-xs text-green-700 dark:text-green-400">
+                                        {promo.label}{promo.type === 'store' && promo.store_name ? ` · ${promo.store_name} only` : ''}
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">New total: <strong>{peso(grandTotal)}</strong></p>
+                                </div>
+                                <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => { setPromo(null); setCouponError(null); }}>
+                                    Remove
+                                </Button>
+                            </div>
+                        ) : (
+                            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); applyCoupon(); }}>
+                                <input
+                                    value={couponInput}
+                                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(null); }}
+                                    placeholder="Enter coupon code"
+                                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm uppercase focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                                />
+                                <Button type="submit" variant="outline" disabled={applying || !couponInput.trim()}>
+                                    {applying ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                                </Button>
+                            </form>
+                        )}
+                        {couponError && (
+                            <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                                {couponError}
+                            </p>
+                        )}
+                    </CardContent>
+                </Card>
+
                 {/* Grand total */}
                 {stores.length > 1 && (
                     <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10">
@@ -538,6 +630,12 @@ export default function CheckoutPage({ stores, customer }: Props) {
                                     <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
                                         <span>Store discounts</span>
                                         <span>−{peso(grandDiscount)}</span>
+                                    </div>
+                                )}
+                                {promo && promoTotal > 0 && (
+                                    <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                                        <span>Coupon {promo.code}</span>
+                                        <span>−{peso(promoTotal)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between font-bold text-gray-900 dark:text-white text-base pt-1 border-t border-blue-200 dark:border-blue-700 mt-1">

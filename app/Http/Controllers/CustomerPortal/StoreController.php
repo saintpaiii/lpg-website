@@ -71,7 +71,15 @@ class StoreController extends Controller
                 'created_at'    => $r->created_at->format('M d, Y'),
             ]);
 
+        // Running platform promotions this store participates in
+        $promos = \App\Models\Coupon::runningPlatform()
+            ->whereDoesntHave('exclusions', fn ($q) => $q->where('store_id', $store->id))
+            ->get()
+            ->map(fn ($c) => ['code' => $c->code, 'label' => $c->label()])
+            ->values();
+
         return Inertia::render('customer/store', [
+            'promos' => $promos,
             'store' => [
                 'id'            => $store->id,
                 'store_name'    => $store->store_name,

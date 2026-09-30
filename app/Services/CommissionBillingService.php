@@ -66,10 +66,12 @@ class CommissionBillingService
 
         foreach ($storeIds as $storeId) {
             $invoice = DB::transaction(function () use ($storeId, $start, $end) {
+                // This period's commissions plus anything left uninvoiced from earlier
+                // periods (e.g. promo credits that made a previous total ≤ ₱0)
                 $commissions = Commission::where('store_id', $storeId)
                     ->where('status', 'pending')
                     ->whereNull('commission_invoice_id')
-                    ->whereBetween('created_at', [$start, $end])
+                    ->where('created_at', '<=', $end)
                     ->lockForUpdate()
                     ->get();
 
@@ -129,10 +131,18 @@ class CommissionBillingService
      */
     public static function preview(CarbonInterface $start, CarbonInterface $end): array
     {
+        $start = Carbon::parse($start)->startOfDay();
+        $end   = Carbon::parse($end)->endOfDay();
+
+        // Same selection as generate(): stores active in the period, including carried-over items
+        $storeIds = Commission::where('status', 'pending')->whereNull('commission_invoice_id')
+            ->whereBetween('created_at', [$start, $end])->distinct()->pluck('store_id');
+
         $rows = Commission::with('store')
             ->where('status', 'pending')
             ->whereNull('commission_invoice_id')
-            ->whereBetween('created_at', [Carbon::parse($start)->startOfDay(), Carbon::parse($end)->endOfDay()])
+            ->whereIn('store_id', $storeIds)
+            ->where('created_at', '<=', $end)
             ->get()
             ->groupBy('store_id')
             ->map(fn ($group) => [

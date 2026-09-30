@@ -10,7 +10,10 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Store;
+use App\Models\CouponUse;
 use App\Models\StoreCoupon;
+use App\Services\CouponException;
+use App\Services\CouponService;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
 use Illuminate\Http\JsonResponse;
@@ -173,6 +176,43 @@ class CheckoutController extends Controller
         ]);
     }
 
+    /**
+     * Validate a promo code against the current checkout selection.
+     * Returns the coupon rules so the page can recompute the discount live.
+     */
+    public function applyCoupon(Request $request): JsonResponse
+    {
+        $data = $request->validate(['code' => 'required|string|max:40']);
+
+        $selected = array_map('intval', (array) session('cart_selected', []));
+        $items    = CartItem::with('product')
+            ->where('user_id', auth()->id())
+            ->whereIn('product_id', $selected)
+            ->get();
+
+        if ($items->isEmpty()) {
+            return response()->json(['error' => 'Your checkout is empty.'], 422);
+        }
+
+        // store_id => items total, priced the same way as store()
+        $productTotals = [];
+        foreach ($items as $ci) {
+            if (! $ci->product) continue;
+            $price = ($ci->transaction_type ?? 'refill') === 'refill'
+                ? (float) $ci->product->refill_price
+                : (float) ($ci->product->purchase_price ?? $ci->product->refill_price);
+            $productTotals[$ci->store_id] = ($productTotals[$ci->store_id] ?? 0) + $price * $ci->quantity;
+        }
+
+        try {
+            $coupon = CouponService::validate($data['code'], $request->user()->id, $productTotals);
+        } catch (CouponException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        return response()->json(['coupon' => CouponService::toClient($coupon)]);
+    }
+
     public function store(Request $request): RedirectResponse|JsonResponse
     {
         $isJson = str_contains($request->header('Content-Type', ''), 'application/json');
@@ -205,6 +245,7 @@ class CheckoutController extends Controller
                 'payment_mode'               => 'required|in:full,consignment,cod',
                 'coupon_ids'                 => 'nullable|array',
                 'coupon_ids.*'               => 'integer',
+                'coupon_code'                => 'nullable|string|max:40',
                 'notes'                      => 'nullable|string|max:1000',
                 'delivery_latitude'          => 'nullable|numeric|between:-90,90',
                 'delivery_longitude'         => 'nullable|numeric|between:-180,180',
@@ -217,6 +258,7 @@ class CheckoutController extends Controller
 
             $paymentMode = $data['payment_mode'];
             $couponIds   = array_map('intval', $data['coupon_ids'] ?? []);
+            $couponCode  = trim((string) ($data['coupon_code'] ?? '')) ?: null;
 
             // Read selected items from DB cart
             $cartItems = CartItem::with(['product.inventory', 'store'])
@@ -272,8 +314,9 @@ class CheckoutController extends Controller
             }
 
             // Create one order per store in a single DB transaction
-            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $paymentMode, $couponIds, $deliveryLat, $deliveryLng, $estimatedMin) {
-                $createdOrders = [];
+            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $paymentMode, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
+                // ── Pass 1: price every store's items and delivery fee ─────────
+                $prepared = [];
 
                 foreach ($checkoutStores as $storeData) {
                     $store = Store::where('id', $storeData['store_id'])
@@ -332,22 +375,52 @@ class CheckoutController extends Controller
                     }
 
                     // Store discount coupon (issued by this store as a refund resolution)
-                    $coupon   = null;
-                    $discount = 0.0;
+                    $storeCoupon = null;
+                    $discount    = 0.0;
                     if ($couponIds) {
-                        $coupon = StoreCoupon::usable()
+                        $storeCoupon = StoreCoupon::usable()
                             ->whereIn('id', $couponIds)
                             ->where('customer_id', $customer->id)
                             ->where('store_id', $store->id)
                             ->lockForUpdate()
                             ->first();
-                        if ($coupon) {
-                            $discount = min((float) $coupon->amount, $subtotal);
+                        if ($storeCoupon) {
+                            $discount = min((float) $storeCoupon->amount, $subtotal);
                         }
                     }
 
-                    $totalAmount = round($subtotal - $discount, 2);
-                    $grandTotal  = round($totalAmount + $finalFee, 2);
+                    $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount');
+                }
+
+                // ── Promo coupon (platform or store) — validated under a row lock ──
+                $promo       = null;
+                $allocations = [];
+                if ($couponCode) {
+                    $promo = CouponService::validate(
+                        $couponCode,
+                        $request->user()->id,
+                        array_map(fn ($p) => (float) $p['subtotal'], $prepared),
+                        lock: true,
+                    );
+                    $allocations = CouponService::allocate($promo, array_map(fn ($p) => [
+                        'product'  => round($p['subtotal'] - $p['discount'], 2),
+                        'shipping' => (float) $p['finalFee'],
+                    ], $prepared));
+
+                    if (array_sum(array_column($allocations, 'total')) <= 0) {
+                        throw new CouponException("Coupon {$promo->code} doesn't reduce this order.");
+                    }
+                }
+
+                // ── Pass 2: create the orders ─────────────────────────────────
+                $createdOrders = [];
+
+                foreach ($prepared as $storeId => $p) {
+                    $store       = $p['store'];
+                    $promoCut    = $allocations[$storeId] ?? ['product' => 0.0, 'shipping' => 0.0, 'total' => 0.0];
+                    $totalAmount = round($p['subtotal'] - $p['discount'] - $promoCut['product'], 2);
+                    $shippingFee = round($p['finalFee'] - $promoCut['shipping'], 2);
+                    $grandTotal  = round($totalAmount + $shippingFee, 2);
 
                     // Consignment: store-defined minimum down payment now, balance after delivery
                     $downPayment      = null;
@@ -361,11 +434,13 @@ class CheckoutController extends Controller
                         'order_number'               => $this->generateOrderNumber(),
                         'customer_id'                => $customer->id,
                         'store_id'                   => $store->id,
-                        'transaction_type'           => $txTypeFinal,
+                        'transaction_type'           => $p['txTypeFinal'],
                         'status'                     => 'pending',
                         'total_amount'               => $totalAmount,
-                        'shipping_fee'               => $finalFee,
-                        'discount_amount'            => $discount,
+                        'shipping_fee'               => $shippingFee,
+                        'discount_amount'            => $p['discount'],
+                        'coupon_id'                  => $promoCut['total'] > 0 ? $promo->id : null,
+                        'coupon_discount'            => $promoCut['total'],
                         'payment_method'             => $paymentMode === 'cod' ? 'cash' : null,
                         'payment_status'             => 'unpaid',
                         'payment_mode'               => $paymentMode,
@@ -376,11 +451,11 @@ class CheckoutController extends Controller
                         'created_by'                 => $request->user()->id,
                         'delivery_latitude'          => $deliveryLat,
                         'delivery_longitude'         => $deliveryLng,
-                        'delivery_distance_km'       => $distKm !== null ? round($distKm, 2) : null,
+                        'delivery_distance_km'       => $p['distKm'] !== null ? round($p['distKm'], 2) : null,
                         'estimated_delivery_minutes' => $estimatedMin,
                     ]);
 
-                    foreach ($orderedItems as $item) {
+                    foreach ($p['orderedItems'] as $item) {
                         OrderItem::create([
                             'order_id'   => $order->id,
                             'product_id' => $item['product']->id,
@@ -390,8 +465,8 @@ class CheckoutController extends Controller
                         ]);
                     }
 
-                    if ($coupon) {
-                        $coupon->update([
+                    if ($p['storeCoupon']) {
+                        $p['storeCoupon']->update([
                             'status'        => 'used',
                             'used_order_id' => $order->id,
                             'used_at'       => now(),
@@ -401,8 +476,8 @@ class CheckoutController extends Controller
                     $createdOrders[] = [
                         'order'        => $order,
                         'store'        => $store,
-                        'delivery_fee' => $finalFee,
-                        'discount'     => $discount,
+                        'delivery_fee' => $shippingFee,
+                        'discount'     => round($p['discount'] + $promoCut['total'], 2),
                         // Amount collected online right now
                         'pay_now'      => match ($paymentMode) {
                             'consignment' => $downPayment,
@@ -410,6 +485,31 @@ class CheckoutController extends Controller
                             default       => $grandTotal,
                         },
                     ];
+                }
+
+                // One coupon_uses row per discounted order (who pays + agreed commission rate),
+                // grouped by checkout_ref so a multi-store checkout counts as a single use.
+                if ($promo) {
+                    $checkoutRef = (string) \Illuminate\Support\Str::uuid();
+                    foreach ($createdOrders as $entry) {
+                        $cut = (float) $entry['order']->coupon_discount;
+                        if ($cut <= 0) {
+                            continue;
+                        }
+                        $split      = CouponService::split($promo, $cut);
+                        $normalRate = (float) ($entry['store']->commission_rate ?: \App\Models\Commission::DEFAULT_RATE);
+                        CouponUse::create([
+                            'coupon_id'        => $promo->id,
+                            'user_id'          => $request->user()->id,
+                            'order_id'         => $entry['order']->id,
+                            'discount_applied' => $cut,
+                            'admin_absorbed'   => $split['admin'],
+                            'seller_absorbed'  => $split['seller'],
+                            'commission_rate'  => CouponService::promoCommissionRate($promo, $normalRate),
+                            'checkout_ref'     => $checkoutRef,
+                        ]);
+                    }
+                    $promo->increment('used_count');
                 }
 
                 return $createdOrders;
@@ -470,7 +570,7 @@ class CheckoutController extends Controller
                     // Discounted order: charge a single line so the total matches exactly
                     $lineItems[] = [
                         'name'        => "Order {$order->order_number} — {$store->store_name}",
-                        'description' => 'Items + delivery fee, less ₱' . number_format($entry['discount'], 2) . ' store discount',
+                        'description' => 'Items + delivery fee, less ₱' . number_format($entry['discount'], 2) . ' discount',
                         'amount'      => (int) round($entry['pay_now'] * 100),
                         'currency'    => 'PHP',
                         'quantity'    => 1,
@@ -534,6 +634,8 @@ class CheckoutController extends Controller
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
+        } catch (CouponException $e) {
+            return $error($e->getMessage());
         } catch (\Throwable $e) {
             Log::error('Checkout store() error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),

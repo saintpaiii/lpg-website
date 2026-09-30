@@ -28,6 +28,7 @@ type Product = {
     delivery_fee: number;
     avg_rating: number;
     review_count: number;
+    promo_code?: string | null;
 };
 
 type Review = {
@@ -204,6 +205,11 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
                             <p className="text-gray-500 mt-0.5">{product.brand} · {product.weight}</p>
+                            {product.promo_code && (
+                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
+                                    🔥 Promo — use code <span className="font-mono">{product.promo_code}</span> at checkout
+                                </span>
+                            )}
                         </div>
 
                         {/* Rating */}

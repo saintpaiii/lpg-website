@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
@@ -117,7 +118,7 @@ function peso(n: number) {
 
 // ── Invoice Print View (injected into DOM, shown on print) ────────────────────
 
-function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Company }) {
+function InvoicePrintView({ invoice, company, breakdown }: { invoice: Invoice; company: Company; breakdown: PriceBreakdown }) {
     return (
         <div className="hidden print:block font-sans text-gray-900">
             {/* Company header */}
@@ -177,10 +178,7 @@ function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Com
                     ))}
                 </tbody>
                 <tfoot>
-                    <tr className="border-t-2 border-gray-900">
-                        <td colSpan={3} className="pt-3 text-right font-bold">Total</td>
-                        <td className="pt-3 text-right font-bold text-lg">{peso(invoice.total_amount)}</td>
-                    </tr>
+                    <PriceBreakdownRows breakdown={breakdown} labelSpan={3} totalLabel="Total" cellClass="pt-2" />
                     {invoice.paid_amount > 0 && (
                         <tr>
                             <td colSpan={3} className="pt-1 text-right text-gray-600">Paid</td>
@@ -226,7 +224,7 @@ function InvoicePrintView({ invoice, company }: { invoice: Invoice; company: Com
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function InvoiceShowPage({ invoice, company }: Props) {
+export default function InvoiceShowPage({ invoice, company, breakdown }: Props & { breakdown: PriceBreakdown }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Invoices', href: '/admin/invoices' },
         { title: invoice.invoice_number, href: `/admin/invoices/${invoice.id}` },
@@ -424,12 +422,7 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                                             ))}
                                         </tbody>
                                         <tfoot>
-                                            <tr className="border-t-2 border-gray-200 bg-gray-50">
-                                                <td colSpan={3} className="px-4 py-3 text-right font-bold text-gray-900">Total</td>
-                                                <td className="px-4 py-3 text-right tabular-nums text-lg font-bold text-gray-900">
-                                                    {peso(invoice.total_amount)}
-                                                </td>
-                                            </tr>
+                                            <PriceBreakdownRows breakdown={breakdown} labelSpan={3} totalLabel="Total" />
                                         </tfoot>
                                     </table>
                                 </div>
@@ -451,7 +444,7 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
                             <CardContent className="space-y-3">
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">Total Amount</span>
-                                    <span className="font-semibold tabular-nums">{peso(invoice.total_amount)}</span>
+                                    <span className="font-semibold tabular-nums">{peso(breakdown.grand_total)}</span>
                                 </div>
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-500">Paid</span>
@@ -526,7 +519,7 @@ export default function InvoiceShowPage({ invoice, company }: Props) {
 
             {/* Print-only version */}
             <div className="print-root hidden print:block p-8">
-                <InvoicePrintView invoice={invoice} company={company} />
+                <InvoicePrintView invoice={invoice} company={company} breakdown={breakdown} />
             </div>
 
         </AppLayout>

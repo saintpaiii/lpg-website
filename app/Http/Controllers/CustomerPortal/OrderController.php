@@ -478,6 +478,7 @@ class OrderController extends Controller
         }
 
         return Inertia::render('customer/order-show', [
+            'breakdown' => $order->priceBreakdown(),
             'order' => [
                 'id'               => $order->id,
                 'order_number'     => $order->order_number,
@@ -507,6 +508,8 @@ class OrderController extends Controller
                     : null,
                 'is_overdue'          => $order->isBalanceOverdue(),
                 'discount_amount'     => (float) ($order->discount_amount ?? 0),
+                'coupon_code'         => (float) $order->coupon_discount > 0 ? $order->coupon?->code : null,
+                'coupon_discount'     => (float) ($order->coupon_discount ?? 0),
                 'refund_request'      => ($r = $order->refundRequests()->latest()->first()) ? [
                     'id'     => $r->id,
                     'status' => $r->status,

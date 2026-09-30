@@ -18,6 +18,7 @@ class Commission extends Model
         'commission_amount',
         'seller_amount',
         'status',
+        'notes',
         'collected_at',
     ];
 

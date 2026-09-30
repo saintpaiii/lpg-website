@@ -34,6 +34,7 @@ type Product = {
     delivery_fee: number;
     avg_rating: number;
     review_count: number;
+    promo_code: string | null;
 };
 
 type PaginatedProducts = {
@@ -424,6 +425,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center">
                                             <ShoppingCart className="h-10 w-10 text-blue-300" />
                                         </div>
+                                    )}
+                                    {p.promo_code && (
+                                        <span className="absolute left-2 top-2 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-bold text-white shadow" title={`Participating in ${p.promo_code}`}>
+                                            🔥 Promo
+                                        </span>
                                     )}
                                     {p.stock === 0 && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">

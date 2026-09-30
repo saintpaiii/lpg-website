@@ -15,6 +15,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
@@ -56,6 +57,9 @@ type Order = {
     is_overdue: boolean;
     shipping_fee: number | null;
     discount_amount: number;
+    coupon_code: string | null;
+    coupon_discount: number;
+    coupon_type: 'platform' | 'store' | null;
     notes: string | null;
     cancellation_reason: string | null;
     cancellation_notes: string | null;
@@ -95,7 +99,7 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function SellerOrderShow({ order, riders }: Props) {
+export default function SellerOrderShow({ order, riders, breakdown }: Props & { breakdown: PriceBreakdown }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Orders',    href: '/seller/orders'    },
@@ -312,10 +316,7 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                     ))}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="border-t bg-muted/20">
-                                        <td colSpan={3} className="px-4 py-2.5 font-medium text-right">Total</td>
-                                        <td className="px-4 py-2.5 text-right font-bold text-lg">{fmt(order.total_amount)}</td>
-                                    </tr>
+                                    <PriceBreakdownRows breakdown={breakdown} labelSpan={3} />
                                 </tfoot>
                             </table>
                         </CardContent>
@@ -410,6 +411,14 @@ export default function SellerOrderShow({ order, riders }: Props) {
                                     </div>
                                 )}
 
+                                {order.coupon_discount > 0 && (
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">
+                                            Coupon {order.coupon_code} ({order.coupon_type === 'platform' ? 'platform promo — cost shared with the platform' : 'your store promo'})
+                                        </span>
+                                        <span className="text-emerald-600">−{fmt(order.coupon_discount)}</span>
+                                    </div>
+                                )}
                                 {order.discount_amount > 0 && (
                                     <div className="flex justify-between text-xs">
                                         <span className="text-muted-foreground">Store discount applied</span>

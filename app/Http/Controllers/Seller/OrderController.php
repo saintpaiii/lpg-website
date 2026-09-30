@@ -56,6 +56,9 @@ class OrderController extends Controller
             'is_overdue'          => $o->isBalanceOverdue(),
             'shipping_fee'        => $o->shipping_fee ? (float) $o->shipping_fee : null,
             'discount_amount'     => (float) ($o->discount_amount ?? 0),
+            'coupon_code'         => (float) $o->coupon_discount > 0 ? $o->coupon?->code : null,
+            'coupon_type'         => (float) $o->coupon_discount > 0 ? $o->coupon?->type : null,
+            'coupon_discount'     => (float) ($o->coupon_discount ?? 0),
             'notes'               => $o->notes,
             'ordered_at'       => $o->ordered_at?->format('M d, Y g:i A'),
             'delivered_at'     => $o->delivered_at?->format('M d, Y g:i A'),
@@ -354,6 +357,7 @@ class OrderController extends Controller
         $latestPayment = $order->payments->sortByDesc('created_at')->first();
 
         return Inertia::render('seller/order-show', [
+            'breakdown' => $order->priceBreakdown(),
             'order' => $this->formatOrder($order) + [
                 'delivery' => $order->delivery ? [
                     'id'           => $order->delivery->id,
@@ -435,7 +439,7 @@ class OrderController extends Controller
                         'total_amount'       => $order->total_amount,
                         'payment_status'     => $order->payment_status,
                         'paid_amount'        => match ($order->payment_status) {
-                            'paid'    => $order->total_amount,
+                            'paid'    => $order->grandTotal(),
                             'partial' => (float) ($order->down_payment_amount ?? 0),
                             default   => 0,
                         },

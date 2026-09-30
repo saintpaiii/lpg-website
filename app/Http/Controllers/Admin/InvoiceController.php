@@ -219,6 +219,22 @@ class InvoiceController extends Controller
 
     // ── Show ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Detail view: amounts against the order's grand total (items + delivery − discounts).
+     * Invoices marked paid before delivery fees were included in paid_amount show as paid in full.
+     */
+    private function withGrandTotal(array $data, Invoice $invoice): array
+    {
+        $grand = $invoice->order ? $invoice->order->grandTotal() : (float) $invoice->total_amount;
+        $paid  = $invoice->payment_status === 'paid' ? max($grand, (float) $invoice->paid_amount) : (float) $invoice->paid_amount;
+
+        return array_merge($data, [
+            'grand_total' => $grand,
+            'paid_amount' => $paid,
+            'balance'     => max(0, round($grand - $paid, 2)),
+        ]);
+    }
+
     public function show(Request $request, Invoice $invoice): Response
     {
         $invoice->load(['customer', 'order.items.product']);
@@ -231,7 +247,9 @@ class InvoiceController extends Controller
         ];
 
         return Inertia::render('admin/invoice-show', [
-            'invoice' => $this->formatInvoice($invoice),
+            'breakdown' => $invoice->order?->priceBreakdown()
+                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
+            'invoice' => $this->withGrandTotal($this->formatInvoice($invoice), $invoice),
             'company' => $company,
         ]);
     }

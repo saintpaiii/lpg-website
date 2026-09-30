@@ -4,6 +4,7 @@ import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 
 type Invoice = {
     id: number;
@@ -36,7 +37,7 @@ const PAY_STYLES: Record<string, string> = {
     partial: 'bg-amber-100 text-amber-700',
 };
 
-export default function InvoiceShow({ invoice }: Props) {
+export default function InvoiceShow({ invoice, breakdown }: Props & { breakdown: PriceBreakdown }) {
     return (
         <CustomerLayout>
             <Head title={`Invoice ${invoice.invoice_number} — LPG Portal`} />
@@ -138,12 +139,7 @@ export default function InvoiceShow({ invoice }: Props) {
                                         ))}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="border-t bg-gray-50">
-                                            <td colSpan={3} className="px-3 py-2 text-right font-bold">Total Amount</td>
-                                            <td className="px-3 py-2 text-right font-bold text-blue-700 tabular-nums">
-                                                ₱{invoice.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
+                                        <PriceBreakdownRows breakdown={breakdown} labelSpan={3} totalLabel="Total Amount" cellClass="px-3 py-2" />
                                         {invoice.paid_amount > 0 && (
                                             <tr>
                                                 <td colSpan={3} className="px-3 py-2 text-right text-gray-500">Amount Paid</td>

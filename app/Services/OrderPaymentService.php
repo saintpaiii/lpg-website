@@ -35,7 +35,7 @@ class OrderPaymentService
         if ($invoice = $order->invoice) {
             $invoice->update([
                 'payment_status' => 'paid',
-                'paid_amount'    => $order->total_amount,
+                'paid_amount'    => $order->grandTotal(), // items + delivery fee
                 'paid_at'        => $invoice->paid_at ?? now(),
                 'payment_method' => $method ?? $invoice->payment_method ?? $order->payment_method,
             ]);
@@ -158,14 +158,49 @@ class OrderPaymentService
             return $existing;
         }
 
+        $order->loadMissing(['store', 'coupon', 'items']);
+
         $subtotal = round((float) $order->total_amount, 2);
-        if ($subtotal <= 0) {
+        $coupon   = (float) $order->coupon_discount > 0 ? $order->coupon : null;
+
+        // With a promo coupon, commission is charged on the original items price
+        // (before the coupon), not on what the customer paid.
+        $commissionBase = $coupon
+            ? round((float) $order->items->sum('subtotal') - (float) $order->discount_amount, 2)
+            : $subtotal;
+
+        if ($commissionBase <= 0) {
             return null; // e.g. ₱0 replacement orders
         }
 
-        $order->loadMissing('store');
-        $rate       = (float) ($order->store?->commission_rate ?: Commission::DEFAULT_RATE);
-        $commission = round($subtotal * $rate / 100, 2);
+        $rate = (float) ($order->store?->commission_rate ?: Commission::DEFAULT_RATE);
+
+        // Platform coupon: cost is shared. The store pays the promo commission rate on
+        // the original price, and the platform's share of the discount is credited back
+        // against that commission (a negative amount is a credit carried to the next
+        // commission invoice — the platform holds no seller funds to pay it out).
+        if ($coupon?->type === 'platform') {
+            $use       = \App\Models\CouponUse::where('order_id', $order->id)->where('coupon_id', $coupon->id)->first();
+            $promoRate = (float) ($use?->commission_rate ?? CouponService::promoCommissionRate($coupon, $rate));
+            $adminCut  = (float) ($use?->admin_absorbed ?? CouponService::split($coupon, (float) $order->coupon_discount)['admin']);
+            $gross     = round($commissionBase * $promoRate / 100, 2);
+            $net       = round($gross - $adminCut, 2);
+
+            return Commission::create([
+                'order_id'          => $order->id,
+                'store_id'          => $order->store_id,
+                'order_total'       => $subtotal,
+                'commission_rate'   => $promoRate,
+                'commission_amount' => $net,
+                'seller_amount'     => round($subtotal - $net, 2),
+                'status'            => 'pending',
+                'notes'             => "Platform coupon {$coupon->code}: {$promoRate}% promo commission on ₱" . number_format($commissionBase, 2)
+                    . ' = ₱' . number_format($gross, 2) . ', less ₱' . number_format($adminCut, 2) . ' platform share of the discount'
+                    . ($net < 0 ? ' (credit of ₱' . number_format(abs($net), 2) . ' to the store)' : ''),
+            ]);
+        }
+
+        $commission = round($commissionBase * $rate / 100, 2);
 
         return Commission::create([
             'order_id'          => $order->id,
@@ -175,6 +210,9 @@ class OrderPaymentService
             'commission_amount' => $commission,
             'seller_amount'     => round($subtotal - $commission, 2),
             'status'            => 'pending',
+            'notes'             => $coupon
+                ? "Store coupon {$coupon->code} — commission on original price ₱" . number_format($commissionBase, 2)
+                : null,
         ]);
     }
 }

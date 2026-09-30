@@ -89,7 +89,7 @@ function StarsDisplay({ value, size = 'sm' }: { value: number; size?: 'xs' | 'sm
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function StorePage({ store, products, recent_reviews, search: initialSearch }: Props) {
+export default function StorePage({ store, products, recent_reviews, search: initialSearch, promos = [] }: Props & { promos?: { code: string; label: string }[] }) {
     const [search, setSearch]       = useState(initialSearch);
     const [cartSubmitting, setCartSubmitting] = useState(false);
 
@@ -164,6 +164,18 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         </span>
                                     )}
                                 </div>
+
+                                {promos.length > 0 && (
+                                    <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-800 dark:bg-orange-900/20 dark:text-orange-300">
+                                        🔥 This store is participating in the{' '}
+                                        {promos.map((p, i) => (
+                                            <span key={p.code}>
+                                                <span className="font-mono font-bold">{p.code}</span> ({p.label}){i < promos.length - 1 ? ', ' : ''}
+                                            </span>
+                                        ))}{' '}
+                                        promotion{promos.length > 1 ? 's' : ''}!
+                                    </div>
+                                )}
 
                                 {store.description && (
                                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl">{store.description}</p>

@@ -17,6 +17,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 
 type Payment = {
     id: number;
@@ -259,6 +260,8 @@ type Order = {
     is_overdue: boolean;
     shipping_fee: number | null;
     discount_amount: number;
+    coupon_code: string | null;
+    coupon_discount: number;
     refund_request: { id: number; status: string } | null;
     notes: string | null;
     cancellation_reason: string | null;
@@ -496,7 +499,7 @@ function peso(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 }
 
-export default function OrderShow({ order }: Props) {
+export default function OrderShow({ order, breakdown }: Props & { breakdown: PriceBreakdown }) {
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
     const hasActiveRefund = !!order.refund_request && ['pending', 'approved', 'processed'].includes(order.refund_request.status);
     const canRefund = order.status === 'delivered' && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund;
@@ -819,12 +822,7 @@ export default function OrderShow({ order }: Props) {
                                         ))}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="border-t bg-gray-50">
-                                            <td colSpan={3} className="px-4 py-3 text-right font-bold text-gray-700">Total</td>
-                                            <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white tabular-nums">
-                                                ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
+                                        <PriceBreakdownRows breakdown={breakdown} labelSpan={3} />
                                     </tfoot>
                                 </table>
                             </CardContent>
@@ -971,6 +969,12 @@ export default function OrderShow({ order }: Props) {
                                     </div>
                                 )}
 
+                                {order.coupon_discount > 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Coupon {order.coupon_code}</span>
+                                        <span className="font-medium text-emerald-600">−{peso(order.coupon_discount)}</span>
+                                    </div>
+                                )}
                                 {order.discount_amount > 0 && (
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Store discount</span>

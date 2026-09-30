@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AuthLogController;
 use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CustomerController;
 use App\Http\Controllers\Admin\CommissionController;
+use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -111,6 +112,14 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::patch('commissions/{invoice}/mark-paid', [CommissionController::class, 'markPaid'])->name('commissions.mark-paid');
     Route::patch('commissions/{invoice}/waive', [CommissionController::class, 'waive'])->name('commissions.waive');
     Route::post('commissions/{invoice}/remind', [CommissionController::class, 'remind'])->name('commissions.remind');
+
+    // Platform coupons
+    Route::get('coupons', [CouponController::class, 'index'])->name('coupons');
+    Route::post('coupons', [CouponController::class, 'store'])->name('coupons.store');
+    Route::get('coupons/{coupon}', [CouponController::class, 'show'])->name('coupons.show');
+    Route::put('coupons/{coupon}', [CouponController::class, 'update'])->name('coupons.update');
+    Route::patch('coupons/{coupon}/toggle', [CouponController::class, 'toggle'])->name('coupons.toggle');
+    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('coupons.destroy');
 
     // Refund disputes (escalated by customers)
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');

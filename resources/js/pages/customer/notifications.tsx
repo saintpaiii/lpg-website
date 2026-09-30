@@ -28,7 +28,7 @@ function typeIcon(type: string) {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-    order_update: 'Order', delivery_update: 'Delivery', payment: 'Payment', system: 'System',
+    order_update: 'Order', delivery_update: 'Delivery', payment: 'Payment', system: 'System', promo: 'Promo',
 };
 
 export default function CustomerNotifications({ notifications }: Props) {

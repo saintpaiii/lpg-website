@@ -14,6 +14,7 @@ use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\RefundController as SellerRefundController;
 use App\Http\Controllers\Seller\RevenueController;
 use App\Http\Controllers\Seller\CommissionController as SellerCommissionController;
+use App\Http\Controllers\Seller\CouponController as SellerCouponController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
 use App\Http\Controllers\Seller\VehicleController;
@@ -141,6 +142,14 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('commission/{invoice}', [SellerCommissionController::class, 'show'])->name('commission.show');
             Route::get('commission/{invoice}/pdf', [SellerCommissionController::class, 'pdf'])->name('commission.pdf');
             Route::post('commission/{invoice}/pay', [SellerCommissionController::class, 'pay'])->name('commission.pay');
+
+            // Store coupons
+            Route::get('coupons', [SellerCouponController::class, 'index'])->name('coupons');
+            Route::post('coupons', [SellerCouponController::class, 'store'])->name('coupons.store');
+            Route::patch('coupons/platform/{coupon}/participation', [SellerCouponController::class, 'participation'])->name('coupons.participation');
+            Route::put('coupons/{coupon}', [SellerCouponController::class, 'update'])->name('coupons.update');
+            Route::patch('coupons/{coupon}/toggle', [SellerCouponController::class, 'toggle'])->name('coupons.toggle');
+            Route::delete('coupons/{coupon}', [SellerCouponController::class, 'destroy'])->name('coupons.destroy');
         });
 
         // ── Refund requests (handled by the seller) ──────────────────────────

@@ -12,6 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
+import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import type { BreadcrumbItem } from '@/types';
 
 const COMMISSION_STATUS_LABELS: Record<string, string> = {
@@ -65,7 +66,7 @@ function fmt(n: number) {
 
 const COD_METHODS = ['cash', 'gcash', 'bank_transfer', 'maya'] as const;
 
-export default function SellerInvoiceShow({ invoice }: Props) {
+export default function SellerInvoiceShow({ invoice, breakdown }: Props & { breakdown: PriceBreakdown }) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Invoices',  href: '/seller/invoices'  },
@@ -80,7 +81,7 @@ export default function SellerInvoiceShow({ invoice }: Props) {
     const [recordAmount,   setRecordAmount]   = useState('');
     const [recordLoading,  setRecordLoading]  = useState(false);
 
-    const grandTotal = invoice.total_amount + invoice.shipping_fee;
+    const grandTotal = breakdown.grand_total;
 
     function submitRecordPayment() {
         if (!recordAmount || parseFloat(recordAmount) <= 0) return;
@@ -180,20 +181,7 @@ export default function SellerInvoiceShow({ invoice }: Props) {
                                     ))}
                                 </tbody>
                                 <tfoot>
-                                    <tr className="border-t">
-                                        <td colSpan={3} className="px-4 py-2 text-right text-muted-foreground text-sm">Subtotal</td>
-                                        <td className="px-4 py-2 text-right font-semibold">{fmt(invoice.total_amount)}</td>
-                                    </tr>
-                                    {invoice.shipping_fee > 0 && (
-                                        <tr>
-                                            <td colSpan={3} className="px-4 py-2 text-right text-muted-foreground text-sm">Delivery Fee</td>
-                                            <td className="px-4 py-2 text-right">{fmt(invoice.shipping_fee)}</td>
-                                        </tr>
-                                    )}
-                                    <tr className="border-t bg-muted/20">
-                                        <td colSpan={3} className="px-4 py-3 text-right font-bold">Total (paid by customer to your store)</td>
-                                        <td className="px-4 py-3 text-right font-bold text-lg">{fmt(grandTotal)}</td>
-                                    </tr>
+                                    <PriceBreakdownRows breakdown={breakdown} labelSpan={3} totalLabel="Total (paid by customer to your store)" />
                                 </tfoot>
                             </table>
 
