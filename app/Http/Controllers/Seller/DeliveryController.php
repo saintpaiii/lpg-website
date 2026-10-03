@@ -54,9 +54,7 @@ class DeliveryController extends Controller
                     'id'           => $d->order->id,
                     'order_number' => $d->order->order_number,
                     'customer'     => $d->order->customer?->name ?? '—',
-                    'address'      => $d->order->customer
-                        ? trim(($d->order->customer->address ?? '') . ', ' . ($d->order->customer->city ?? ''), ', ')
-                        : '—',
+                    'address'      => $d->order->deliveryAddressText() ?: '—',
                     'total_amount' => (float) $d->order->total_amount,
                 ] : null,
                 'rider'   => $d->rider ? ['id' => $d->rider->id, 'name' => $d->rider->name, 'phone' => $d->rider->phone] : null,
@@ -177,6 +175,8 @@ class DeliveryController extends Controller
             'vehicle_id'  => $vehicle?->id,
             'assigned_at' => now(),
             'status'      => 'assigned',
+            'sequence'    => null,
+            'batch_id'    => null,
         ];
 
         if ($order->delivery) {

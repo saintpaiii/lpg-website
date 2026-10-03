@@ -1,4 +1,7 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import axios from 'axios';
+import DeliveryMap, { type RouteData, type RouteStop } from '@/components/delivery-map';
+import { fetchRoute } from '@/lib/map';
 import {
     AlertTriangle,
     Banknote,
@@ -7,7 +10,9 @@ import {
     CheckCircle,
     ChevronDown,
     ExternalLink,
+    List,
     Locate,
+    Map as MapIcon,
     MapPin,
     Navigation,
     Package,
@@ -590,17 +595,10 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
             const { lat: sLat, lng: sLng } = o.store_location!;
             const custLat = o.delivery_latitude!;
             const custLng = o.delivery_longitude!;
-            const url = `https://router.project-osrm.org/route/v1/driving/${sLng},${sLat};${custLng},${custLat}?overview=full&geometries=geojson`;
-            fetch(url)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.code === 'Ok' && data.routes?.[0]) {
-                        const coords = (data.routes[0].geometry.coordinates as [number, number][])
-                            .map(([lng, lat]) => [lat, lng] as [number, number]);
-                        setOsrmCoords(coords);
-                    }
-                })
-                .catch(() => {});
+            // Cached OSRM proxy (lng,lat conversion happens server-side)
+            fetchRoute([[sLat, sLng], [custLat, custLng]]).then((r) => {
+                if (r.ok) setOsrmCoords(r.coords);
+            });
         }
     }, []);
 
@@ -791,10 +789,81 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
     );
 }
 
+// ── Route map view ─────────────────────────────────────────────────────────────
+
+/** Pull fresh stop statuses + counters without a full page visit (statuses can also change from the seller/admin side). */
+const refreshRoute = () => router.reload({ only: ['route', 'counts'] });
+
+/** Map of today's route. While visible, follows the rider's GPS and shares it every 60s. */
+function RouteMapView({ route, onUploadProof }: { route: RouteData; onUploadProof: (stop: RouteStop) => void }) {
+    const [pos, setPos] = useState<[number, number] | null>(null);
+    const [gpsError, setGpsError] = useState<string | null>(null);
+    const latest = useRef<[number, number] | null>(null);
+
+    useEffect(() => {
+        if (!navigator.geolocation) { setGpsError('Location is not supported on this device.'); return; }
+        const watchId = navigator.geolocation.watchPosition(
+            (p) => {
+                const here: [number, number] = [p.coords.latitude, p.coords.longitude];
+                latest.current = here;
+                setPos(here);
+                setGpsError(null);
+            },
+            () => setGpsError('Turn on location to show your position and share it with customers.'),
+            { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 },
+        );
+
+        const send = () => {
+            if (!latest.current) return;
+            axios.post('/rider/location', { latitude: latest.current[0], longitude: latest.current[1] }).catch(() => {});
+        };
+        const first = setTimeout(send, 3000);       // share soon after the first fix
+        const timer = setInterval(() => {           // then at most once a minute,
+            send();
+            if (document.visibilityState === 'visible') refreshRoute();   // and keep pin statuses current
+        }, 60_000);
+
+        // Stop tracking/sharing when leaving the map view or the page
+        return () => {
+            navigator.geolocation.clearWatch(watchId);
+            clearTimeout(first);
+            clearInterval(timer);
+        };
+    }, []);
+
+    const remaining = route.stops.filter((s) => s.status !== 'delivered' && s.status !== 'failed').length;
+
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <p className="text-gray-600">
+                    <strong>{remaining}</strong> stop{remaining === 1 ? '' : 's'} left
+                    {route.stops.length > remaining && ` · ${route.stops.length - remaining} done today`}
+                </p>
+                <p className={`text-xs ${gpsError ? 'text-amber-600' : 'text-gray-400'}`}>
+                    {gpsError ?? (pos ? 'Sharing your location every minute while this map is open' : 'Getting your location…')}
+                </p>
+            </div>
+            <DeliveryMap route={route} riderPos={pos} onUploadProof={onUploadProof} />
+        </div>
+    );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function RiderDeliveries({ deliveries, tab, counts, filters }: Props) {
+export default function RiderDeliveries({ deliveries, tab, counts, filters, route }: Props & { route: RouteData }) {
     const flash = (usePage().props as any).flash as { success?: string; error?: string } | undefined;
+
+    const [view, setView] = useState<'list' | 'map'>(() =>
+        typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'map' ? 'map' : 'list');
+
+    function changeView(v: 'list' | 'map') {
+        setView(v);
+        if (v === 'map') refreshRoute();   // never show stale pin statuses
+        const url = new URL(window.location.href);
+        if (v === 'map') url.searchParams.set('view', 'map'); else url.searchParams.delete('view');
+        window.history.replaceState(window.history.state, '', url.toString());
+    }
 
     const [expanded, setExpanded]           = useState<number | null>(null);
     const [statusTarget, setStatusTarget]   = useState<DeliveryRow | null>(null);
@@ -894,6 +963,26 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
                     </Card>
                 </div>
 
+                {/* List / Map toggle (kept in the URL so it survives the proof-upload reload) */}
+                <div className="inline-flex w-fit rounded-lg border bg-white p-1 shadow-sm">
+                    {(['list', 'map'] as const).map((v) => (
+                        <button key={v} type="button" onClick={() => changeView(v)}
+                            className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${view === v ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                            {v === 'list' ? <List className="h-4 w-4" /> : <MapIcon className="h-4 w-4" />}
+                            {v === 'list' ? 'List View' : 'Map View'}
+                        </button>
+                    ))}
+                </div>
+
+                {view === 'map' ? (
+                    <RouteMapView route={route} onUploadProof={(stop) => {
+                        const next = STATUS_NEXT[stop.status]?.find((s) => s !== 'failed');
+                        if (!next) return;
+                        // Same proof dialog as the list view — no shortcut around the photo proof
+                        openStatusDialog({ id: stop.id, status: stop.status, order: { order_number: stop.order_number } } as unknown as DeliveryRow, next);
+                    }} />
+                ) : (
+                <>
                 {/* Tabs */}
                 <div className="border-b border-gray-200">
                     <nav className="-mb-px flex gap-6">
@@ -1068,6 +1157,8 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters }: Pr
                     data={deliveries}
                     onVisit={(url) => router.visit(url, { preserveState: true })}
                 />
+                </>
+                )}
             </div>
 
             <UpdateStatusDialog

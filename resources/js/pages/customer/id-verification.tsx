@@ -48,6 +48,9 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
     // ── Camera states ────────────────────────────────────────────────────────
     const [cameraMode, setCameraMode]     = useState<'off' | 'active' | 'captured'>('off');
     const [cameraError, setCameraError]   = useState<string | null>(null);
+    // Where the current selfie came from: decides "Retake" (camera) vs "Change Photo" (upload)
+    const [selfieSource, setSelfieSource] = useState<'camera' | 'upload' | null>(null);
+    const selfieInputRef = useRef<HTMLInputElement>(null);
     const videoRef  = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -60,6 +63,13 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
     useEffect(() => {
         return () => stopCamera();
     }, []);
+
+    // The <video> element only exists once the camera is active, so attach the stream then
+    useEffect(() => {
+        if (cameraMode === 'active' && videoRef.current && streamRef.current) {
+            videoRef.current.srcObject = streamRef.current;
+        }
+    }, [cameraMode]);
 
     // ── ID file handler ───────────────────────────────────────────────────────
     function handleIdFile(file: File | undefined) {
@@ -84,10 +94,20 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
             setErrors(p => ({ ...p, selfie: 'File must be 5 MB or smaller.' }));
             return;
         }
+        stopCamera();
         setSelfieFile(file);
         setSelfiePreview(URL.createObjectURL(file));
+        setSelfieSource('upload');
         setErrors(p => ({ ...p, selfie: '' }));
+        setCameraError(null); // an uploaded photo makes any earlier camera problem irrelevant
         setCameraMode('off');
+    }
+
+    function openSelfiePicker() {
+        if (selfieInputRef.current) {
+            selfieInputRef.current.value = ''; // allow re-choosing the same file
+            selfieInputRef.current.click();
+        }
     }
 
     // ── Camera helpers ────────────────────────────────────────────────────────
@@ -98,11 +118,9 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                 video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
             });
             streamRef.current = stream;
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-            }
-            setCameraMode('active');
+            setCameraMode('active'); // the stream is attached to <video> by the effect above
         } catch {
+            setCameraMode('off');
             setCameraError('Camera access denied or unavailable. Please upload a photo instead.');
         }
     }
@@ -122,6 +140,7 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                 const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
                 setSelfieFile(file);
                 setSelfiePreview(URL.createObjectURL(blob));
+                setSelfieSource('camera');
                 setErrors(p => ({ ...p, selfie: '' }));
                 setCameraMode('captured');
                 stopCamera();
@@ -137,10 +156,17 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
         if (videoRef.current) videoRef.current.srcObject = null;
     }
 
-    function retakePhoto() {
+    function clearSelfie() {
         setSelfieFile(null);
         setSelfiePreview(null);
+        setSelfieSource(null);
         setCameraMode('off');
+    }
+
+    /** Camera photo: discard it and reopen the camera. */
+    function retakePhoto() {
+        clearSelfie();
+        startCamera();
     }
 
     // ── Submit ────────────────────────────────────────────────────────────────
@@ -343,15 +369,46 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                             {selfiePreview && (
                                 <div className="relative">
                                     <img src={selfiePreview} alt="Selfie preview" className="w-full rounded-lg border object-cover max-h-64" />
-                                    <button
-                                        type="button"
-                                        onClick={retakePhoto}
-                                        className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                    >
-                                        <RefreshCw className="h-3 w-3" /> Retake
-                                    </button>
+                                    <div className="absolute right-2 top-2 flex gap-1.5">
+                                        {selfieSource === 'camera' ? (
+                                            <button
+                                                type="button"
+                                                onClick={retakePhoto}
+                                                className="flex items-center gap-1 rounded-full bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                                            >
+                                                <RefreshCw className="h-3 w-3" /> Retake
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={openSelfiePicker}
+                                                className="flex items-center gap-1 rounded-full bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                                            >
+                                                <Upload className="h-3 w-3" /> Change Photo
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={clearSelfie}
+                                            className="flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
+                                        >
+                                            <X className="h-3 w-3" /> Remove
+                                        </button>
+                                    </div>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {selfieSource === 'camera' ? 'Photo taken with your camera.' : 'Photo uploaded from your device.'}
+                                    </p>
                                 </div>
                             )}
+
+                            {/* One file input, reused by Upload from Gallery, Change Photo and Upload a photo instead */}
+                            <input
+                                ref={selfieInputRef}
+                                type="file"
+                                accept=".jpg,.jpeg,.png"
+                                className="hidden"
+                                onChange={(e) => handleSelfieFile(e.target.files?.[0])}
+                            />
 
                             {/* Camera view */}
                             {cameraMode === 'active' && (
@@ -397,23 +454,22 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                                         Use Camera
                                     </Button>
 
-                                    <label className="flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
-                                        <Upload className="h-4 w-4" />
+                                    <Button type="button" variant="outline" className="flex-1" onClick={openSelfiePicker}>
+                                        <Upload className="h-4 w-4 mr-1.5" />
                                         Upload from Gallery
-                                        <input
-                                            type="file"
-                                            accept=".jpg,.jpeg,.png"
-                                            className="hidden"
-                                            onChange={(e) => handleSelfieFile(e.target.files?.[0])}
-                                        />
-                                    </label>
+                                    </Button>
                                 </div>
                             )}
 
-                            {cameraError && (
-                                <p className="flex items-center gap-1 text-xs text-amber-600">
-                                    <AlertCircle className="h-3.5 w-3.5" /> {cameraError}
-                                </p>
+                            {/* Only after "Use Camera" fails, and only while there is no photo yet */}
+                            {cameraError && !selfiePreview && (
+                                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                    <span className="flex-1">{cameraError}</span>
+                                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={openSelfiePicker}>
+                                        <Upload className="h-3 w-3 mr-1" /> Upload a photo instead
+                                    </Button>
+                                </div>
                             )}
                             {errors.selfie && (
                                 <p className="flex items-center gap-1 text-xs text-red-500">

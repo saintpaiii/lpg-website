@@ -11,6 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             DemoSeeder::class,
             LoyaltySeeder::class,
+            BarangayCoordinateSeeder::class,
+            CustomerAddressSeeder::class,   // after barangay coordinates (used to pin the Home address)
         ]);
     }
 }

@@ -18,6 +18,8 @@ class Delivery extends Model
         'rider_id',
         'vehicle_id',
         'status',
+        'sequence',
+        'batch_id',
         'notes',
         'assigned_at',
         'delivered_at',

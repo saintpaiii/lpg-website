@@ -2,9 +2,10 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, ShieldCheck, ShoppingCart, Store, TicketPercent } from 'lucide-react';
 import { formatAddress } from '@/data/cavite-locations';
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Marker, Polyline } from 'react-leaflet';
+import AddressSearchMap, { locationFromSaved, type ChangeReason, type DeliveryLocation, type SavedAddress } from '@/components/address-search-map';
+import { fetchRoute, PIN_COLORS, pinIcon } from '@/lib/map';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,18 +13,6 @@ import CustomerLayout from '@/layouts/customer-layout';
 import { allocateDiscount, type CouponRules } from '@/lib/coupons';
 import TierBadge, { TIER_LABELS, type Tier } from '@/components/tier-badge';
 import type { SharedData } from '@/types';
-
-// ── Leaflet icon fix ──────────────────────────────────────────────────────────
-if (typeof window !== 'undefined') {
-    import('leaflet').then((L) => {
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconUrl:      'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            iconRetinaUrl:'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            shadowUrl:    'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        });
-    });
-}
 
 type CartItem = {
     product_id: number;
@@ -80,11 +69,16 @@ type CustomerInfo = {
     barangay: string;
     lat: number | null;
     lng: number | null;
+    pin_source?: 'barangay' | 'city' | null;
+    pin_message?: string | null;
+    address_lat?: number | null;
+    address_lng?: number | null;
 } | null;
 
 type Props = {
     stores: StoreGroup[];
     customer: CustomerInfo;
+    savedAddresses?: SavedAddress[];
 };
 
 type PaymentMode = 'full' | 'consignment' | 'cod';
@@ -103,6 +97,9 @@ function peso(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 }
 
+/** Pins further than this from the chosen address get a non-blocking "check your pin" note. */
+const PIN_WARN_KM = 3;
+
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
     const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -118,45 +115,17 @@ function calcFee(sg: StoreGroup, distKm: number): number {
     return Math.ceil((base + distKm * perKm) / 5) * 5;
 }
 
-// Leaflet helpers
-function FitBounds({ positions }: { positions: [number, number][] }) {
-    const map = useMap();
-    const key = positions.map((p) => p.join(',')).join('|');
-    useEffect(() => {
-        if (positions.length >= 2) map.fitBounds(positions as any, { padding: [40, 40] });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key]);
-    return null;
-}
-
-function MapClickHandler({ onPin }: { onPin: (lat: number, lng: number) => void }) {
-    useMapEvents({
-        click(e) { onPin(e.latlng.lat, e.latlng.lng); },
-    });
-    return null;
-}
-
+/** Store → customer road route via the cached /api/route proxy (null when routing is unavailable). */
 async function fetchOsrmRoute(
     fromLat: number, fromLng: number,
     toLat: number, toLng: number,
     signal?: AbortSignal,
 ): Promise<{ coords: [number, number][]; durationMin: number } | null> {
-    try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
-        const res  = await fetch(url, { signal });
-        const data = await res.json();
-        if (data.code !== 'Ok') return null;
-        const route = data.routes[0];
-        return {
-            coords:      route.geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng] as [number, number]),
-            durationMin: Math.round(route.duration / 60),
-        };
-    } catch {
-        return null;
-    }
+    const r = await fetchRoute([[fromLat, fromLng], [toLat, toLng]], signal);
+    return r.ok ? { coords: r.coords, durationMin: r.durationMin ?? 0 } : null;
 }
 
-export default function CheckoutPage({ stores, customer }: Props) {
+export default function CheckoutPage({ stores, customer, savedAddresses = [] }: Props) {
     const { auth } = usePage<SharedData>().props;
     const idStatus = auth.user.id_verification_status;
 
@@ -222,11 +191,41 @@ export default function CheckoutPage({ stores, customer }: Props) {
     const [selectedCoupons, setSelectedCoupons] = useState<Record<number, number | null>>({});
     const [loading, setLoading]         = useState(false);
 
-    // Map state
-    const hasStoreMap = stores.some((sg) => sg.store_lat && sg.store_lng);
-    const [pin, setPin]             = useState<{ lat: number; lng: number } | null>(
-        customer?.lat && customer?.lng ? { lat: customer.lat, lng: customer.lng } : null,
+    // Delivery location: the default saved address (or the profile address, pinned at its barangay).
+    // The customer can pick another saved address, search a new one, and drag/tap the pin.
+    const [addresses, setAddresses] = useState<SavedAddress[]>(savedAddresses);
+    const [delivery, setDelivery] = useState<DeliveryLocation>(() => {
+        const def = savedAddresses.find((a) => a.is_default) ?? savedAddresses[0];
+        return def ? locationFromSaved(def) : {
+            addressId: null,
+            line: customer?.address ?? '',
+            barangay: customer?.barangay ?? '',
+            city: customer?.city ?? '',
+            lat: customer?.lat ?? null,
+            lng: customer?.lng ?? null,
+        };
+    });
+    // Where the chosen address itself is (for "Move pin back") — updated whenever the address changes, not on drags
+    const [anchor, setAnchor] = useState<{ lat: number; lng: number } | null>(
+        delivery.lat != null && delivery.lng != null ? { lat: delivery.lat, lng: delivery.lng } : null,
     );
+    const [pinIsAuto, setPinIsAuto] = useState(savedAddresses.length === 0 && (customer?.pin_source === 'barangay' || customer?.pin_source === 'city'));
+
+    function handleDeliveryChange(next: DeliveryLocation, reason: ChangeReason) {
+        setDelivery(next);
+        if (reason === 'pin') { setPinIsAuto(false); return; }
+        if (next.lat != null && next.lng != null) setAnchor({ lat: next.lat, lng: next.lng });
+    }
+    const handlePinChange = useCallback((lat: number, lng: number) => {
+        setDelivery((d) => ({ ...d, lat, lng }));
+        setPinIsAuto(false);
+    }, []);
+
+    const pin = delivery.lat != null && delivery.lng != null ? { lat: delivery.lat, lng: delivery.lng } : null;
+
+    // How far the pin has drifted from the chosen address — only a reminder, never blocks the order
+    const pinDriftKm = pin && anchor ? haversineKm(anchor.lat, anchor.lng, pin.lat, pin.lng) : null;
+    const deliveryText = formatAddress(delivery.line, delivery.barangay, delivery.city);
     const [gpsLoading, setGpsLoading] = useState(false);
     const [osrmRoute, setOsrmRoute]   = useState<{ coords: [number, number][]; durationMin: number } | null>(null);
     const osrmAbortRef = useRef<AbortController | null>(null);
@@ -264,7 +263,7 @@ export default function CheckoutPage({ stores, customer }: Props) {
         if (!navigator.geolocation) { toast.error('Geolocation not supported.'); return; }
         setGpsLoading(true);
         navigator.geolocation.getCurrentPosition(
-            (pos) => { setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGpsLoading(false); },
+            (pos) => { handlePinChange(+pos.coords.latitude.toFixed(7), +pos.coords.longitude.toFixed(7)); setGpsLoading(false); },
             () => { toast.error('Could not get location. Please click on the map.'); setGpsLoading(false); },
             { enableHighAccuracy: true, timeout: 8000 },
         );
@@ -332,6 +331,10 @@ export default function CheckoutPage({ stores, customer }: Props) {
     const estimatedMins = osrmRoute?.durationMin ?? null;
 
     async function placeOrder() {
+        if (delivery.addressId === null && !delivery.line.trim() && !(delivery.barangay && delivery.city)) {
+            toast.error('Please complete your delivery address (house no. / street, barangay and city).');
+            return;
+        }
         setLoading(true);
         try {
             const res = await axios.post<{ checkout_url?: string; redirect_url?: string; error?: string }>(
@@ -342,8 +345,11 @@ export default function CheckoutPage({ stores, customer }: Props) {
                     coupon_ids:                 Object.values(selectedCoupons).filter((id): id is number => !!id),
                     coupon_code:                promo?.code ?? null,
                     notes,
-                    delivery_latitude:          pin?.lat  ?? null,
-                    delivery_longitude:         pin?.lng  ?? null,
+                    delivery_latitude:          pin?.lat ?? null,
+                    delivery_longitude:         pin?.lng ?? null,
+                    delivery_address:           delivery.line.trim() || null,
+                    delivery_barangay:          delivery.barangay || null,
+                    delivery_city:              delivery.city || null,
                     estimated_delivery_minutes: estimatedMins,
                 },
             );
@@ -385,7 +391,10 @@ export default function CheckoutPage({ stores, customer }: Props) {
                             <div className="text-sm text-gray-700 dark:text-gray-300 space-y-0.5">
                                 <p className="font-semibold">{customer.name}</p>
                                 <p>{customer.phone}</p>
-                                <p>{formatAddress(customer.address, customer.barangay, customer.city)}</p>
+                                <p>{deliveryText || formatAddress(customer.address, customer.barangay, customer.city)}</p>
+                                {delivery.addressId !== null && (
+                                    <p className="text-xs text-gray-500">{addresses.find((a) => a.id === delivery.addressId)?.label ?? 'Saved address'}</p>
+                                )}
                             </div>
                         ) : (
                             <div className="text-sm text-amber-700 dark:text-amber-400">
@@ -399,8 +408,8 @@ export default function CheckoutPage({ stores, customer }: Props) {
                     </CardContent>
                 </Card>
 
-                {/* Delivery location map */}
-                {hasStoreMap && (
+                {/* Delivery location — auto-pinned from the customer's barangay, draggable */}
+                {customer && (
                     <Card>
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -425,39 +434,50 @@ export default function CheckoutPage({ stores, customer }: Props) {
                                 </Button>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">
-                                Click on the map to pin your delivery location, or use GPS.
+                                {pin
+                                    ? 'Your pin is auto-placed based on your address. Drag it or tap the map to adjust for accuracy.'
+                                    : 'Search your address or tap the map to pin your delivery location, or use GPS.'}
                             </p>
+                            {pinDriftKm !== null && pinDriftKm > PIN_WARN_KM && (
+                                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                    <span>
+                                        Your pin is {pinDriftKm.toFixed(1)} km from {deliveryText || 'your address'}. Make sure it marks where you want the delivery — you can still place the order.
+                                    </span>
+                                    <button type="button" className="font-semibold underline"
+                                        onClick={() => anchor && handlePinChange(anchor.lat, anchor.lng)}>
+                                        Move pin back to my address
+                                    </button>
+                                </div>
+                            )}
+                            {customer.pin_message && pinIsAuto && (
+                                <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                                    {customer.pin_message}
+                                </p>
+                            )}
                         </CardHeader>
-                        <CardContent className="p-0">
-                            <MapContainer
-                                center={pin ? [pin.lat, pin.lng] : (customer?.lat && customer?.lng ? [customer.lat, customer.lng] : [14.28, 120.95])}
-                                zoom={13}
-                                style={{ height: 300, width: '100%' }}
-                                scrollWheelZoom={false}
+                        <CardContent className="space-y-0 px-4 pb-0">
+                            <AddressSearchMap
+                                savedAddresses={addresses}
+                                value={delivery}
+                                onChange={handleDeliveryChange}
+                                onSaved={(list) => setAddresses(list)}
+                                height="300px"
+                                fitTo={stores.filter((sg) => sg.store_lat && sg.store_lng).map((sg) => [sg.store_lat!, sg.store_lng!] as [number, number])}
                             >
-                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                <MapClickHandler onPin={(lat, lng) => setPin({ lat, lng })} />
                                 {/* Store pins */}
                                 {stores.filter((sg) => sg.store_lat && sg.store_lng).map((sg) => (
-                                    <Marker key={sg.store_id} position={[sg.store_lat!, sg.store_lng!]} />
+                                    <Marker key={sg.store_id} position={[sg.store_lat!, sg.store_lng!]} icon={pinIcon(PIN_COLORS.store)} />
                                 ))}
-                                {/* Customer pin */}
-                                {pin && <Marker position={[pin.lat, pin.lng]} />}
                                 {/* OSRM route (single store only) */}
                                 {osrmRoute && (
                                     <Polyline positions={osrmRoute.coords} pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.75 }} />
                                 )}
-                                {/* Auto-fit when both pins present */}
-                                {pin && stores.some((sg) => sg.store_lat) && (
-                                    <FitBounds positions={[
-                                        ...stores.filter((sg) => sg.store_lat && sg.store_lng).map((sg) => [sg.store_lat!, sg.store_lng!] as [number, number]),
-                                        [pin.lat, pin.lng],
-                                    ]} />
-                                )}
-                            </MapContainer>
+                            </AddressSearchMap>
+                        </CardContent>
+                        <CardContent className="p-0">
                             {/* Distance & fee info per store */}
                             {pin && Object.keys(distFees).length > 0 && (
-                                <div className="px-4 py-3 space-y-1.5 border-t border-gray-100 bg-blue-50/60 dark:bg-blue-900/10">
+                                <div className="mt-3 px-4 py-3 space-y-1.5 border-t border-gray-100 bg-blue-50/60 dark:bg-blue-900/10">
                                     {stores.filter((sg) => distFees[sg.store_id]).map((sg) => {
                                         const df = distFees[sg.store_id];
                                         return (
@@ -479,10 +499,11 @@ export default function CheckoutPage({ stores, customer }: Props) {
                                 </div>
                             )}
                             {!pin && (
-                                <div className="px-4 py-3 text-xs text-gray-400 text-center border-t border-gray-100">
-                                    No pin set — flat delivery fee will apply
+                                <div className="mt-3 px-4 py-3 text-xs text-gray-400 text-center border-t border-gray-100">
+                                    No pin set — flat delivery fee will apply. Your order will still be placed at your barangay for the rider's map.
                                 </div>
                             )}
+                            <div className="h-3" />
                         </CardContent>
                     </Card>
                 )}

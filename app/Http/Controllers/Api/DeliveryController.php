@@ -41,11 +41,13 @@ class DeliveryController extends Controller
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,
                     'phone'   => $d->order->customer->phone,
-                    'address' => $d->order->customer->address,
-                    'barangay'=> $d->order->customer->barangay,
-                    'city'    => $d->order->customer->city,
-                    'lat'     => $d->order->customer->lat,
-                    'lng'     => $d->order->customer->lng,
+                    'address' => $d->order->deliveryAddressParts()['address'],
+                    'barangay'=> $d->order->deliveryAddressParts()['barangay'],
+                    'city'    => $d->order->deliveryAddressParts()['city'],
+                    // Order's delivery pin (barangay lookup, or where the customer dragged it at checkout).
+                    // Previously read non-existent customer->lat/lng columns, so it was always null.
+                    'lat'     => $d->order->delivery_latitude !== null ? (float) $d->order->delivery_latitude : null,
+                    'lng'     => $d->order->delivery_longitude !== null ? (float) $d->order->delivery_longitude : null,
                 ] : null,
                 'items' => $d->order->items->map(fn ($item) => [
                     'id'         => $item->id,
@@ -229,6 +231,8 @@ class DeliveryController extends Controller
                 'order_id'    => $order->id,
                 'rider_id'    => $data['rider_id'],
                 'status'      => 'assigned',
+                'sequence'    => null,
+                'batch_id'    => null,
                 'notes'       => $data['notes'] ?? null,
                 'assigned_at' => now(),
             ]);

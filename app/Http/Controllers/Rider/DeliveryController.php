@@ -56,9 +56,9 @@ class DeliveryController extends Controller
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,
                     'phone'   => $d->order->customer->phone,
-                    'address' => $d->order->customer->address,
-                    'barangay'=> $d->order->customer->barangay,
-                    'city'    => $d->order->customer->city,
+                    'address' => $d->order->deliveryAddressParts()['address'],
+                    'barangay'=> $d->order->deliveryAddressParts()['barangay'],
+                    'city'    => $d->order->deliveryAddressParts()['city'],
                 ] : null,
                 'items' => $d->order->items->map(fn ($item) => [
                     'id'         => $item->id,
@@ -117,7 +117,49 @@ class DeliveryController extends Controller
                 'delivered_today' => (int) ($counts->delivered_today_count ?? 0),
             ],
             'filters' => $request->only('tab'),
+            'route'   => $this->routeData($user),
         ]);
+    }
+
+    /**
+     * Stops for the rider's map view: active deliveries plus anything finished today
+     * (so completed stops show green/gray), in route order — batch by batch, then by
+     * sequence within a batch; individually assigned deliveries follow by assignment time.
+     */
+    private function routeData($user): array
+    {
+        $stops = Delivery::with(['order.customer', 'order.store'])
+            ->where('rider_id', $user->id)
+            ->where(fn ($q) => $q->whereIn('status', ['assigned', 'picked_up', 'in_transit'])
+                ->orWhere(fn ($w) => $w->whereIn('status', ['delivered', 'failed'])->where('updated_at', '>=', now()->startOfDay())))
+            ->get()
+            ->sortBy(fn (Delivery $d) => [$d->batch_id ? 0 : 1, optional($d->assigned_at)->timestamp ?? 0, $d->sequence ?? 0])
+            ->values();
+
+        $modeLabels = ['full' => 'Full Payment', 'consignment' => 'Consignment', 'cod' => 'COD'];
+
+        return [
+            'store' => \App\Services\DeliveryRouteService::storeLocation($user->store_id ? \App\Models\Store::find($user->store_id) : null),
+            'stops' => $stops->map(function (Delivery $d, int $i) use ($modeLabels) {
+                $o = $d->order;
+                return [
+                    'id'                => $d->id,
+                    'number'            => $i + 1,
+                    'sequence'          => $d->sequence,
+                    'batch_id'          => $d->batch_id,
+                    'status'            => $d->status,
+                    'order_number'      => $o?->order_number,
+                    'customer_name'     => $o?->customer?->name ?? '—',
+                    'customer_phone'    => $o?->customer?->phone,
+                    'address'           => $o?->deliveryAddressText() ?? '',
+                    'lat'               => $o?->delivery_latitude ? (float) $o->delivery_latitude : null,
+                    'lng'               => $o?->delivery_longitude ? (float) $o->delivery_longitude : null,
+                    'amount'            => $o ? $o->grandTotal() : 0,
+                    'payment_label'     => $modeLabels[$o?->payment_mode ?? 'full'] ?? 'Full Payment',
+                    'amount_to_collect' => $o && $o->payment_mode === 'cod' && $o->payment_status === 'unpaid' ? $o->grandTotal() : 0,
+                ];
+            })->all(),
+        ];
     }
 
     // ── Delivery History (completed) ──────────────────────────────────────────
@@ -144,9 +186,9 @@ class DeliveryController extends Controller
                     'total_amount' => (float) $d->order->total_amount,
                     'customer'     => $d->order->customer ? [
                         'name'     => $d->order->customer->name,
-                        'address'  => $d->order->customer->address,
-                        'barangay' => $d->order->customer->barangay,
-                        'city'     => $d->order->customer->city,
+                        'address'  => $d->order->deliveryAddressParts()['address'],
+                        'barangay' => $d->order->deliveryAddressParts()['barangay'],
+                        'city'     => $d->order->deliveryAddressParts()['city'],
                     ] : null,
                 ] : null,
                 'proofs' => $d->proofs->map(fn ($p) => [

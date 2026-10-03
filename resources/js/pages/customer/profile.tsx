@@ -1,6 +1,8 @@
 import { Head, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { AddressFields } from '@/components/address-fields';
+import AddressMap, { lookupBarangay } from '@/components/address-map';
+import AddressSearchBox, { matchBarangay, matchCity, type GeocodeResult } from '@/components/address-search-box';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import CustomerLayout from '@/layouts/customer-layout';
-import type { FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 
 type Profile = {
     first_name: string;
@@ -19,6 +21,8 @@ type Profile = {
     address: string;
     city: string;
     barangay: string;
+    latitude: number | null;
+    longitude: number | null;
 };
 
 type Props = { profile: Profile };
@@ -32,7 +36,39 @@ export default function CustomerProfile({ profile }: Props) {
         address: profile.address,
         city:    profile.city,
         barangay: profile.barangay,
+        latitude:  profile.latitude,
+        longitude: profile.longitude,
     });
+    const [pinNote, setPinNote] = useState<string | null>(null);
+
+    /** Barangay picked → move the pin to that barangay's centre (the customer then drags to their house). */
+    async function pinFromBarangay(city: string, barangay: string) {
+        if (!city || !barangay) return;
+        const geo = await lookupBarangay(city, barangay);
+        if (!geo || geo.precision === 'none') return;
+        profileForm.setData((d) => ({ ...d, latitude: geo.latitude, longitude: geo.longitude }));
+        setPinNote(geo.found ? null : (geo.message ?? null));
+    }
+
+    // No saved pin yet: start at the barangay centre so there's something to drag
+    useEffect(() => {
+        if (profile.latitude == null && profile.city && profile.barangay) pinFromBarangay(profile.city, profile.barangay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    /** Search result → pin there, and fill city/barangay/street when we can match them. */
+    function pickSearchResult(r: GeocodeResult) {
+        const city = matchCity(r.city);
+        const barangay = city ? matchBarangay(city, r.barangay) : null;
+        profileForm.setData((d) => ({
+            ...d,
+            latitude: r.lat,
+            longitude: r.lng,
+            ...(city ? { city, barangay: barangay ?? '' } : {}),
+            ...(r.street && !d.address ? { address: r.street } : {}),
+        }));
+        setPinNote(city && !barangay ? 'Please choose your barangay from the list.' : null);
+    }
 
     const passwordForm = useForm({
         current_password: '',
@@ -142,10 +178,38 @@ export default function CustomerProfile({ profile }: Props) {
                                 city={profileForm.data.city}
                                 barangay={profileForm.data.barangay}
                                 onAddressChange={(v) => profileForm.setData('address', v)}
-                                onCityChange={(v) => profileForm.setData('city', v)}
-                                onBarangayChange={(v) => profileForm.setData('barangay', v)}
+                                onCityChange={(v) => profileForm.setData((d) => ({ ...d, city: v, barangay: '' }))}
+                                onBarangayChange={(v) => {
+                                    profileForm.setData('barangay', v);
+                                    pinFromBarangay(profileForm.data.city, v);
+                                }}
                                 errors={profileForm.errors}
                             />
+
+                            <div className="grid gap-1.5">
+                                <Label className="text-sm font-medium">Delivery pin</Label>
+                                <p className="text-xs text-gray-500">
+                                    Search your street or landmark, then drag the pin (or tap the map) to your exact house.
+                                    This becomes your <strong>Home</strong> address at checkout.
+                                </p>
+                                <AddressSearchBox onSelect={pickSearchResult} />
+                                {pinNote && (
+                                    <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{pinNote}</p>
+                                )}
+                                <AddressMap
+                                    latitude={profileForm.data.latitude}
+                                    longitude={profileForm.data.longitude}
+                                    onLocationChange={(lat, lng) => {
+                                        profileForm.setData((d) => ({ ...d, latitude: lat, longitude: lng }));
+                                        setPinNote(null);
+                                    }}
+                                    height="260px"
+                                    clickMoves
+                                />
+                                {(profileForm.errors.latitude || profileForm.errors.longitude) && (
+                                    <p className="text-xs text-red-500">{profileForm.errors.latitude ?? profileForm.errors.longitude}</p>
+                                )}
+                            </div>
 
                             <div className="pt-2">
                                 <Button

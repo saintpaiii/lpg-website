@@ -33,6 +33,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])  ->name('notifications.unread-count');
     Route::post('/notifications/read-all',    [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
     Route::post('/notifications/{id}/read',   [NotificationController::class, 'markAsRead'])   ->name('notifications.mark-read');
+
+    // Auto-pin an address on maps (checkout, profile)
+    Route::get('/api/barangay-coordinates', [\App\Http\Controllers\BarangayCoordinateController::class, 'getCoordinates'])
+        ->middleware('throttle:60,1')
+        ->name('api.barangay-coordinates');
+
+    // Free OpenStreetMap services, proxied + cached (Nominatim address search, OSRM road routes)
+    Route::get('/api/geocode', [\App\Http\Controllers\MapServiceController::class, 'geocode'])
+        ->middleware('throttle:30,1')
+        ->name('api.geocode');
+    Route::get('/api/route', [\App\Http\Controllers\MapServiceController::class, 'route'])
+        ->middleware('throttle:60,1')
+        ->name('api.route');
 });
 
 // ── Seller Registration & Pending (accessible without seller middleware) ─────

@@ -393,6 +393,61 @@ class OrderController extends Controller
         return response()->json($result);
     }
 
+    // ── Delivery tracking ─────────────────────────────────────────────────────
+
+    /**
+     * GET /customer/orders/{order}/tracking — polled every 30s by the tracking card.
+     * The rider's position is rounded to 2 decimals (≈1.1 km): customers see an area,
+     * never the rider's exact GPS.
+     */
+    public function getTracking(Request $request, Order $order): JsonResponse
+    {
+        $customer = $this->getCustomer($request);
+        if (! $customer || $order->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        $order->load(['delivery.rider', 'store']);
+        $delivery = $order->delivery;
+
+        $status = match (true) {
+            $order->status === 'delivered'                          => 'delivered',
+            $order->status !== 'out_for_delivery' || ! $delivery    => 'not_dispatched',
+            $delivery->status === 'assigned'                        => 'preparing_pickup',
+            default                                                 => 'on_the_way',
+        };
+
+        $riderArea = null;
+        if ($delivery && in_array($status, ['on_the_way', 'preparing_pickup'])) {
+            $loc = \App\Models\RiderCurrentLocation::where('user_id', $delivery->rider_id)->first();
+            // Ignore stale positions (rider stopped sharing more than 30 minutes ago)
+            if ($loc && $loc->updated_at && $loc->updated_at->gt(now()->subMinutes(30))) {
+                $riderArea = ['lat' => round($loc->latitude, 2), 'lng' => round($loc->longitude, 2), 'updated_at' => $loc->updated_at->toIso8601String()];
+            }
+        }
+
+        $stopsBefore = 0;
+        if ($delivery?->batch_id && $delivery->sequence) {
+            $stopsBefore = \App\Models\Delivery::where('batch_id', $delivery->batch_id)
+                ->where('sequence', '<', $delivery->sequence)
+                ->whereNotIn('status', ['delivered', 'failed'])
+                ->count();
+        }
+
+        $store = \App\Services\DeliveryRouteService::storeLocation($order->store);
+
+        return response()->json([
+            'status'           => $status,
+            'rider_name'       => $delivery?->rider?->name,
+            'rider_area'       => $riderArea,
+            'delivery_address' => $order->delivery_latitude && $order->delivery_longitude
+                ? ['lat' => (float) $order->delivery_latitude, 'lng' => (float) $order->delivery_longitude]
+                : null,
+            'store_location'   => $store ? ['lat' => $store['lat'], 'lng' => $store['lng'], 'name' => $order->store?->store_name] : null,
+            'stops_before'     => $stopsBefore,
+        ]);
+    }
+
     // ── Cancel ────────────────────────────────────────────────────────────────
 
     public function cancel(Request $request, Order $order): RedirectResponse

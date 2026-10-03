@@ -57,6 +57,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::patch('orders/{order}/status', [OrderController::class, 'updateStatus'])->name('orders.status');
             Route::patch('orders/{order}/payment', [OrderController::class, 'updatePayment'])->name('orders.payment');
             Route::patch('orders/{order}/refunded', [OrderController::class, 'markRefunded'])->name('orders.refunded');
+            Route::post('orders/batch-assign', [OrderController::class, 'batchAssign'])->name('orders.batch-assign');
             Route::post('orders/{order}/assign-delivery', [OrderController::class, 'assignDelivery'])->name('orders.assign-delivery');
             Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         });

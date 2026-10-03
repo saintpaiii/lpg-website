@@ -60,9 +60,9 @@ class OrderController extends Controller
                 'id'      => $o->customer->id,
                 'name'    => $o->customer->name,
                 'phone'   => $o->customer->phone,
-                'address' => $o->customer->address,
-                'barangay'=> $o->customer->barangay,
-                'city'    => $o->customer->city,
+                'address' => $o->deliveryAddressParts()['address'],
+                'barangay'=> $o->deliveryAddressParts()['barangay'],
+                'city'    => $o->deliveryAddressParts()['city'],
             ] : null,
             'items' => $o->items->map(fn ($item) => [
                 'id'         => $item->id,

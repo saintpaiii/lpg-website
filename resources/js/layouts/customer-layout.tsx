@@ -14,6 +14,7 @@ import {
     Star,
     Store,
     User,
+    MapPinned,
     X,
     XCircle,
 } from 'lucide-react';
@@ -102,6 +103,7 @@ export default function CustomerLayout({ children, title }: Props) {
             badge: !isVerified ? (idStatus === 'pending' && hasSubmittedId ? 'Pending' : '!') : undefined,
         },
         { title: 'Profile', href: '/customer/profile', icon: User },
+        { title: 'My Addresses', href: '/customer/addresses', icon: MapPinned },
     ];
 
     // Seller / become-seller link

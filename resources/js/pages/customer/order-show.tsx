@@ -1,10 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, ArrowLeft, Banknote, Camera, Handshake, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, Navigation, RefreshCcw, Star, XCircle } from 'lucide-react';
-import L from 'leaflet';
+import { AlertTriangle, ArrowLeft, Banknote, Camera, Handshake, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, RefreshCcw, Star, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { fmtDate } from '@/lib/utils';
@@ -17,6 +14,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
+import TrackingCard from '@/components/tracking-card';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 
 type Payment = {
@@ -27,204 +25,6 @@ type Payment = {
     payment_method: string | null;
     paid_at: string | null;
 };
-
-// ── Leaflet icon fix ──────────────────────────────────────────────────────────
-if (typeof window !== 'undefined') {
-    import('leaflet').then((L) => {
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-            iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-            iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-            shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        });
-    });
-}
-
-function FitBounds({ positions }: { positions: [number, number][] }) {
-    const map = useMap();
-    const key = positions.map((p) => p.join(',')).join('|');
-    useEffect(() => {
-        if (positions.length >= 2) map.fitBounds(positions as any, { padding: [40, 40] });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [key]);
-    return null;
-}
-
-async function fetchOsrmRoute(
-    storeLat: number, storeLng: number,
-    custLat: number, custLng: number,
-    signal?: AbortSignal,
-): Promise<[number, number][] | null> {
-    try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${storeLng},${storeLat};${custLng},${custLat}?overview=full&geometries=geojson`;
-        const res = await fetch(url, { signal });
-        const data = await res.json();
-        if (data.code !== 'Ok') return null;
-        return data.routes[0].geometry.coordinates.map(([lng, lat]: [number, number]) => [lat, lng]);
-    } catch {
-        return null;
-    }
-}
-
-type RiderLoc = { latitude: number; longitude: number; at: string } | null;
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// ── Colored pin icons ─────────────────────────────────────────────────────────
-
-function makePinIcon(color: string, pulse = false) {
-    return L.divIcon({
-        html: `<svg width="24" height="34" viewBox="0 0 24 34" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 0C5.373 0 0 5.373 0 12c0 9.5 12 22 12 22S24 21.5 24 12C24 5.373 18.627 0 12 0z"
-                  fill="${color}" stroke="white" stroke-width="1.5"/>
-            <circle cx="12" cy="12" r="5" fill="white" opacity="0.95"/>
-            ${pulse ? `<circle cx="12" cy="12" r="10" fill="${color}" opacity="0.2" style="animation:none"/>` : ''}
-        </svg>`,
-        className: '',
-        iconSize: [24, 34],
-        iconAnchor: [12, 34],
-        popupAnchor: [0, -36],
-    });
-}
-
-// Pre-create icons (browser-only, Leaflet is already loaded)
-const storeIcon    = makePinIcon('#ef4444');      // red
-const customerIcon = makePinIcon('#3b82f6');      // blue
-const riderIcon    = makePinIcon('#22c55e', true); // green + pulse ring
-
-// ── TrackingMap ───────────────────────────────────────────────────────────────
-
-function TrackingMap({ order }: { order: Order }) {
-    const [osrmCoords, setOsrmCoords] = useState<[number, number][]>([]);
-    const [riderLoc, setRiderLoc]     = useState<RiderLoc>(null);
-    const abortRef = useRef<AbortController | null>(null);
-    const pollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-
-    const storeLoc = order.store_location;
-    const custLat  = order.delivery_latitude;
-    const custLng  = order.delivery_longitude;
-
-    // Fetch OSRM route on mount
-    useEffect(() => {
-        if (!storeLoc || custLat == null || custLng == null) return;
-        abortRef.current?.abort();
-        const ctrl = new AbortController();
-        abortRef.current = ctrl;
-        fetchOsrmRoute(storeLoc.lat, storeLoc.lng, custLat, custLng, ctrl.signal).then((coords) => {
-            if (coords) setOsrmCoords(coords);
-        });
-        return () => ctrl.abort();
-    }, [storeLoc?.lat, storeLoc?.lng, custLat, custLng]);
-
-    // Poll rider location every 15 seconds
-    useEffect(() => {
-        async function poll() {
-            try {
-                const res = await fetch(`/customer/orders/${order.id}/rider-location`, {
-                    headers: { 'Accept': 'application/json' },
-                });
-                if (!res.ok) return;
-                const json = await res.json();
-                if (json.location) setRiderLoc(json.location);
-            } catch { /* silent */ }
-        }
-        poll();
-        pollRef.current = setInterval(poll, 15_000);
-        return () => { if (pollRef.current) clearInterval(pollRef.current); };
-    }, [order.id]);
-
-    if (!storeLoc || custLat == null || custLng == null) return null;
-
-    const storePos:    [number, number] = [storeLoc.lat, storeLoc.lng];
-    const customerPos: [number, number] = [custLat, custLng];
-    const allPositions: [number, number][] = riderLoc
-        ? [storePos, customerPos, [riderLoc.latitude, riderLoc.longitude]]
-        : [storePos, customerPos];
-
-    const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${storeLoc.lat},${storeLoc.lng}&destination=${custLat},${custLng}`;
-
-    const riderDistKm = riderLoc
-        ? haversineKm(riderLoc.latitude, riderLoc.longitude, custLat, custLng)
-        : null;
-
-    return (
-        <div className="mt-5 rounded-xl border border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800 overflow-hidden">
-            {/* Banner */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-orange-500 text-white">
-                <Navigation className="h-4 w-4 shrink-0" />
-                <p className="text-sm font-semibold">Your order is on the way!</p>
-                <span className="ml-auto text-xs opacity-90">
-                    {riderDistKm != null
-                        ? `Rider is ${riderDistKm.toFixed(1)} km away`
-                        : order.delivery_distance_km != null
-                            ? `${order.delivery_distance_km.toFixed(1)} km${order.estimated_delivery_minutes != null ? ` · ~${order.estimated_delivery_minutes} min` : ''}`
-                            : ''}
-                </span>
-            </div>
-
-            {/* Map */}
-            <MapContainer
-                center={customerPos}
-                zoom={13}
-                style={{ height: 260, width: '100%' }}
-                scrollWheelZoom={false}
-                zoomControl={true}
-            >
-                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                <FitBounds positions={allPositions} />
-                {/* Store — red pin */}
-                <Marker position={storePos} icon={storeIcon} />
-                {/* Customer — blue pin */}
-                <Marker position={customerPos} icon={customerIcon} />
-                {/* Rider — green pin */}
-                {riderLoc && (
-                    <Marker position={[riderLoc.latitude, riderLoc.longitude]} icon={riderIcon} />
-                )}
-                {/* Route line */}
-                {osrmCoords.length > 0 && (
-                    <Polyline positions={osrmCoords} pathOptions={{ color: '#f97316', weight: 4, opacity: 0.8 }} />
-                )}
-            </MapContainer>
-
-            {/* Legend + footer */}
-            <div className="px-4 py-2.5 space-y-1.5">
-                <div className="flex items-center gap-4 text-xs flex-wrap">
-                    <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-3 h-3 rounded-full bg-red-500 border border-white shadow-sm" />
-                        Store
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-3 h-3 rounded-full bg-blue-500 border border-white shadow-sm" />
-                        Your location
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-3 h-3 rounded-full bg-green-500 border border-white shadow-sm" />
-                        {riderLoc ? `Rider (last seen ${new Date(riderLoc.at).toLocaleTimeString()})` : 'Rider (waiting…)'}
-                    </span>
-                </div>
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-orange-700 dark:text-orange-400">
-                        {riderLoc ? '' : 'Rider location will appear when they share it.'}
-                    </span>
-                    <a
-                        href={mapsUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-orange-700 dark:text-orange-400 font-medium hover:underline"
-                    >
-                        Open Maps <ExternalLink className="h-3 w-3" />
-                    </a>
-                </div>
-            </div>
-        </div>
-    );
-}
 
 const CANCEL_REASONS = [
     'Changed my mind',
@@ -761,7 +561,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                     <CardContent>
                         <StatusStepper status={order.status} order={order} />
                         {order.status === 'out_for_delivery' && (
-                            <TrackingMap order={order} />
+                            <TrackingCard orderId={order.id} />
                         )}
                         {order.delivery && (
                             <>

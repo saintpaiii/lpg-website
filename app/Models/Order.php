@@ -44,6 +44,9 @@ class Order extends Model
         'coupon_discount',
         'delivery_latitude',
         'delivery_longitude',
+        'delivery_address',
+        'delivery_barangay',
+        'delivery_city',
         'delivery_distance_km',
         'estimated_delivery_minutes',
     ];
@@ -80,6 +83,29 @@ class Order extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Where this order is delivered: the address chosen at checkout (saved address / map search),
+     * else the customer's profile address for orders placed before saved addresses existed.
+     *
+     * @return array{address: ?string, barangay: ?string, city: ?string}
+     */
+    public function deliveryAddressParts(): array
+    {
+        if ($this->delivery_address) {
+            return ['address' => $this->delivery_address, 'barangay' => $this->delivery_barangay, 'city' => $this->delivery_city];
+        }
+
+        return ['address' => $this->customer?->address, 'barangay' => $this->customer?->barangay, 'city' => $this->customer?->city];
+    }
+
+    /** "Street, Barangay, City" for the delivery address. */
+    public function deliveryAddressText(): string
+    {
+        $p = $this->deliveryAddressParts();
+
+        return collect([$p['address'], $p['barangay'], $p['city']])->filter()->unique()->implode(', ');
     }
 
     public function createdBy(): BelongsTo

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\BarangayCoordinateController;
 use App\Models\Customer;
+use App\Models\CustomerAddress;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -22,6 +24,8 @@ class ProfileController extends Controller
     {
         $user     = $request->user();
         $customer = $this->getCustomer($request);
+        // The profile address is the customer's "Home" saved address (what checkout pre-selects)
+        $home = static::homeAddress($user->id);
 
         return Inertia::render('customer/profile', [
             'profile' => [
@@ -33,6 +37,8 @@ class ProfileController extends Controller
                 'address'     => $customer?->address ?? '',
                 'city'        => $customer?->city ?? '',
                 'barangay'    => $customer?->barangay ?? '',
+                'latitude'    => $home?->latitude ?? ($customer?->latitude !== null ? (float) $customer->latitude : null),
+                'longitude'   => $home?->longitude ?? ($customer?->longitude !== null ? (float) $customer->longitude : null),
             ],
         ]);
     }
@@ -47,7 +53,14 @@ class ProfileController extends Controller
             'address'     => 'required|string|max:500',
             'city'        => 'required|string|max:100',
             'barangay'    => 'nullable|string|max:100',
+            // Delivery pin (draggable on the profile map) — Philippines bounds
+            'latitude'    => 'nullable|numeric|between:4,22|required_with:longitude',
+            'longitude'   => 'nullable|numeric|between:116,127|required_with:latitude',
         ]);
+        // No pin: place it at the barangay (or city) centre
+        $pin = isset($data['latitude'], $data['longitude'])
+            ? [(float) $data['latitude'], (float) $data['longitude']]
+            : BarangayCoordinateController::addressPoint($data['city'], $data['barangay'] ?? null);
 
         $fullName = trim(
             $data['first_name']
@@ -72,6 +85,8 @@ class ProfileController extends Controller
                 'address'  => $data['address'],
                 'city'     => $data['city'],
                 'barangay' => $data['barangay'] ?? '',
+                'latitude'  => $pin[0] ?? null,
+                'longitude' => $pin[1] ?? null,
             ]);
         } else {
             // Google-registered users have no Customer record yet — create one now
@@ -83,11 +98,39 @@ class ProfileController extends Controller
                 'address'       => $data['address'],
                 'city'          => $data['city'],
                 'barangay'      => $data['barangay'] ?? '',
+                'latitude'      => $pin[0] ?? null,
+                'longitude'     => $pin[1] ?? null,
                 'customer_type' => 'household',
             ]);
         }
 
+        // Keep the "Home" saved address in step with the profile (checkout pre-selects it)
+        $home = static::homeAddress($user->id);
+        $homeData = [
+            'address_line' => $data['address'],
+            'barangay'     => ($data['barangay'] ?? '') ?: null,
+            'city'         => $data['city'],
+            'latitude'     => $pin[0] ?? null,
+            'longitude'    => $pin[1] ?? null,
+        ];
+        if ($home) {
+            $home->update($homeData);
+        } else {
+            CustomerAddress::create($homeData + [
+                'user_id'    => $user->id,
+                'label'      => 'Home',
+                'is_default' => ! CustomerAddress::where('user_id', $user->id)->where('is_default', true)->exists(),
+            ]);
+        }
+
         return back()->with('success', 'Profile updated successfully.');
+    }
+
+    /** The saved address labelled "Home" (the default one first), if any. */
+    private static function homeAddress(int $userId): ?CustomerAddress
+    {
+        return CustomerAddress::where('user_id', $userId)->where('label', 'Home')
+            ->orderByDesc('is_default')->orderBy('id')->first();
     }
 
     public function updatePassword(Request $request): RedirectResponse

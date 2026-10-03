@@ -56,6 +56,7 @@ class OrderController extends Controller
             'is_overdue'          => $o->isBalanceOverdue(),
             'shipping_fee'        => $o->shipping_fee ? (float) $o->shipping_fee : null,
             'discount_amount'     => (float) ($o->discount_amount ?? 0),
+            'has_coordinates'     => $o->delivery_latitude !== null && $o->delivery_longitude !== null,
             'coupon_code'         => (float) $o->coupon_discount > 0 ? $o->coupon?->code : null,
             'coupon_type'         => (float) $o->coupon_discount > 0 ? $o->coupon?->type : null,
             'coupon_discount'     => (float) ($o->coupon_discount ?? 0),
@@ -68,8 +69,8 @@ class OrderController extends Controller
                 'id'      => $o->customer->id,
                 'name'    => $o->customer->name,
                 'phone'   => $o->customer->phone,
-                'address' => $o->customer->address,
-                'city'    => $o->customer->city,
+                'address' => $o->deliveryAddressParts()['address'],
+                'city'    => $o->deliveryAddressParts()['city'],
             ] : null,
             'items' => $o->items->map(fn ($item) => [
                 'id'         => $item->id,
@@ -569,6 +570,85 @@ class OrderController extends Controller
         return back()->with('success', "Payment updated for {$order->order_number}.");
     }
 
+    /**
+     * Assign several confirmed/preparing orders to one rider at once. Stops are ordered
+     * nearest-neighbour from the store and share a batch_id so the rider sees one route.
+     */
+    public function batchAssign(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+
+        $data = $request->validate([
+            'order_ids'   => 'required|array|min:1|max:30',
+            'order_ids.*' => 'integer|distinct|exists:orders,id',
+            'rider_id'    => 'required|integer|exists:users,id',
+        ]);
+
+        $rider = User::where('id', $data['rider_id'])
+            ->where('store_id', $store->id)
+            ->where('sub_role', 'rider')
+            ->where('is_active', true)
+            ->first(); // soft-deleted riders are excluded by the model scope
+        if (! $rider) {
+            return back()->with('error', 'Choose an active rider from your store.');
+        }
+
+        $orders = Order::with('customer')->whereIn('id', $data['order_ids'])->where('store_id', $store->id)->get();
+
+        if ($orders->count() !== count($data['order_ids'])) {
+            return back()->with('error', 'Some selected orders do not belong to your store.');
+        }
+        if ($bad = $orders->first(fn ($o) => ! in_array($o->status, ['confirmed', 'preparing']))) {
+            return back()->with('error', "Order {$bad->order_number} is " . str_replace('_', ' ', $bad->status) . ' — only confirmed or preparing orders can be batched.');
+        }
+        if ($bad = $orders->first(fn ($o) => $o->delivery_latitude === null || $o->delivery_longitude === null)) {
+            return back()->with('error', "Order {$bad->order_number}'s address is not mapped, so it can't be routed. Assign it individually instead.");
+        }
+        // Same payment rule as single assignment: paid, COD, or consignment with the down payment in
+        if ($bad = $orders->first(fn ($o) => ! ($o->payment_status === 'paid' || $o->payment_mode === 'cod'
+                || ($o->payment_mode === 'consignment' && $o->payment_status === 'partial')))) {
+            return back()->with('error', "Order {$bad->order_number} is awaiting payment and can't be dispatched yet.");
+        }
+
+        $start = \App\Services\DeliveryRouteService::storeLocation($store)
+            ?? ['lat' => (float) $orders->first()->delivery_latitude, 'lng' => (float) $orders->first()->delivery_longitude];
+        $sequence = \App\Services\DeliveryRouteService::optimizeRoute($start['lat'], $start['lng'], $orders);
+        $batchId  = (string) \Illuminate\Support\Str::uuid();
+
+        DB::transaction(function () use ($sequence, $rider, $store, $batchId) {
+            foreach ($sequence as $i => $order) {
+                $attrs = [
+                    'rider_id'     => $rider->id,
+                    'status'       => 'assigned',
+                    'sequence'     => $i + 1,
+                    'batch_id'     => $batchId,
+                    'assigned_at'  => now(),
+                    'delivered_at' => null,
+                ];
+                // Re-use the record if the order had a delivery before (e.g. a failed attempt)
+                $existing = Delivery::where('order_id', $order->id)->first();
+                $existing ? $existing->update($attrs) : Delivery::create($attrs + ['order_id' => $order->id, 'store_id' => $store->id]);
+
+                $order->update(['status' => 'out_for_delivery']);
+            }
+        });
+
+        $count = count($sequence);
+        NotificationService::send($rider->id, 'batch_delivery_assigned', 'New Delivery Route',
+            "You have been assigned {$count} new deliveries. View your route.",
+            ['batch_id' => $batchId, 'link' => '/rider/deliveries?view=map']);
+
+        foreach ($sequence as $order) {
+            if ($userId = $order->customer?->user_id) {
+                NotificationService::send($userId, 'order_out_for_delivery', 'Your order is on its way!',
+                    "Your order #{$order->order_number} is out for delivery! Track it now.",
+                    ['order_id' => $order->id, 'link' => '/customer/orders/' . $order->id]);
+            }
+        }
+
+        return back()->with('success', "{$count} order(s) assigned to {$rider->name} as one route.");
+    }
+
     public function assignDelivery(Request $request, Order $order): RedirectResponse
     {
         $store = request()->attributes->get('seller_store');
@@ -589,6 +669,8 @@ class OrderController extends Controller
                 'rider_id'    => $rider->id,
                 'assigned_at' => now(),
                 'status'      => 'assigned',
+                'sequence'    => null,
+                'batch_id'    => null,
             ]);
         } else {
             Delivery::create([
@@ -596,6 +678,8 @@ class OrderController extends Controller
                 'store_id'    => $store->id,
                 'rider_id'    => $rider->id,
                 'status'      => 'assigned',
+                'sequence'    => null,
+                'batch_id'    => null,
                 'assigned_at' => now(),
             ]);
         }

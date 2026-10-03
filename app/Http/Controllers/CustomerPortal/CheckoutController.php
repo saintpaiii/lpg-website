@@ -197,16 +197,39 @@ class CheckoutController extends Controller
             return redirect('/customer/products')->with('error', 'Your cart is empty. Browse products to start shopping.');
         }
 
+        // Initial delivery pin: always from the customer's TEXT address (barangay_coordinates lookup,
+        // else city centre). customers.latitude/longitude is deliberately NOT used — pins set at
+        // registration are unreliable. The customer can still drag the pin for this order.
+        $pin = null;
+        $addressPoint = null;
+        if ($customer) {
+            $geo = \App\Http\Controllers\BarangayCoordinateController::resolve($customer->city, $customer->barangay);
+            if ($geo['precision'] !== 'none') {
+                $addressPoint = [(float) $geo['latitude'], (float) $geo['longitude']];
+                $pin = ['lat' => $addressPoint[0], 'lng' => $addressPoint[1], 'source' => $geo['precision'], 'message' => $geo['message'] ?? null];
+            }
+        }
+
+        // Saved delivery addresses (default first). First visit: the profile address becomes "Home".
+        AddressController::ensureDefaultFromProfile($userId, $customer);
+        $savedAddresses = AddressController::listFor($userId);
+
         return Inertia::render('customer/checkout', [
             'stores'   => $checkoutStores,
+            'savedAddresses' => $savedAddresses,
             'customer' => $customer ? [
                 'name'     => $customer->name,
                 'phone'    => $customer->phone,
                 'address'  => $customer->address,
                 'city'     => $customer->city,
                 'barangay' => $customer->barangay,
-                'lat'      => $customer->latitude  ? (float) $customer->latitude  : null,
-                'lng'      => $customer->longitude ? (float) $customer->longitude : null,
+                'lat'      => $pin['lat'] ?? null,
+                'lng'      => $pin['lng'] ?? null,
+                'pin_source'  => $pin['source'] ?? null,   // barangay | city | null
+                'pin_message' => $pin['message'] ?? null,
+                // Centre of the typed address (fallback pin when the customer has no saved address)
+                'address_lat' => $addressPoint[0] ?? null,
+                'address_lng' => $addressPoint[1] ?? null,
             ] : null,
         ]);
     }
@@ -290,12 +313,31 @@ class CheckoutController extends Controller
                 'notes'                      => 'nullable|string|max:1000',
                 'delivery_latitude'          => 'nullable|numeric|between:-90,90',
                 'delivery_longitude'         => 'nullable|numeric|between:-180,180',
+                // Address the pin belongs to (saved address or map search); default: profile address
+                'delivery_address'           => 'nullable|string|max:500',
+                'delivery_barangay'          => 'nullable|string|max:100',
+                'delivery_city'              => 'nullable|string|max:100',
                 'estimated_delivery_minutes' => 'nullable|integer|min:0|max:9999',
             ]);
 
             $deliveryLat  = isset($data['delivery_latitude'])  ? (float) $data['delivery_latitude']  : null;
             $deliveryLng  = isset($data['delivery_longitude']) ? (float) $data['delivery_longitude'] : null;
             $estimatedMin = isset($data['estimated_delivery_minutes']) ? (int) $data['estimated_delivery_minutes'] : null;
+
+            // Snapshot the delivery address on the order: the one chosen at checkout, else the profile address.
+            // (Riders see this text next to the pin, and later profile edits must not move the order.)
+            $chosenAddress = trim((string) ($data['delivery_address'] ?? ''));
+            $delivery = $chosenAddress !== ''
+                ? ['address' => $chosenAddress, 'barangay' => $data['delivery_barangay'] ?? null, 'city' => $data['delivery_city'] ?? null]
+                : ['address' => $customer->address, 'barangay' => $customer->barangay, 'city' => $customer->city];
+
+            // The customer's pin is always used as-is: barangay centres are approximate, the customer
+            // knows where they live. (The page shows a non-blocking note when the pin is far away.)
+            $addressPoint = \App\Http\Controllers\BarangayCoordinateController::addressPoint($delivery['city'], $delivery['barangay']);
+
+            // No map pin: place the order at the customer's barangay/city centre so it can be routed
+            // (only for the map — the delivery fee still uses the flat fee, as before)
+            $geoFallback = ($deliveryLat === null || $deliveryLng === null) ? $addressPoint : null;
 
             $couponIds   = array_map('intval', $data['coupon_ids'] ?? []);
             $couponCode  = trim((string) ($data['coupon_code'] ?? '')) ?: null;
@@ -371,7 +413,7 @@ class CheckoutController extends Controller
             }
 
             // Create one order per store in a single DB transaction
-            $orders = DB::transaction(function () use ($checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
+            $orders = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
                 // ── Pass 1: price every store's items and delivery fee ─────────
                 $prepared = [];
 
@@ -508,8 +550,11 @@ class CheckoutController extends Controller
                         'notes'                      => $data['notes'] ?? null,
                         'ordered_at'                 => now(),
                         'created_by'                 => $request->user()->id,
-                        'delivery_latitude'          => $deliveryLat,
-                        'delivery_longitude'         => $deliveryLng,
+                        'delivery_latitude'          => $deliveryLat ?? $geoFallback[0] ?? null,
+                        'delivery_longitude'         => $deliveryLng ?? $geoFallback[1] ?? null,
+                        'delivery_address'           => $delivery['address'] ?: null,
+                        'delivery_barangay'          => $delivery['barangay'] ?: null,
+                        'delivery_city'              => $delivery['city'] ?: null,
                         'delivery_distance_km'       => $p['distKm'] !== null ? round($p['distKm'], 2) : null,
                         'estimated_delivery_minutes' => $estimatedMin,
                     ]);

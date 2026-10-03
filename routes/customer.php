@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CustomerPortal\AddressController;
 use App\Http\Controllers\CustomerPortal\CartController;
 use App\Http\Controllers\CustomerPortal\CheckoutController;
 use App\Http\Controllers\CustomerPortal\DashboardController;
@@ -51,12 +52,20 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
         Route::post('orders/{order}/rate', [RatingController::class, 'store'])->name('orders.rate');
         Route::get('orders/{order}/rider-location', [RiderLocationController::class, 'showForOrder'])->name('orders.rider-location');
+        Route::get('orders/{order}/tracking', [OrderController::class, 'getTracking'])->name('orders.tracking');
 
         // Store pages
         Route::get('store/{store}', [StoreController::class, 'show'])->name('store.show');
 
         Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+
+        // Saved delivery addresses
+        Route::get('addresses', [AddressController::class, 'index'])->name('addresses.index');
+        Route::post('addresses', [AddressController::class, 'store'])->name('addresses.store');
+        Route::put('addresses/{address}', [AddressController::class, 'update'])->name('addresses.update');
+        Route::delete('addresses/{address}', [AddressController::class, 'destroy'])->name('addresses.destroy');
+        Route::post('addresses/{address}/set-default', [AddressController::class, 'setDefault'])->name('addresses.set-default');
 
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile');
         Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');

@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle, Eye, FileDown, Loader2, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
+import { CheckCircle, Eye, FileDown, Loader2, MapPinOff, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
+import BatchAssignBar from '@/components/batch-assign-bar';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -36,7 +37,13 @@ type Order = {
     customer: { id: number; name: string } | null;
     created_at: string;
     cancelled_by: 'customer' | 'seller' | null;
+    has_coordinates: boolean;
 };
+
+/** Confirmed/preparing orders whose payment allows dispatch (same rule as single assignment). */
+const isDispatchable = (o: Order) =>
+    ['confirmed', 'preparing'].includes(o.status)
+    && (o.payment_status === 'paid' || o.payment_mode === 'cod' || (o.payment_mode === 'consignment' && o.payment_status === 'partial'));
 
 type Rider  = { id: number; name: string };
 type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number; outstanding_balance: number; overdue_balance: number };
@@ -83,6 +90,25 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
     const [cancelReason, setCancelReason] = useState('');
     const [cancelNotes,  setCancelNotes]  = useState('');
     const [loading,      setLoading]      = useState(false);
+
+    // Batch assignment (several orders → one rider, routed nearest-first)
+    const [selected, setSelected]       = useState<number[]>([]);
+    const [batching, setBatching]       = useState(false);
+    const batchable = tab === 'active' ? orders.data.filter((o) => isDispatchable(o) && o.has_coordinates) : [];
+    const allSelected = batchable.length > 0 && batchable.every((o) => selected.includes(o.id));
+
+    function toggleSelected(id: number) {
+        setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    }
+
+    function batchAssign(riderIdToUse: number) {
+        setBatching(true);
+        router.post('/seller/orders/batch-assign', { order_ids: selected, rider_id: riderIdToUse }, {
+            preserveScroll: true,
+            onSuccess: () => setSelected([]),
+            onFinish: () => setBatching(false),
+        });
+    }
 
     function navigate(overrides: Record<string, string> = {}) {
         router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, balance: filters.balance ?? '', ...overrides }, { preserveState: true, replace: true });
@@ -267,6 +293,14 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
+                                        {tab === 'active' && (
+                                            <th className="w-10 pl-4 py-2.5">
+                                                <input type="checkbox" aria-label="Select all orders ready for delivery"
+                                                    disabled={batchable.length === 0} checked={allSelected}
+                                                    onChange={() => setSelected(allSelected ? [] : batchable.map((o) => o.id))}
+                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                                            </th>
+                                        )}
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Order</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Customer</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Amount</th>
@@ -278,9 +312,22 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                 </thead>
                                 <tbody>
                                     {orders.data.length === 0 ? (
-                                        <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No orders found.</td></tr>
+                                        <tr><td colSpan={tab === 'active' ? 8 : 7} className="text-center py-12 text-muted-foreground">No orders found.</td></tr>
                                     ) : orders.data.map((o) => (
-                                        <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                                        <tr key={o.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${selected.includes(o.id) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}>
+                                            {tab === 'active' && (
+                                                <td className="w-10 pl-4 py-3">
+                                                    {isDispatchable(o) && (o.has_coordinates ? (
+                                                        <input type="checkbox" aria-label={`Select ${o.order_number}`}
+                                                            checked={selected.includes(o.id)} onChange={() => toggleSelected(o.id)}
+                                                            className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                                                    ) : (
+                                                        <span title="Address not mapped — assign this order individually" className="inline-flex text-amber-500">
+                                                            <MapPinOff className="h-4 w-4" />
+                                                        </span>
+                                                    ))}
+                                                </td>
+                                            )}
                                             <td className="px-4 py-3">
                                                 <p className="font-mono text-xs text-blue-600 font-medium">{o.order_number}</p>
                                                 <p className="text-xs text-muted-foreground capitalize">{o.transaction_type.replace('_', ' ')}</p>
@@ -479,6 +526,16 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Keep the last rows reachable above the floating bar */}
+            {selected.length > 0 && <div className="h-28" aria-hidden />}
+            <BatchAssignBar
+                count={selected.length}
+                riders={riders}
+                processing={batching}
+                onAssign={batchAssign}
+                onCancel={() => setSelected([])}
+            />
         </AppLayout>
     );
 }

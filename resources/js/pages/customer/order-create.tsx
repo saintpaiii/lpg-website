@@ -1,4 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { fetchRoute } from '@/lib/map';
 import { CreditCard, MapPin, Minus, Plus, ShoppingCart, Trash2, Truck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -83,25 +84,14 @@ function FitBounds({ positions }: { positions: [number, number][] }) {
 
 // ── OSRM fetch helper ──────────────────────────────────────────────────────────
 
+/** Store → customer road route via the cached /api/route proxy (null when routing is unavailable). */
 async function fetchOsrmRoute(
     storeLat: number, storeLng: number,
     custLat: number, custLng: number,
     signal?: AbortSignal,
 ): Promise<{ coords: [number, number][]; distanceKm: number; durationMin: number } | null> {
-    try {
-        const url = `https://router.project-osrm.org/route/v1/driving/${storeLng},${storeLat};${custLng},${custLat}?overview=full&geometries=geojson`;
-        const res  = await fetch(url, { signal });
-        const data = await res.json();
-        if (data.code !== 'Ok' || !data.routes?.length) return null;
-        const route = data.routes[0];
-        return {
-            coords:      (route.geometry.coordinates as [number, number][]).map(([lng, lat]) => [lat, lng]),
-            distanceKm:  route.distance / 1000,
-            durationMin: Math.round(route.duration / 60),
-        };
-    } catch {
-        return null;
-    }
+    const r = await fetchRoute([[storeLat, storeLng], [custLat, custLng]], signal);
+    return r.ok ? { coords: r.coords, distanceKm: r.distanceKm ?? 0, durationMin: r.durationMin ?? 0 } : null;
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────────
