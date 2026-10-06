@@ -45,6 +45,21 @@ class ConsignmentBalanceReminders extends Command
                         . $order->balance_due_date->format('M d, Y') . ').',
                     ['order_id' => $order->id, 'link' => '/customer/orders/' . $order->id]
                 );
+
+                // Same reminder in the customer's chat, as an automatic message from the store
+                // (once per due date; never blocks the reminder)
+                try {
+                    \App\Services\ChatService::automatic(
+                        \App\Services\ChatService::customerStoreConversation($userId, $order->store_id),
+                        'store', null,
+                        'Reminder: your balance of ₱' . number_format((float) $order->remaining_balance, 2)
+                            . " for order {$order->order_number} is due on " . $order->balance_due_date->format('M d, Y') . '.',
+                        $order->id,
+                        'balance_reminder_' . $order->balance_due_date->format('Y-m-d'),
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Chat balance reminder failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
+                }
             }
             $order->update(['balance_reminder_sent_at' => now()]);
         }

@@ -1,4 +1,7 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { statusLabel, useLiveReload } from '@/lib/echo';
+import type { SharedData } from '@/types';
+import MessageButton from '@/components/chat/message-button';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertTriangle, ArrowLeft, Banknote, Camera, Handshake, CheckCircle2, Circle, Clock, CreditCard, ExternalLink, Flag, Loader2, MapPin, RefreshCcw, Star, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -81,6 +84,7 @@ type Order = {
         product: { name: string; brand: string | null } | null;
     }[];
     delivery: {
+        id: number;
         status: string;
         rider_name: string | null;
         assigned_at: string | null;
@@ -300,6 +304,10 @@ function peso(n: number) {
 }
 
 export default function OrderShow({ order, breakdown }: Props & { breakdown: PriceBreakdown }) {
+    // Live: this order's status / delivery changes reload the page data
+    const meId = usePage<SharedData>().props.auth.user.id as number;
+    useLiveReload(`user.${meId}`, ['order', 'breakdown'], (e) => e.order_id === order.id,
+        (e) => toast.info(`Order updated: ${statusLabel(e.status)}`));
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
     const hasActiveRefund = !!order.refund_request && ['pending', 'approved', 'processed'].includes(order.refund_request.status);
     const canRefund = order.status === 'delivered' && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund;
@@ -538,6 +546,9 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                     Refund: {order.refund_request.status}
                                 </Button>
                             </Link>
+                        )}
+                        {order.store_id && (
+                            <MessageButton portal="customer" params={{ store_id: order.store_id }} label="Message store" className="gap-1.5" />
                         )}
                         {order.store_id && (
                             <Button

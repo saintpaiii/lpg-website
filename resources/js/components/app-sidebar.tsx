@@ -1,3 +1,4 @@
+import { useUnreadMessages } from '@/components/chat/use-unread-messages';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Award,
@@ -32,6 +33,7 @@ import {
     UserCog,
     Users,
     Warehouse,
+    MessageSquare,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -59,6 +61,13 @@ export function AppSidebar() {
     const isSeller    = role === 'seller' || (role === 'seller_staff' && subRole !== 'rider');
     const isPlatformAdmin = role === 'platform_admin' || role === 'admin';
 
+    // Chat unread badge (seller/staff inbox or rider inbox)
+    const chatPortal = isRider ? 'rider' : isSeller && (role === 'seller' || can('messages.view')) ? 'seller' : null;
+    const unreadMessages = useUnreadMessages(chatPortal);
+    const unreadBadge = unreadMessages > 0
+        ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const }
+        : {};
+
     // ── Seller portal navigation ──────────────────────────────────────────────
     if (isSeller) {
         const isActualSeller = role === 'seller'; // store owner sees everything
@@ -68,6 +77,7 @@ export function AppSidebar() {
             (isActualSeller || can('dashboard.view'))   && { title: 'Dashboard',    href: '/seller/dashboard',  icon: LayoutDashboard },
             (isActualSeller || can('products.view'))    && { title: 'Products',     href: '/seller/products',   icon: Package         },
             (isActualSeller || can('orders.view'))      && { title: 'Orders',       href: '/seller/orders',     icon: ShoppingCart    },
+            (isActualSeller || can('messages.view'))    && { title: 'Messages',     href: '/seller/messages',   icon: MessageSquare, ...unreadBadge },
             (isActualSeller || can('deliveries.view'))  && { title: 'Deliveries',   href: '/seller/deliveries', icon: Truck           },
             isActualSeller                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
             (isActualSeller || can('invoices.view'))    && { title: 'Invoices',     href: '/seller/invoices',   icon: Receipt         },
@@ -153,6 +163,7 @@ export function AppSidebar() {
         // Riders have dedicated delivery pages
         isRider && { title: 'My Deliveries',   href: '/rider/deliveries',    icon: Truck          },
         isRider && { title: 'Delivery History', href: '/rider/history',      icon: History        },
+        isRider && { title: 'Messages',         href: '/rider/messages',     icon: MessageSquare, ...unreadBadge },
         isRider && { title: 'My Attendance',    href: '/rider/my-attendance', icon: CalendarDays  },
         isRider && { title: 'My Payslips',      href: '/rider/my-payslips',  icon: ClipboardList  },
         !isPlatformAdmin && !isRider && can('customers.view') && { title: 'Customers', href: '/admin/customers', icon: Users },

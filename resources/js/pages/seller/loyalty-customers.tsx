@@ -1,15 +1,18 @@
+import MessageButton from '@/components/chat/message-button';
+import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, Award, ChevronLeft, ChevronRight, Crown, FileDown, Search, ShieldCheck, Users } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import TierBadge, { type Tier } from '@/components/tier-badge';
 import { peso, timeAgo, trustColor } from '@/components/trust-score-bar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, SharedData } from '@/types';
 
 type Row = {
     id: number;
+    user_id: number;
     customer_name: string;
     customer_email: string;
     tier: Tier;
@@ -34,6 +37,8 @@ type Props = {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Loyalty Customers', href: '/seller/loyalty/customers' }];
 
 export default function LoyaltyCustomers({ enabled, settings, stats, customers, filters }: Props) {
+    const { can } = usePermission();
+    const canMessage = usePage<SharedData>().props.auth.user.role === 'seller' || can('messages.view');
     const [search, setSearch] = useState(filters.search);
 
     function visit(params: Record<string, string | number>) {
@@ -128,6 +133,7 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                                             <SortHead col="total_spent" label="Total Spent" right />
                                             <SortHead col="last_order_at" label="Last Order" />
                                             <th className="px-4 py-2.5 text-left font-medium">Consignment</th>
+                                            {canMessage && <th className="px-2 py-2.5"><span className="sr-only">Message</span></th>}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
@@ -148,6 +154,11 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                                                         ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Eligible</span>
                                                         : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Not Eligible</span>}
                                                 </td>
+                                                {canMessage && (
+                                                    <td className="px-2 py-3">
+                                                        <MessageButton portal="seller" params={{ customer_user_id: c.user_id }} label={`Message ${c.customer_name}`} iconOnly variant="ghost" />
+                                                    </td>
+                                                )}
                                             </tr>
                                         ))}
                                     </tbody>

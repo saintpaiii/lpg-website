@@ -12,13 +12,23 @@ class NotificationService
     /** Send a notification to a single user. */
     public static function send(int $userId, string $type, string $title, string $message, array $data = []): void
     {
-        Notification::create([
+        $n = Notification::create([
             'user_id' => $userId,
             'type'    => $type,
             'title'   => $title,
             'message' => $message,
             'data'    => $data ?: null,
         ]);
+
+        // Live bell update (same shape as the shared recentNotifications prop); never throws
+        \App\Support\Realtime::send(new \App\Events\NotificationCreated([
+            'id'         => $n->id,
+            'type'       => $n->type,
+            'title'      => $n->title,
+            'message'    => $n->message,
+            'data'       => $n->data,
+            'created_at' => $n->created_at?->diffForHumans(),
+        ], ["user.{$userId}"]));
     }
 
     /** Send to multiple users. */

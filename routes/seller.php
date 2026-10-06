@@ -6,6 +6,7 @@ use App\Http\Controllers\Seller\DeliveryController;
 use App\Http\Controllers\Seller\DssController;
 use App\Http\Controllers\Seller\InventoryController;
 use App\Http\Controllers\Seller\InvoiceController;
+use App\Http\Controllers\Seller\MessageController as SellerMessageController;
 use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use App\Http\Controllers\Seller\ReviewController;
@@ -63,6 +64,21 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         });
 
         // ── Deliveries ───────────────────────────────────────────────────────
+        Route::middleware('permission:messages.view')->group(function () {
+            // ── Messages (chat) — 'start' / 'unread-count' before the {conversation} wildcard ──
+            Route::get('messages', [SellerMessageController::class, 'index'])->name('messages');
+            Route::post('messages/start', [SellerMessageController::class, 'start'])->name('messages.start');
+            Route::get('messages/unread-count', [SellerMessageController::class, 'unreadCount'])->name('messages.unread');
+            Route::get('messages/{conversation}', [SellerMessageController::class, 'show'])->name('messages.show');
+            Route::get('messages/{conversation}/messages', [SellerMessageController::class, 'messages'])->name('messages.poll');
+            Route::post('messages/{conversation}', [SellerMessageController::class, 'store'])->middleware('throttle:30,1')->name('messages.send');
+            Route::get('messages/{conversation}/crm', [SellerMessageController::class, 'crm'])->name('messages.crm');
+            Route::get('quick-replies', [SellerMessageController::class, 'quickReplies'])->name('quick-replies');
+            Route::post('quick-replies', [SellerMessageController::class, 'storeQuickReply'])->name('quick-replies.store');
+            Route::put('quick-replies/{quickReply}', [SellerMessageController::class, 'updateQuickReply'])->name('quick-replies.update');
+            Route::delete('quick-replies/{quickReply}', [SellerMessageController::class, 'destroyQuickReply'])->name('quick-replies.destroy');
+        });
+
         Route::middleware('permission:deliveries.view')->group(function () {
             Route::get('deliveries', [DeliveryController::class, 'index'])->name('deliveries');
             Route::post('deliveries/assign', [DeliveryController::class, 'assign'])->name('deliveries.assign');

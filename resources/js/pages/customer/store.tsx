@@ -1,3 +1,4 @@
+import MessageButton from '@/components/chat/message-button';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, Award, BadgeCheck, MapPin, Phone, Search, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
@@ -151,6 +152,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{store.store_name}</h1>
+                                    <MessageButton portal="customer" params={{ store_id: store.id }} label="Message store" className="gap-1.5" />
                                     {store.is_top_rated && (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
                                             <Award className="h-3 w-3" />

@@ -13,6 +13,7 @@ class DatabaseSeeder extends Seeder
             LoyaltySeeder::class,
             BarangayCoordinateSeeder::class,
             CustomerAddressSeeder::class,   // after barangay coordinates (used to pin the Home address)
+            StoreQuickReplySeeder::class,   // default chat quick replies
         ]);
     }
 }

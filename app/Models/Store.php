@@ -106,6 +106,26 @@ class Store extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    protected static function booted(): void
+    {
+        // Newly approved stores start with the default chat quick replies
+        static::saved(function (Store $store) {
+            if ($store->status === 'approved' && ($store->wasRecentlyCreated || $store->wasChanged('status'))) {
+                try {
+                    StoreQuickReply::ensureDefaults($store->id);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Default quick replies failed', ['store_id' => $store->id, 'error' => $e->getMessage()]);
+                }
+            }
+        });
+    }
+
+    /** Customers can message the store (same rule as the storefront: approved, not commission-suspended). */
+    public function canReceiveMessages(): bool
+    {
+        return $this->status === 'approved' && ! $this->commission_suspended;
+    }
+
     /** Platform admin who approved this store */
     public function approvedBy(): BelongsTo
     {

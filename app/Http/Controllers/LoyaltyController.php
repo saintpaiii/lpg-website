@@ -217,6 +217,7 @@ class LoyaltyController extends Controller
     {
         return [
             'id'                  => $l->id,
+            'user_id'             => $l->user_id,
             'customer_name'       => $l->customer_name,
             'customer_email'      => $l->customer_email,
             'tier'                => $l->tier,

@@ -24,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+
+        // Chat auto-messages follow order / delivery changes from any controller, API or job
+        \App\Models\Order::observe(\App\Observers\OrderObserver::class);
+        \App\Models\Delivery::observe(\App\Observers\DeliveryObserver::class);
     }
 
     /**

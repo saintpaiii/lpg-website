@@ -332,6 +332,9 @@ class DemoSeeder extends Seeder
             ['users.delete',             'User Management', 'Archive / delete users'],
             ['users.permissions',        'User Management', 'Manage per-user permission overrides'],
 
+            ['messages.view',            'Messages',        'View customer and rider messages'],
+            ['messages.reply',           'Messages',        'Reply to customer and rider messages'],
+
             ['settings.view',            'Settings',        'View system settings'],
             ['settings.edit',            'Settings',        'Edit system settings'],
         ];
@@ -365,6 +368,7 @@ class DemoSeeder extends Seeder
             'products.view',
             'orders.view', 'orders.create', 'orders.edit', 'orders.confirm', 'orders.cancel',
             'invoices.view', 'invoices.payment',
+            'messages.view', 'messages.reply',
         ];
         $warehousePerms = [
             'dashboard.view',

@@ -1,4 +1,4 @@
-import { Camera, MapPinOff, Navigation } from 'lucide-react';
+import { Camera, MapPinOff, MessageSquare, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -58,10 +58,12 @@ function FitToPoints({ points }: { points: LatLng[] }) {
  * "already driven" path (store → done stops); the solid blue path continues from the
  * last finished stop (or the store) through the stops still to deliver.
  */
-export default function DeliveryMap({ route, riderPos, onUploadProof, height = 480 }: {
+export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage, height = 480 }: {
     route: RouteData;
     riderPos: LatLng | null;
     onUploadProof: (stop: RouteStop) => void;
+    /** Optional "Message" action in the popup (rider → customer chat for this delivery). */
+    onMessage?: (stop: RouteStop) => void;
     height?: number;
 }) {
     const mapped = route.stops.filter((s) => s.lat !== null && s.lng !== null);
@@ -152,6 +154,12 @@ export default function DeliveryMap({ route, riderPos, onUploadProof, height = 4
                                                     className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs font-semibold hover:bg-gray-50">
                                                     <Camera className="h-3 w-3" /> Upload Proof
                                                 </button>
+                                                {onMessage && (
+                                                    <button type="button" onClick={() => onMessage(s)} aria-label={`Message ${s.customer_name}`} title="Message customer"
+                                                        className="inline-flex items-center justify-center rounded-md border border-gray-300 px-2 py-1.5 hover:bg-gray-50">
+                                                        <MessageSquare className="h-3 w-3" />
+                                                    </button>
+                                                )}
                                             </div>
                                         )}
                                     </div>

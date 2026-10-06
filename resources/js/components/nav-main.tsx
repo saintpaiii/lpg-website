@@ -32,21 +32,24 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                             >
                                 <Link href={item.href} prefetch>
                                     {item.icon && (
-                                        <item.icon
-                                            className={cn(
-                                                'mr-2 size-4 shrink-0',
-                                                active ? 'text-white' : '',
+                                        <span className="relative mr-2 shrink-0">
+                                            <item.icon className={cn('size-4', active ? 'text-white' : '')} />
+                                            {item.badge && item.badgeTone === 'unread' && (
+                                                // Dot on the icon, visible when the sidebar is collapsed to icons
+                                                <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-blue-600 ring-2 ring-sidebar group-data-[collapsible=icon]:block" />
                                             )}
-                                        />
+                                        </span>
                                     )}
                                     <span className="flex-1 truncate">{item.title}</span>
                                     {item.badge && (
                                         <span
                                             className={cn(
                                                 'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
-                                                active
-                                                    ? 'bg-white/20 text-white'
-                                                    : 'bg-muted text-muted-foreground',
+                                                item.badgeTone === 'unread'
+                                                    ? (active ? 'bg-white text-blue-700' : 'bg-blue-600 text-white')
+                                                    : active
+                                                        ? 'bg-white/20 text-white'
+                                                        : 'bg-muted text-muted-foreground',
                                             )}
                                         >
                                             {item.badge}

@@ -5,6 +5,7 @@ use App\Http\Controllers\CustomerPortal\CartController;
 use App\Http\Controllers\CustomerPortal\CheckoutController;
 use App\Http\Controllers\CustomerPortal\DashboardController;
 use App\Http\Controllers\CustomerPortal\InvoiceController;
+use App\Http\Controllers\CustomerPortal\MessageController;
 use App\Http\Controllers\CustomerPortal\OrderController;
 use App\Http\Controllers\CustomerPortal\PaymentController;
 use App\Http\Controllers\CustomerPortal\ProductBrowseController;
@@ -43,6 +44,15 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::post('checkout/coupon', [CheckoutController::class, 'applyCoupon'])->name('checkout.coupon');
 
         // Orders
+
+        // ── Messages (chat) — 'start' / 'unread-count' before the {conversation} wildcard ──
+        Route::get('messages', [MessageController::class, 'index'])->name('messages');
+        Route::post('messages/start', [MessageController::class, 'start'])->name('messages.start');
+        Route::get('messages/unread-count', [MessageController::class, 'unreadCount'])->name('messages.unread');
+        Route::get('messages/{conversation}', [MessageController::class, 'show'])->name('messages.show');
+        Route::get('messages/{conversation}/messages', [MessageController::class, 'messages'])->name('messages.poll');
+        Route::post('messages/{conversation}', [MessageController::class, 'store'])->middleware('throttle:30,1')->name('messages.send');
+
         Route::get('orders', [OrderController::class, 'index'])->name('orders');
         Route::redirect('orders/create', '/customer/products')->name('orders.create');
         Route::get('orders/{order}', [OrderController::class, 'show'])->name('orders.show');

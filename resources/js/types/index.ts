@@ -36,6 +36,8 @@ export type SharedData = {
     };
     cart_count: number;
     unreadNotifications: number;
+    /** Unread chat messages across all of the user's conversations */
+    unreadMessages?: number;
     recentNotifications: AppNotification[];
     [key: string]: unknown;
 };

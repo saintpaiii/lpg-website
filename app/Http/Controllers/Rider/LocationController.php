@@ -30,6 +30,7 @@ class LocationController extends Controller
         ]);
 
         RiderCurrentLocation::record(auth()->id(), (float) $data['latitude'], (float) $data['longitude']);
+        $this->broadcastPosition(auth()->id(), (float) $data['latitude'], (float) $data['longitude']);
 
         if (empty($data['delivery_id'])) {
             return response()->json(['success' => true, 'at' => now()->toIso8601String()]);
@@ -63,6 +64,39 @@ class LocationController extends Controller
         }
 
         return response()->json(['success' => true, 'at' => now()->toIso8601String()]);
+    }
+
+    /**
+     * Live position for each of the rider's active deliveries: the customer gets it rounded to
+     * 2 decimals (~1 km, same privacy rule as the tracking card), the store gets it exact.
+     */
+    private function broadcastPosition(int $riderId, float $lat, float $lng): void
+    {
+        if (! \App\Support\Realtime::enabled()) {
+            return;
+        }
+        try {
+            $at = now()->toIso8601String();
+            $active = Delivery::with('order.customer:id,user_id')->where('rider_id', $riderId)
+                ->whereIn('status', ['assigned', 'picked_up', 'in_transit'])->get();
+
+            foreach ($active->groupBy(fn ($d) => $d->store_id ?? $d->order?->store_id) as $storeId => $deliveries) {
+                \App\Support\Realtime::send(new \App\Events\RiderLocationUpdated([
+                    'rider_id' => $riderId, 'lat' => $lat, 'lng' => $lng, 'updated_at' => $at,
+                    'delivery_ids' => $deliveries->pluck('id')->values(),
+                ], ["store.{$storeId}"]));
+            }
+            foreach ($active as $d) {
+                if ($userId = $d->order?->customer?->user_id) {
+                    \App\Support\Realtime::send(new \App\Events\RiderLocationUpdated([
+                        'order_id' => $d->order_id, 'delivery_id' => $d->id,
+                        'lat' => round($lat, 2), 'lng' => round($lng, 2), 'updated_at' => $at,
+                    ], ["user.{$userId}"]));
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Rider location live update failed', ['rider_id' => $riderId, 'error' => $e->getMessage()]);
+        }
     }
 
     // GET /customer/orders/{order}/rider-location — customer polls rider location for their own order

@@ -1,4 +1,7 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { statusLabel, useLiveReload } from '@/lib/echo';
+import MessageButton from '@/components/chat/message-button';
+import { usePermission } from '@/hooks/use-permission';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Flag, Package, Truck, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,7 +22,7 @@ import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-brea
 import TierBadge, { type Tier } from '@/components/tier-badge';
 import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
-import type { BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, SharedData } from '@/types';
 
 type OrderItem = {
     id: number;
@@ -32,7 +35,7 @@ type OrderItem = {
 type Delivery = {
     id: number;
     status: string;
-    rider: { name: string; phone: string | null } | null;
+    rider: { id: number; name: string; phone: string | null } | null;
     assigned_at: string | null;
     delivered_at: string | null;
 };
@@ -70,7 +73,7 @@ type Order = {
     ordered_at: string | null;
     delivered_at: string | null;
     created_at: string;
-    customer: { id: number; name: string; phone: string | null; address: string; city: string } | null;
+    customer: { id: number; user_id: number | null; name: string; phone: string | null; address: string; city: string } | null;
     items: OrderItem[];
     has_invoice: boolean;
     invoice_number: string | null;
@@ -111,6 +114,12 @@ type CustomerLoyaltyInfo = {
 } | null;
 
 export default function SellerOrderShow({ order, riders, breakdown, loyalty }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo }) {
+    // Live: this order's status / delivery changes reload the page data
+    const liveStoreId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
+    useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
+        (e) => toast.info(`Order updated: ${statusLabel(e.status)}`));
+    const { can } = usePermission();
+    const canMessage = (usePage<SharedData>().props.auth.user.role === 'seller') || can('messages.view');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Orders',    href: '/seller/orders'    },
@@ -346,6 +355,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                     </div>
                                     {order.customer.phone && <p className="text-muted-foreground">{order.customer.phone}</p>}
                                     <p className="text-muted-foreground text-xs">{order.customer.address}, {order.customer.city}</p>
+                                    {canMessage && order.customer.user_id && (
+                                        <MessageButton portal="seller" params={{ customer_id: order.customer.id }} label="Message customer" className="mt-1.5 gap-1.5" />
+                                    )}
                                     {loyalty && (
                                         <div className="mt-2 space-y-1 border-t pt-2">
                                             <p className="text-xs text-muted-foreground">Trust score at your store</p>
@@ -490,6 +502,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 <CardContent className="text-sm space-y-1">
                                     <p><span className="text-muted-foreground">Status:</span> <span className="capitalize font-medium">{order.delivery.status.replace('_', ' ')}</span></p>
                                     {order.delivery.rider && <p><span className="text-muted-foreground">Rider:</span> {order.delivery.rider.name}</p>}
+                                    {canMessage && order.delivery.rider && (
+                                        <MessageButton portal="seller" params={{ rider_id: order.delivery.rider.id }} label="Message rider" className="mt-1.5 gap-1.5" />
+                                    )}
                                     {order.delivery.assigned_at && <p className="text-xs text-muted-foreground">Assigned: {fmtDateTime(order.delivery.assigned_at)}</p>}
                                     {order.delivery.delivered_at && <p className="text-xs text-muted-foreground">Delivered: {fmtDateTime(order.delivery.delivered_at)}</p>}
                                 </CardContent>

@@ -1,4 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { statusLabel, useLiveReload } from '@/lib/echo';
+import type { SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { CreditCard, Loader2, Package, Printer, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -89,6 +91,11 @@ const STATUS_TABS = [
 ] as const;
 
 export default function Orders({ orders, date_from, date_to, status }: Props) {
+    // Live: any of my orders changing refreshes the list
+    const meId = usePage<SharedData>().props.auth.user.id as number;
+    useLiveReload(`user.${meId}`, ['orders'], () => true, (e, kind) => {
+        if (kind === 'order' && 'order_number' in e && e.order_number) toast.info(`Order ${e.order_number}: ${statusLabel(e.status)}`);
+    });
     const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
     const [cancelReason, setCancelReason] = useState('');
     const [cancelNotes, setCancelNotes] = useState('');

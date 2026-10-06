@@ -1,3 +1,4 @@
+import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, MapPin, Package, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -249,6 +250,7 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 >
                                     {product.store_name}
                                 </button>
+                                <MessageButton portal="customer" params={{ store_id: product.store_id }} label="Message store" className="ml-auto h-7 gap-1 px-2 text-xs" />
                             </div>
                             <p className="text-gray-500 pl-6">
                                 {[product.store_barangay, product.store_city].filter(Boolean).join(', ')}

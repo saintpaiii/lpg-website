@@ -12,4 +12,6 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     badge?: string;
+    /** 'unread' renders the badge as a blue pill (and a dot when the sidebar is collapsed). */
+    badgeTone?: 'default' | 'unread';
 };

@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Bell, BellOff, Check, CheckCheck, Package, Settings, Truck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEchoPrivate, usePollInterval } from '@/lib/echo';
 import type { AppNotification, SharedData } from '@/types';
 
 function typeIcon(type: string) {
@@ -20,12 +21,23 @@ export function NotificationBell() {
     const [open, setOpen]             = useState(false);
     const [unread, setUnread]         = useState(initialUnread);
     const [shaking, setShaking]       = useState(false);
+    const [recent, setRecent]         = useState<AppNotification[]>(recentNotifications);
     const ref = useRef<HTMLDivElement>(null);
+    const pollMs = usePollInterval(30_000);
 
     // Sync with fresh Inertia shared data on page navigation
     useEffect(() => { setUnread(initialUnread); }, [initialUnread]);
+    useEffect(() => { setRecent(recentNotifications); }, [recentNotifications]);
 
-    // Poll unread count every 30 seconds
+    // Live: new notification → top of the list, count +1, little shake
+    useEchoPrivate<AppNotification>(`user.${auth.user.id}`, 'NotificationCreated', (n) => {
+        setRecent((list) => [n, ...list.filter((x) => x.id !== n.id)].slice(0, 5));
+        setUnread((u) => u + 1);
+        setShaking(true);
+        setTimeout(() => setShaking(false), 600);
+    });
+
+    // Poll unread count every 30 seconds (60 s safety net while live updates are connected)
     useEffect(() => {
         const poll = async () => {
             try {
@@ -41,9 +53,9 @@ export function NotificationBell() {
             }
         };
 
-        const id = setInterval(poll, 30_000);
+        const id = setInterval(poll, pollMs);
         return () => clearInterval(id);
-    }, [unread]);
+    }, [unread, pollMs]);
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -113,13 +125,13 @@ export function NotificationBell() {
 
                     {/* List */}
                     <div className="max-h-72 overflow-y-auto divide-y divide-border">
-                        {recentNotifications.length === 0 ? (
+                        {recent.length === 0 ? (
                             <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
                                 <BellOff className="h-8 w-8 opacity-30" />
                                 <p className="text-xs">No new notifications</p>
                             </div>
                         ) : (
-                            recentNotifications.map(n => (
+                            recent.map(n => (
                                 <div
                                     key={n.id}
                                     className="group flex items-start gap-3 px-4 py-3 transition-colors hover:bg-accent/50 cursor-pointer"

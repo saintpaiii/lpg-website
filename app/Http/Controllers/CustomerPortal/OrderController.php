@@ -596,6 +596,7 @@ class OrderController extends Controller
                     ->pluck('product_id')
                     ->toArray(),
                 'delivery' => $order->delivery ? [
+                    'id'          => $order->delivery->id,
                     'status'      => $order->delivery->status,
                     'rider_name'  => $order->delivery->rider?->name,
                     'assigned_at' => $order->delivery->assigned_at?->format('M d, Y g:i A'),

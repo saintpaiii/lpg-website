@@ -17,7 +17,9 @@ import {
     MapPinned,
     X,
     XCircle,
+    MessageSquare,
 } from 'lucide-react';
+import { useUnreadMessages } from '@/components/chat/use-unread-messages';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { InstallAppBanner } from '@/components/install-app-banner';
 import { NavMain } from '@/components/nav-main';
@@ -85,10 +87,14 @@ export default function CustomerLayout({ children, title }: Props) {
         }
     }
 
+    const unreadMessages = useUnreadMessages('customer');
+
     // ── Sidebar nav items ───────────────────────────────────────────────────
     const mainNavItems: NavItem[] = [
         { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag },
         { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
+        { title: 'Messages',    href: '/customer/messages',       icon: MessageSquare,
+          ...(unreadMessages > 0 ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const } : {}) },
         { title: 'My Loyalty',  href: '/customer/loyalty',        icon: Star        },
         { title: 'My Invoices', href: '/customer/invoices',       icon: Receipt     },
         { title: 'My Refunds',  href: '/customer/refunds',        icon: RotateCcw   },
@@ -309,6 +315,7 @@ export default function CustomerLayout({ children, title }: Props) {
                         {[
                             { label: 'Browse',  href: '/customer/products', icon: ShoppingBag },
                             { label: 'Orders',  href: '/customer/orders',   icon: Package     },
+                            { label: 'Messages', href: '/customer/messages', icon: MessageSquare },
                             { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart },
                             { label: 'Profile', href: '/customer/profile',  icon: User        },
                         ].map(({ label, href, icon: Icon }) => {
@@ -323,6 +330,11 @@ export default function CustomerLayout({ children, title }: Props) {
                                 >
                                     <div className="relative">
                                         <Icon className="h-5 w-5" />
+                                        {label === 'Messages' && unreadMessages > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 rounded-full bg-blue-600 px-0.5 text-white text-[9px] font-bold flex items-center justify-center">
+                                                {unreadMessages > 9 ? '9+' : unreadMessages}
+                                            </span>
+                                        )}
                                         {label === 'Cart' && cart_count > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center">
                                                 {cart_count > 9 ? '9+' : cart_count}

@@ -67,6 +67,7 @@ class OrderController extends Controller
             'deleted_at'       => $o->deleted_at?->format('M d, Y g:i A'),
             'customer' => $o->customer ? [
                 'id'      => $o->customer->id,
+                'user_id' => $o->customer->user_id,   // null = walk-in (no chat account)
                 'name'    => $o->customer->name,
                 'phone'   => $o->customer->phone,
                 'address' => $o->deliveryAddressParts()['address'],
@@ -376,7 +377,7 @@ class OrderController extends Controller
                     'id'           => $order->delivery->id,
                     'status'       => $order->delivery->status,
                     'rider'        => $order->delivery->rider
-                        ? ['name' => $order->delivery->rider->name, 'phone' => $order->delivery->rider->phone]
+                        ? ['id' => $order->delivery->rider->id, 'name' => $order->delivery->rider->name, 'phone' => $order->delivery->rider->phone]
                         : null,
                     'assigned_at'  => $order->delivery->assigned_at?->format('M d, Y g:i A'),
                     'delivered_at' => $order->delivery->delivered_at?->format('M d, Y g:i A'),

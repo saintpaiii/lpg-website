@@ -1,10 +1,12 @@
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { CheckCircle2, MapPin, MapPinOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useEchoPrivate, usePollInterval } from '@/lib/echo';
 import { OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, type LatLng } from '@/lib/map';
+import type { SharedData } from '@/types';
 
 type Tracking = {
     status: 'not_dispatched' | 'preparing_pickup' | 'on_the_way' | 'delivered';
@@ -40,6 +42,8 @@ function Fit({ points }: { points: LatLng[] }) {
 export default function TrackingCard({ orderId }: { orderId: number }) {
     const [data, setData] = useState<Tracking | null>(null);
     const [failed, setFailed] = useState(false);
+    const meId = usePage<SharedData>().props.auth.user.id as number;
+    const pollMs = usePollInterval(30_000);   // 60 s safety net while live updates are connected
 
     useEffect(() => {
         let cancelled = false;
@@ -47,9 +51,20 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
             .then((r) => { if (!cancelled) { setData(r.data); setFailed(false); } })
             .catch(() => { if (!cancelled) setFailed(true); });
         load();
-        const timer = setInterval(load, 30_000);
+        const timer = setInterval(load, pollMs);
         return () => { cancelled = true; clearInterval(timer); };
-    }, [orderId]);
+    }, [orderId, pollMs]);
+
+    // Live: the rider's (rounded) position moves the circle right away
+    useEchoPrivate<{ order_id: number; lat: number; lng: number; updated_at: string }>(`user.${meId}`, 'RiderLocationUpdated', (e) => {
+        if (e.order_id !== orderId) return;
+        setData((d) => (d ? { ...d, rider_area: { lat: e.lat, lng: e.lng, updated_at: e.updated_at } } : d));
+    });
+    // Live: delivery status changes refresh the card (and the "stops before you" count)
+    useEchoPrivate<{ order_id: number }>(`user.${meId}`, 'DeliveryUpdated', (e) => {
+        if (e.order_id !== orderId) return;
+        axios.get<Tracking>(`/customer/orders/${orderId}/tracking`).then((r) => setData(r.data)).catch(() => {});
+    });
 
     // Delivered while watching → refresh the page so the order shows its final state
     useEffect(() => {

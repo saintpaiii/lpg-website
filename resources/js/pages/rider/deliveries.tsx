@@ -1,3 +1,5 @@
+import { useLiveReload } from '@/lib/echo';
+import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import DeliveryMap, { type RouteData, type RouteStop } from '@/components/delivery-map';
@@ -44,7 +46,7 @@ import {
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
-import type { BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, SharedData } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -795,7 +797,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 const refreshRoute = () => router.reload({ only: ['route', 'counts'] });
 
 /** Map of today's route. While visible, follows the rider's GPS and shares it every 60s. */
-function RouteMapView({ route, onUploadProof }: { route: RouteData; onUploadProof: (stop: RouteStop) => void }) {
+function RouteMapView({ route, onUploadProof, onMessage }: { route: RouteData; onUploadProof: (stop: RouteStop) => void; onMessage?: (stop: RouteStop) => void }) {
     const [pos, setPos] = useState<[number, number] | null>(null);
     const [gpsError, setGpsError] = useState<string | null>(null);
     const latest = useRef<[number, number] | null>(null);
@@ -844,7 +846,7 @@ function RouteMapView({ route, onUploadProof }: { route: RouteData; onUploadProo
                     {gpsError ?? (pos ? 'Sharing your location every minute while this map is open' : 'Getting your location…')}
                 </p>
             </div>
-            <DeliveryMap route={route} riderPos={pos} onUploadProof={onUploadProof} />
+            <DeliveryMap route={route} riderPos={pos} onUploadProof={onUploadProof} onMessage={onMessage} />
         </div>
     );
 }
@@ -852,6 +854,9 @@ function RouteMapView({ route, onUploadProof }: { route: RouteData; onUploadProo
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function RiderDeliveries({ deliveries, tab, counts, filters, route }: Props & { route: RouteData }) {
+    // Live: my deliveries (assigned / reassigned / status) refresh the list, counters and map pins
+    const riderId = usePage<SharedData>().props.auth.user.id as number;
+    useLiveReload(`user.${riderId}`, ['deliveries', 'counts', 'route'], (_e, kind) => kind === 'delivery');
     const flash = (usePage().props as any).flash as { success?: string; error?: string } | undefined;
 
     const [view, setView] = useState<'list' | 'map'>(() =>
@@ -902,9 +907,12 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
             <div className="flex flex-col gap-6 p-6">
 
                 {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">My Deliveries</h1>
-                    <p className="mt-0.5 text-sm text-muted-foreground">View and update your assigned deliveries.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">My Deliveries</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">View and update your assigned deliveries.</p>
+                    </div>
+                    <MessageButton portal="rider" params={{}} label="Message store" className="gap-1.5" />
                 </div>
 
                 {/* Flash */}
@@ -975,7 +983,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 </div>
 
                 {view === 'map' ? (
-                    <RouteMapView route={route} onUploadProof={(stop) => {
+                    <RouteMapView route={route} onMessage={(stop) => router.post('/rider/messages/start', { delivery_id: stop.id })} onUploadProof={(stop) => {
                         const next = STATUS_NEXT[stop.status]?.find((s) => s !== 'failed');
                         if (!next) return;
                         // Same proof dialog as the list view — no shortcut around the photo proof
@@ -1115,6 +1123,10 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                         )}
                                         {d.order?.payment_mode === 'cod' && d.order.payment_status === 'paid' && (
                                             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Cash collected</span>
+                                        )}
+
+                                        {!isHistory && ['assigned', 'picked_up', 'in_transit'].includes(d.status) && (
+                                            <MessageButton portal="rider" params={{ delivery_id: d.id }} label="Message customer" className="h-7 gap-1 text-xs" />
                                         )}
 
                                         {/* Status actions */}

@@ -1,4 +1,6 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { useLiveReload, type OrderEvent } from '@/lib/echo';
+import type { SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CheckCircle, Eye, FileDown, Loader2, MapPinOff, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
 import BatchAssignBar from '@/components/batch-assign-bar';
 import { useState } from 'react';
@@ -82,6 +84,11 @@ type ActionDialog =
     | null;
 
 export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
+    // Live: new orders and status changes for this store
+    const storeId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
+    useLiveReload(storeId ? `store.${storeId}` : null, ['orders', 'counts'], () => true, (e, kind) => {
+        if (kind === 'order' && (e as OrderEvent).is_new) toast.success(`New order ${(e as OrderEvent).order_number}`);
+    });
     const [searchVal,    setSearchVal]    = useState(filters.search ?? '');
     const [dateFrom,     setDateFrom]     = useState(filters.date_from ?? '');
     const [dateTo,       setDateTo]       = useState(filters.date_to ?? '');
