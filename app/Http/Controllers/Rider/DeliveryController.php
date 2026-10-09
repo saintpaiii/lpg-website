@@ -17,11 +17,30 @@ use Inertia\Response;
 
 class DeliveryController extends Controller
 {
+    /**
+     * The rider may report the customer while the delivery is active, or within 7 days after it
+     * was delivered / failed (same rule as ReportService), when the order has a customer.
+     */
+    private static function canReport(Delivery $d): bool
+    {
+        if (! $d->order?->customer_id) {
+            return false;
+        }
+        if (in_array($d->status, ['assigned', 'picked_up', 'in_transit'], true)) {
+            return true;
+        }
+
+        return in_array($d->status, ['delivered', 'failed'], true)
+            && ($d->delivered_at ?? $d->updated_at)?->gte(now()->subDays(7));
+    }
+
     private function formatDelivery(Delivery $d): array
     {
         return [
             'id'           => $d->id,
             'status'       => $d->status,
+            'store_name'   => $d->order?->store?->store_name,
+            'can_report'   => self::canReport($d),
             'notes'        => $d->notes,
             'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
             'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
@@ -168,7 +187,7 @@ class DeliveryController extends Controller
     {
         $user = auth()->user();
 
-        $deliveries = Delivery::with(['order.customer', 'proofs'])
+        $deliveries = Delivery::with(['order.customer', 'order.store', 'proofs'])
             ->where('rider_id', $user->id)
             ->whereIn('status', ['delivered', 'failed'])
             ->latest('delivered_at')
@@ -177,6 +196,8 @@ class DeliveryController extends Controller
             ->through(fn ($d) => [
                 'id'           => $d->id,
                 'status'       => $d->status,
+                'store_name'   => $d->order?->store?->store_name,
+                'can_report'   => self::canReport($d),
                 'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
                 'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
                 'notes'        => $d->notes,

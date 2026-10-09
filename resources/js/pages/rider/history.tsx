@@ -1,3 +1,4 @@
+import ReportCustomerButton from '@/components/reports/report-customer-button';
 import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -28,6 +29,8 @@ type Proof = {
 type DeliveryRow = {
     id: number;
     status: 'delivered' | 'failed';
+    store_name: string | null;
+    can_report: boolean;
     delivered_at: string | null;
     assigned_at: string | null;
     notes: string | null;
@@ -267,6 +270,11 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                             <p className="mt-0.5 font-medium text-gray-900">
                                                 {d.order?.customer?.name ?? '—'}
                                             </p>
+                                            {d.can_report && d.order && (
+                                                <div className="mt-1.5">
+                                                    <ReportCustomerButton order={{ id: d.order.id, order_number: d.order.order_number, store_name: d.store_name }} />
+                                                </div>
+                                            )}
                                             {d.order?.customer && (
                                                 <p className="mt-0.5 text-xs text-gray-400">
                                                     {[d.order.customer.address, d.order.customer.barangay, d.order.customer.city].filter(Boolean).join(', ') || '—'}

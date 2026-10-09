@@ -1,3 +1,4 @@
+import ReportFormDialog from '@/components/reports/report-form-dialog';
 import { statusLabel, useLiveReload } from '@/lib/echo';
 import MessageButton from '@/components/chat/message-button';
 import { usePermission } from '@/hooks/use-permission';
@@ -120,6 +121,8 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
         (e) => toast.info(`Order updated: ${statusLabel(e.status)}`));
     const { can } = usePermission();
     const canMessage = (usePage<SharedData>().props.auth.user.role === 'seller') || can('messages.view');
+    const canFileReport = usePage<SharedData>().props.auth.user.role === 'seller' || can('customer_reports.manage');
+    const liveStoreName = (usePage<SharedData>().props.auth as { store?: { store_name: string } | null }).store?.store_name;
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Orders',    href: '/seller/orders'    },
@@ -128,13 +131,8 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
 
     const [showCancel,    setShowCancel]    = useState(false);
     const [showAssign,    setShowAssign]    = useState(false);
-    const [showReport,    setShowReport]    = useState(false);
-    const [reportCategory, setReportCategory] = useState('');
-    const [reportSubject,   setReportSubject]  = useState('');
-    const [reportDesc,      setReportDesc]     = useState('');
-    const [reportFiles,     setReportFiles]    = useState<File[]>([]);
-    const [reportSubmitting, setReportSubmitting] = useState(false);
-    const reportFileRef = useRef<HTMLInputElement>(null);
+    // "Report customer" (sends only order_id — the backend takes the customer from the order)
+    const [showReport, setShowReport] = useState(false);
     const [selectedRider, setSelectedRider] = useState('');
     const [cancelReason,  setCancelReason]  = useState('');
     const [cancelNotes,   setCancelNotes]   = useState('');
@@ -163,27 +161,6 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
         if (!selectedRider) return;
         router.post(`/seller/orders/${order.id}/assign-delivery`, { rider_id: selectedRider }, {
             onSuccess: () => setShowAssign(false),
-        });
-    }
-
-    function submitReport() {
-        if (!reportCategory || !reportSubject.trim() || !reportDesc.trim() || !order.customer) return;
-        setReportSubmitting(true);
-        const fd = new FormData();
-        fd.append('reported_id', String(order.customer.id));
-        if (order.id) fd.append('order_id', String(order.id));
-        fd.append('category', reportCategory);
-        fd.append('subject', reportSubject);
-        fd.append('description', reportDesc);
-        reportFiles.forEach((f) => fd.append('evidence[]', f));
-        router.post('/seller/reports/user', fd as any, {
-            onSuccess: () => {
-                toast.success('Report submitted successfully.');
-                setShowReport(false);
-                setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]);
-            },
-            onError: () => toast.error('Failed to submit report.'),
-            onFinish: () => setReportSubmitting(false),
         });
     }
 
@@ -277,9 +254,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 <Button size="sm" variant="outline">View Invoice</Button>
                             </Link>
                         )}
-                        {order.customer && (
+                        {order.customer && canFileReport && (
                             <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowReport(true)}>
-                                <Flag className="h-3.5 w-3.5 mr-1" /> Report Buyer
+                                <Flag className="h-3.5 w-3.5 mr-1" /> Report customer
                             </Button>
                         )}
                     </div>
@@ -632,69 +609,23 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            {/* Report Buyer dialog */}
-            <Dialog open={showReport} onOpenChange={(o) => { setShowReport(o); if (!o) { setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]); } }}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Flag className="h-4 w-4 text-red-500" />
-                            Report Buyer — {order.customer?.name}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 text-sm">
-                        <p className="text-muted-foreground text-xs">
-                            Regarding order <span className="font-mono font-semibold">{order.order_number}</span>
-                        </p>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Category <span className="text-red-500">*</span></label>
-                            <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)}
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select a category…</option>
-                                <option value="fraud">Fraud</option>
-                                <option value="rude_behavior">Rude Behavior</option>
-                                <option value="harassment">Harassment</option>
-                                <option value="non_delivery">Refused to Receive</option>
-                                <option value="counterfeit">Counterfeit Claim</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Subject <span className="text-red-500">*</span></label>
-                            <input value={reportSubject} onChange={(e) => setReportSubject(e.target.value)}
-                                placeholder="Brief title…"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
-                            <textarea value={reportDesc} onChange={(e) => setReportDesc(e.target.value)}
-                                rows={4} placeholder="Describe what happened…"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Evidence (optional, max 5 files)</label>
-                            <input ref={reportFileRef} type="file" multiple accept="image/*,video/mp4,application/pdf"
-                                className="hidden"
-                                onChange={(e) => setReportFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
-                            <Button type="button" variant="outline" size="sm" onClick={() => reportFileRef.current?.click()}>
-                                Attach Files
-                            </Button>
-                            {reportFiles.length > 0 && (
-                                <p className="text-xs text-muted-foreground">{reportFiles.map((f) => f.name).join(', ')}</p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowReport(false)}>Cancel</Button>
-                        <Button
-                            onClick={submitReport}
-                            disabled={reportSubmitting || !reportCategory || !reportSubject.trim() || !reportDesc.trim()}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                            {reportSubmitting ? 'Submitting…' : 'Submit Report'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Report customer */}
+            {order.customer && canFileReport && (
+                <ReportFormDialog
+                    open={showReport}
+                    onOpenChange={setShowReport}
+                    reporterSide="store"
+                    submitUrl="/seller/reports/user"
+                    title={`Report customer — ${order.customer.name}`}
+                    order={{
+                        id: order.id,
+                        order_number: order.order_number,
+                        items: order.items.filter((i) => i.product).map((i) => ({ product_id: i.product!.id, name: i.product!.name })),
+                        has_rider: order.delivery !== null,
+                        store_name: liveStoreName ?? 'Your store',
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

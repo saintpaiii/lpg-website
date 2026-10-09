@@ -1,3 +1,4 @@
+import ReportFormDialog from '@/components/reports/report-form-dialog';
 import { statusLabel, useLiveReload } from '@/lib/echo';
 import type { SharedData } from '@/types';
 import MessageButton from '@/components/chat/message-button';
@@ -426,35 +427,8 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
         });
     }
 
-    // Report state
-    const [reportOpen,     setReportOpen]     = useState(false);
-    const [reportCategory, setReportCategory] = useState('');
-    const [reportSubject,  setReportSubject]  = useState('');
-    const [reportDesc,     setReportDesc]     = useState('');
-    const [reportFiles,    setReportFiles]    = useState<File[]>([]);
-    const [reportSubmitting, setReportSubmitting] = useState(false);
-    const reportFileRef = useRef<HTMLInputElement>(null);
-
-    const submitReport = useCallback(() => {
-        if (!reportCategory || !reportSubject.trim() || !reportDesc.trim() || !order.store_id) return;
-        setReportSubmitting(true);
-        const fd = new FormData();
-        fd.append('reported_store_id', String(order.store_id));
-        fd.append('order_id', String(order.id));
-        fd.append('category', reportCategory);
-        fd.append('subject', reportSubject);
-        fd.append('description', reportDesc);
-        reportFiles.forEach((f) => fd.append('evidence[]', f));
-        router.post('/customer/reports', fd as any, {
-            onSuccess: () => {
-                toast.success('Report submitted. We will review it shortly.');
-                setReportOpen(false);
-                setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]);
-            },
-            onError: () => toast.error('Failed to submit report.'),
-            onFinish: () => setReportSubmitting(false),
-        });
-    }, [reportCategory, reportSubject, reportDesc, reportFiles, order.store_id, order.id]);
+    // "Report a problem" dialog (categories come from config/reports.php)
+    const [reportOpen, setReportOpen] = useState(false);
 
     // Show toast for ?payment=success|cancelled query param
     useEffect(() => {
@@ -470,6 +444,16 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
             url.searchParams.delete('payment');
             window.history.replaceState({}, '', url.toString());
         }
+    }, []);
+
+    // ?refund=1 (from a report's "Request a refund") opens the refund form, same as the button
+    useEffect(() => {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('refund') !== '1') return;
+        if (canRefund) { setRefundAmount(String(grandTotal)); setRefundOpen(true); }
+        url.searchParams.delete('refund');
+        window.history.replaceState({}, '', url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (
@@ -558,7 +542,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                 onClick={() => setReportOpen(true)}
                             >
                                 <Flag className="h-4 w-4" />
-                                Report Seller
+                                Report a problem
                             </Button>
                         )}
                     </div>
@@ -1040,71 +1024,20 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                 </DialogContent>
             </Dialog>
 
-            {/* Report Seller dialog */}
-            <Dialog open={reportOpen} onOpenChange={(o) => { setReportOpen(o); if (!o) { setReportCategory(''); setReportSubject(''); setReportDesc(''); setReportFiles([]); } }}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Flag className="h-4 w-4 text-red-500" />
-                            Report Seller — {order.store_name}
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 text-sm">
-                        <p className="text-muted-foreground text-xs">
-                            Regarding order <span className="font-mono font-semibold">{order.order_number}</span>
-                        </p>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Category <span className="text-red-500">*</span></label>
-                            <select value={reportCategory} onChange={(e) => setReportCategory(e.target.value)}
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select a category…</option>
-                                <option value="fraud">Fraud</option>
-                                <option value="fake_product">Fake / Wrong Product</option>
-                                <option value="non_delivery">Non-Delivery</option>
-                                <option value="overpricing">Overpricing</option>
-                                <option value="rude_behavior">Rude Behavior</option>
-                                <option value="harassment">Harassment</option>
-                                <option value="counterfeit">Counterfeit Product</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Subject <span className="text-red-500">*</span></label>
-                            <input value={reportSubject} onChange={(e) => setReportSubject(e.target.value)}
-                                placeholder="Brief title…"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
-                            <textarea value={reportDesc} onChange={(e) => setReportDesc(e.target.value)}
-                                rows={4} placeholder="Describe what happened…"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Evidence (optional, max 5 files)</label>
-                            <input ref={reportFileRef} type="file" multiple accept="image/*,video/mp4,application/pdf"
-                                className="hidden"
-                                onChange={(e) => setReportFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
-                            <Button type="button" variant="outline" size="sm" onClick={() => reportFileRef.current?.click()}>
-                                Attach Files
-                            </Button>
-                            {reportFiles.length > 0 && (
-                                <p className="text-xs text-muted-foreground">{reportFiles.map((f) => f.name).join(', ')}</p>
-                            )}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setReportOpen(false)}>Cancel</Button>
-                        <Button
-                            onClick={submitReport}
-                            disabled={reportSubmitting || !reportCategory || !reportSubject.trim() || !reportDesc.trim()}
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                        >
-                            {reportSubmitting ? 'Submitting…' : 'Submit Report'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Report a problem */}
+            <ReportFormDialog
+                open={reportOpen}
+                onOpenChange={setReportOpen}
+                reporterSide="customer"
+                submitUrl="/customer/reports"
+                order={{
+                    id: order.id,
+                    order_number: order.order_number,
+                    items: order.items.filter((i) => i.product_id !== null).map((i) => ({ product_id: i.product_id!, name: i.product?.name ?? 'Item' })),
+                    has_rider: order.delivery !== null,
+                    store_name: order.store_name,
+                }}
+            />
         </CustomerLayout>
     );
 }

@@ -1,3 +1,4 @@
+import WebsiteProblemSidebar from '@/components/reports/website-problem-sidebar';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     Clock,
@@ -156,6 +157,7 @@ export default function CustomerLayout({ children, title }: Props) {
                 <SidebarContent>
                     {/* Show all items for customers; only Browse for admins previewing */}
                     <NavMain items={isAdmin ? mainNavItems.slice(0, 1) : mainNavItems} />
+                    {!isAdmin && <WebsiteProblemSidebar portal="customer" />}
 
                     {!isAdmin && (
                         <>

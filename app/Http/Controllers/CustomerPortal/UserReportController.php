@@ -3,89 +3,100 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;
 use App\Models\UserReport;
-use App\Services\NotificationService;
+use App\Services\ReportService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/** Customer "My Reports": problems with orders, and website problems. */
 class UserReportController extends Controller
 {
     public function index(Request $request): Response
     {
-        $reports = UserReport::with(['reportedStore', 'order'])
-            ->where('reporter_id', $request->user()->id)
-            ->latest()
-            ->paginate(20);
+        $user = $request->user();
+        $tab  = $request->get('tab') === 'website' ? 'website' : 'reports';
+        $reports = UserReport::with(['reportedStore', 'order', 'reportedRider', 'reportedProduct', 'reportedCustomer', 'reporter'])
+            ->where('reporter_id', $user->id)->where('reporter_side', 'customer')
+            ->where('type', $tab === 'website' ? '=' : '!=', UserReport::SYSTEM_TYPE)
+            ->orderByRaw("status IN ('resolved','dismissed')")->orderByDesc('last_activity_at')->orderByDesc('id')
+            ->paginate(20)->withQueryString()
+            ->through(fn (UserReport $r) => ReportService::presentListItem($r, $user, 'customer'));
 
         return Inertia::render('customer/reports', [
-            'reports' => $reports->through(fn (UserReport $r) => [
-                'id'             => $r->id,
-                'type'           => $r->type,
-                'category'       => $r->category,
-                'subject'        => $r->subject,
-                'description'    => $r->description,
-                'status'         => $r->status,
-                'resolution'     => $r->resolution,
-                'resolved_at'    => $r->resolved_at?->format('M d, Y'),
-                'created_at'     => $r->created_at->format('M d, Y'),
-                'order_number'   => $r->order?->order_number,
-                'store_name'     => $r->reportedStore?->store_name,
-                'evidence_urls'  => collect($r->evidence_paths ?? [])->map(fn ($p) => Storage::url($p))->values()->all(),
-            ]),
+            'reports'     => $reports,
+            'tab'         => $tab,
+            'falseReports' => ReportService::customerFalseReports($user->id),
         ]);
     }
 
     public function store(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'order_id'            => 'nullable|integer|exists:orders,id',
-            'reported_store_id'   => 'required|integer|exists:stores,id',
-            'category'            => 'required|in:fraud,fake_product,rude_behavior,non_delivery,overpricing,harassment,counterfeit,other',
-            'subject'             => 'required|string|max:255',
-            'description'         => 'required|string|max:5000',
-            'evidence'            => 'nullable|array|max:5',
-            'evidence.*'          => 'file|mimes:jpg,jpeg,png,webp,mp4,pdf|max:10240',
-        ]);
+        $report = ReportService::create($request->user(), 'customer', $request->only('order_id', 'category', 'subject', 'description', 'product_id'),
+            $request->file('evidence', []));
 
-        // Verify the order belongs to this customer (if provided)
-        if ($data['order_id']) {
-            $order = Order::find($data['order_id']);
-            $customer = \App\Models\Customer::where('user_id', $request->user()->id)->first();
-            if (!$order || !$customer || $order->customer_id !== $customer->id) {
-                abort(403);
-            }
-        }
+        return redirect(ReportService::linkFor($report, 'customer'))->with('success', 'Your report was sent.');
+    }
 
-        $evidencePaths = [];
-        if ($request->hasFile('evidence')) {
-            foreach ($request->file('evidence') as $file) {
-                $path = $file->store('reports/evidence', 'public');
-                $evidencePaths[] = $path;
-            }
-        }
+    public function storeWebsiteProblem(Request $request): RedirectResponse
+    {
+        ReportService::createSystemReport($request->user(), 'customer', $request->only('category', 'system_area', 'subject', 'description', 'page_url'),
+            $request->file('screenshots', []), $request->userAgent());
 
-        $report = UserReport::create([
-            'reporter_id'       => $request->user()->id,
-            'reported_store_id' => $data['reported_store_id'],
-            'order_id'          => $data['order_id'] ?? null,
-            'type'              => 'buyer_report',
-            'category'          => $data['category'],
-            'subject'           => $data['subject'],
-            'description'       => $data['description'],
-            'evidence_paths'    => $evidencePaths ?: null,
-            'status'            => 'pending',
-        ]);
+        return back()->with('success', 'Thanks! The admin team will look into it.');
+    }
 
-        // Notify platform admins
-        NotificationService::sendToRole('platform_admin', 'user_report', 'New Report Submitted',
-            "A buyer has submitted a report against a seller: \"{$data['subject']}\"",
-            ['report_id' => $report->id]
-        );
+    public function show(Request $request, UserReport $userReport): Response
+    {
+        $this->authorizeView($request, $userReport);
 
-        return back()->with('success', 'Your report has been submitted. We will review it shortly.');
+        return Inertia::render('customer/report-show', ['report' => ReportService::present($userReport, $request->user(), 'customer')]);
+    }
+
+    public function reply(Request $request, UserReport $userReport): RedirectResponse
+    {
+        $this->authorizeView($request, $userReport);
+        ReportService::reply($userReport, $request->user(), $request->input('body'), $request->file('images', []));
+
+        return back()->with('success', 'Reply sent.');
+    }
+
+    public function confirm(Request $request, UserReport $userReport): RedirectResponse
+    {
+        $this->authorizeView($request, $userReport);
+        ReportService::confirmFixed($userReport, $request->user());
+
+        return back()->with('success', 'Thanks! The report is now resolved.');
+    }
+
+    public function notSolved(Request $request, UserReport $userReport): RedirectResponse
+    {
+        $this->authorizeView($request, $userReport);
+        ReportService::notSolved($userReport, $request->user(), $request->input('reason'));
+
+        return back()->with('success', "Thanks for letting us know. We'll keep working on it.");
+    }
+
+    /** "Send to admin" when the store hasn't solved it after 24 hours. */
+    public function escalate(Request $request, UserReport $userReport): RedirectResponse
+    {
+        $this->authorizeView($request, $userReport);
+        ReportService::escalate($userReport, $request->user(), 'reporter', $request->input('reason'));
+
+        return back()->with('success', 'Your report was sent to the platform admin.');
+    }
+
+    public function withdraw(Request $request, UserReport $userReport): RedirectResponse
+    {
+        $this->authorizeView($request, $userReport);
+        ReportService::withdraw($userReport, $request->user());
+
+        return back()->with('success', 'Report withdrawn.');
+    }
+
+    private function authorizeView(Request $request, UserReport $r): void
+    {
+        abort_unless(ReportService::canView($r, $request->user()), 403);
     }
 }

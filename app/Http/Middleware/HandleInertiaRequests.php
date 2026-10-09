@@ -96,6 +96,11 @@ class HandleInertiaRequests extends Middleware
                 : 0,
             'unreadNotifications' => fn () => $user ? NotificationService::getUnreadCount($user->id) : 0,
             'unreadMessages'      => fn () => $user ? \App\Services\ChatService::unreadCountFor($user) : 0,
+            // Report categories (config/reports.php) and sidebar badges — lazy, only computed when used
+            'reportCategories'    => fn () => $user ? config('reports.categories') : [],
+            'systemReportCategories' => fn () => $user ? config('reports.system_categories') : [],
+            'systemReportAreas'      => fn () => $user ? config('reports.system_areas') : [],
+            'reportBadges'        => fn () => \App\Services\ReportService::badgesFor($user),
             'recentNotifications' => fn () => $user
                 ? Notification::where('user_id', $user->id)
                     ->whereNull('read_at')

@@ -38,6 +38,13 @@ export type SharedData = {
     unreadNotifications: number;
     /** Unread chat messages across all of the user's conversations */
     unreadMessages?: number;
+    /** config/reports.php categories, keyed by category */
+    reportCategories?: Record<string, import('@/components/reports/types').ReportCategory>;
+    /** Reports waiting on this user's store / on the admin */
+    reportBadges?: { store: number; admin: number };
+    /** "Report a website problem" catalog */
+    systemReportCategories?: Record<string, import('@/components/reports/types').SystemCategory>;
+    systemReportAreas?: Record<string, string[]>;
     recentNotifications: AppNotification[];
     [key: string]: unknown;
 };

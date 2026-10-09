@@ -4,6 +4,7 @@ use App\Http\Controllers\Rider\CustomerController as RiderCustomerController;
 use App\Http\Controllers\Rider\DeliveryController as RiderDeliveryController;
 use App\Http\Controllers\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Rider\MessageController as RiderMessageController;
+use App\Http\Controllers\Rider\ReportController as RiderReportController;
 use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\PayrollController;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +16,16 @@ Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('ri
     Route::get('deliveries/{delivery}/rider-location', [RiderLocationController::class, 'show'])->name('deliveries.rider-location');
     Route::post('location', [RiderLocationController::class, 'store'])->name('location');
     Route::get('history', [RiderDeliveryController::class, 'history'])->name('history');
+
+    // ── My Reports (rider reports a customer; goes to the store and the admin) ──
+    Route::get('reports', [RiderReportController::class, 'index'])->name('reports');
+    Route::post('reports', [RiderReportController::class, 'store'])->middleware('throttle:20,60')->name('reports.store');
+    Route::post('reports/website-problem', [RiderReportController::class, 'storeWebsiteProblem'])->middleware('throttle:20,60')->name('reports.website-problem');
+    Route::get('reports/{userReport}', [RiderReportController::class, 'show'])->name('reports.show');
+    Route::post('reports/{userReport}/reply', [RiderReportController::class, 'reply'])->name('reports.reply');
+    Route::post('reports/{userReport}/withdraw', [RiderReportController::class, 'withdraw'])->name('reports.withdraw');
+    Route::post('reports/{userReport}/confirm', [RiderReportController::class, 'confirm'])->name('reports.confirm');
+    Route::post('reports/{userReport}/not-solved', [RiderReportController::class, 'notSolved'])->name('reports.not-solved');
 
     // ── Messages (chat) — 'start' / 'unread-count' before the {conversation} wildcard ──
     Route::get('messages', [RiderMessageController::class, 'index'])->name('messages');

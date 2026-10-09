@@ -1,3 +1,4 @@
+import ReportCustomerButton from '@/components/reports/report-customer-button';
 import { useLiveReload } from '@/lib/echo';
 import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -93,6 +94,9 @@ type OrderRef = {
 type DeliveryRow = {
     id: number;
     status: DeliveryStatus;
+    store_name: string | null;
+    /** Rider may report the customer (active, or finished within 7 days) — decided by the server */
+    can_report: boolean;
     notes: string | null;
     assigned_at: string | null;
     delivered_at: string | null;
@@ -1127,6 +1131,9 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                                         {!isHistory && ['assigned', 'picked_up', 'in_transit'].includes(d.status) && (
                                             <MessageButton portal="rider" params={{ delivery_id: d.id }} label="Message customer" className="h-7 gap-1 text-xs" />
+                                        )}
+                                        {d.can_report && d.order && (
+                                            <ReportCustomerButton order={{ id: d.order.id, order_number: d.order.order_number, store_name: d.store_name }} />
                                         )}
 
                                         {/* Status actions */}

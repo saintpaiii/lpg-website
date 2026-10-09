@@ -1,3 +1,4 @@
+import WebsiteProblemSidebar from '@/components/reports/website-problem-sidebar';
 import { useUnreadMessages } from '@/components/chat/use-unread-messages';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -68,6 +69,10 @@ export function AppSidebar() {
         ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const }
         : {};
 
+    // Reports waiting on the store / the admin (shared prop, refreshed on navigation and by report pages)
+    const reportBadges = usePage<SharedData>().props.reportBadges;
+    const badgeFor = (n?: number) => (n && n > 0 ? { badge: n > 99 ? '99+' : String(n), badgeTone: 'unread' as const } : {});
+
     // ── Seller portal navigation ──────────────────────────────────────────────
     if (isSeller) {
         const isActualSeller = role === 'seller'; // store owner sees everything
@@ -90,6 +95,7 @@ export function AppSidebar() {
             isActualSeller                             && { title: 'Revenue',      href: '/seller/revenue',        icon: TrendingUp        },
             isActualSeller                             && { title: 'Commission',   href: '/seller/commission',     icon: HandCoins         },
             (isActualSeller || can('orders.view'))     && { title: 'Refunds',      href: '/seller/refunds',        icon: RefreshCcw        },
+            (isActualSeller || can('customer_reports.manage')) && { title: 'Customer Reports', href: '/seller/customer-reports', icon: Flag, ...badgeFor(reportBadges?.store) },
             isActualSeller                             && { title: 'Coupons',      href: '/seller/coupons',        icon: TicketPercent     },
             (isActualSeller || can('reports.view'))     && { title: 'Reports',      href: '/seller/reports',    icon: LineChart       },
             (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain           },
@@ -132,6 +138,7 @@ export function AppSidebar() {
 
                 <SidebarFooter>
                     <SidebarSeparator />
+                    <WebsiteProblemSidebar portal="store" myReportsHref="/seller/website-reports" />
                     {/* Switch back to customer portal — store owner only */}
                     {isActualSeller && (
                         <SidebarMenu>
@@ -164,12 +171,13 @@ export function AppSidebar() {
         isRider && { title: 'My Deliveries',   href: '/rider/deliveries',    icon: Truck          },
         isRider && { title: 'Delivery History', href: '/rider/history',      icon: History        },
         isRider && { title: 'Messages',         href: '/rider/messages',     icon: MessageSquare, ...unreadBadge },
+        isRider && { title: 'My Reports',       href: '/rider/reports',      icon: Flag           },
         isRider && { title: 'My Attendance',    href: '/rider/my-attendance', icon: CalendarDays  },
         isRider && { title: 'My Payslips',      href: '/rider/my-payslips',  icon: ClipboardList  },
         !isPlatformAdmin && !isRider && can('customers.view') && { title: 'Customers', href: '/admin/customers', icon: Users },
         can('invoices.view')   && { title: 'Invoices',           href: '/admin/invoices',                                     icon: Receipt         },
         can('reports.view')    && { title: 'Reports',            href: '/admin/reports',                                      icon: BarChart3       },
-        isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag            },
+        isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag, ...badgeFor(reportBadges?.admin) },
         isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw      },
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
         isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
@@ -206,6 +214,7 @@ export function AppSidebar() {
 
             <SidebarFooter>
                 <SidebarSeparator />
+                {isRider && !isPlatformAdmin && <WebsiteProblemSidebar portal="rider" />}
                 {isPlatformAdmin && (
                     <SidebarMenu>
                         <SidebarMenuItem>

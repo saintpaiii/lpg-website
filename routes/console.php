@@ -19,3 +19,6 @@ Schedule::command('coupons:expiry-reminders')->dailyAt('09:00');
 
 // Loyalty: recency decay of trust scores + inactivity / low-trust tier demotions
 Schedule::command('loyalty:refresh')->dailyAt('02:00');
+
+// Reports: unanswered store reports go to the admin after 48 h; unconfirmed fixes close after 72 h
+Schedule::command('reports:auto-escalate')->hourly()->withoutOverlapping();

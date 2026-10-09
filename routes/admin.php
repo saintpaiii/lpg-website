@@ -128,10 +128,17 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
     Route::patch('refunds/{refund}/decide', [RefundController::class, 'decide'])->name('refunds.decide');
 
-    // User Reports
+    // User Reports — every action also checks isAdmin() (this group lets sellers/staff in)
     Route::get('user-reports', [UserReportController::class, 'index'])->name('user-reports');
-    Route::patch('user-reports/{userReport}', [UserReportController::class, 'update'])->name('user-reports.update');
-    Route::get('user-reports/export', [UserReportController::class, 'export'])->name('user-reports.export');
+    Route::get('user-reports/export', [UserReportController::class, 'export'])->name('user-reports.export');   // before {userReport}
+    Route::get('user-reports/{userReport}', [UserReportController::class, 'show'])->name('user-reports.show');
+    Route::post('user-reports/{userReport}/reply', [UserReportController::class, 'reply'])->name('user-reports.reply');
+    Route::post('user-reports/{userReport}/start-review', [UserReportController::class, 'startReview'])->name('user-reports.start-review');
+    Route::post('user-reports/{userReport}/start-investigating', [UserReportController::class, 'startInvestigating'])->name('user-reports.start-investigating');
+    Route::post('user-reports/{userReport}/propose-resolution', [UserReportController::class, 'proposeResolution'])->name('user-reports.propose-resolution');
+    Route::post('user-reports/{userReport}/remind-store', [UserReportController::class, 'remindStore'])->name('user-reports.remind-store');
+    Route::post('user-reports/{userReport}/close', [UserReportController::class, 'close'])->name('user-reports.close');
+    Route::post('user-reports/{userReport}/hand-to-store', [UserReportController::class, 'handToStore'])->name('user-reports.hand-to-store');
 
     // Auth Logs — platform admin only
     Route::get('auth-logs', [AuthLogController::class, 'index'])

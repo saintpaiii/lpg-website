@@ -7,6 +7,7 @@ use App\Http\Controllers\Seller\DssController;
 use App\Http\Controllers\Seller\InventoryController;
 use App\Http\Controllers\Seller\InvoiceController;
 use App\Http\Controllers\Seller\MessageController as SellerMessageController;
+use App\Http\Controllers\Seller\WebsiteReportController as SellerWebsiteReportController;
 use App\Http\Controllers\Seller\OrderController;
 use App\Http\Controllers\Seller\ProductController;
 use App\Http\Controllers\Seller\ReviewController;
@@ -188,8 +189,26 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
         });
 
-        // ── User Reports (seller reports a buyer) ────────────────────────────
-        Route::post('reports/user', [SellerUserReportController::class, 'store'])->name('reports.user.store');
+        // ── Customer Reports (customer / rider reports for this store + reports the store files) ──
+        // (separate from the sales 'reports' pages above)
+        Route::middleware('permission:customer_reports.manage')->group(function () {
+            Route::post('reports/user', [SellerUserReportController::class, 'store'])->middleware('throttle:20,60')->name('reports.user.store');
+            Route::get('customer-reports', [SellerUserReportController::class, 'index'])->name('customer-reports');
+            Route::get('customer-reports/{userReport}', [SellerUserReportController::class, 'show'])->name('customer-reports.show');
+            Route::post('customer-reports/{userReport}/reply', [SellerUserReportController::class, 'reply'])->name('customer-reports.reply');
+            Route::post('customer-reports/{userReport}/start-review', [SellerUserReportController::class, 'startReview'])->name('customer-reports.start-review');
+            Route::post('customer-reports/{userReport}/start-investigating', [SellerUserReportController::class, 'startInvestigating'])->name('customer-reports.start-investigating');
+            Route::post('customer-reports/{userReport}/propose-resolution', [SellerUserReportController::class, 'proposeResolution'])->name('customer-reports.propose-resolution');
+            Route::post('customer-reports/{userReport}/withdraw', [SellerUserReportController::class, 'withdraw'])->name('customer-reports.withdraw');
+        });
+
+        // ── My website reports (any owner / non-rider staff — no extra permission) ──
+        Route::get('website-reports', [SellerWebsiteReportController::class, 'index'])->name('website-reports');
+        Route::post('website-reports', [SellerWebsiteReportController::class, 'store'])->middleware('throttle:20,60')->name('website-reports.store');
+        Route::get('website-reports/{userReport}', [SellerWebsiteReportController::class, 'show'])->name('website-reports.show');
+        Route::post('website-reports/{userReport}/reply', [SellerWebsiteReportController::class, 'reply'])->name('website-reports.reply');
+        Route::post('website-reports/{userReport}/confirm', [SellerWebsiteReportController::class, 'confirm'])->name('website-reports.confirm');
+        Route::post('website-reports/{userReport}/not-solved', [SellerWebsiteReportController::class, 'notSolved'])->name('website-reports.not-solved');
 
         // ── Loyalty program ──────────────────────────────────────────────────
         // Settings/toggle: store owner only. Customers: owner + HR (checked in controller).

@@ -93,9 +93,16 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::post('orders/{order}/refund', [RefundController::class, 'store'])->name('orders.refund');
         Route::post('refunds/{refund}/escalate', [RefundController::class, 'escalate'])->name('refunds.escalate');
 
-        // User reports (customer reports a seller / view own reports)
+        // User reports (customer reports a problem with an order / follows it)
         Route::get('reports', [UserReportController::class, 'index'])->name('reports');
-        Route::post('reports', [UserReportController::class, 'store'])->name('reports.store');
+        Route::post('reports', [UserReportController::class, 'store'])->middleware('throttle:20,60')->name('reports.store');
+        Route::post('reports/website-problem', [UserReportController::class, 'storeWebsiteProblem'])->middleware('throttle:20,60')->name('reports.website-problem');
+        Route::get('reports/{userReport}', [UserReportController::class, 'show'])->name('reports.show');
+        Route::post('reports/{userReport}/reply', [UserReportController::class, 'reply'])->name('reports.reply');
+        Route::post('reports/{userReport}/confirm', [UserReportController::class, 'confirm'])->name('reports.confirm');
+        Route::post('reports/{userReport}/not-solved', [UserReportController::class, 'notSolved'])->name('reports.not-solved');
+        Route::post('reports/{userReport}/escalate', [UserReportController::class, 'escalate'])->name('reports.escalate');
+        Route::post('reports/{userReport}/withdraw', [UserReportController::class, 'withdraw'])->name('reports.withdraw');
 
         // Seller application (for customers who want to become sellers)
         Route::get('become-seller', [BecomeSellerController::class, 'create'])->name('become-seller');
