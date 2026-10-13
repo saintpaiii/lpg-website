@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CheckCircle2, Circle, Clock, MapPin, Package, Search, ShoppingBag, ShoppingCart, Star, Truck } from 'lucide-react';
+import { CheckCircle2, Circle, Clock, MapPin, Navigation, Package, Search, ShoppingBag, ShoppingCart, Star, Truck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -131,6 +131,20 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                             <ShoppingBag className="h-4 w-4 mr-2" />
                             Browse Products
                         </Button>
+                    </Link>
+                </div>
+
+                {/* Find a Store */}
+                <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-blue-900 dark:bg-blue-950/30">
+                    <div className="flex items-center gap-3">
+                        <Navigation className="h-6 w-6 shrink-0 text-blue-600" />
+                        <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">Need LPG fast? Find the nearest store</p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">See which stores can deliver your size, with distance and the total price.</p>
+                        </div>
+                    </div>
+                    <Link href="/customer/find-store">
+                        <Button className="w-full bg-blue-600 text-white hover:bg-blue-700 sm:w-auto">Find a Store</Button>
                     </Link>
                 </div>
 

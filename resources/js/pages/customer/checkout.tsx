@@ -364,8 +364,11 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
         } catch (err) {
             let msg = 'Checkout failed. Please try again.';
             if (axios.isAxiosError(err)) {
-                msg = err.response?.data?.error ?? err.response?.data?.message ?? msg;
+                msg = err.response
+                    ? (err.response.data?.error ?? err.response.data?.message ?? msg)
+                    : "We couldn't reach the server. Please check your internet connection and try again.";
             }
+            // Nothing is reset — address, pin, payment choices and coupons stay as they were
             toast.error(msg);
             setLoading(false);
         }

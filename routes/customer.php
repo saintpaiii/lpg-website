@@ -4,6 +4,7 @@ use App\Http\Controllers\CustomerPortal\AddressController;
 use App\Http\Controllers\CustomerPortal\CartController;
 use App\Http\Controllers\CustomerPortal\CheckoutController;
 use App\Http\Controllers\CustomerPortal\DashboardController;
+use App\Http\Controllers\CustomerPortal\FindStoreController;
 use App\Http\Controllers\CustomerPortal\InvoiceController;
 use App\Http\Controllers\CustomerPortal\MessageController;
 use App\Http\Controllers\CustomerPortal\OrderController;
@@ -30,6 +31,10 @@ Route::middleware(['auth', 'verified', 'customer'])
         // Product browsing
         Route::get('products', [ProductBrowseController::class, 'index'])->name('products');
         Route::get('products/{id}', [ProductBrowseController::class, 'show'])->name('products.show');
+
+        // Find a Store (nearest / cheapest store that can deliver a given LPG size)
+        Route::get('find-store', [FindStoreController::class, 'index'])->name('find-store');
+        Route::get('find-store/results', [FindStoreController::class, 'results'])->middleware('throttle:60,1')->name('find-store.results');
 
         // Cart
         Route::get('cart', [CartController::class, 'index'])->name('cart');

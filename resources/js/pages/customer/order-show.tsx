@@ -320,6 +320,30 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
     const [payingBalance,  setPayingBalance]   = useState(false);
 
     const canPayBalance = order.payment_mode === 'consignment' && order.payment_status === 'partial';
+    // Online order (Full Payment / Consignment) whose PayMongo payment was never completed
+    const awaitingPayment = order.payment_mode !== 'cod' && order.payment_status === 'unpaid' && ['pending', 'confirmed'].includes(order.status);
+    const [payingNow, setPayingNow] = useState(false);
+
+    async function payNow() {
+        setPayingNow(true);
+        try {
+            const res = await axios.post<{ checkout_url?: string; error?: string }>(`/customer/orders/${order.id}/pay`);
+            if (res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+                return;
+            }
+            toast.error(res.data.error ?? 'Could not start payment.');
+        } catch (err) {
+            let msg = 'Could not start payment. Please try again.';
+            if (axios.isAxiosError(err)) {
+                msg = err.response
+                    ? (err.response.data?.error ?? err.response.data?.message ?? msg)
+                    : "We couldn't reach the server. Please check your internet connection and try again.";
+            }
+            toast.error(msg);
+        }
+        setPayingNow(false);
+    }
 
     async function payBalance() {
         setPayingBalance(true);
@@ -437,7 +461,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
         if (val === 'success') {
             toast.success('Payment received! Your order has been updated.');
         } else if (val === 'cancelled') {
-            toast.error('Payment was cancelled.');
+            toast.warning('Payment was not completed. Your order is saved — you can pay anytime within 60 minutes from My Orders, or it will be cancelled automatically.', { duration: 10000 });
         }
         if (val) {
             const url = new URL(window.location.href);
@@ -473,6 +497,11 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] ?? 'bg-gray-100'}`}>
                             {order.status.replace('_', ' ')}
                         </span>
+                        {awaitingPayment && (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                                Waiting for payment
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         {canPayBalance && (
@@ -547,6 +576,24 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         )}
                     </div>
                 </div>
+
+                {awaitingPayment && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center dark:border-amber-800 dark:bg-amber-950/40">
+                        <div className="flex-1">
+                            <p className="font-semibold text-amber-900 dark:text-amber-200">Waiting for payment</p>
+                            <p className="text-sm text-amber-800 dark:text-amber-300">
+                                {order.payment_mode === 'consignment' && order.down_payment_amount
+                                    ? `Pay the ${peso(order.down_payment_amount)} down payment`
+                                    : `Pay ${peso(grandTotal)}`}
+                                {' '}within 60 minutes of placing the order, or it will be cancelled automatically.
+                            </p>
+                        </div>
+                        <Button className="gap-1.5 bg-amber-500 font-semibold text-white hover:bg-amber-600" onClick={payNow} disabled={payingNow}>
+                            {payingNow ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                            Pay now
+                        </Button>
+                    </div>
+                )}
 
                 {/* Status tracker */}
                 <Card>

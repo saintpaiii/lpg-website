@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Exceptions\PaymentServiceUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Order;
@@ -9,6 +10,7 @@ use App\Models\Payment;
 use App\Services\PayMongoService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
@@ -66,7 +68,8 @@ class PaymentController extends Controller
 
             return response()->json(['checkout_url' => $session['checkout_url']]);
         } catch (\Throwable $e) {
-            return response()->json(['error' => 'Could not start payment. Please try again later.'], 422);
+            Log::warning('Pay now error: ' . $e->getMessage(), ['user_id' => auth()->id(), 'order_id' => $order->id]);
+            return response()->json(['error' => PaymentServiceUnavailable::friendlyMessage($e) ?? 'Could not start payment. Please try again later.'], 422);
         }
     }
 
@@ -120,7 +123,8 @@ class PaymentController extends Controller
 
             return response()->json(['checkout_url' => $session['checkout_url']]);
         } catch (\Throwable $e) {
-            return response()->json(['error' => 'Could not start balance payment. Please try again later.'], 422);
+            Log::warning('Pay balance error: ' . $e->getMessage(), ['user_id' => auth()->id(), 'order_id' => $order->id]);
+            return response()->json(['error' => PaymentServiceUnavailable::friendlyMessage($e) ?? 'Could not start balance payment. Please try again later.'], 422);
         }
     }
 }

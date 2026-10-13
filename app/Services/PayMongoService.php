@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\PaymentServiceUnavailable;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -28,7 +30,10 @@ class PayMongoService
         return Http::withBasicAuth($this->secretKey, '')
             ->withHeaders(['Content-Type' => 'application/json'])
             ->acceptJson()
-            ->baseUrl(self::BASE_URL);
+            ->baseUrl(self::BASE_URL)
+            ->connectTimeout(10)
+            ->timeout(20)
+            ->retry(2, 500, fn ($e) => $e instanceof ConnectionException, throw: false);
     }
 
     private function throwIfFailed(Response $response, string $context): void
@@ -84,7 +89,11 @@ class PayMongoService
             $payload['data']['attributes']['billing'] = $billing;
         }
 
-        $response = $this->client()->post('/checkout_sessions', $payload);
+        try {
+            $response = $this->client()->post('/checkout_sessions', $payload);
+        } catch (ConnectionException $e) {
+            throw new PaymentServiceUnavailable('[PayMongo] createCheckoutSession: ' . $e->getMessage(), 0, $e);
+        }
         $this->throwIfFailed($response, 'createCheckoutSession');
 
         $data = $response->json('data');
@@ -101,7 +110,11 @@ class PayMongoService
      */
     public function retrieveCheckoutSession(string $checkoutSessionId): array
     {
-        $response = $this->client()->get("/checkout_sessions/{$checkoutSessionId}");
+        try {
+            $response = $this->client()->get("/checkout_sessions/{$checkoutSessionId}");
+        } catch (ConnectionException $e) {
+            throw new PaymentServiceUnavailable('[PayMongo] retrieveCheckoutSession: ' . $e->getMessage(), 0, $e);
+        }
         $this->throwIfFailed($response, 'retrieveCheckoutSession');
 
         return $response->json('data');

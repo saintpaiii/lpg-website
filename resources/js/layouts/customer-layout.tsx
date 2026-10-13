@@ -16,6 +16,7 @@ import {
     Store,
     User,
     MapPinned,
+    Navigation,
     X,
     XCircle,
     MessageSquare,
@@ -93,6 +94,7 @@ export default function CustomerLayout({ children, title }: Props) {
     // ── Sidebar nav items ───────────────────────────────────────────────────
     const mainNavItems: NavItem[] = [
         { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag },
+        { title: 'Find a Store', href: '/customer/find-store',    icon: Navigation  },
         { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
         { title: 'Messages',    href: '/customer/messages',       icon: MessageSquare,
           ...(unreadMessages > 0 ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const } : {}) },

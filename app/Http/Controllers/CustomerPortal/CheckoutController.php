@@ -14,6 +14,7 @@ use App\Models\CouponUse;
 use App\Models\StoreCoupon;
 use App\Services\CouponException;
 use App\Services\CouponService;
+use App\Services\DeliveryFeeService;
 use App\Services\LoyaltyService;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
@@ -33,25 +34,6 @@ class CheckoutController extends Controller
         'consignment' => 'Consignment',
         'cod'         => 'Cash on Delivery',
     ];
-
-    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
-    {
-        $R    = 6371;
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-        $a    = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
-        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
-    }
-
-    private function calcDeliveryFee(Store $store, float $distKm): float
-    {
-        $base  = (float) ($store->base_delivery_fee ?? 0);
-        $perKm = (float) ($store->fee_per_km ?? 0);
-        if ($base <= 0 && $perKm <= 0) {
-            return (float) ($store->delivery_fee ?? 0);
-        }
-        return ceil(($base + $distKm * $perKm) / 5) * 5;
-    }
 
     private function generateOrderNumber(): string
     {
@@ -413,7 +395,7 @@ class CheckoutController extends Controller
             }
 
             // Create one order per store in a single DB transaction
-            $orders = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
+            $result = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
                 // ── Pass 1: price every store's items and delivery fee ─────────
                 $prepared = [];
 
@@ -469,8 +451,8 @@ class CheckoutController extends Controller
                     $finalFee    = (float) ($storeData['delivery_fee'] ?? 0);
                     if ($deliveryLat !== null && $deliveryLng !== null
                         && $store->latitude && $store->longitude) {
-                        $distKm   = $this->haversineKm((float) $store->latitude, (float) $store->longitude, $deliveryLat, $deliveryLng);
-                        $finalFee = $this->calcDeliveryFee($store, $distKm);
+                        $distKm   = DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $deliveryLat, $deliveryLng);
+                        $finalFee = DeliveryFeeService::fee($store, $distKm);
                     }
 
                     // Store discount coupon (issued by this store as a refund resolution)
@@ -618,10 +600,113 @@ class CheckoutController extends Controller
                     $promo->increment('used_count');
                 }
 
-                return $createdOrders;
+                // The PayMongo session is created BEFORE the transaction commits: if PayMongo can't be
+                // reached (or errors), everything above rolls back — no orders, no coupon use — and the
+                // cart, notifications and chat messages below/after commit never happen.
+
+                // Orders fully covered by a store coupon need no online payment
+                foreach ($createdOrders as $entry) {
+                    if ($entry['mode'] === 'full' && $entry['pay_now'] <= 0) {
+                        $entry['order']->update(['payment_status' => 'paid']);
+                    }
+                }
+
+                // Only Full Payment / Consignment orders are charged online. COD orders are simply
+                // placed (the rider collects cash) — in a mixed checkout they stay placed even if
+                // the customer leaves the PayMongo page.
+                $toCharge = array_values(array_filter($createdOrders, fn ($e) => $e['pay_now'] > 0));
+                if (empty($toCharge)) {
+                    return ['orders' => $createdOrders, 'session' => null];
+                }
+
+                $paymongo  = app(PayMongoService::class);
+                $user      = $request->user();
+                $lineItems = [];
+
+                foreach ($toCharge as $entry) {
+                    $order = $entry['order'];
+                    $store = $entry['store'];
+                    $order->load('items.product');
+
+                    if ($entry['mode'] === 'consignment') {
+                        $pct = $entry['dp_percent'];
+                        $lineItems[] = [
+                            'name'        => "Down Payment — {$store->store_name}",
+                            'description' => "{$pct}% consignment down payment for Order {$order->order_number}",
+                            'amount'      => (int) round($entry['pay_now'] * 100),
+                            'currency'    => 'PHP',
+                            'quantity'    => 1,
+                        ];
+                    } elseif ($entry['discount'] > 0) {
+                        // Discounted order: charge a single line so the total matches exactly
+                        $lineItems[] = [
+                            'name'        => "Order {$order->order_number} — {$store->store_name}",
+                            'description' => 'Items + delivery fee, less ₱' . number_format($entry['discount'], 2) . ' discount',
+                            'amount'      => (int) round($entry['pay_now'] * 100),
+                            'currency'    => 'PHP',
+                            'quantity'    => 1,
+                        ];
+                    } else {
+                        // Full payment: line items per product
+                        foreach ($order->items as $item) {
+                            $lineItems[] = [
+                                'name'        => $item->product?->name ?? 'LPG Product',
+                                'description' => ($item->product?->brand ?? '') . ' — ' . $store->store_name,
+                                'amount'      => (int) round((float) $item->unit_price * 100),
+                                'currency'    => 'PHP',
+                                'quantity'    => $item->quantity,
+                            ];
+                        }
+                        if ((float) $entry['delivery_fee'] > 0) {
+                            $lineItems[] = [
+                                'name'        => 'Delivery Fee',
+                                'description' => $store->store_name,
+                                'amount'      => (int) round((float) $entry['delivery_fee'] * 100),
+                                'currency'    => 'PHP',
+                                'quantity'    => 1,
+                            ];
+                        }
+                    }
+                }
+
+                $firstOrder = $toCharge[0]['order'];
+                $storeNames = implode(', ', array_map(fn ($e) => $e['store']->store_name, $toCharge));
+
+                $session = $paymongo->createCheckoutSession([
+                    'reference_number' => $firstOrder->order_number,
+                    'description'      => collect($toCharge)->every(fn ($e) => $e['mode'] === 'consignment') && count($toCharge) === 1
+                        ? "Consignment Down Payment — Order {$firstOrder->order_number}"
+                        : (count($toCharge) > 1
+                            ? 'LPG Orders from ' . $storeNames
+                            : "LPG Order {$firstOrder->order_number} from {$toCharge[0]['store']->store_name}"),
+                    'line_items'       => $lineItems,
+                    'success_url'      => url('/customer/orders?payment=success'),
+                    'cancel_url'       => url('/customer/orders?payment=cancelled'),
+                    'customer_name'    => $user->name,
+                    'customer_email'   => $user->email,
+                    'customer_phone'   => $user->phone ?? '',
+                ]);
+
+                if (empty($session['checkout_url'])) {
+                    throw new \RuntimeException('PayMongo did not return a checkout URL.');
+                }
+
+                // One Payment record per order
+                foreach ($toCharge as $entry) {
+                    Payment::create([
+                        'order_id'             => $entry['order']->id,
+                        'paymongo_checkout_id' => $session['id'],
+                        'amount'               => round($entry['pay_now'], 2),
+                        'status'               => 'pending',
+                    ]);
+                }
+
+                return ['orders' => $createdOrders, 'session' => $session];
             });
 
-            // Remove ordered items from DB cart (leave unselected items intact)
+            ['orders' => $orders, 'session' => $session] = $result;
+
+            // Only now (orders committed, payment page ready) — remove ordered items from DB cart (leave unselected items intact)
             CartItem::where('user_id', auth()->id())
                 ->whereIn('product_id', $selected)
                 ->delete();
@@ -641,102 +726,10 @@ class CheckoutController extends Controller
                 );
             }
 
-            // Orders fully covered by a store coupon need no online payment
-            foreach ($orders as $entry) {
-                if ($entry['mode'] === 'full' && $entry['pay_now'] <= 0) {
-                    $entry['order']->update(['payment_status' => 'paid']);
-                }
-            }
-
-            // Only Full Payment / Consignment orders are charged online. COD orders are simply
-            // placed (the rider collects cash) — in a mixed checkout they stay placed even if
-            // the customer leaves the PayMongo page.
-            $toCharge = array_values(array_filter($orders, fn ($e) => $e['pay_now'] > 0));
-            if (empty($toCharge)) {
+            // Nothing to charge online (COD only / fully covered by coupons)
+            if ($session === null) {
                 $anyCod = collect($orders)->contains(fn ($e) => $e['mode'] === 'cod');
                 return response()->json(['redirect_url' => url('/customer/orders?placed=' . ($anyCod ? 'cod' : '1'))]);
-            }
-
-            $paymongo  = app(PayMongoService::class);
-            $user      = $request->user();
-            $lineItems = [];
-
-            foreach ($toCharge as $entry) {
-                $order = $entry['order'];
-                $store = $entry['store'];
-                $order->load('items.product');
-
-                if ($entry['mode'] === 'consignment') {
-                    $pct = $entry['dp_percent'];
-                    $lineItems[] = [
-                        'name'        => "Down Payment — {$store->store_name}",
-                        'description' => "{$pct}% consignment down payment for Order {$order->order_number}",
-                        'amount'      => (int) round($entry['pay_now'] * 100),
-                        'currency'    => 'PHP',
-                        'quantity'    => 1,
-                    ];
-                } elseif ($entry['discount'] > 0) {
-                    // Discounted order: charge a single line so the total matches exactly
-                    $lineItems[] = [
-                        'name'        => "Order {$order->order_number} — {$store->store_name}",
-                        'description' => 'Items + delivery fee, less ₱' . number_format($entry['discount'], 2) . ' discount',
-                        'amount'      => (int) round($entry['pay_now'] * 100),
-                        'currency'    => 'PHP',
-                        'quantity'    => 1,
-                    ];
-                } else {
-                    // Full payment: line items per product
-                    foreach ($order->items as $item) {
-                        $lineItems[] = [
-                            'name'        => $item->product?->name ?? 'LPG Product',
-                            'description' => ($item->product?->brand ?? '') . ' — ' . $store->store_name,
-                            'amount'      => (int) round((float) $item->unit_price * 100),
-                            'currency'    => 'PHP',
-                            'quantity'    => $item->quantity,
-                        ];
-                    }
-                    if ((float) $entry['delivery_fee'] > 0) {
-                        $lineItems[] = [
-                            'name'        => 'Delivery Fee',
-                            'description' => $store->store_name,
-                            'amount'      => (int) round((float) $entry['delivery_fee'] * 100),
-                            'currency'    => 'PHP',
-                            'quantity'    => 1,
-                        ];
-                    }
-                }
-            }
-
-            $firstOrder = $toCharge[0]['order'];
-            $storeNames = implode(', ', array_map(fn ($e) => $e['store']->store_name, $toCharge));
-
-            $session = $paymongo->createCheckoutSession([
-                'reference_number' => $firstOrder->order_number,
-                'description'      => collect($toCharge)->every(fn ($e) => $e['mode'] === 'consignment') && count($toCharge) === 1
-                    ? "Consignment Down Payment — Order {$firstOrder->order_number}"
-                    : (count($toCharge) > 1
-                        ? 'LPG Orders from ' . $storeNames
-                        : "LPG Order {$firstOrder->order_number} from {$toCharge[0]['store']->store_name}"),
-                'line_items'       => $lineItems,
-                'success_url'      => url('/customer/orders?payment=success'),
-                'cancel_url'       => url('/customer/orders?payment=cancelled'),
-                'customer_name'    => $user->name,
-                'customer_email'   => $user->email,
-                'customer_phone'   => $user->phone ?? '',
-            ]);
-
-            if (empty($session['checkout_url'])) {
-                throw new \RuntimeException('PayMongo did not return a checkout URL.');
-            }
-
-            // One Payment record per order
-            foreach ($toCharge as $entry) {
-                Payment::create([
-                    'order_id'             => $entry['order']->id,
-                    'paymongo_checkout_id' => $session['id'],
-                    'amount'               => round($entry['pay_now'], 2),
-                    'status'               => 'pending',
-                ]);
             }
 
             return response()->json(['checkout_url' => $session['checkout_url']]);
@@ -745,13 +738,23 @@ class CheckoutController extends Controller
             throw $e;
         } catch (CouponException $e) {
             return $error($e->getMessage());
+        } catch (\App\Exceptions\PaymentServiceUnavailable $e) {
+            // No connection to PayMongo — the transaction rolled back, nothing was saved
+            Log::warning('Checkout: payment service unreachable', ['user_id' => auth()->id(), 'error' => $e->getPrevious()?->getMessage() ?? $e->getMessage()]);
+            $msg = "We couldn't reach the payment service. Please check your internet connection and try again, or choose Cash on Delivery.";
+            if ($isJson) {
+                return response()->json(['error' => $msg], 422);
+            }
+            return back()->with('error', $msg);
         } catch (\Throwable $e) {
             Log::error('Checkout store() error: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
                 'file'    => $e->getFile(),
                 'line'    => $e->getLine(),
             ]);
-            $msg = app()->isLocal() ? $e->getMessage() : 'Checkout failed. Please try again or use Cash on Delivery.';
+            $msg = $e instanceof \RuntimeException && str_starts_with($e->getMessage(), '[PayMongo]')
+                ? 'The payment service had a problem. Please try again in a moment, or choose Cash on Delivery.'
+                : (app()->isLocal() ? $e->getMessage() : 'Checkout failed. Please try again or use Cash on Delivery.');
             if ($isJson) {
                 return response()->json(['error' => $msg], 422);
             }

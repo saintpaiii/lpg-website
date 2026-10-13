@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Exceptions\PaymentServiceUnavailable;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
-use App\Models\Inventory;
-use App\Models\InventoryTransaction;
 use App\Models\Invoice;
 use App\Models\Order;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -20,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -310,7 +310,8 @@ class OrderController extends Controller
             // Return JSON so the frontend can do a full browser redirect (avoids CORS from Inertia/Axios)
             return response()->json(['checkout_url' => $session['checkout_url']]);
         } catch (\Throwable $e) {
-            return response()->json(['error' => 'Could not start online payment. Please try again or contact support.'], 422);
+            Log::warning('Customer order pay error: ' . $e->getMessage(), ['user_id' => auth()->id(), 'order_id' => $order->id]);
+            return response()->json(['error' => PaymentServiceUnavailable::friendlyMessage($e) ?? 'Could not start online payment. Please try again or contact support.'], 422);
         }
     }
 
@@ -372,7 +373,8 @@ class OrderController extends Controller
                 ? ['status' => 'paid', 'message' => 'Balance payment confirmed! Your order is fully paid.']
                 : ['status' => 'paid', 'message' => 'Payment confirmed! Your order has been updated.'];
         } catch (\Throwable $e) {
-            return ['status' => 'error', 'message' => 'Could not verify payment. Please try again.'];
+            Log::warning('Payment verify error: ' . $e->getMessage(), ['user_id' => auth()->id(), 'order_id' => $order->id]);
+            return ['status' => 'error', 'message' => PaymentServiceUnavailable::friendlyMessage($e) ?? 'Could not verify payment. Please try again.'];
         }
     }
 
@@ -467,49 +469,12 @@ class OrderController extends Controller
             'cancellation_notes'  => 'nullable|string|max:1000',
         ]);
 
-        DB::transaction(function () use ($order, $data, $request) {
-            // Restore stock if order was already confirmed (stock was deducted)
-            if ($order->status === 'confirmed') {
-                $order->load('items');
-                foreach ($order->items as $item) {
-                    $inventory = Inventory::where('product_id', $item->product_id)->first();
-                    if ($inventory) {
-                        $inventory->increment('quantity', $item->quantity);
-                        InventoryTransaction::create([
-                            'product_id' => $item->product_id,
-                            'type'       => 'cancelled',
-                            'quantity'   => $item->quantity,
-                            'reference'  => $order->order_number,
-                            'notes'      => 'Order cancelled by customer — stock restored',
-                            'user_id'    => $request->user()->id,
-                        ]);
-                    }
-                }
-            }
-
-            $cancelUpdates = [
-                'status'              => 'cancelled',
-                'cancellation_reason' => $data['cancellation_reason'],
-                'cancellation_notes'  => $data['cancellation_notes'] ?? null,
-                'cancelled_by'        => 'customer',
-                'cancelled_at'        => now(),
-            ];
-
-            // If already paid (fully or a consignment down payment), flag for refund
-            if (in_array($order->payment_status, ['paid', 'partial'])) {
-                $cancelUpdates['payment_status'] = 'to_refund';
-            }
-
-            $order->update($cancelUpdates);
-
-            // Void invoice if one exists
-            if ($order->invoice) {
-                $order->invoice->update(['payment_status' => 'voided']);
-            }
-        });
-
-        // Loyalty: a customer cancellation lowers their trust score at this store
-        \App\Services\LoyaltyService::recordCancelled($order->fresh());
+        \App\Services\OrderCancellationService::cancelByCustomer(
+            $order,
+            $data['cancellation_reason'],
+            $data['cancellation_notes'] ?? null,
+            $request->user()->id,
+        );
 
         return redirect()->route('customer.orders')->with('success', 'Order cancelled successfully.');
     }

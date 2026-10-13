@@ -22,3 +22,6 @@ Schedule::command('loyalty:refresh')->dailyAt('02:00');
 
 // Reports: unanswered store reports go to the admin after 48 h; unconfirmed fixes close after 72 h
 Schedule::command('reports:auto-escalate')->hourly()->withoutOverlapping();
+
+// Online orders whose PayMongo payment wasn't completed within 60 minutes are cancelled (stock/notifications via the customer-cancel path)
+Schedule::command('orders:cancel-unpaid')->everyFifteenMinutes()->withoutOverlapping();

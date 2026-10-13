@@ -80,6 +80,12 @@ const PAY_STYLES: Record<string, string> = {
     partial: 'bg-amber-100 text-amber-700',
 };
 
+/** Online order (Full Payment / Consignment) whose PayMongo payment was never completed. */
+const awaitingPayment = (o: { status: string; payment_status: string; payment_mode: string }) =>
+    o.payment_mode !== 'cod' && o.payment_status === 'unpaid' && ['pending', 'confirmed'].includes(o.status);
+
+const CANCELLED_PAYMENT_MSG = 'Payment was not completed. Your order is saved — you can pay anytime within 60 minutes from My Orders, or it will be cancelled automatically.';
+
 const STATUS_TABS = [
     { value: '',                 label: 'All' },
     { value: 'pending',          label: 'Pending' },
@@ -101,6 +107,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
     const [cancelNotes, setCancelNotes] = useState('');
     const [cancelling, setCancelling] = useState(false);
     const [payingBalanceId, setPayingBalanceId] = useState<number | null>(null);
+    const [payingId, setPayingId] = useState<number | null>(null);
     const [dateFrom, setDateFrom] = useState(date_from);
     const [dateTo,   setDateTo]   = useState(date_to);
 
@@ -112,7 +119,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
         if (val === 'success') {
             toast.success('Payment received! Your orders have been updated.');
         } else if (val === 'cancelled') {
-            toast.error('Payment was cancelled.');
+            toast.warning(CANCELLED_PAYMENT_MSG, { duration: 10000 });
         } else if (placed) {
             toast.success(placed === 'cod'
                 ? 'Order placed! Please prepare cash for the rider on delivery.'
@@ -168,6 +175,21 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
             toast.error(err?.response?.data?.error ?? 'Could not start balance payment.');
             setPayingBalanceId(null);
         }
+    }
+
+    async function payNow(order: Order) {
+        setPayingId(order.id);
+        try {
+            const res = await axios.post<{ checkout_url?: string; error?: string }>(`/customer/orders/${order.id}/pay`);
+            if (res.data.checkout_url) {
+                window.location.href = res.data.checkout_url;
+                return;
+            }
+            toast.error(res.data.error ?? 'Could not start payment.');
+        } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? (err?.response ? 'Could not start payment.' : "We couldn't reach the server. Please check your internet connection and try again."));
+        }
+        setPayingId(null);
     }
 
     function submitCancel() {
@@ -292,12 +314,18 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
+                                                    {awaitingPayment(order) ? (
+                                                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 whitespace-nowrap">
+                                                            Waiting for payment
+                                                        </span>
+                                                    ) : (
                                                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
                                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                                          order.payment_status === 'refunded'  ? 'Refunded' :
                                                          order.payment_status === 'partial'   ? 'Partial' :
                                                          order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                                                     </span>
+                                                    )}
                                                     {order.payment_mode === 'consignment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
                                                         <p className={`text-[10px] font-medium mt-0.5 ${order.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
                                                             Balance: ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -313,6 +341,19 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                                 View
                                                             </Button>
                                                         </Link>
+                                                        {awaitingPayment(order) && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-7 px-2.5 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold gap-1"
+                                                                onClick={() => payNow(order)}
+                                                                disabled={payingId === order.id}
+                                                            >
+                                                                {payingId === order.id
+                                                                    ? <Loader2 className="h-3 w-3 animate-spin" />
+                                                                    : <CreditCard className="h-3 w-3" />}
+                                                                Pay now
+                                                            </Button>
+                                                        )}
                                                         {order.payment_mode === 'consignment' && order.payment_status === 'partial' && (
                                                             <Button
                                                                 size="sm"

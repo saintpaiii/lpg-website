@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Exceptions\PaymentServiceUnavailable;
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Http\Controllers\Concerns\PresentsCommissionInvoices;
 use App\Http\Controllers\Controller;
@@ -129,7 +130,8 @@ class CommissionController extends Controller
             return response()->json(['checkout_url' => $session['checkout_url']]);
         } catch (\Throwable $e) {
             Log::error('Commission pay error: ' . $e->getMessage(), ['invoice_id' => $invoice->id]);
-            return response()->json(['error' => app()->isLocal() ? $e->getMessage() : 'Could not start payment. Please try again later.'], 422);
+            return response()->json(['error' => PaymentServiceUnavailable::friendlyMessage($e)
+                ?? (app()->isLocal() ? $e->getMessage() : 'Could not start payment. Please try again later.')], 422);
         }
     }
 

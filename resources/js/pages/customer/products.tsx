@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, MapPin, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, MapPin, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -314,6 +314,17 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                             </span>
                         )}
                     </Button>
+                    <Link href={'/customer/find-store' + (() => {
+                        const q = new URLSearchParams();
+                        if (filters.weight) q.set('weight', filters.weight);
+                        if (filters.brand) q.set('brand', filters.brand);
+                        return q.toString() ? `?${q}` : '';
+                    })()}>
+                        <Button variant="outline" className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300">
+                            <Navigation className="h-4 w-4" />
+                            Find the nearest store
+                        </Button>
+                    </Link>
                 </div>
 
                 {/* Filter panel */}
