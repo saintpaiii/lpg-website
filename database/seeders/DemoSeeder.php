@@ -340,15 +340,15 @@ class DemoSeeder extends Seeder
             ['settings.edit',            'Settings',        'Edit system settings'],
         ];
 
+        // Some permissions (messages.view / messages.reply / customer_reports.manage) are also created by
+        // migrations, so upsert by name instead of inserting blindly (migrate:fresh --seed would hit the unique key).
         $permIds = [];
         foreach ($permDefs as [$name, $group, $desc]) {
-            $permIds[$name] = DB::table('permissions')->insertGetId([
-                'name'        => $name,
-                'group'       => $group,
-                'description' => $desc,
-                'created_at'  => $this->now,
-                'updated_at'  => $this->now,
-            ]);
+            DB::table('permissions')->updateOrInsert(
+                ['name' => $name],
+                ['group' => $group, 'description' => $desc, 'created_at' => $this->now, 'updated_at' => $this->now]
+            );
+            $permIds[$name] = DB::table('permissions')->where('name', $name)->value('id');
         }
 
         $allPerms = array_keys($permIds);
@@ -403,7 +403,8 @@ class DemoSeeder extends Seeder
         foreach ($rolePermMap as $role => $perms) {
             foreach ($perms as $permName) {
                 if (! isset($permIds[$permName])) continue;
-                DB::table('role_permissions')->insert([
+                // insertOrIgnore: the permission migrations may already have added this role row
+                DB::table('role_permissions')->insertOrIgnore([
                     'role'          => $role,
                     'permission_id' => $permIds[$permName],
                     'created_at'    => $this->now,
