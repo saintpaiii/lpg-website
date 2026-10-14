@@ -27,7 +27,7 @@ export function pinIcon(color: string, label?: string | number): L.DivIcon {
                     <path d="M15 0C6.7 0 0 6.6 0 14.8 0 25.9 15 40 15 40s15-14.1 15-25.2C30 6.6 23.3 0 15 0z" fill="${color}"/>
                     <circle cx="15" cy="14.5" r="${label !== undefined ? 9.5 : 5.5}" fill="#fff"/>
                 </svg>
-                ${label !== undefined ? `<span style="position:absolute;top:6px;left:0;width:30px;text-align:center;font:700 12px/17px system-ui,sans-serif;color:${color}">${label}</span>` : ''}
+                ${label !== undefined ? `<span style="position:absolute;top:6px;left:0;width:30px;text-align:center;font:700 ${String(label ?? '').length > 2 ? 9 : 12}px/17px system-ui,sans-serif;color:${color}">${label}</span>` : ''}
             </div>`,
     });
 }
@@ -92,3 +92,49 @@ export async function routeSegment(from: LatLng, to: LatLng, signal?: AbortSigna
 
 export const googleMapsDirections = (lat: number, lng: number) =>
     `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+
+// ── Service area (Cavite + ~5 km margin) — same numbers as App\Support\ServiceArea ──
+export const SERVICE_AREA = { south: 14.0, north: 14.6, west: 120.5, east: 121.15 } as const;
+export const SERVICE_AREA_BOUNDS = L.latLngBounds([SERVICE_AREA.south, SERVICE_AREA.west], [SERVICE_AREA.north, SERVICE_AREA.east]);
+export const SERVICE_AREA_MESSAGE = 'Please choose a location inside Cavite. We only serve addresses within Cavite.';
+/** Furthest zoom-out: the whole province. */
+export const SERVICE_AREA_MIN_ZOOM = 10;
+
+export const isInServiceArea = (lat: number, lng: number): boolean =>
+    lat >= SERVICE_AREA.south && lat <= SERVICE_AREA.north && lng >= SERVICE_AREA.west && lng <= SERVICE_AREA.east;
+
+/** Keep a map inside the service area: no panning far outside Cavite, no zooming out past the province. */
+export function applyServiceArea(map: L.Map): void {
+    map.setMaxBounds(SERVICE_AREA_BOUNDS.pad(0.05));
+    map.options.maxBoundsViscosity = 1.0;
+    map.setMinZoom(SERVICE_AREA_MIN_ZOOM);
+}
+
+// ── Device location ("Use my current location") ──────────────────────────────
+
+export type DeviceLocation = { lat: number; lng: number; accuracy_m: number };
+
+/** Above this the reading is a guess (computers without GPS locate by internet connection). */
+export const ACCURATE_ENOUGH_M = 300;
+
+export const OUTSIDE_SERVICE_AREA_DEVICE = 'Your current location is outside Cavite. Please pick or search an address in Cavite.';
+export const DEVICE_LOCATION_FAILED = "Couldn't get your location. Pick a saved address instead.";
+
+export function getDeviceLocation(): Promise<DeviceLocation> {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) { reject(new Error('unsupported')); return; }
+        navigator.geolocation.getCurrentPosition(
+            (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy_m: pos.coords.accuracy }),
+            reject,
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        );
+    });
+}
+
+/** "about 2.4 km" / "about 450 m" */
+export const accuracyText = (m: number): string =>
+    m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
+
+export const lowAccuracyNotice = (m: number): string =>
+    `Your device's location is only accurate to about ${accuracyText(m)}. Computers without GPS guess it from your internet connection. ` +
+    'Please drag the pin to your exact spot, or pick a saved address.';

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\BarangayCoordinateController;
 use App\Models\Customer;
@@ -54,7 +55,7 @@ class ProfileController extends Controller
             'city'        => 'required|string|max:100',
             'barangay'    => 'nullable|string|max:100',
             // Delivery pin (draggable on the profile map) — Philippines bounds
-            'latitude'    => 'nullable|numeric|between:4,22|required_with:longitude',
+            'latitude'    => ['nullable', 'numeric', 'between:4,22', 'required_with:longitude', new InServiceArea('longitude')],
             'longitude'   => 'nullable|numeric|between:116,127|required_with:latitude',
         ]);
         // No pin: place it at the barangay (or city) centre

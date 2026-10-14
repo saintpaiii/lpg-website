@@ -24,6 +24,7 @@ import {
 import { useUnreadMessages } from '@/components/chat/use-unread-messages';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { InstallAppBanner } from '@/components/install-app-banner';
+import LegalUpdateDialog from '@/components/legal-update-dialog';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { NotificationBell } from '@/components/notification-bell';
@@ -355,6 +356,9 @@ export default function CustomerLayout({ children, title }: Props) {
 
             {/* Toasts */}
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
+
+            {/* Updated Terms / Privacy Policy must be accepted to continue */}
+            <LegalUpdateDialog />
 
             {/* PWA install banner */}
             <InstallAppBanner />

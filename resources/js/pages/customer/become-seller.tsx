@@ -8,6 +8,7 @@ import { AddressFields } from '@/components/address-fields';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
+import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,8 @@ type Props = {
     has_valid_id: boolean;
     previous_store: PreviousStore;
     previous_docs: PreviousDocs;
+    seller_terms: SellerTerms;
+    commission_rate: number;
 };
 
 // ── File field definitions ─────────────────────────────────────────────────────
@@ -84,7 +87,7 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, commission_rate }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -415,58 +418,11 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                 <Card>
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-base flex items-center gap-2">
-                                            <ScrollText className="h-4 w-4 text-blue-600" /> Terms and Conditions
+                                            <ScrollText className="h-4 w-4 text-blue-600" /> Review and agree
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        {/* Scrollable terms text */}
-                                        <div className="max-h-80 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-4 text-sm text-gray-700 dark:text-gray-300 space-y-4 mb-5">
-                                            <p className="font-medium text-gray-900 dark:text-white">
-                                                By registering as a seller on LPG Distribution Cavite, you agree to the following:
-                                            </p>
-
-                                            <TermsSection title="1. Platform Commission">
-                                                <li>The platform charges a <strong>5% commission</strong> on every completed order (based on product subtotal, excluding delivery fee)</li>
-                                                <li>Commission is automatically deducted from your earnings</li>
-                                                <li>Commission rate may be adjusted by the platform administrator</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="2. Payment Processing">
-                                                <li>Online payments are processed through PayMongo</li>
-                                                <li>COD payments are recorded by the seller</li>
-                                                <li>Platform earnings are settled after order delivery</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="3. Store Requirements">
-                                                <li>You must maintain valid and up-to-date permits (BIR, Business Permit, FSIC, DOE License, LTO)</li>
-                                                <li>Expired permits may result in store suspension</li>
-                                                <li>You are responsible for product quality and safety</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="4. Order Fulfillment">
-                                                <li>You must process orders within 24 hours</li>
-                                                <li>Delivery must be completed within the agreed timeframe</li>
-                                                <li>Repeated order cancellations may result in penalties or suspension</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="5. Account Conduct">
-                                                <li>Fraudulent activity will result in permanent ban</li>
-                                                <li>The platform reserves the right to suspend or terminate seller accounts for violations</li>
-                                                <li>All uploaded documents must be authentic</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="6. Data Privacy">
-                                                <li>Your store information and documents are kept confidential</li>
-                                                <li>Customer data shared with you is for order fulfillment only</li>
-                                                <li>You must comply with the Data Privacy Act of 2012</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="7. Liability">
-                                                <li>The platform is not liable for disputes between sellers and customers</li>
-                                                <li>Sellers are responsible for their own tax obligations</li>
-                                                <li>Product liability rests with the seller</li>
-                                            </TermsSection>
-                                        </div>
+                                        <div className="mb-5"><SellerTermsBox terms={seller_terms} /></div>
 
                                         {/* Three checkboxes */}
                                         <div className="space-y-3">
@@ -475,7 +431,8 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                 onChange={setAgreeTerms}
                                                 id="agree_terms"
                                             >
-                                                I have read and agree to the Terms and Conditions
+                                                I have read and agree to the Seller Terms and the{' '}
+                                                <a href="/privacy" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-medium text-blue-600 underline dark:text-blue-400">Privacy Policy</a>
                                             </AgreementCheckbox>
                                             <AgreementCheckbox
                                                 checked={agreeAuthentic}
@@ -489,8 +446,8 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                 onChange={setAgreeCommission}
                                                 id="agree_commission"
                                             >
-                                                I understand and agree to the platform commission fee of{' '}
-                                                <strong>5% per completed order</strong>
+                                                I understand and agree to the platform commission of{' '}
+                                                <strong>{commission_rate}% per completed order</strong>
                                             </AgreementCheckbox>
                                         </div>
 
@@ -548,17 +505,6 @@ function PreviousDocBadge({ url }: { url: string }) {
                 View <ExternalLink className="h-3 w-3" />
             </a>
             <span className="text-emerald-600 dark:text-emerald-500">— re-upload below to replace it.</span>
-        </div>
-    );
-}
-
-function TermsSection({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div>
-            <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">{title}</p>
-            <ul className="list-disc list-inside space-y-0.5 text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
-                {children}
-            </ul>
         </div>
     );
 }

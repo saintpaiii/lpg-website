@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\BarangayCoordinateController;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
@@ -92,7 +93,7 @@ class FindStoreController extends Controller
             'brand'    => ['nullable', 'string', 'max:100'],
             'type'     => ['required', 'in:refill,new_purchase'],
             'quantity' => ['required', 'integer', 'min:1', 'max:20'],
-            'lat'      => ['required', 'numeric', 'between:-90,90'],
+            'lat'      => ['required', 'numeric', 'between:-90,90', new InServiceArea('lng')],
             'lng'      => ['required', 'numeric', 'between:-180,180'],
             'sort'     => ['nullable', 'in:nearest,cheapest'],
         ]);

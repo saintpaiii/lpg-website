@@ -27,6 +27,7 @@ import {
 import L from 'leaflet';
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -425,6 +426,7 @@ function UpdateStatusDialog({
                                 >
                                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                                     <Marker position={[riderLat, riderLng]} icon={riderPinIcon} />
+                                    <ServiceAreaLimit />
                                 </MapContainer>
                             </div>
                         )}
@@ -744,6 +746,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                             {osrmCoords && (
                                 <Polyline positions={osrmCoords} pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.75 }} />
                             )}
+                            <ServiceAreaLimit />
                         </MapContainer>
                     </div>
                     <p className="mt-1 text-xs text-gray-400">

@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [LandingController::class, 'index'])->name('home');
 Route::get('/offline', fn() => response()->view('offline'))->name('offline');
 
+// Terms & Policies — public, no account needed
+Route::get('/terms',        [\App\Http\Controllers\LegalPageController::class, 'show'])->name('legal.terms');
+Route::get('/seller-terms', [\App\Http\Controllers\LegalPageController::class, 'show'])->name('legal.seller-terms');
+Route::get('/privacy',      [\App\Http\Controllers\LegalPageController::class, 'show'])->name('legal.privacy');
+
 // Google OAuth
 Route::get('/auth/google',          [SocialAuthController::class, 'redirectToGoogle'])->name('auth.google');
 Route::get('/auth/google/callback', [SocialAuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
@@ -29,6 +34,9 @@ Route::get('/invoices/{invoice}/print', [InvoicePrintController::class, 'show'])
 
 // ── Notifications — available to all authenticated users ──────────────────────
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Accept updated Terms / Privacy Policy (the update popup)
+    Route::post('/legal/accept', [\App\Http\Controllers\LegalAcceptController::class, 'store'])->middleware('throttle:30,1')->name('legal.accept');
+
     Route::get('/notifications',              [NotificationController::class, 'index'])        ->name('notifications.index');
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount'])  ->name('notifications.unread-count');
     Route::post('/notifications/read-all',    [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');

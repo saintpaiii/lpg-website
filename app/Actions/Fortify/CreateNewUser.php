@@ -6,6 +6,7 @@ use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
 use App\Models\Customer;
 use App\Models\User;
+use App\Services\LegalService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
@@ -32,6 +33,9 @@ class CreateNewUser implements CreatesNewUsers
             'city'        => ['required', 'string', 'max:100'],
             'barangay'    => ['nullable', 'string', 'max:100'],
             'password'    => $this->passwordRules(),
+            'terms'       => ['accepted'],
+        ], [
+            'terms.accepted' => 'Please agree to the Terms of Service and Privacy Policy.',
         ])->validate();
 
         return DB::transaction(function () use ($input) {
@@ -59,6 +63,9 @@ class CreateNewUser implements CreatesNewUsers
                 'barangay'      => $input['barangay'] ?? '',
                 'customer_type' => 'household',
             ]);
+
+            // Proof of agreement to the current Terms of Service + Privacy Policy
+            LegalService::accept($user, LegalService::currentIds(['customer_terms', 'privacy_policy']), 'registration', request());
 
             return $user;
         });

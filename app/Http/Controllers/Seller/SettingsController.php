@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Seller;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,7 +62,7 @@ class SettingsController extends Controller
             'fee_per_km'               => 'nullable|numeric|min:0|max:999.99',
             'max_delivery_radius_km'   => 'nullable|integer|min:1|max:200',
             'logo'                     => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-            'latitude'          => 'nullable|numeric|between:-90,90',
+            'latitude'          => ['nullable', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
             'longitude'         => 'nullable|numeric|between:-180,180',
             'attendance_radius' => 'nullable|integer|min:50|max:5000',
             'allow_cod'                => 'nullable|boolean',

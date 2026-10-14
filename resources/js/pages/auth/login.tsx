@@ -342,6 +342,9 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                         <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
                             LPG Distribution Cavite &bull; Marketplace Platform
                         </p>
+                        <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                            <a href="/terms" className="hover:underline">Terms</a> &middot; <a href="/privacy" className="hover:underline">Privacy</a>
+                        </p>
                     </div>
                 </div>
             </div>

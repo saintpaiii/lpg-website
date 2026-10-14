@@ -35,6 +35,7 @@ import {
     Users,
     Warehouse,
     MessageSquare,
+    ScrollText,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -182,6 +183,7 @@ export function AppSidebar() {
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
         isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
+        isPlatformAdmin        && { title: 'Terms & Policies',   href: '/admin/legal',                                        icon: ScrollText      },
         isPlatformAdmin        && { title: 'Commissions',        href: '/admin/commissions',                                  icon: Banknote        },
         isPlatformAdmin        && { title: 'Coupons',            href: '/admin/coupons',                                      icon: TicketPercent   },
         isPlatformAdmin        && { title: 'Auth Logs',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },

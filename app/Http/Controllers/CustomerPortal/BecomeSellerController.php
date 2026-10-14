@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\Store;
 use App\Models\VerificationRequest;
+use App\Services\LegalService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -65,6 +67,7 @@ class BecomeSellerController extends Controller
             'has_valid_id'   => (bool) $user->valid_id,
             'previous_store' => $previousStore,
             'previous_docs'  => $previousDocs,
+            ...LegalService::sellerTermsProps(),
         ]);
     }
 
@@ -145,7 +148,7 @@ class BecomeSellerController extends Controller
                 'doe_lpg_license' => $doeLicensePath,
                 'lto_permit'      => $ltoPermitPath,
                 'status'          => 'pending',
-                'commission_rate' => 5.00,
+                'commission_rate' => (float) Setting::get('default_commission_rate', 5.00),   // the rate the seller agreed to
             ]
         );
 
@@ -170,6 +173,9 @@ class BecomeSellerController extends Controller
             'status'               => 'pending',
             'terms_agreed_at'      => now(),
         ]);
+
+        // Proof of agreement to the current Seller Terms + Privacy Policy
+        LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
 
         return redirect('/customer/become-seller')
             ->with('success', 'Your seller application has been submitted. We will review it within 1–3 business days.');

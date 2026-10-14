@@ -111,6 +111,16 @@ class UsersController extends Controller
                 'city'       => $store->city,
             ] : null,
             'orders' => $orders,
+            // Which Terms / Privacy Policy versions this user agreed to, and when
+            'legalAcceptances' => \App\Models\LegalAcceptance::with('document:id,type,version')
+                ->where('user_id', $user->id)->latest('accepted_at')->get()
+                ->map(fn ($a) => [
+                    'id'       => $a->id,
+                    'label'    => \App\Models\LegalDocument::TYPES[$a->document?->type] ?? 'Document',
+                    'version'  => $a->document?->version,
+                    'date'     => $a->accepted_at->timezone('Asia/Manila')->format('M d, Y g:i A'),
+                    'context'  => \App\Models\LegalAcceptance::CONTEXT_LABELS[$a->context] ?? $a->context,
+                ])->values(),
         ]);
     }
 

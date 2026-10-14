@@ -4,12 +4,19 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Banknote, Crosshair, Info, Loader2, MapPin, Minus, Navigation, Plus, Search, ShoppingCart, Star, Store as StoreIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Marker as LeafletMarker } from 'leaflet';
 import { MapContainer, Marker, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import CustomerLayout from '@/layouts/customer-layout';
-import { OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, type LatLng } from '@/lib/map';
+import { toast } from 'sonner';
+import LocationAccuracyNotice from '@/components/location-accuracy-notice';
+import {
+    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, getDeviceLocation, isInServiceArea, OSM_ATTRIBUTION, OSM_TILES, OUTSIDE_SERVICE_AREA_DEVICE,
+    PIN_COLORS, pinIcon, SERVICE_AREA_MESSAGE, type LatLng,
+} from '@/lib/map';
 import { cn } from '@/lib/utils';
 
 type Address = { id: number; label: string; full_text: string; lat: number; lng: number; is_default: boolean };
@@ -78,12 +85,14 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
         const lat = parseFloat(qs.get('lat') ?? ''), lng = parseFloat(qs.get('lng') ?? '');
         if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
             const addr = addresses.find((a) => String(a.id) === qs.get('address'));
-            return addr ? { label: addr.full_text, lat: addr.lat, lng: addr.lng, address_id: addr.id } : { label: 'My current location', lat, lng, address_id: null };
+            return addr ? { label: addr.full_text, lat: addr.lat, lng: addr.lng, address_id: addr.id } : { label: 'Pinned location', lat, lng, address_id: null };
         }
         return default_location;
     });
     const [locating, setLocating] = useState(false);
     const [locError, setLocError] = useState<string | null>(null);
+    // A rough "current location" (computer without GPS): not searched until confirmed
+    const [roughM, setRoughM] = useState<number | null>(null);
 
     const [sort, setSort] = useState<Sort>(qs.get('sort') === 'cheapest' ? 'cheapest' : 'nearest');
     const [results, setResults] = useState<Result[] | null>(null);
@@ -97,8 +106,9 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
     const [added, setAdded] = useState<Set<number>>(new Set());
     const cardRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
-    async function search(nextSort: Sort = sort) {
-        if (!location || !sizeReady) return;
+    async function search(nextSort: Sort = sort, loc: Location | null = location) {
+        if (!loc || !sizeReady) return;
+        const location = loc;
         setLoading(true);
         setError(null);
         setSelected(null);
@@ -123,6 +133,8 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
             setSummary(null);
             setError(axios.isAxiosError(err) && err.response?.status === 429
                 ? 'Too many searches. Please wait a minute and try again.'
+                : axios.isAxiosError(err) && err.response?.status === 422 && err.response.data?.message
+                    ? String(err.response.data.message)
                 : axios.isAxiosError(err) && !err.response
                     ? "We couldn't reach the server. Please check your internet connection and try again."
                     : 'Something went wrong while searching. Please try again.');
@@ -145,13 +157,21 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
 
     function useCurrentLocation() {
         setLocError(null);
-        if (!navigator.geolocation) { setLocError("Couldn't get your location. Pick a saved address instead."); return; }
         setLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => { setLocation({ label: 'My current location', lat: pos.coords.latitude, lng: pos.coords.longitude, address_id: null }); setLocating(false); },
-            () => { setLocError("Couldn't get your location. Pick a saved address instead."); setLocating(false); },
-            { enableHighAccuracy: true, timeout: 10000 },
-        );
+        getDeviceLocation().then((loc) => {
+            if (!isInServiceArea(loc.lat, loc.lng)) { setLocError(OUTSIDE_SERVICE_AREA_DEVICE); return; }
+            setLocation({ label: 'My current location', lat: loc.lat, lng: loc.lng, address_id: null });
+            setRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
+        }).catch(() => setLocError(DEVICE_LOCATION_FAILED))
+            .finally(() => setLocating(false));
+    }
+
+    /** The customer dragged the "You" marker: search again from there. */
+    function movePin(lat: number, lng: number) {
+        const next: Location = { label: 'Pinned location', lat: +lat.toFixed(7), lng: +lng.toFixed(7), address_id: null };
+        setLocation(next);
+        setRoughM(null);
+        search(sort, next);
     }
 
     function addToCart(r: Result) {
@@ -262,7 +282,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                                         value={location?.address_id ?? ''}
                                         onChange={(e) => {
                                             const a = addresses.find((x) => String(x.id) === e.target.value);
-                                            if (a) { setLocation({ label: a.full_text, lat: a.lat, lng: a.lng, address_id: a.id }); setLocError(null); }
+                                            if (a) { setLocation({ label: a.full_text, lat: a.lat, lng: a.lng, address_id: a.id }); setLocError(null); setRoughM(null); }
                                         }}>
                                         {location && location.address_id === null && <option value="">{location.label}</option>}
                                         {addresses.map((a) => <option key={a.id} value={a.id}>{a.label}{a.is_default ? ' (default)' : ''} — {a.full_text}</option>)}
@@ -274,9 +294,10 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                                 </Button>
                             </div>
                             {locError && <p className="text-xs text-red-600">{locError}</p>}
+                            {roughM !== null && <LocationAccuracyNotice accuracyM={roughM} onConfirm={() => { setRoughM(null); search(); }} />}
                         </div>
 
-                        <Button className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-700 sm:w-auto" onClick={() => search()} disabled={!location || !sizeReady || loading}>
+                        <Button className="w-full gap-2 bg-blue-600 text-white hover:bg-blue-700 sm:w-auto" onClick={() => search()} disabled={!location || !sizeReady || loading || roughM !== null}>
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                             Find stores
                         </Button>
@@ -286,6 +307,12 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                 {/* Results */}
                 {(loading || results || error) && (
                     <div className="space-y-3">
+                        {location && (
+                            <p className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
+                                <MapPin className="h-4 w-4 text-red-600" /> Deliver to: <span className="font-medium">{location.label}</span>
+                                {results && results.length > 0 && <span className="text-xs text-gray-500">· drag the "You" pin on the map to adjust</span>}
+                            </p>
+                        )}
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 {!loading && results && searched && (
@@ -342,7 +369,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                         {!loading && results && results.length > 0 && location && (
                             <div className="grid gap-4 lg:grid-cols-5">
                                 <div className={cn('lg:sticky lg:top-4 lg:order-2 lg:col-span-2 lg:block lg:self-start', showMap ? 'block' : 'hidden')}>
-                                    <ResultsMap results={results} customer={[location.lat, location.lng]} selected={selected} onSelect={(id) => focusStore(id, true)} />
+                                    <ResultsMap results={results} customer={[location.lat, location.lng]} selected={selected} onSelect={(id) => focusStore(id, true)} onMoveCustomer={movePin} />
                                 </div>
                                 <ol className="space-y-3 lg:order-1 lg:col-span-3">
                                     {results.map((r, i) => (
@@ -444,7 +471,10 @@ function FlyTo({ to }: { to: LatLng | null }) {
     return null;
 }
 
-function ResultsMap({ results, customer, selected, onSelect }: { results: Result[]; customer: LatLng; selected: number | null; onSelect: (storeId: number) => void }) {
+function ResultsMap({ results, customer, selected, onSelect, onMoveCustomer }: {
+    results: Result[]; customer: LatLng; selected: number | null; onSelect: (storeId: number) => void; onMoveCustomer: (lat: number, lng: number) => void;
+}) {
+    const youRef = useRef<LeafletMarker | null>(null);
     const points: LatLng[] = [customer, ...results.map((r) => [r.store.lat, r.store.lng] as LatLng)];
     const sel = results.find((r) => r.store.id === selected);
     return (
@@ -453,8 +483,22 @@ function ResultsMap({ results, customer, selected, onSelect }: { results: Result
                 <TileLayer url={OSM_TILES} attribution={OSM_ATTRIBUTION} />
                 <FitAll points={points} />
                 <FlyTo to={sel ? [sel.store.lat, sel.store.lng] : null} />
-                <Marker position={customer} icon={pinIcon(PIN_COLORS.customer)} zIndexOffset={500}>
-                    <Tooltip>Deliver here</Tooltip>
+                <Marker position={customer} icon={pinIcon(PIN_COLORS.customer, 'You')} zIndexOffset={500} draggable
+                    ref={(m) => { youRef.current = m; }}
+                    eventHandlers={{
+                        dragend: () => {
+                            const m = youRef.current;
+                            if (!m) return;
+                            const { lat, lng } = m.getLatLng();
+                            if (!isInServiceArea(lat, lng)) {
+                                toast.error(SERVICE_AREA_MESSAGE, { id: 'outside-service-area' });
+                                m.setLatLng(customer);
+                                return;
+                            }
+                            onMoveCustomer(lat, lng);
+                        },
+                    }}>
+                    <Tooltip>You — drag to adjust</Tooltip>
                 </Marker>
                 {results.map((r, i) => (
                     <Marker key={r.store.id} position={[r.store.lat, r.store.lng]}
@@ -464,6 +508,7 @@ function ResultsMap({ results, customer, selected, onSelect }: { results: Result
                         <Tooltip>{i + 1}. {r.store.name} — {peso(r.total)}</Tooltip>
                     </Marker>
                 ))}
+                <ServiceAreaLimit />
             </MapContainer>
         </div>
     );

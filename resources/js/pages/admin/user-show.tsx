@@ -7,6 +7,7 @@ import {
     Calendar,
     Mail,
     Phone,
+    ScrollText,
     ShoppingCart,
     Store,
     UserX,
@@ -62,6 +63,7 @@ interface Props {
     user: UserDetail;
     store: StoreInfo | null;
     orders: OrderRow[];
+    legalAcceptances: { id: number; label: string; version: number | null; date: string; context: string }[];
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -124,7 +126,7 @@ function RoleBadge({ user }: { user: UserDetail }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function UserShow({ user, store, orders }: Props) {
+export default function UserShow({ user, store, orders, legalAcceptances }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Users', href: '/admin/users' },
         { title: user.name, href: `/admin/users/${user.id}` },
@@ -324,6 +326,30 @@ export default function UserShow({ user, store, orders }: Props) {
                         </CardContent>
                     </Card>
                 )}
+
+                {/* Terms / Privacy Policy agreements */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <ScrollText className="h-4 w-4 text-blue-500" />
+                            Policy agreements
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {legalAcceptances.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">This user has not agreed to any policy yet.</p>
+                        ) : (
+                            <ul className="divide-y text-sm">
+                                {legalAcceptances.map((a) => (
+                                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                                        <span className="font-medium">{a.label} <span className="font-normal text-muted-foreground">· Version {a.version ?? '—'}</span></span>
+                                        <span className="text-muted-foreground">{a.date} · {a.context}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Deactivate dialog */}

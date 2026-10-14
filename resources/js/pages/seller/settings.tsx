@@ -13,7 +13,12 @@ import {
     Truck,
 } from 'lucide-react';
 import { Circle, MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
-import type { LeafletMouseEvent } from 'leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
+import LocationAccuracyNotice from '@/components/location-accuracy-notice';
+import {
+    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, SERVICE_AREA_MESSAGE,
+} from '@/lib/map';
+import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -109,7 +114,31 @@ export default function SellerSettings({ store }: Props) {
 
     // Stable ref for map click — avoids stale closure in Leaflet event listeners
     const onPickRef = useRef<((lat: number, lng: number) => void) | null>(null);
-    onPickRef.current = (lat, lng) => setPin({ lat, lng });
+    // Store pins must be inside the Cavite service area
+    const [pinMsg, setPinMsg] = useState<string | null>(null);
+    // A rough "current location" (computer without GPS) — must be confirmed before saving
+    const [roughM, setRoughM] = useState<number | null>(null);
+    const [locating, setLocating] = useState(false);
+    const markerRef = useRef<LeafletMarker | null>(null);
+    const placePin = (lat: number, lng: number): boolean => {
+        if (!isInServiceArea(lat, lng)) { setPinMsg(SERVICE_AREA_MESSAGE); return false; }
+        setPin({ lat, lng });
+        setPinMsg(null);
+        setRoughM(null);
+        return true;
+    };
+    onPickRef.current = (lat, lng) => { placePin(lat, lng); };
+
+    function useDeviceLocation() {
+        setPinMsg(null);
+        setLocating(true);
+        getDeviceLocation().then((loc) => {
+            if (!isInServiceArea(loc.lat, loc.lng)) { setPinMsg(OUTSIDE_SERVICE_AREA_DEVICE); return; }
+            setPin({ lat: loc.lat, lng: loc.lng });
+            setRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
+        }).catch(() => setPinMsg(DEVICE_LOCATION_FAILED))
+            .finally(() => setLocating(false));
+    }
 
     // Fix Leaflet default icon paths (broken by bundler)
     useEffect(() => {
@@ -170,6 +199,10 @@ export default function SellerSettings({ store }: Props) {
 
     function submit(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (roughM !== null) {
+            setPinMsg('Please drag the pin to your store\'s exact entrance, or click "Use this spot" first.');
+            return;
+        }
         setProcessing(true);
         setRecentlySuccessful(false);
 
@@ -212,6 +245,7 @@ export default function SellerSettings({ store }: Props) {
 
     // Merge errors from useForm + manual formErrors
     const allErrors = { ...errors, ...formErrors };
+    const locationError = (formErrors as Record<string, string | undefined>).latitude ?? (formErrors as Record<string, string | undefined>).longitude;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -518,7 +552,8 @@ export default function SellerSettings({ store }: Props) {
                             </CardTitle>
                             <CardDescription>
                                 Pin your store on the map. Staff must be within the radius to clock in/out.
-                                Click the map to set a pin, or use the button to use your current GPS location.
+                                Drag the pin to your store's exact entrance. Using 'current location' on a computer may be
+                                several kilometers off.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -536,7 +571,16 @@ export default function SellerSettings({ store }: Props) {
                                     <MapClickHandler onPickRef={onPickRef} />
                                     {pin && (
                                         <>
-                                            <Marker position={[pin.lat, pin.lng]} />
+                                            <Marker position={[pin.lat, pin.lng]} draggable
+                                                ref={(m) => { markerRef.current = m; }}
+                                                eventHandlers={{
+                                                    dragend: () => {
+                                                        const m = markerRef.current;
+                                                        if (!m) return;
+                                                        const { lat, lng } = m.getLatLng();
+                                                        if (!placePin(+lat.toFixed(7), +lng.toFixed(7))) m.setLatLng([pin.lat, pin.lng]);
+                                                    },
+                                                }} />
                                             <Circle
                                                 center={[pin.lat, pin.lng]}
                                                 radius={Number(radius) || 500}
@@ -544,6 +588,7 @@ export default function SellerSettings({ store }: Props) {
                                             />
                                         </>
                                     )}
+                                    <ServiceAreaLimit />
                                 </MapContainer>
                             </div>
 
@@ -604,16 +649,15 @@ export default function SellerSettings({ store }: Props) {
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                    navigator.geolocation?.getCurrentPosition(
-                                        (pos) => setPin({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                                        () => alert('Could not get your location. Please check your browser permissions.'),
-                                    );
-                                }}
+                                onClick={useDeviceLocation}
+                                disabled={locating}
                             >
-                                <Crosshair className="mr-1.5 h-4 w-4" />
+                                {locating ? <Spinner className="mr-1.5 h-4 w-4" /> : <Crosshair className="mr-1.5 h-4 w-4" />}
                                 Use My Current Location
                             </Button>
+                            {roughM !== null && <LocationAccuracyNotice accuracyM={roughM} onConfirm={() => setRoughM(null)} />}
+                            {pinMsg && <p className="text-xs text-red-600">{pinMsg}</p>}
+                            {!pinMsg && locationError && <p className="text-xs text-red-600">{locationError}</p>}
 
                             {/* Attendance radius */}
                             <div className="grid gap-1.5">

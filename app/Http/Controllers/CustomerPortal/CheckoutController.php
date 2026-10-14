@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Customer;
@@ -293,7 +294,7 @@ class CheckoutController extends Controller
                 'coupon_ids.*'               => 'integer',
                 'coupon_code'                => 'nullable|string|max:40',
                 'notes'                      => 'nullable|string|max:1000',
-                'delivery_latitude'          => 'nullable|numeric|between:-90,90',
+                'delivery_latitude'          => ['nullable', 'numeric', 'between:-90,90', new InServiceArea('delivery_longitude')],
                 'delivery_longitude'         => 'nullable|numeric|between:-180,180',
                 // Address the pin belongs to (saved address or map search); default: profile address
                 'delivery_address'           => 'nullable|string|max:500',

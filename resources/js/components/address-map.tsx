@@ -1,8 +1,10 @@
 import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
-import { OSM_ATTRIBUTION, OSM_TILES, type LatLng } from '@/lib/map'; // also fixes Leaflet's default marker icons
+import { toast } from 'sonner';
+import { isInServiceArea, OSM_ATTRIBUTION, OSM_TILES, SERVICE_AREA_MESSAGE, type LatLng } from '@/lib/map'; // also fixes Leaflet's default marker icons
 
 export const CAVITE_CENTER: LatLng = [14.4791, 120.897];
 
@@ -77,10 +79,17 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
             const m = markerRef.current;
             if (!m) return;
             const { lat, lng } = m.getLatLng();
+            // Outside Cavite: refuse and put the pin back
+            if (!isInServiceArea(lat, lng)) {
+                toast.error(SERVICE_AREA_MESSAGE, { id: 'outside-service-area' });
+                if (pin) m.setLatLng(pin);
+                return;
+            }
             draggedByUser.current = true; // keep the view where the user left it
             onLocationChange(+lat.toFixed(7), +lng.toFixed(7));
         },
-    }), [onLocationChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [onLocationChange, pin?.[0], pin?.[1]]);
 
     return (
         <div className="space-y-1.5">
@@ -92,6 +101,7 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
                     <FixSizeOnMount />
                     {/* Click places a pin when there isn't one yet (or moves it, with clickMoves); otherwise drag it */}
                     <ClickToPlace enabled={!disabled && (clickMoves || !hasPin)} onPlace={(lat, lng) => {
+                        if (!isInServiceArea(lat, lng)) { toast.error(SERVICE_AREA_MESSAGE, { id: 'outside-service-area' }); return; }
                         draggedByUser.current = true; // the user chose this spot — don't re-zoom
                         onLocationChange(+lat.toFixed(7), +lng.toFixed(7));
                     }} />
@@ -104,6 +114,7 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
                         />
                     )}
                     {children}
+                    <ServiceAreaLimit />
                 </MapContainer>
 
                 {!hasPin && !disabled && (

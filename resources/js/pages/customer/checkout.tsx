@@ -5,7 +5,8 @@ import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
 import AddressSearchMap, { locationFromSaved, type ChangeReason, type DeliveryLocation, type SavedAddress } from '@/components/address-search-map';
-import { fetchRoute, PIN_COLORS, pinIcon } from '@/lib/map';
+import { ACCURATE_ENOUGH_M, fetchRoute, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon } from '@/lib/map';
+import LocationAccuracyNotice from '@/components/location-accuracy-notice';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -212,6 +213,7 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
     const [pinIsAuto, setPinIsAuto] = useState(savedAddresses.length === 0 && (customer?.pin_source === 'barangay' || customer?.pin_source === 'city'));
 
     function handleDeliveryChange(next: DeliveryLocation, reason: ChangeReason) {
+        setGpsRoughM(null);
         setDelivery(next);
         if (reason === 'pin') { setPinIsAuto(false); return; }
         if (next.lat != null && next.lng != null) setAnchor({ lat: next.lat, lng: next.lng });
@@ -259,14 +261,18 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
         }
     }, [pin?.lat, pin?.lng]);
 
+    // A rough device reading (computer without GPS) is placed but must be confirmed before ordering
+    const [gpsRoughM, setGpsRoughM] = useState<number | null>(null);
+
     function useGPS() {
-        if (!navigator.geolocation) { toast.error('Geolocation not supported.'); return; }
         setGpsLoading(true);
-        navigator.geolocation.getCurrentPosition(
-            (pos) => { handlePinChange(+pos.coords.latitude.toFixed(7), +pos.coords.longitude.toFixed(7)); setGpsLoading(false); },
-            () => { toast.error('Could not get location. Please click on the map.'); setGpsLoading(false); },
-            { enableHighAccuracy: true, timeout: 8000 },
-        );
+        getDeviceLocation().then((loc) => {
+            if (!isInServiceArea(loc.lat, loc.lng)) { toast.error(OUTSIDE_SERVICE_AREA_DEVICE); return; }
+            handlePinChange(+loc.lat.toFixed(7), +loc.lng.toFixed(7));
+            setGpsRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
+        }).catch(() => {
+            toast.error('Could not get location. Please click on the map.');
+        }).finally(() => setGpsLoading(false));
     }
 
     // Payment options per store. Consignment only when the backend marks it available for
@@ -333,6 +339,10 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
     async function placeOrder() {
         if (delivery.addressId === null && !delivery.line.trim() && !(delivery.barangay && delivery.city)) {
             toast.error('Please complete your delivery address (house no. / street, barangay and city).');
+            return;
+        }
+        if (gpsRoughM !== null) {
+            toast.error('Please drag the pin to your exact spot, or click "Use this spot" first.');
             return;
         }
         setLoading(true);
@@ -451,6 +461,9 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                                         Move pin back to my address
                                     </button>
                                 </div>
+                            )}
+                            {gpsRoughM !== null && (
+                                <div className="mt-1"><LocationAccuracyNotice accuracyM={gpsRoughM} onConfirm={() => setGpsRoughM(null)} /></div>
                             )}
                             {customer.pin_message && pinIsAuto && (
                                 <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">

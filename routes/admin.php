@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
 use App\Http\Controllers\Admin\InvoiceController;
+use App\Http\Controllers\Admin\LegalDocumentController;
 use App\Http\Controllers\Admin\DssController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\SettingsController;
@@ -83,6 +84,15 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('settings', [SettingsController::class, 'index'])->name('settings');
         Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
     });
+
+    // Terms & Policies (platform admins only — every action checks isAdmin(); sellers pass the 'admin' middleware)
+    Route::get('legal', [LegalDocumentController::class, 'index'])->name('legal.index');
+    Route::post('legal/preview', [LegalDocumentController::class, 'preview'])->middleware('throttle:30,1')->name('legal.preview');
+    Route::get('legal/{type}', [LegalDocumentController::class, 'edit'])->whereIn('type', array_keys(\App\Models\LegalDocument::TYPES))->name('legal.edit');
+    Route::post('legal/{type}/draft', [LegalDocumentController::class, 'saveDraft'])->whereIn('type', array_keys(\App\Models\LegalDocument::TYPES))->name('legal.draft');
+    Route::post('legal/{type}/publish', [LegalDocumentController::class, 'publish'])->whereIn('type', array_keys(\App\Models\LegalDocument::TYPES))->name('legal.publish');
+    Route::delete('legal/{type}/draft', [LegalDocumentController::class, 'discardDraft'])->whereIn('type', array_keys(\App\Models\LegalDocument::TYPES))->name('legal.discard');
+    Route::get('legal/{type}/versions/{document}', [LegalDocumentController::class, 'showVersion'])->whereIn('type', array_keys(\App\Models\LegalDocument::TYPES))->name('legal.version');
 
     // Store Management
     Route::middleware('permission:stores.view')->group(function () {

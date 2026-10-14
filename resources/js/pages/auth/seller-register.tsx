@@ -2,11 +2,12 @@ import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
 import {
     ArrowLeft, BadgeCheck, Building2, CheckSquare, FileText,
-    Flame, ScrollText, Store, Upload, X,
+    Flame, Store, Upload, X,
 } from 'lucide-react';
 import React, { useRef, useState } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
+import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -110,19 +111,6 @@ function AgreementCheckbox({
     );
 }
 
-// ── Terms section helper ──────────────────────────────────────────────────────
-
-function TermsSection({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div>
-            <p className="font-semibold text-gray-800 dark:text-gray-200 mb-1">{title}</p>
-            <ul className="list-disc list-inside space-y-0.5 text-gray-600 dark:text-gray-400 text-xs leading-relaxed">
-                {children}
-            </ul>
-        </div>
-    );
-}
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 const STEP_LABELS = ['Store Info', 'Documents', 'Terms'];
@@ -133,7 +121,7 @@ const BENEFITS = [
     { icon: Building2,   title: 'Manage Your Store',    desc: 'Full dashboard for orders, inventory, deliveries, invoices, and reports.' },
 ];
 
-export default function SellerRegister() {
+export default function SellerRegister({ seller_terms, commission_rate }: { seller_terms: SellerTerms; commission_rate: number }) {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors]         = useState<Record<string, string>>({});
     const [step, setStep]             = useState<1 | 2 | 3>(1);
@@ -446,72 +434,20 @@ export default function SellerRegister() {
                                 <>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 3 of 3 — Review & Agree to Terms</p>
 
-                                    {/* Scrollable terms */}
-                                    <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 overflow-hidden">
-                                        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                                            <ScrollText className="h-4 w-4 text-blue-600" />
-                                            <span className="text-sm font-semibold text-gray-900 dark:text-white">Terms and Conditions</span>
-                                        </div>
-                                        <div className="max-h-72 overflow-y-auto p-4 text-sm text-gray-700 dark:text-gray-300 space-y-4">
-                                            <p className="font-medium text-gray-900 dark:text-white">
-                                                By registering as a seller on LPG Distribution Cavite, you agree to the following:
-                                            </p>
-
-                                            <TermsSection title="1. Platform Commission">
-                                                <li>The platform charges a <strong>5% commission</strong> on every completed order (based on product subtotal, excluding delivery fee)</li>
-                                                <li>Commission is automatically deducted from your earnings</li>
-                                                <li>Commission rate may be adjusted by the platform administrator</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="2. Payment Processing">
-                                                <li>Online payments are processed through PayMongo</li>
-                                                <li>COD payments are recorded by the seller</li>
-                                                <li>Platform earnings are settled after order delivery</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="3. Store Requirements">
-                                                <li>You must maintain valid and up-to-date permits (BIR, Business Permit, FSIC, DOE License, LTO)</li>
-                                                <li>Expired permits may result in store suspension</li>
-                                                <li>You are responsible for product quality and safety</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="4. Order Fulfillment">
-                                                <li>You must process orders within 24 hours</li>
-                                                <li>Delivery must be completed within the agreed timeframe</li>
-                                                <li>Repeated order cancellations may result in penalties or suspension</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="5. Account Conduct">
-                                                <li>Fraudulent activity will result in permanent ban</li>
-                                                <li>The platform reserves the right to suspend or terminate seller accounts for violations</li>
-                                                <li>All uploaded documents must be authentic</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="6. Data Privacy">
-                                                <li>Your store information and documents are kept confidential</li>
-                                                <li>Customer data shared with you is for order fulfillment only</li>
-                                                <li>You must comply with the Data Privacy Act of 2012</li>
-                                            </TermsSection>
-
-                                            <TermsSection title="7. Liability">
-                                                <li>The platform is not liable for disputes between sellers and customers</li>
-                                                <li>Sellers are responsible for their own tax obligations</li>
-                                                <li>Product liability rests with the seller</li>
-                                            </TermsSection>
-                                        </div>
-                                    </div>
+                                    <SellerTermsBox terms={seller_terms} />
 
                                     {/* Agreement checkboxes */}
                                     <div className="space-y-3">
                                         <AgreementCheckbox checked={agreeTerms} onChange={setAgreeTerms} id="reg_agree_terms">
-                                            I have read and agree to the Terms and Conditions
+                                            I have read and agree to the Seller Terms and the{' '}
+                                            <a href="/privacy" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-medium text-blue-600 underline dark:text-blue-400">Privacy Policy</a>
                                         </AgreementCheckbox>
                                         <AgreementCheckbox checked={agreeAuthentic} onChange={setAgreeAuthentic} id="reg_agree_authentic">
                                             I confirm that all uploaded documents are authentic and valid
                                         </AgreementCheckbox>
                                         <AgreementCheckbox checked={agreeCommission} onChange={setAgreeCommission} id="reg_agree_commission">
-                                            I understand and agree to the platform commission fee of{' '}
-                                            <strong>5% per completed order</strong>
+                                            I understand and agree to the platform commission of{' '}
+                                            <strong>{commission_rate}% per completed order</strong>
                                         </AgreementCheckbox>
                                     </div>
 

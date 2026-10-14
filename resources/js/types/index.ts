@@ -23,6 +23,11 @@ export type AppNotification = {
     read_at?: string | null;
 };
 
+export type PendingLegal = {
+    has_any_acceptance: boolean;
+    documents: { id: number; type: string; label: string; title: string; version: number; change_summary: string | null; url: string }[];
+};
+
 export type SharedData = {
     name: string;
     auth: Auth;
@@ -46,5 +51,7 @@ export type SharedData = {
     systemReportCategories?: Record<string, import('@/components/reports/types').SystemCategory>;
     systemReportAreas?: Record<string, string[]>;
     recentNotifications: AppNotification[];
+    /** Terms / Privacy Policy versions this user must accept before continuing (null = nothing pending) */
+    pendingLegal?: PendingLegal | null;
     [key: string]: unknown;
 };

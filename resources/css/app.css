@@ -222,3 +222,20 @@ a[role="button"]:active {
         display: none !important;
     }
 }
+
+/* Rendered Terms / Policies (Markdown → HTML, no typography plugin) */
+.legal-content { color: #374151; font-size: 0.9375rem; line-height: 1.7; }
+.legal-content h1 { font-size: 1.5rem; font-weight: 700; margin: 1.5rem 0 0.75rem; color: #111827; }
+.legal-content h2 { font-size: 1.15rem; font-weight: 700; margin: 1.75rem 0 0.5rem; color: #111827; }
+.legal-content h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; color: #111827; }
+.legal-content > :first-child { margin-top: 0; }
+.legal-content p { margin: 0.75rem 0; }
+.legal-content ul, .legal-content ol { margin: 0.5rem 0 0.75rem; padding-left: 1.4rem; }
+.legal-content ul { list-style: disc; }
+.legal-content ol { list-style: decimal; }
+.legal-content li { margin: 0.3rem 0; }
+.legal-content strong { font-weight: 600; color: #111827; }
+.legal-content a { color: #2563eb; text-decoration: underline; }
+.dark .legal-content { color: #d1d5db; }
+.dark .legal-content h1, .dark .legal-content h2, .dark .legal-content h3, .dark .legal-content strong { color: #f9fafb; }
+.dark .legal-content a { color: #60a5fa; }

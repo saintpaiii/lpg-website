@@ -1,6 +1,7 @@
 import { Camera, MapPinOff, MessageSquare, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
 import { dotIcon, googleMapsDirections, OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, fetchRoute, type LatLng } from '@/lib/map';
 
@@ -174,6 +175,7 @@ export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage,
                             <Marker position={riderPos} icon={dotIcon('#2563eb')}><Popup>You are here</Popup></Marker>
                         </>
                     )}
+                    <ServiceAreaLimit />
                 </MapContainer>
             </div>
 

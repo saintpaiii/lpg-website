@@ -3,6 +3,7 @@ import { fetchRoute } from '@/lib/map';
 import { CreditCard, MapPin, Minus, Plus, ShoppingCart, Trash2, Truck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import type { LeafletMouseEvent } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { toast } from 'sonner';
@@ -545,6 +546,7 @@ export default function OrderCreate({ products, defaultAddress, storeDelivery }:
                                                 pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.7 }}
                                             />
                                         )}
+                                        <ServiceAreaLimit />
                                     </MapContainer>
                                 </div>
                                 {pin ? (

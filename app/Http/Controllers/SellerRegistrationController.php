@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
+use App\Services\LegalService;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +27,7 @@ class SellerRegistrationController extends Controller
             return redirect()->route('home');
         }
 
-        return Inertia::render('auth/seller-register');
+        return Inertia::render('auth/seller-register', LegalService::sellerTermsProps());
     }
 
     /** POST /seller/register */
@@ -99,7 +101,7 @@ class SellerRegistrationController extends Controller
                 'lto_permit'       => $ltoPermitPath,
                 'status'           => 'pending',
                 'subscription_plan'=> 'free',
-                'commission_rate'  => 5.00,
+                'commission_rate'  => (float) Setting::get('default_commission_rate', 5.00),   // the rate the seller agreed to
                 'is_featured'      => false,
             ]);
 
@@ -119,6 +121,9 @@ class SellerRegistrationController extends Controller
                 'status'               => 'pending',
                 'terms_agreed_at'      => now(),
             ]);
+
+            // Proof of agreement to the current Seller Terms + Privacy Policy
+            LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
 
             // Send email verification
             $user->sendEmailVerificationNotification();

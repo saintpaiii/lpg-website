@@ -8,7 +8,7 @@ import AddressSearchBox, { matchBarangay, matchCity, shortPlaceName, type Geocod
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import type { LatLng } from '@/lib/map';
+import { isInServiceArea, SERVICE_AREA_MESSAGE, type LatLng } from '@/lib/map';
 
 export type SavedAddress = {
     id: number;
@@ -73,6 +73,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
     }
 
     function pickSearchResult(r: GeocodeResult) {
+        if (!isInServiceArea(r.lat, r.lng)) { toast.error(SERVICE_AREA_MESSAGE); return; }
         const city = matchCity(r.city) ?? '';
         const barangay = matchBarangay(city, r.barangay) ?? '';
         setNote(city

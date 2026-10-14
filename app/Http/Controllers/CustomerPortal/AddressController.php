@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\BarangayCoordinateController;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
@@ -120,7 +121,7 @@ class AddressController extends Controller
             'address_line' => ['required', 'string', 'max:255'],
             'barangay'     => ['nullable', 'string', 'max:100'],
             'city'         => ['nullable', 'string', 'max:100'],
-            'latitude'     => ['nullable', 'numeric', 'between:4,22', 'required_with:longitude'],      // Philippines
+            'latitude'     => ['nullable', 'numeric', 'between:4,22', 'required_with:longitude', new InServiceArea('longitude')],      // Philippines
             'longitude'    => ['nullable', 'numeric', 'between:116,127', 'required_with:latitude'],
             'is_default'   => ['sometimes', 'boolean'],
         ]);

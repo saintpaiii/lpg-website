@@ -1,6 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, Flame } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Flame } from 'lucide-react';
 import React, { useState } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
@@ -28,6 +28,9 @@ export default function Register() {
         password_confirmation: '',
     });
 
+    // Terms of Service + Privacy Policy agreement (required)
+    const [agreed, setAgreed] = useState(false);
+
     function set(key: keyof typeof fields, value: string) {
         setFields((prev) => ({ ...prev, [key]: value }));
     }
@@ -39,6 +42,7 @@ export default function Register() {
 
         const formData = new FormData();
         Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+        if (agreed) formData.append('terms', '1');
 
         try {
             await axios.post('/register', formData);
@@ -217,9 +221,27 @@ export default function Register() {
                             </div>
                             <PasswordStrengthIndicator password={fields.password} />
 
+                            <div className="space-y-1">
+                                <label htmlFor="terms" className="group flex cursor-pointer items-start gap-3">
+                                    <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                                        agreed ? 'border-blue-600 bg-blue-600' : 'border-gray-300 group-hover:border-blue-400 dark:border-gray-600'
+                                    }`}>
+                                        {agreed && <CheckSquare className="h-3 w-3 text-white" />}
+                                    </div>
+                                    <input id="terms" type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="sr-only" />
+                                    <span className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                                        I agree to the{' '}
+                                        <a href="/terms" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400">Terms of Service</a>
+                                        {' '}and{' '}
+                                        <a href="/privacy" target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} className="font-medium text-blue-600 underline hover:text-blue-700 dark:text-blue-400">Privacy Policy</a>
+                                    </span>
+                                </label>
+                                <InputError message={errors.terms} />
+                            </div>
+
                             <Button
                                 type="submit"
-                                disabled={processing}
+                                disabled={processing || !agreed}
                                 className="h-11 w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 mt-2"
                             >
                                 {processing && <Spinner />}
@@ -259,6 +281,9 @@ export default function Register() {
 
                         <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
                             LPG Marketplace &bull; Cavite
+                        </p>
+                        <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                            <a href="/terms" className="hover:underline">Terms</a> &middot; <a href="/privacy" className="hover:underline">Privacy</a>
                         </p>
                     </div>
                 </div>

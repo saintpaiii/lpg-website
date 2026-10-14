@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, TileLayer, useMap } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
@@ -333,6 +334,7 @@ export default function MyAttendancePage({
                                             <Marker position={[myCoords.lat, myCoords.lng]} icon={myIcon} />
                                         )}
                                         <MapFitter positions={mapPositions} />
+                                        <ServiceAreaLimit />
                                     </MapContainer>
                                 </div>
                             )}

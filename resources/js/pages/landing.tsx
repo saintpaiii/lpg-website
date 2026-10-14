@@ -667,6 +667,11 @@ export default function Landing({ products, stats }: Props) {
 
                         <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
                             <p>© 2026 LPG Distribution Cavite. All rights reserved.</p>
+                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                                <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+                                <Link href="/seller-terms" className="hover:text-white transition-colors">Seller Terms</Link>
+                                <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+                            </div>
                             <p>Built for Cavite LPG Distributors</p>
                         </div>
                     </div>

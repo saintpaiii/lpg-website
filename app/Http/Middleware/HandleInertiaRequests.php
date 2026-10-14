@@ -101,6 +101,22 @@ class HandleInertiaRequests extends Middleware
             'systemReportCategories' => fn () => $user ? config('reports.system_categories') : [],
             'systemReportAreas'      => fn () => $user ? config('reports.system_areas') : [],
             'reportBadges'        => fn () => \App\Services\ReportService::badgesFor($user),
+            // Terms / Privacy Policy versions this user still has to accept (major updates, Google sign-ups)
+            'pendingLegal'        => function () use ($user) {
+                $pending = \App\Services\LegalService::pendingFor($user);
+                return $pending ? [
+                    'has_any_acceptance' => $pending['has_any_acceptance'],
+                    'documents'          => array_map(fn ($d) => [
+                        'id'             => $d->id,
+                        'type'           => $d->type,
+                        'label'          => $d->label(),
+                        'title'          => $d->title,
+                        'version'        => $d->version,
+                        'change_summary' => $d->change_summary,
+                        'url'            => $d->publicPath(),
+                    ], $pending['documents']),
+                ] : null;
+            },
             'recentNotifications' => fn () => $user
                 ? Notification::where('user_id', $user->id)
                     ->whereNull('read_at')

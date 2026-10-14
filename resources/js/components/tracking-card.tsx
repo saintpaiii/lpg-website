@@ -3,6 +3,7 @@ import axios from 'axios';
 import { CheckCircle2, MapPin, MapPinOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
 import { useEchoPrivate, usePollInterval } from '@/lib/echo';
 import { OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, type LatLng } from '@/lib/map';
@@ -125,6 +126,7 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
                                     <Popup>Rider is somewhere in this area</Popup>
                                 </Circle>
                             )}
+                            <ServiceAreaLimit />
                         </MapContainer>
                     </div>
                 )
