@@ -52,6 +52,12 @@ class Store extends Model
         'consignment_due_days',
         'commission_suspended',
         'commission_suspended_at',
+        'business_permit_expires_at',
+        'fsic_permit_expires_at',
+        'doe_lpg_license_expires_at',
+        'lto_permit_expires_at',
+        'documents_suspended',
+        'documents_suspended_at',
     ];
 
     protected function casts(): array
@@ -70,6 +76,12 @@ class Store extends Model
             'max_delivery_radius_km'   => 'integer',
             'commission_suspended'     => 'boolean',
             'commission_suspended_at'  => 'datetime',
+            'business_permit_expires_at' => 'date',
+            'fsic_permit_expires_at'     => 'date',
+            'doe_lpg_license_expires_at' => 'date',
+            'lto_permit_expires_at'      => 'date',
+            'documents_suspended'        => 'boolean',
+            'documents_suspended_at'     => 'datetime',
             'allow_cod'                => 'boolean',
             'allow_consignment'        => 'boolean',
             'min_down_payment_percent' => 'integer',
@@ -80,10 +92,10 @@ class Store extends Model
     // ── Relationships ─────────────────────────────────────────────────────────
 
     /** The seller/owner of this store */
-    /** Approved and not suspended for unpaid commission — safe to show to customers. */
+    /** Approved, not suspended for unpaid commission, not hidden for an expired permit — safe to show to customers. */
     public function scopeVisibleToCustomers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
-        return $query->where('status', 'approved')->where('commission_suspended', false);
+        return $query->where('status', 'approved')->where('commission_suspended', false)->where('documents_suspended', false);
     }
 
     public function loyaltySettings(): \Illuminate\Database\Eloquent\Relations\HasOne
@@ -120,10 +132,21 @@ class Store extends Model
         });
     }
 
-    /** Customers can message the store (same rule as the storefront: approved, not commission-suspended). */
+    /** Customers can message the store (same rule as the storefront). */
     public function canReceiveMessages(): bool
     {
-        return $this->status === 'approved' && ! $this->commission_suspended;
+        return $this->isOpenToCustomers();
+    }
+
+    /** Approved, not suspended for unpaid commission, not hidden for an expired permit. */
+    public function isOpenToCustomers(): bool
+    {
+        return $this->status === 'approved' && ! $this->commission_suspended && ! $this->documents_suspended;
+    }
+
+    public function documentSubmissions(): HasMany
+    {
+        return $this->hasMany(StoreDocumentSubmission::class);
     }
 
     /** Platform admin who approved this store */

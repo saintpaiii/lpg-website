@@ -180,7 +180,7 @@ class LoyaltyService
 
         StoreLoyaltySettings::where('is_enabled', true)->with('store')->each(function (StoreLoyaltySettings $settings) use (&$demoted) {
             // Suspended stores are frozen: no tier changes while they can't take orders
-            if (! $settings->store || $settings->store->status !== 'approved' || $settings->store->commission_suspended) {
+            if (! $settings->store || ! $settings->store->isOpenToCustomers()) {
                 return;
             }
 

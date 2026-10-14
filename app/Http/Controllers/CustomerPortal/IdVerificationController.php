@@ -33,8 +33,8 @@ class IdVerificationController extends Controller
             'status'           => $user->id_verification_status,
             'rejection_reason' => $user->id_rejection_reason,
             'has_pending'      => $hasPending,
-            'valid_id_url'     => $user->valid_id_path ? Storage::url($user->valid_id_path) : null,
-            'selfie_url'       => $user->selfie_path   ? Storage::url($user->selfie_path)   : null,
+            'valid_id_url'     => \App\Support\PrivateDocument::urlIf($user->valid_id_path, 'user', $user->id, 'valid_id_path'),
+            'selfie_url'       => \App\Support\PrivateDocument::urlIf($user->selfie_path, 'user', $user->id, 'selfie_path'),
         ]);
     }
 
@@ -56,8 +56,9 @@ class IdVerificationController extends Controller
         ]);
 
         // Store uploaded files
-        $validIdPath = $request->file('valid_id')->store('verifications/ids', 'public');
-        $selfiePath  = $request->file('selfie')->store('verifications/selfies', 'public');
+        // Private ('local' disk) — only the customer and document reviewers can open them
+        $validIdPath = $request->file('valid_id')->store('verifications/ids', 'local');
+        $selfiePath  = $request->file('selfie')->store('verifications/selfies', 'local');
 
         // Update user record
         $user->update([

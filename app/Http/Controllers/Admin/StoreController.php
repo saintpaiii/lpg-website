@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\PrivateDocument;
+use App\Support\StoreDocuments;
 use App\Http\Controllers\Controller;
 use App\Models\AccountAction;
 use App\Models\Store;
@@ -118,23 +120,33 @@ class StoreController extends Controller
                 'suspension_reason'      => $store->suspension_reason,
                 'suspension_notes'       => $store->suspension_notes,
                 'suspended_at'           => $store->suspended_at?->format('M d, Y g:i A'),
-                // Document URLs — check verification request first, fall back to direct fields
-                'valid_id_url' => ($verification?->valid_id_path ?? $store->owner?->valid_id)
-                    ? Storage::url($verification?->valid_id_path ?? $store->owner->valid_id) : null,
-                'bir_permit_url' => ($verification?->bir_permit_path ?? $store->bir_permit)
-                    ? Storage::url($verification?->bir_permit_path ?? $store->bir_permit) : null,
-                'business_permit_url' => ($verification?->business_permit_path ?? $store->business_permit)
-                    ? Storage::url($verification?->business_permit_path ?? $store->business_permit) : null,
-                'fsic_permit_url' => ($verification?->fsic_permit_path ?? $store->fsic_permit)
-                    ? Storage::url($verification?->fsic_permit_path ?? $store->fsic_permit) : null,
-                'doe_lpg_license_url' => ($verification?->doe_lpg_license_path ?? $store->doe_lpg_license)
-                    ? Storage::url($verification?->doe_lpg_license_path ?? $store->doe_lpg_license) : null,
-                'lto_permit_url' => ($verification?->lto_permit_path ?? $store->lto_permit)
-                    ? Storage::url($verification?->lto_permit_path ?? $store->lto_permit) : null,
+                'logo_url'               => $store->logo ? Storage::url($store->logo) : null,
+                'documents_suspended'    => (bool) $store->documents_suspended,
+                // Private document links — the store's own file first (an approved renewal), else the application's
+                'valid_id_url' => $verification?->valid_id_path
+                    ? PrivateDocument::url('verification', $verification->id, 'valid_id_path')
+                    : PrivateDocument::urlIf($store->owner?->valid_id, 'user', (int) $store->user_id, 'valid_id'),
+                ...collect(StoreDocuments::TYPES)->mapWithKeys(fn ($t, $type) => ["{$type}_url" => $store->{$type}
+                    ? PrivateDocument::url('store', $store->id, $type)
+                    : PrivateDocument::urlIf($verification?->{"{$type}_path"}, 'verification', (int) $verification?->id, "{$type}_path")])->all(),
+                // Expiry date + status of each permit
+                'permits' => collect(array_keys(StoreDocuments::TYPES))->map(fn ($t) => StoreDocuments::summary($store, $t))->values(),
                 'terms_agreed_at' => $verification?->terms_agreed_at?->format('M d, Y'),
             ],
             'stats'   => $stats,
             'history' => $history,
+            // Latest renewals / extra documents the seller uploaded
+            'documentHistory' => $store->documentSubmissions()->with('reviewer:id,name')->latest()->limit(20)->get()
+                ->map(fn ($d) => [
+                    'id'          => $d->id,
+                    'label'       => $d->doc_type === 'other' ? ($d->label ?? 'Other document') : StoreDocuments::label($d->doc_type),
+                    'date'        => $d->created_at->timezone('Asia/Manila')->format('M d, Y'),
+                    'expires_on'  => $d->expires_at?->format('M d, Y'),
+                    'status'      => $d->status,
+                    'reviewer'    => $d->reviewer?->name,
+                    'reason'      => $d->rejection_reason,
+                    'url'         => PrivateDocument::url('store-document', $d->id, 'file_path'),
+                ])->values(),
         ]);
     }
 

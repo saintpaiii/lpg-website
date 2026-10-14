@@ -30,6 +30,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
+import StoreAvatar from '@/components/store-avatar';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
 
@@ -64,6 +66,14 @@ type StoreDetail = {
     suspension_reason: string | null;
     suspension_notes: string | null;
     suspended_at: string | null;
+    logo_url: string | null;
+    documents_suspended: boolean;
+    permits: { type: string; label: string; expires_on: string | null; days_left: number | null; status: PermitStatus }[];
+};
+
+type DocumentHistoryRow = {
+    id: number; label: string; date: string; expires_on: string | null;
+    status: 'pending' | 'approved' | 'rejected'; reviewer: string | null; reason: string | null; url: string;
 };
 
 type ActionHistory = {
@@ -107,6 +117,7 @@ type Props = {
     store: StoreDetail;
     stats: StoreStats;
     history: ActionHistory[];
+    documentHistory: DocumentHistoryRow[];
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -138,7 +149,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function StoreShow({ store, stats, history }: Props) {
+export default function StoreShow({ store, stats, history, documentHistory }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/admin/dashboard' },
         { title: 'Stores',    href: '/admin/stores' },
@@ -201,10 +212,16 @@ export default function StoreShow({ store, stats, history }: Props) {
                         </Link>
                         <div>
                             <div className="flex items-center gap-3">
+                                <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={40} />
                                 <h1 className="text-2xl font-bold tracking-tight">{store.store_name}</h1>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
                                     {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                 </span>
+                                {store.documents_suspended && (
+                                    <span className="inline-flex items-center rounded-full border border-red-200 bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                                        Hidden from customers (expired documents)
+                                    </span>
+                                )}
                             </div>
                             <p className="text-muted-foreground text-sm mt-0.5">
                                 Applied {store.created_at}
@@ -359,26 +376,15 @@ export default function StoreShow({ store, stats, history }: Props) {
                                         <span className="text-xs text-muted-foreground">Valid ID (Owner)</span>
                                         <DocLink url={store.valid_id_url} label="View ID" />
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">BIR Registration</span>
-                                        <DocLink url={store.bir_permit_url} label="View BIR" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Business Permit</span>
-                                        <DocLink url={store.business_permit_url} label="View Permit" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">FSIC (Fire Safety)</span>
-                                        <DocLink url={store.fsic_permit_url} label="View FSIC" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">DOE LPG License</span>
-                                        <DocLink url={store.doe_lpg_license_url} label="View DOE License" />
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">LTO (License to Operate)</span>
-                                        <DocLink url={store.lto_permit_url} label="View LTO" />
-                                    </div>
+                                    {store.permits.map((p) => (
+                                        <div key={p.type} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                                            <span className="text-xs text-muted-foreground">{p.label}</span>
+                                            <span className="flex items-center gap-2">
+                                                <PermitBadge p={p} />
+                                                <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -440,6 +446,49 @@ export default function StoreShow({ store, stats, history }: Props) {
                         </CardContent>
                     </Card>
                 )}
+                {/* Renewed permits / extra documents uploaded by the store */}
+                <Card>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Document history</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {documentHistory.length === 0 ? (
+                            <p className="py-4 text-center text-sm text-muted-foreground">No renewed or extra documents uploaded yet.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-muted-foreground">
+                                            <th className="pb-2 pr-3 font-medium">Document</th>
+                                            <th className="pb-2 pr-3 font-medium">Uploaded</th>
+                                            <th className="pb-2 pr-3 font-medium">Valid until</th>
+                                            <th className="pb-2 pr-3 font-medium">Status</th>
+                                            <th className="pb-2 pr-3 font-medium">Reviewed by</th>
+                                            <th className="pb-2" />
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {documentHistory.map((d) => (
+                                            <tr key={d.id}>
+                                                <td className="py-2 pr-3">{d.label}</td>
+                                                <td className="py-2 pr-3 whitespace-nowrap">{d.date}</td>
+                                                <td className="py-2 pr-3 whitespace-nowrap">{d.expires_on ?? '—'}</td>
+                                                <td className="py-2 pr-3">
+                                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${d.status === 'approved' ? 'bg-green-100 text-green-800' : d.status === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {d.status === 'pending' ? 'Waiting for review' : d.status === 'approved' ? 'Approved' : 'Rejected'}
+                                                    </span>
+                                                    {d.reason && <span className="block text-xs text-red-600">{d.reason}</span>}
+                                                </td>
+                                                <td className="py-2 pr-3">{d.reviewer ?? '—'}</td>
+                                                <td className="py-2 text-right"><a href={d.url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">View</a></td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Reject dialog */}

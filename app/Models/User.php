@@ -80,6 +80,28 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'platform_admin' || (bool) $this->is_admin;
     }
 
+    /**
+     * Home page of a store owner or store staff member (same mapping as LoginResponse).
+     * Null for every other role.
+     */
+    public function sellerHomeUrl(): ?string
+    {
+        return match (true) {
+            $this->role === 'seller'                                     => route('seller.dashboard'),
+            $this->role === 'seller_staff' && $this->sub_role === 'rider'     => route('rider.deliveries'),
+            $this->role === 'seller_staff' && $this->sub_role === 'warehouse' => route('seller.inventory'),
+            $this->role === 'seller_staff'                               => route('seller.invoices'),   // seller.dashboard needs a permission staff may lack
+            default                                                      => null,
+        };
+    }
+
+    /** Platform admins, or platform staff allowed to review verifications / stores — may open private documents. */
+    public function canReviewDocuments(): bool
+    {
+        return $this->isAdmin()
+            || ($this->is_platform_staff && ($this->hasPermission('verifications.view') || $this->hasPermission('stores.view')));
+    }
+
     public function isSeller(): bool
     {
         return $this->role === 'seller';

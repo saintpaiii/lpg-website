@@ -31,6 +31,10 @@ export type SellerStore = {
     status: string;
     commission_suspended?: boolean;
     commission_owed?: number;
+    /** Hidden from customers because a permit expired more than 7 days ago */
+    documents_suspended?: boolean;
+    /** Most urgent permit problem (expired, or expiring within 7 days) */
+    documents_alert?: { label: string; date: string; status: string; days_left: number } | null;
 };
 
 export type SellerApplication = {

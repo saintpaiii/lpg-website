@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
 use App\Services\LegalService;
+use App\Support\StoreDocuments;
 use App\Services\NotificationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -58,18 +59,26 @@ class SellerRegistrationController extends Controller
             'doe_lpg_license'       => ['required', $fileRule()],
             'lto_permit'            => ['required', $fileRule()],
 
+            // Optional store logo (same rule as Seller Settings)
+            'logo'                  => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+
+            // Permit "Valid until" dates
+            ...StoreDocuments::expiryRules(),
+
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ]);
+        ], StoreDocuments::expiryMessages());
 
         DB::transaction(function () use ($request, $validated) {
-            // Store uploaded documents
-            $validIdPath        = $request->file('valid_id')->store('valid_ids', 'public');
-            $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'public');
-            $businessPermitPath = $request->file('business_permit')->store('business_permits', 'public');
-            $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'public');
-            $doeLicensePath     = $request->file('doe_lpg_license')->store('doe_licenses', 'public');
-            $ltoPermitPath      = $request->file('lto_permit')->store('lto_permits', 'public');
+            // Store uploaded documents — private ('local' disk, served only to the owner and reviewers)
+            $validIdPath        = $request->file('valid_id')->store('valid_ids', 'local');
+            $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'local');
+            $businessPermitPath = $request->file('business_permit')->store('business_permits', 'local');
+            $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'local');
+            $doeLicensePath     = $request->file('doe_lpg_license')->store('doe_licenses', 'local');
+            $ltoPermitPath      = $request->file('lto_permit')->store('lto_permits', 'local');
+            // The logo is public (customers see it)
+            $logoPath           = $request->hasFile('logo') ? $request->file('logo')->store('store-logos', 'public') : null;
 
             // Create seller user account (email unverified)
             $user = User::create([
@@ -99,6 +108,11 @@ class SellerRegistrationController extends Controller
                 'fsic_permit'      => $fsicPermitPath,
                 'doe_lpg_license'  => $doeLicensePath,
                 'lto_permit'       => $ltoPermitPath,
+                'logo'             => $logoPath,
+                'business_permit_expires_at' => $validated['business_permit_expires_at'],
+                'fsic_permit_expires_at'     => $validated['fsic_permit_expires_at'],
+                'doe_lpg_license_expires_at' => $validated['doe_lpg_license_expires_at'],
+                'lto_permit_expires_at'      => $validated['lto_permit_expires_at'],
                 'status'           => 'pending',
                 'subscription_plan'=> 'free',
                 'commission_rate'  => (float) Setting::get('default_commission_rate', 5.00),   // the rate the seller agreed to

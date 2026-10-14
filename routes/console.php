@@ -25,3 +25,6 @@ Schedule::command('reports:auto-escalate')->hourly()->withoutOverlapping();
 
 // Online orders whose PayMongo payment wasn't completed within 60 minutes are cancelled (stock/notifications via the customer-cancel path)
 Schedule::command('orders:cancel-unpaid')->everyFifteenMinutes()->withoutOverlapping();
+
+// Store permits: reminders 30/7/1 days before expiry; hide stores whose permit expired more than 7 days ago
+Schedule::command('stores:check-documents')->dailyAt('06:00')->withoutOverlapping();

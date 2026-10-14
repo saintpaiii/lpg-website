@@ -16,7 +16,7 @@ class StoreController extends Controller
 {
     public function show(Request $request, Store $store): Response
     {
-        if ($store->status !== 'approved' || $store->commission_suspended) {
+        if (! $store->isOpenToCustomers()) {
             abort(404);
         }
 
@@ -83,6 +83,7 @@ class StoreController extends Controller
             'store' => [
                 'id'            => $store->id,
                 'store_name'    => $store->store_name,
+                'logo_url'      => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
                 'description'   => $store->description,
                 'city'          => $store->city,
                 'barangay'      => $store->barangay,

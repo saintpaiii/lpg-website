@@ -52,7 +52,7 @@ class CouponService
                 $name = $coupon->store?->store_name ?? 'another store';
                 throw new CouponException("This coupon is only valid at {$name}.");
             }
-            if ($coupon->store->status !== 'approved' || $coupon->store->commission_suspended) {
+            if (! $coupon->store->isOpenToCustomers()) {
                 throw new CouponException('This coupon is not available right now.');
             }
         }

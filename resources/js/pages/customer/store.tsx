@@ -15,12 +15,14 @@ import {
 import { StarRating } from '@/components/ui/star-rating';
 import CustomerLayout from '@/layouts/customer-layout';
 import { formatAddress } from '@/data/cavite-locations';
+import StoreAvatar from '@/components/store-avatar';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type StoreInfo = {
     id: number;
     store_name: string;
+    logo_url: string | null;
     description: string | null;
     city: string | null;
     barangay: string | null;
@@ -151,6 +153,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                         <div className="flex flex-wrap items-start justify-between gap-4">
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 flex-wrap">
+                                    <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={48} />
                                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{store.store_name}</h1>
                                     <MessageButton portal="customer" params={{ store_id: store.id }} label="Message store" className="gap-1.5" />
                                     {store.is_top_rated && (

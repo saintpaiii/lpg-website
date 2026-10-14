@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, MapPin, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
 import { formatCity } from '@/data/cavite-locations';
+import StoreAvatar from '@/components/store-avatar';
 
 type Product = {
     id: number;
@@ -28,6 +29,7 @@ type Product = {
     stock: number;
     store_id: number;
     store_name: string;
+    store_logo_url: string | null;
     store_city: string;
     store_barangay: string;
     store_province: string;
@@ -452,7 +454,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
                                     <p className="text-xs text-gray-500 mb-2">{p.brand} · {p.weight}</p>
                                     <div className="flex items-center gap-1 text-xs text-gray-400 mb-1.5">
-                                        <MapPin className="h-3 w-3 shrink-0" />
+                                        <StoreAvatar name={p.store_name} logoUrl={p.store_logo_url} size={18} />
                                         <button
                                             className="hover:text-blue-600 hover:underline transition-colors text-left"
                                             onClick={(e) => { e.stopPropagation(); router.visit(`/customer/store/${p.store_id}`); }}

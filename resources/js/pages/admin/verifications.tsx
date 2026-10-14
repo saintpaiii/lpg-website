@@ -22,6 +22,8 @@ import {
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
+import StoreAvatar from '@/components/store-avatar';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',     href: '/admin/dashboard' },
@@ -60,6 +62,8 @@ type VerificationRow = {
     fsic_permit_url: string | null;
     doe_lpg_license_url: string | null;
     lto_permit_url: string | null;
+    store_logo_url?: string | null;
+    permit_expiries?: { type: string; label: string; expires_on: string | null; days_left: number | null; status: PermitStatus }[];
 };
 
 type Counts = { pending: number; approved: number; rejected: number };
@@ -334,7 +338,10 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                         {v.store_name && (
                                             <div className="flex gap-2">
                                                 <span className="text-sm text-muted-foreground w-24 shrink-0">Store Name</span>
-                                                <span className="text-sm font-medium">{v.store_name}</span>
+                                                <span className="flex items-center gap-2 text-sm font-medium">
+                                                    <StoreAvatar name={v.store_name} logoUrl={v.store_logo_url} size={28} />
+                                                    {v.store_name}
+                                                </span>
                                             </div>
                                         )}
                                         {v.store_phone && (
@@ -405,6 +412,17 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                             <DocRow label="DOE LPG Retail License" url={v.doe_lpg_license_url} />
                                             <DocRow label="LTO (License to Operate)" url={v.lto_permit_url} />
                                         </>}
+                                    </div>
+                                )}
+                                {v.type === 'seller_application' && (v.permit_expiries?.length ?? 0) > 0 && (
+                                    <div className="mt-2 space-y-1 rounded-md border px-3 py-2">
+                                        <p className="text-xs font-medium text-muted-foreground">Valid until (entered by the seller)</p>
+                                        {v.permit_expiries!.map((p) => (
+                                            <div key={p.type} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                                <span>{p.label}</span>
+                                                <PermitBadge p={p} />
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                             </section>

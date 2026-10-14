@@ -29,7 +29,12 @@ class EnsureIsAdmin
                 ->with('deactivation_info', ['reason' => $reason, 'notes' => $notes]);
         }
 
-        // Standard staff roles always have access (includes platform_admin, seller, seller_staff).
+        // Store owners and store staff (incl. riders) never use the admin area — send them to their own home.
+        if (in_array($user->role, ['seller', 'seller_staff'], true) && ! $user->isAdmin()) {
+            return redirect($user->sellerHomeUrl())->with('error', 'That page is for platform administrators only.');
+        }
+
+        // Standard staff roles always have access (includes platform_admin; legacy manager / cashier / warehouse).
         if ($user->isStaff()) {
             return $next($request);
         }

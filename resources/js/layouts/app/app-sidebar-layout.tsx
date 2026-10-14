@@ -3,6 +3,7 @@ import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { CommissionSuspensionBanner } from '@/components/commission-suspension-banner';
+import { DocumentSuspensionBanner } from '@/components/document-suspension-banner';
 import { InstallAppBanner } from '@/components/install-app-banner';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import type { AppLayoutProps } from '@/types';
@@ -20,6 +21,7 @@ export default function AppSidebarLayout({
             <AppContent variant="sidebar" className="overflow-x-hidden">
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
                 <CommissionSuspensionBanner />
+                <DocumentSuspensionBanner />
                 {children}
             </AppContent>
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />

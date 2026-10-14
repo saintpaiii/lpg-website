@@ -54,7 +54,7 @@ class LandingController extends Controller
         }
 
         $products = Product::where('is_active', true)
-            ->whereDoesntHave('store', fn ($q) => $q->where('commission_suspended', true))
+            ->whereDoesntHave('store', fn ($q) => $q->where(fn ($w) => $w->where('commission_suspended', true)->orWhere('documents_suspended', true)))
             ->orderBy('weight_kg')
             ->get(['id', 'name', 'brand', 'weight_kg', 'selling_price']);
 

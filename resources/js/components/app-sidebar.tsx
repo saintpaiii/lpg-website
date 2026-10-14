@@ -36,6 +36,8 @@ import {
     Warehouse,
     MessageSquare,
     ScrollText,
+    FileCheck,
+    FileText,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -103,6 +105,7 @@ export function AppSidebar() {
             isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award     },
             (isActualSeller || isHR)                    && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users     },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
+            isActualSeller                              && { title: 'Store Documents', href: '/seller/documents', icon: FileText     },
             { title: 'Notifications', href: '/notifications', icon: Bell   },
             { title: 'Profile',       href: '/settings/profile', icon: User },
         ].filter(Boolean) as NavItem[];
@@ -168,6 +171,7 @@ export function AppSidebar() {
         isPlatformAdmin                                && { title: 'Platform Staff',   href: '/admin/staff',          icon: UserCog    },
         (isPlatformAdmin || can('stores.view'))        && { title: 'Stores',           href: '/admin/stores',         icon: Store      },
         (isPlatformAdmin || can('verifications.view')) && { title: 'Verifications',    href: '/admin/verifications',  icon: BadgeCheck },
+        (isPlatformAdmin || can('verifications.view') || can('stores.view')) && { title: 'Store Documents', href: '/admin/store-documents', icon: FileCheck },
         // Riders have dedicated delivery pages
         isRider && { title: 'My Deliveries',   href: '/rider/deliveries',    icon: Truck          },
         isRider && { title: 'Delivery History', href: '/rider/history',      icon: History        },

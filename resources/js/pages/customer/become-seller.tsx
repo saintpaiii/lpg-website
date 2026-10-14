@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
+import { isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type ExpiringDoc } from '@/components/seller-application-fields';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,11 @@ type PreviousStore = {
     barangay: string;
     province: string;
     phone: string;
+    logo_url: string | null;
+    business_permit_expires_at: string | null;
+    fsic_permit_expires_at: string | null;
+    doe_lpg_license_expires_at: string | null;
+    lto_permit_expires_at: string | null;
 } | null;
 
 type PreviousDocs = {
@@ -44,6 +50,10 @@ type Props = {
     previous_docs: PreviousDocs;
     seller_terms: SellerTerms;
     commission_rate: number;
+    /** Set when 5 applications were rejected within 30 days */
+    limit_message: string | null;
+    attempt: number;
+    max_attempts: number;
 };
 
 // ── File field definitions ─────────────────────────────────────────────────────
@@ -87,7 +97,7 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, commission_rate }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, commission_rate, limit_message, attempt, max_attempts }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -110,6 +120,11 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         fsic_permit: File | null;
         doe_lpg_license: File | null;
         lto_permit: File | null;
+        logo: File | null;
+        business_permit_expires_at: string;
+        fsic_permit_expires_at: string;
+        doe_lpg_license_expires_at: string;
+        lto_permit_expires_at: string;
         terms_agreed: boolean;
     }>({
         store_name:        previous_store?.store_name    ?? '',
@@ -125,6 +140,12 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         fsic_permit:     null,
         doe_lpg_license: null,
         lto_permit:      null,
+        logo:            null,
+        // Pre-filled on resubmission, still required
+        business_permit_expires_at: previous_store?.business_permit_expires_at ?? '',
+        fsic_permit_expires_at:     previous_store?.fsic_permit_expires_at ?? '',
+        doe_lpg_license_expires_at: previous_store?.doe_lpg_license_expires_at ?? '',
+        lto_permit_expires_at:      previous_store?.lto_permit_expires_at ?? '',
         terms_agreed:    false,
     });
 
@@ -223,9 +244,19 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                     </Card>
                 )}
 
+                {/* Too many rejected applications in 30 days */}
+                {!isPending && limit_message && (
+                    <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20">
+                        <CardContent className="pt-6 text-sm text-amber-800 dark:text-amber-300">{limit_message}</CardContent>
+                    </Card>
+                )}
+
                 {/* Application form */}
-                {!isPending && (
+                {!isPending && !limit_message && (
                     <form onSubmit={submit} className="space-y-6">
+                        {isRejected && (
+                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Attempt {attempt} of {max_attempts}</p>
+                        )}
 
                         {/* Step indicators */}
                         <div className="flex gap-1">
@@ -295,6 +326,12 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                             />
                                             {(errors.store_phone || step1Errors.store_phone) && <p className="mt-1 text-xs text-red-600">{errors.store_phone || step1Errors.store_phone}</p>}
                                         </div>
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardContent className="pt-6">
+                                        <StoreLogoPicker file={data.logo} currentUrl={previous_store?.logo_url} error={errors.logo} onChange={(f) => setData('logo', f)} />
                                     </CardContent>
                                 </Card>
 
@@ -371,6 +408,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         {/* Other required docs */}
                                         {DOC_FIELDS.map(doc => {
                                             const existingUrl = previous_docs?.[doc.urlKey] ?? null;
+                                            const expiryKey = isExpiringDoc(doc.key) ? (`${doc.key}_expires_at` as `${ExpiringDoc}_expires_at`) : null;
                                             return (
                                                 <div key={doc.key}>
                                                     {existingUrl && <PreviousDocBadge url={existingUrl} />}
@@ -384,6 +422,12 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                         inputRef={fileRefs[doc.key]}
                                                         onChange={f => setData(doc.key, f)}
                                                     />
+                                                    {expiryKey && (
+                                                        <div className="mt-2">
+                                                            <PermitExpiryInput id={expiryKey} value={data[expiryKey]}
+                                                                error={errors[expiryKey]} onChange={(v) => setData(expiryKey, v)} />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}

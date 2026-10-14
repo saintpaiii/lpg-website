@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Store, Trash2 } from 'lucide-react';
+import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     AlertDialog,
@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import type { SharedData } from '@/types';
+import StoreAvatar from '@/components/store-avatar';
 
 type CartItem = {
     product_id: number;
@@ -32,6 +33,7 @@ type CartItem = {
 type StoreGroup = {
     store_id: number;
     store_name: string;
+    store_logo_url?: string | null;
     delivery_fee: number;
     items: CartItem[];
 };
@@ -212,7 +214,7 @@ export default function CartPage({ cart }: Props) {
                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 cursor-pointer"
                                             />
                                             <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
-                                                <Store className="h-4 w-4 text-blue-500" />
+                                                <StoreAvatar name={sg.store_name} logoUrl={sg.store_logo_url} size={24} />
                                                 {sg.store_name}
                                             </CardTitle>
                                             {sg.delivery_fee > 0 ? (

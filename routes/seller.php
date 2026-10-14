@@ -225,6 +225,12 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             ->middleware('permission:dss.view')
             ->name('dss');
 
+        // ── Store Documents (permit renewals, extra documents) — owner only ──
+        Route::middleware('seller_owner')->group(function () {
+            Route::get('documents', [\App\Http\Controllers\Seller\StoreDocumentController::class, 'index'])->name('documents.index');
+            Route::post('documents', [\App\Http\Controllers\Seller\StoreDocumentController::class, 'store'])->middleware('throttle:20,1')->name('documents.store');
+        });
+
         // ── Settings ─────────────────────────────────────────────────────────
         Route::middleware('permission:settings.view')->group(function () {
             Route::get('settings', [SettingsController::class, 'index'])->name('settings');

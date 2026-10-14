@@ -1,6 +1,6 @@
 import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, MapPin, Package, ShoppingCart, Star } from 'lucide-react';
+import { ArrowLeft, Package, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { StarRating } from '@/components/ui/star-rating';
@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import { fmtDate } from '@/lib/utils';
+import StoreAvatar from '@/components/store-avatar';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ type Product = {
     stock: number;
     store_id: number;
     store_name: string;
+    store_logo_url: string | null;
     store_city: string;
     store_barangay: string;
     delivery_fee: number;
@@ -243,7 +245,7 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                         {/* Store */}
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1.5 text-sm">
                             <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                <MapPin className="h-4 w-4 text-blue-500 shrink-0" />
+                                <StoreAvatar name={product.store_name} logoUrl={product.store_logo_url} size={28} />
                                 <button
                                     className="font-semibold hover:text-blue-600 hover:underline transition-colors"
                                     onClick={() => router.visit(`/customer/store/${product.store_id}`)}

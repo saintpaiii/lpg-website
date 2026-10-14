@@ -37,6 +37,12 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
+    /** Store columns the layout needs (sidebar, suspension banners). */
+    private const STORE_COLUMNS = [
+        'id', 'store_name', 'status', 'commission_suspended', 'documents_suspended',
+        'business_permit_expires_at', 'fsic_permit_expires_at', 'doe_lpg_license_expires_at', 'lto_permit_expires_at',
+    ];
+
     public function share(Request $request): array
     {
         $user = $request->user();
@@ -46,8 +52,8 @@ class HandleInertiaRequests extends Middleware
         if ($user && ($user->role === 'seller' || $user->role === 'seller_staff')) {
             $store = $request->attributes->get('seller_store')
                 ?? ($user->role === 'seller'
-                    ? Store::where('user_id', $user->id)->select('id', 'store_name', 'status', 'commission_suspended')->first()
-                    : ($user->store_id ? Store::find($user->store_id, ['id', 'store_name', 'status', 'commission_suspended']) : null));
+                    ? Store::where('user_id', $user->id)->select(self::STORE_COLUMNS)->first()
+                    : ($user->store_id ? Store::find($user->store_id, self::STORE_COLUMNS) : null));
         }
 
         // Pending/rejected seller application — shown in customer portal for non-sellers
@@ -80,6 +86,9 @@ class HandleInertiaRequests extends Middleware
                     'commission_owed'      => $store->commission_suspended
                         ? \App\Services\CommissionBillingService::outstandingFor($store->id)
                         : 0,
+                    // Permit problems for the seller banner (from the store row only)
+                    'documents_suspended'  => (bool) $store->documents_suspended,
+                    'documents_alert'      => \App\Support\StoreDocuments::alertFor($store),
                 ] : null,
                 'seller_application' => $sellerApplication,
             ],

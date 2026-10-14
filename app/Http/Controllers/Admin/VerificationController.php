@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\PrivateDocument;
 use App\Http\Controllers\Controller;
 use App\Models\Store;
 use App\Models\VerificationRequest;
@@ -98,18 +99,22 @@ class VerificationController extends Controller
                     'store_address'    => $store?->address,
                     'store_city'       => $store?->city,
                     'store_barangay'   => $store?->barangay,
+                    'store_logo_url'   => $store?->logo ? Storage::url($store->logo) : null,
+                    // "Valid until" dates the seller entered for each expiring permit
+                    'permit_expiries'  => $store ? collect(\App\Support\StoreDocuments::expiringTypes())
+                        ->map(fn ($t) => \App\Support\StoreDocuments::summary($store, $t))->values() : [],
                     // Resubmission data
                     'is_resubmission'            => $isResubmission,
                     'previous_rejection_reason'  => $isResubmission ? $prevApp?->rejection_reason : null,
                     'reuploaded_docs'            => $reuploadedDocs,
                     // Document URLs — all 6 + selfie
-                    'valid_id_url'          => $v->valid_id_path ? Storage::url($v->valid_id_path) : null,
-                    'selfie_url'            => $v->selfie_path   ? Storage::url($v->selfie_path)   : null,
-                    'bir_permit_url'        => $v->bir_permit_path ? Storage::url($v->bir_permit_path) : null,
-                    'business_permit_url'   => $v->business_permit_path ? Storage::url($v->business_permit_path) : null,
-                    'fsic_permit_url'       => $v->fsic_permit_path ? Storage::url($v->fsic_permit_path) : null,
-                    'doe_lpg_license_url'   => $v->doe_lpg_license_path ? Storage::url($v->doe_lpg_license_path) : null,
-                    'lto_permit_url'        => $v->lto_permit_path ? Storage::url($v->lto_permit_path) : null,
+                    'valid_id_url'          => PrivateDocument::urlIf($v->valid_id_path, 'verification', $v->id, 'valid_id_path'),
+                    'selfie_url'            => PrivateDocument::urlIf($v->selfie_path, 'verification', $v->id, 'selfie_path'),
+                    'bir_permit_url'        => PrivateDocument::urlIf($v->bir_permit_path, 'verification', $v->id, 'bir_permit_path'),
+                    'business_permit_url'   => PrivateDocument::urlIf($v->business_permit_path, 'verification', $v->id, 'business_permit_path'),
+                    'fsic_permit_url'       => PrivateDocument::urlIf($v->fsic_permit_path, 'verification', $v->id, 'fsic_permit_path'),
+                    'doe_lpg_license_url'   => PrivateDocument::urlIf($v->doe_lpg_license_path, 'verification', $v->id, 'doe_lpg_license_path'),
+                    'lto_permit_url'        => PrivateDocument::urlIf($v->lto_permit_path, 'verification', $v->id, 'lto_permit_path'),
                 ];
             }),
             'counts' => $counts,

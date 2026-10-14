@@ -42,6 +42,7 @@ class CartController extends Controller
                 $stores[$storeId] = [
                     'store_id'     => $storeId,
                     'store_name'   => $store->store_name,
+                    'store_logo_url' => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
                     'delivery_fee' => (float) ($store->delivery_fee ?? 0),
                     'items'        => [],
                 ];

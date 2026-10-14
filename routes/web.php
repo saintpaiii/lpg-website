@@ -34,6 +34,11 @@ Route::get('/invoices/{invoice}/print', [InvoicePrintController::class, 'show'])
 
 // ── Notifications — available to all authenticated users ──────────────────────
 Route::middleware(['auth', 'verified'])->group(function () {
+    // Private documents (IDs, selfies, permits) — owner or document reviewers only
+    Route::get('/documents/{kind}/{id}/{field}', [\App\Http\Controllers\DocumentFileController::class, 'show'])
+        ->whereIn('kind', ['user', 'verification', 'store', 'store-document'])->whereNumber('id')
+        ->middleware('throttle:120,1')->name('documents.show');
+
     // Accept updated Terms / Privacy Policy (the update popup)
     Route::post('/legal/accept', [\App\Http\Controllers\LegalAcceptController::class, 'store'])->middleware('throttle:30,1')->name('legal.accept');
 

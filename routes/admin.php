@@ -85,6 +85,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
     });
 
+    // Store Documents review (every action checks canReviewDocuments())
+    Route::get('store-documents', [\App\Http\Controllers\Admin\StoreDocumentController::class, 'index'])->name('store-documents.index');
+    Route::post('store-documents/{submission}/approve', [\App\Http\Controllers\Admin\StoreDocumentController::class, 'approve'])->name('store-documents.approve');
+    Route::post('store-documents/{submission}/reject', [\App\Http\Controllers\Admin\StoreDocumentController::class, 'reject'])->name('store-documents.reject');
+
     // Terms & Policies (platform admins only — every action checks isAdmin(); sellers pass the 'admin' middleware)
     Route::get('legal', [LegalDocumentController::class, 'index'])->name('legal.index');
     Route::post('legal/preview', [LegalDocumentController::class, 'preview'])->middleware('throttle:30,1')->name('legal.preview');

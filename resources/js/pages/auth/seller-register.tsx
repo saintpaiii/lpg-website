@@ -8,6 +8,7 @@ import React, { useRef, useState } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
+import { EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker } from '@/components/seller-application-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -149,6 +150,10 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
         store_province:        'Cavite',
     });
 
+    // "Valid until" dates of the expiring permits, and the optional logo
+    const [expiries, setExpiries] = useState<Record<string, string>>({});
+    const [logo, setLogo] = useState<File | null>(null);
+
     const [agreeTerms, setAgreeTerms]           = useState(false);
     const [agreeAuthentic, setAgreeAuthentic]   = useState(false);
     const [agreeCommission, setAgreeCommission] = useState(false);
@@ -174,6 +179,8 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
         for (const [key, file] of Object.entries(files)) {
             if (file) formData.append(key, file);
         }
+        for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
+        if (logo) formData.append('logo', logo);
         formData.append('terms_agreed', '1');
 
         try {
@@ -190,8 +197,8 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
             setErrors(mapped);
             // Navigate back to offending step
             const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation',
-                               'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay'];
-            const step2Keys = DOC_FIELDS.map(d => d.key);
+                               'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo'];
+            const step2Keys = [...DOC_FIELDS.map(d => d.key), ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
             else if (step2Keys.some((k) => mapped[k])) setStep(2);
             else setStep(3);
@@ -370,6 +377,8 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
                                         <InputError message={errors.store_description} />
                                     </div>
 
+                                    <StoreLogoPicker file={logo} error={errors.logo} onChange={setLogo} />
+
                                     <AddressFields
                                         address={fields.store_address}
                                         city={fields.store_city}
@@ -402,16 +411,21 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
                                     </div>
 
                                     {DOC_FIELDS.map((doc) => (
-                                        <FileUploadField
-                                            key={doc.key}
-                                            id={doc.key}
-                                            label={doc.label}
-                                            hint={doc.hint}
-                                            file={files[doc.key]}
-                                            error={errors[doc.key]}
-                                            onFileChange={(f) => setFile(doc.key, f)}
-                                            onClear={() => setFile(doc.key, null)}
-                                        />
+                                        <div key={doc.key} className="space-y-2">
+                                            <FileUploadField
+                                                id={doc.key}
+                                                label={doc.label}
+                                                hint={doc.hint}
+                                                file={files[doc.key]}
+                                                error={errors[doc.key]}
+                                                onFileChange={(f) => setFile(doc.key, f)}
+                                                onClear={() => setFile(doc.key, null)}
+                                            />
+                                            {isExpiringDoc(doc.key) && (
+                                                <PermitExpiryInput id={`${doc.key}_expires_at`} value={expiries[doc.key] ?? ''} error={errors[`${doc.key}_expires_at`]}
+                                                    onChange={(v) => setExpiries((e) => ({ ...e, [doc.key]: v }))} />
+                                            )}
+                                        </div>
                                     ))}
 
                                     <div className="flex gap-3 mt-2">
