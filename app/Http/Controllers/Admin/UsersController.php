@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Support\PrivateDocument;
 use App\Http\Controllers\Controller;
 use App\Models\AccountAction;
 use App\Models\Customer;
@@ -89,6 +90,54 @@ class UsersController extends Controller
         // Owned store info (sellers)
         $store = $user->ownedStore ?? $user->store;
 
+        // ── Identity & documents (files are private links) ──
+        $customerRow = Customer::where('user_id', $user->id)->first();
+        $requests = \App\Models\VerificationRequest::withTrashed()->with('reviewer:id,name')
+            ->where('user_id', $user->id)->whereIn('type', ['customer_id_verification', 'seller_application'])
+            ->orderByDesc('created_at')->get();
+        $latestId = $requests->firstWhere('type', 'customer_id_verification');
+        $identity = [
+            'status'          => match (true) {
+                $user->id_verification_status === 'verified' || (bool) $user->id_verified => 'verified',
+                $user->id_verification_status === 'pending'  => 'pending',
+                $user->id_verification_status === 'rejected' => 'rejected',
+                default                                      => 'not_submitted',
+            },
+            'verified_at'     => $user->id_verified_at?->timezone('Asia/Manila')->format('M d, Y'),
+            'verified_by'     => $latestId?->status === 'approved' ? $latestId->reviewer?->name : null,
+            'rejection_reason'=> $user->id_rejection_reason,
+            'full_name'       => trim(implode(' ', array_filter([$user->first_name, $user->middle_name, $user->last_name]))) ?: $user->name,
+            'phone'           => $user->phone ?: $customerRow?->phone,
+            'email'           => $user->email,
+            'email_verified'  => (bool) $user->email_verified_at,
+            'home_address'    => $customerRow ? collect([$customerRow->address, $customerRow->barangay, $customerRow->city])->filter()->implode(', ') : null,
+            'saved_addresses' => \App\Models\CustomerAddress::where('user_id', $user->id)->count(),
+            'valid_id_url'    => PrivateDocument::urlIf($user->valid_id_path, 'user', $user->id, 'valid_id_path')
+                ?? PrivateDocument::urlIf($user->valid_id, 'user', $user->id, 'valid_id'),
+            'selfie_url'      => PrivateDocument::urlIf($user->selfie_path, 'user', $user->id, 'selfie_path'),
+            'store_id'        => $user->role === 'seller' ? $store?->id : null,
+            'can_revoke'      => request()->user()->isAdmin(),
+            'history'         => $requests->map(fn ($r) => [
+                'id'       => $r->id,
+                'date'     => $r->created_at->timezone('Asia/Manila')->format('M d, Y'),
+                'type'     => $r->type === 'seller_application' ? 'Seller application' : 'ID verification',
+                'status'   => $r->status,
+                'reviewer' => $r->reviewer?->name,
+                'reason'   => $r->rejection_reason,
+            ])->values(),
+            // Riders / staff: their documents (read-only here; the store owner reviews them)
+            'staff_documents' => $user->role === 'seller_staff'
+                ? \App\Models\StaffDocument::where('user_id', $user->id)->latest()->get()->map(fn ($d) => [
+                    'id'              => $d->id,
+                    'label'           => \App\Services\StaffDocumentService::label($d->doc_type, $d->label),
+                    'document_number' => $d->document_number,
+                    'expires_on'      => $d->expires_at?->format('M j, Y'),
+                    'status'          => $d->status,
+                    'url'             => PrivateDocument::url('staff-document', $d->id, 'file_path'),
+                ])->values()
+                : [],
+        ];
+
         return Inertia::render('admin/user-show', [
             'user' => [
                 'id'          => $user->id,
@@ -111,6 +160,7 @@ class UsersController extends Controller
                 'city'       => $store->city,
             ] : null,
             'orders' => $orders,
+            'identity' => $identity,
             // Which Terms / Privacy Policy versions this user agreed to, and when
             'legalAcceptances' => \App\Models\LegalAcceptance::with('document:id,type,version')
                 ->where('user_id', $user->id)->latest('accepted_at')->get()
@@ -122,6 +172,34 @@ class UsersController extends Controller
                     'context'  => \App\Models\LegalAcceptance::CONTEXT_LABELS[$a->context] ?? $a->context,
                 ])->values(),
         ]);
+    }
+
+    // ── Revoke ID verification (platform admins only) ─────────────────────────
+
+    public function revokeVerification(Request $request, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $data = $request->validate(['reason' => ['required', 'string', 'max:255']], ['reason.required' => 'Please give a reason.']);
+
+        $user->forceFill([
+            'id_verified'            => false,
+            'id_verification_status' => 'rejected',
+            'id_rejection_reason'    => $data['reason'],
+        ])->save();
+
+        AccountAction::create([
+            'target_type'  => 'user',
+            'target_id'    => $user->id,
+            'action'       => 'revoke_id',
+            'reason'       => $data['reason'],
+            'performed_by' => $request->user()->id,
+        ]);
+
+        \App\Services\NotificationService::send($user->id, 'system', 'Please verify your ID again',
+            "Please upload your ID again: {$data['reason']}", ['link' => '/customer/id-verification']);
+
+        return back()->with('success', "{$user->name}'s ID verification was revoked. They must upload their ID again.");
     }
 
     // ── Toggle Active ─────────────────────────────────────────────────────────

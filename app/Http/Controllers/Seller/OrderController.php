@@ -145,13 +145,16 @@ class OrderController extends Controller
                 ->whereDate('balance_due_date', '<', now()->toDateString())->count(),
         ];
 
-        $riders = User::where('store_id', $store->id)
+        $riderRows = User::where('store_id', $store->id)
             ->where('role', 'seller_staff')
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])
+            ->get(['id', 'name', 'role', 'sub_role']);
+        // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
+        $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        $riders = $riderRows
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
             ->values()
             ->all();
 
@@ -346,13 +349,16 @@ class OrderController extends Controller
         $order->load(['customer', 'items.product', 'invoice', 'delivery.rider', 'payments']);
 
         // Riders for this store (seller_staff with sub_role=rider)
-        $riders = User::where('store_id', $store->id)
+        $riderRows = User::where('store_id', $store->id)
             ->where('role', 'seller_staff')
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'phone'])
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone])
+            ->get(['id', 'name', 'phone', 'role', 'sub_role']);
+        // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
+        $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        $riders = $riderRows
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
             ->values()
             ->all();
 
@@ -593,6 +599,10 @@ class OrderController extends Controller
         if (! $rider) {
             return back()->with('error', 'Choose an active rider from your store.');
         }
+        // Riders need an approved, unexpired driver's license
+        if ($why = \App\Services\StaffDocumentService::assignmentError($rider)) {
+            return back()->with('error', $why);
+        }
 
         $orders = Order::with('customer')->whereIn('id', $data['order_ids'])->where('store_id', $store->id)->get();
 
@@ -664,6 +674,10 @@ class OrderController extends Controller
             ->where('store_id', $store->id)
             ->where('sub_role', 'rider')
             ->firstOrFail();
+        // Riders need an approved, unexpired driver's license
+        if ($why = \App\Services\StaffDocumentService::assignmentError($rider)) {
+            return back()->with('error', $why);
+        }
 
         if ($order->delivery) {
             $order->delivery->update([

@@ -53,5 +53,7 @@ export type SharedData = {
     recentNotifications: AppNotification[];
     /** Terms / Privacy Policy versions this user must accept before continuing (null = nothing pending) */
     pendingLegal?: PendingLegal | null;
+    /** Riders only: can they make deliveries (approved, unexpired driver's license)? */
+    rider_license?: { can_deliver: boolean; message: string } | null;
     [key: string]: unknown;
 };

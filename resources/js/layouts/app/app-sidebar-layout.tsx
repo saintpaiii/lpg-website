@@ -4,6 +4,8 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { CommissionSuspensionBanner } from '@/components/commission-suspension-banner';
 import { DocumentSuspensionBanner } from '@/components/document-suspension-banner';
+import { StoreLocationBanner } from '@/components/store-location-banner';
+import { RiderLicenseBanner } from '@/components/rider-license-banner';
 import { InstallAppBanner } from '@/components/install-app-banner';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import type { AppLayoutProps } from '@/types';
@@ -22,6 +24,8 @@ export default function AppSidebarLayout({
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
                 <CommissionSuspensionBanner />
                 <DocumentSuspensionBanner />
+                <StoreLocationBanner />
+                <RiderLicenseBanner />
                 {children}
             </AppContent>
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />

@@ -35,6 +35,8 @@ export type SellerStore = {
     documents_suspended?: boolean;
     /** Most urgent permit problem (expired, or expiring within 7 days) */
     documents_alert?: { label: string; date: string; status: string; days_left: number } | null;
+    /** The store is pinned on the map */
+    has_location?: boolean;
 };
 
 export type SellerApplication = {

@@ -20,6 +20,7 @@ import {
     type ReturnMethod,
 } from '@/lib/refunds';
 import type { BreadcrumbItem } from '@/types';
+import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 type Counts = { pending: number; approved: number; processed: number; rejected: number; escalated: number; all: number };
 
@@ -28,7 +29,7 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
-    riders: { id: number; name: string }[];
+    riders: ({ id: number; name: string } & RiderLicenseFields)[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Refunds', href: '/seller/refunds' }];
@@ -281,7 +282,7 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                 ) : (
                                     <select value={form.rider_id} onChange={(e) => setForm((f) => ({ ...f, rider_id: e.target.value }))} className={inputCls}>
                                         <option value="">Select a rider…</option>
-                                        {riders.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                        {riders.map((r) => <option key={r.id} value={r.id} disabled={riderDisabled(r)}>{r.name}{riderLicenseSuffix(r)}</option>)}
                                     </select>
                                 )}
                                 <p className="text-xs text-muted-foreground">A ₱0 replacement order with the same items is created and stock is deducted.</p>

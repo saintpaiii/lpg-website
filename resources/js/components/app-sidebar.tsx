@@ -38,6 +38,7 @@ import {
     ScrollText,
     FileCheck,
     FileText,
+    IdCard,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
@@ -93,6 +94,7 @@ export function AppSidebar() {
             isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog         },
             (isActualSeller || isHR)                   && { title: 'Attendance',   href: '/seller/attendance',      icon: CalendarDays      },
             (!isActualSeller && !isHR)                 && { title: 'My Attendance',href: '/seller/my-attendance',  icon: CalendarDays      },
+            (!isActualSeller)                          && { title: 'My Documents', href: '/seller/my-documents',   icon: IdCard            },
             (!isActualSeller)                          && { title: 'My Payslips',  href: '/seller/my-payslips',    icon: ClipboardList     },
             (isActualSeller || isHR)                   && { title: 'Payroll',      href: '/seller/payroll',        icon: BadgeDollarSign   },
             isActualSeller                             && { title: 'Revenue',      href: '/seller/revenue',        icon: TrendingUp        },
@@ -178,6 +180,7 @@ export function AppSidebar() {
         isRider && { title: 'Messages',         href: '/rider/messages',     icon: MessageSquare, ...unreadBadge },
         isRider && { title: 'My Reports',       href: '/rider/reports',      icon: Flag           },
         isRider && { title: 'My Attendance',    href: '/rider/my-attendance', icon: CalendarDays  },
+        isRider && { title: 'My Documents',     href: '/rider/documents',    icon: IdCard         },
         isRider && { title: 'My Payslips',      href: '/rider/my-payslips',  icon: ClipboardList  },
         !isPlatformAdmin && !isRider && can('customers.view') && { title: 'Customers', href: '/admin/customers', icon: Users },
         can('invoices.view')   && { title: 'Invoices',           href: '/admin/invoices',                                     icon: Receipt         },

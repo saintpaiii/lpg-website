@@ -42,4 +42,8 @@ Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('ri
     Route::get('my-attendance', [AttendanceController::class, 'myAttendance'])->name('my-attendance');
     Route::post('my-attendance/clock-in', [AttendanceController::class, 'myClockIn'])->name('my-attendance.clock-in');
     Route::post('my-attendance/clock-out', [AttendanceController::class, 'myClockOut'])->name('my-attendance.clock-out');
+
+    // ── My Documents (driver's license required before delivering) ───────────
+    Route::get('documents', [\App\Http\Controllers\StaffDocumentController::class, 'index'])->name('documents');
+    Route::post('documents', [\App\Http\Controllers\StaffDocumentController::class, 'store'])->middleware('throttle:20,1')->name('documents.store');
 });

@@ -442,7 +442,6 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
         refundFiles.forEach((f) => fd.append('evidence[]', f));
         router.post(`/customer/orders/${order.id}/refund`, fd as any, {
             onSuccess: () => {
-                toast.success('Refund request submitted.');
                 setRefundOpen(false);
                 setRefundAmount(''); setRefundReason(''); setRefundResolution(''); setRefundDesc(''); setRefundFiles([]);
             },

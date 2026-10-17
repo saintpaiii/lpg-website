@@ -65,8 +65,16 @@ class VerificationController extends Controller
             ->get()
             ->keyBy('user_id');
 
+        // Applicant details for the modal — preloaded for the whole page (no N+1)
+        $customers = \App\Models\Customer::whereIn('user_id', $userIds)->get()->keyBy('user_id');
+        $orderCounts = \App\Models\Order::whereIn('customer_id', $customers->pluck('id'))
+            ->selectRaw('customer_id, COUNT(*) as n')->groupBy('customer_id')->pluck('n', 'customer_id');
+        $history = VerificationRequest::withTrashed()->with('reviewer:id,name')
+            ->whereIn('user_id', $userIds)->whereIn('type', ['seller_application', 'customer_id_verification'])
+            ->orderByDesc('created_at')->get()->groupBy(fn ($h) => $h->user_id . '|' . $h->type);
+
         return Inertia::render('admin/verifications', [
-            'verifications' => $paginated->through(function ($v) use ($stores, $previousApps, $docFields) {
+            'verifications' => $paginated->through(function ($v) use ($stores, $previousApps, $docFields, $customers, $orderCounts, $history) {
                 $store          = $stores->get($v->user_id);
                 $prevApp        = $previousApps->get($v->user_id);
                 $isResubmission = $prevApp !== null;
@@ -92,6 +100,27 @@ class VerificationController extends Controller
                     'user_name'        => $v->user?->name ?? '—',
                     'user_email'       => $v->user?->email ?? '—',
                     'user_id_verified' => $v->user?->id_verified ?? false,
+                    'user_phone'       => $v->user?->phone ?: $customers->get($v->user_id)?->phone,
+                    'user_first_name'  => $v->user?->first_name,
+                    'user_middle_name' => $v->user?->middle_name,
+                    'user_last_name'   => $v->user?->last_name,
+                    'user_joined'      => $v->user?->created_at?->format('M d, Y'),
+                    'email_verified'   => (bool) $v->user?->email_verified_at,
+                    'customer_address' => ($c = $customers->get($v->user_id))
+                        ? collect([$c->address, $c->barangay, $c->city])->filter()->implode(', ')
+                        : null,
+                    'customer_type'    => $c?->customer_type,
+                    'order_count'      => $c ? (int) ($orderCounts[$c->id] ?? 0) : null,
+                    // Earlier requests of the same type (incl. soft-deleted resubmissions), newest first, max 5
+                    'past_attempts'    => collect($history->get($v->user_id . '|' . $v->type, []))
+                        ->filter(fn ($h) => $h->id !== $v->id && $h->created_at->lt($v->created_at))
+                        ->take(5)
+                        ->map(fn ($h) => [
+                            'date'     => $h->created_at->timezone('Asia/Manila')->format('M d, Y'),
+                            'status'   => $h->status,
+                            'reason'   => $h->rejection_reason,
+                            'reviewer' => $h->reviewer?->name,
+                        ])->values(),
                     'reviewer_name'    => $v->reviewer?->name,
                     // Store info
                     'store_name'       => $store?->store_name,
@@ -100,6 +129,8 @@ class VerificationController extends Controller
                     'store_city'       => $store?->city,
                     'store_barangay'   => $store?->barangay,
                     'store_logo_url'   => $store?->logo ? Storage::url($store->logo) : null,
+                    'store_latitude'   => $store?->latitude !== null ? (float) $store?->latitude : null,
+                    'store_longitude'  => $store?->longitude !== null ? (float) $store?->longitude : null,
                     // "Valid until" dates the seller entered for each expiring permit
                     'permit_expiries'  => $store ? collect(\App\Support\StoreDocuments::expiringTypes())
                         ->map(fn ($t) => \App\Support\StoreDocuments::summary($store, $t))->values() : [],

@@ -42,7 +42,10 @@ class StaffController extends Controller
             });
         }
 
-        $staff = $query->latest()->paginate(20)->withQueryString()
+        $page = $query->latest()->paginate(20)->withQueryString();
+        // Driver's license status of the riders on this page (one query)
+        $license = \App\Services\StaffDocumentService::forRiders($page->getCollection());
+        $staff = $page
             ->through(fn ($u) => [
                 'id'             => $u->id,
                 'name'           => $u->name,
@@ -57,6 +60,7 @@ class StaffController extends Controller
                 'is_active'      => $u->is_active,
                 'created_at'     => $u->created_at->format('M d, Y'),
                 'deleted_at'     => $u->deleted_at?->format('M d, Y'),
+                'license_status' => $u->sub_role === 'rider' ? ($license[$u->id]['license_status'] ?? 'missing') : null,
             ]);
 
         $counts = [
@@ -185,6 +189,25 @@ class StaffController extends Controller
             'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
             'userOverrides'  => $userOverrides,
+            // Documents this staff member uploaded (the owner approves / rejects them here)
+            'documents'      => \App\Models\StaffDocument::where('user_id', $user->id)->with('reviewer:id,name')->latest()->get()
+                ->map(fn ($d) => [
+                    'id'              => $d->id,
+                    'doc_type'        => $d->doc_type,
+                    'label'           => \App\Services\StaffDocumentService::label($d->doc_type, $d->label),
+                    'document_number' => $d->document_number,
+                    'expires'         => $d->expires_at?->toDateString(),
+                    'expires_on'      => $d->expires_at?->format('M j, Y'),
+                    'status'          => $d->status,
+                    'reason'          => $d->rejection_reason,
+                    'reviewer'        => $d->reviewer?->name,
+                    'date'            => $d->created_at->timezone('Asia/Manila')->format('M j, Y'),
+                    'url'             => \App\Support\PrivateDocument::url('staff-document', $d->id, 'file_path'),
+                ])->values(),
+            'license'        => $user->sub_role === 'rider' ? [
+                'status'  => \App\Services\StaffDocumentService::riderLicenseStatus($user),
+                'message' => \App\Services\StaffDocumentService::message($user),
+            ] : null,
         ]);
     }
 

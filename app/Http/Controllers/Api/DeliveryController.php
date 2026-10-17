@@ -70,9 +70,11 @@ class DeliveryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user  = $request->user();
+        // Only platform admins and riders use the delivery API (customers and store staff get a token from /api/login too)
+        abort_unless($user->isAdmin() || $user->isRider(), 403);
         $query = Delivery::with(['order.customer', 'order.items.product', 'rider']);
 
-        if ($user->role === 'rider') {
+        if ($user->isRider()) {
             $query->where('rider_id', $user->id);
         }
 
@@ -95,8 +97,10 @@ class DeliveryController extends Controller
     public function show(Request $request, Delivery $delivery): JsonResponse
     {
         $user = $request->user();
+        // Only platform admins and riders use the delivery API (customers and store staff get a token from /api/login too)
+        abort_unless($user->isAdmin() || $user->isRider(), 403);
 
-        if ($user->role === 'rider' && $delivery->rider_id !== $user->id) {
+        if ($user->isRider() && $delivery->rider_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
@@ -111,8 +115,10 @@ class DeliveryController extends Controller
     public function collectPayment(Request $request, Delivery $delivery): JsonResponse
     {
         $user = $request->user();
+        // Only platform admins and riders use the delivery API (customers and store staff get a token from /api/login too)
+        abort_unless($user->isAdmin() || $user->isRider(), 403);
 
-        if ($user->role === 'rider' && $delivery->rider_id !== $user->id) {
+        if ($user->isRider() && $delivery->rider_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
@@ -137,8 +143,10 @@ class DeliveryController extends Controller
     public function updateStatus(Request $request, Delivery $delivery): JsonResponse
     {
         $user = $request->user();
+        // Only platform admins and riders use the delivery API (customers and store staff get a token from /api/login too)
+        abort_unless($user->isAdmin() || $user->isRider(), 403);
 
-        if ($user->role === 'rider' && $delivery->rider_id !== $user->id) {
+        if ($user->isRider() && $delivery->rider_id !== $user->id) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
@@ -149,6 +157,11 @@ class DeliveryController extends Controller
 
         $newStatus = $data['status'];
 
+        // A rider needs an approved, unexpired driver's license to pick up
+        if ($newStatus === 'picked_up' && $user->isRider() && ! \App\Services\StaffDocumentService::canDeliver($user)) {
+            return response()->json(['message' => \App\Services\StaffDocumentService::message($user)], 422);
+        }
+
         if (in_array($delivery->status, ['delivered', 'failed'])) {
             return response()->json(['message' => 'Cannot change status of a completed delivery.'], 422);
         }
@@ -158,7 +171,7 @@ class DeliveryController extends Controller
         }
 
         // Riders follow strict progression; admins can jump
-        if ($user->role === 'rider') {
+        if ($user->isRider()) {
             $allowed = [
                 'assigned'   => ['picked_up', 'failed'],
                 'picked_up'  => ['in_transit', 'failed'],
@@ -217,6 +230,11 @@ class DeliveryController extends Controller
         ]);
 
         $order = Order::findOrFail($data['order_id']);
+
+        // Riders need an approved, unexpired driver's license
+        if (($rider = \App\Models\User::find($data['rider_id'])) && ($why = \App\Services\StaffDocumentService::assignmentError($rider))) {
+            return response()->json(['message' => $why], 422);
+        }
 
         if ($order->delivery()->exists()) {
             return response()->json(['message' => 'This order already has a delivery assigned.'], 422);

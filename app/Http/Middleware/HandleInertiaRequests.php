@@ -41,6 +41,7 @@ class HandleInertiaRequests extends Middleware
     private const STORE_COLUMNS = [
         'id', 'store_name', 'status', 'commission_suspended', 'documents_suspended',
         'business_permit_expires_at', 'fsic_permit_expires_at', 'doe_lpg_license_expires_at', 'lto_permit_expires_at',
+        'latitude', 'longitude',
     ];
 
     public function share(Request $request): array
@@ -89,6 +90,8 @@ class HandleInertiaRequests extends Middleware
                     // Permit problems for the seller banner (from the store row only)
                     'documents_suspended'  => (bool) $store->documents_suspended,
                     'documents_alert'      => \App\Support\StoreDocuments::alertFor($store),
+                    // Stores without a pin: delivery fees fall back to the flat fee and staff cannot clock in
+                    'has_location'         => $store->latitude !== null && $store->longitude !== null,
                 ] : null,
                 'seller_application' => $sellerApplication,
             ],
@@ -110,6 +113,11 @@ class HandleInertiaRequests extends Middleware
             'systemReportCategories' => fn () => $user ? config('reports.system_categories') : [],
             'systemReportAreas'      => fn () => $user ? config('reports.system_areas') : [],
             'reportBadges'        => fn () => \App\Services\ReportService::badgesFor($user),
+            // Riders only: may they make deliveries (approved, unexpired driver's license)?
+            'rider_license'       => fn () => $user && $user->isRider() ? [
+                'can_deliver' => \App\Services\StaffDocumentService::canDeliver($user),
+                'message'     => \App\Services\StaffDocumentService::message($user),
+            ] : null,
             // Terms / Privacy Policy versions this user still has to accept (major updates, Google sign-ups)
             'pendingLegal'        => function () use ($user) {
                 $pending = \App\Services\LegalService::pendingFor($user);

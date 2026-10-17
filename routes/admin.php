@@ -35,6 +35,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('users/{user}', [UsersController::class, 'show'])->withTrashed()->name('users.show');
     });
     Route::patch('users/{user}/toggle-active', [UsersController::class, 'toggleActive'])->name('users.toggle-active');
+    Route::patch('users/{user}/revoke-verification', [UsersController::class, 'revokeVerification'])->name('users.revoke-verification');
     Route::delete('users/{user}', [UsersController::class, 'destroy'])->name('users.destroy');
     Route::post('users/{user}/restore', [UsersController::class, 'restore'])->withTrashed()->name('users.restore');
 

@@ -81,6 +81,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * We verify email with a 6-digit code (OtpController), not a link.
+     * Laravel would otherwise email a "click to verify" link on registration (Registered event).
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+    }
+
+    /**
      * Home page of a store owner or store staff member (same mapping as LoginResponse).
      * Null for every other role.
      */

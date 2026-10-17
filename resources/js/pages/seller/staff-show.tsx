@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
-import { toast } from 'sonner';
 import AppLayout from '@/layouts/app-layout';
+import StaffDocumentsCard, { type StaffDocumentRow } from '@/components/staff-documents-card';
 import { fmtDate } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,6 +44,8 @@ interface Props {
     allPermissions: Record<string, PermDef[]>;
     roleDefaults: string[];
     userOverrides: UserOverride[];
+    documents: StaffDocumentRow[];
+    license: { status: string; message: string } | null;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -111,7 +113,6 @@ function PermissionManager({
             { permissions: buildPayload() },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Permissions saved.'),
                 onFinish: () => setSaving(false),
             }
         );
@@ -125,7 +126,6 @@ function PermissionManager({
                 preserveScroll: true,
                 onSuccess: () => {
                     setChecked(Object.fromEntries(roleDefaults.map((n) => [n, true])));
-                    toast.success('Permissions reset to role defaults.');
                 },
                 onFinish: () => setResetting(false),
             }
@@ -217,7 +217,7 @@ function PermissionManager({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides }: Props) {
+export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides, documents, license }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Staff', href: '/seller/staff' },
@@ -262,6 +262,9 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Documents (driver's license etc.) — the owner approves or rejects them */}
+                <StaffDocumentsCard documents={documents} license={license} />
 
                 {/* Permission Manager */}
                 <PermissionManager

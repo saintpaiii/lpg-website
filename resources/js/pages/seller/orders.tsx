@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/seller/dashboard' },
@@ -47,7 +48,7 @@ const isDispatchable = (o: Order) =>
     ['confirmed', 'preparing'].includes(o.status)
     && (o.payment_status === 'paid' || o.payment_mode === 'cod' || (o.payment_mode === 'consignment' && o.payment_status === 'partial'));
 
-type Rider  = { id: number; name: string };
+type Rider  = { id: number; name: string } & RiderLicenseFields;
 type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number; outstanding_balance: number; overdue_balance: number };
 type Paginated = { data: Order[]; current_page: number; last_page: number; total: number };
 
@@ -517,7 +518,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                 </SelectTrigger>
                                 <SelectContent>
                                     {riders.map((r) => (
-                                        <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+                                        <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>{r.name}{riderLicenseSuffix(r)}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

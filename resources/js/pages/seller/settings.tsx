@@ -129,6 +129,24 @@ export default function SellerSettings({ store }: Props) {
     };
     onPickRef.current = (lat, lng) => { placePin(lat, lng); };
 
+    // Manual Latitude / Longitude boxes: typed freely, applied on blur / Enter (outside Cavite → message, pin stays)
+    const [latText, setLatText] = useState(pin ? String(pin.lat) : '');
+    const [lngText, setLngText] = useState(pin ? String(pin.lng) : '');
+    useEffect(() => {
+        setLatText(pin ? String(pin.lat) : '');
+        setLngText(pin ? String(pin.lng) : '');
+    }, [pin?.lat, pin?.lng]);
+    function applyManualPin() {
+        const lat = parseFloat(latText);
+        const lng = parseFloat(lngText);
+        if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+        if (pin && lat === pin.lat && lng === pin.lng) return;
+        if (!placePin(lat, lng)) {
+            setLatText(pin ? String(pin.lat) : '');
+            setLngText(pin ? String(pin.lng) : '');
+        }
+    }
+
     function useDeviceLocation() {
         setPinMsg(null);
         setLocating(true);
@@ -588,7 +606,7 @@ export default function SellerSettings({ store }: Props) {
                                             />
                                         </>
                                     )}
-                                    <ServiceAreaLimit />
+                                    <ServiceAreaLimit outline />
                                 </MapContainer>
                             </div>
 
@@ -598,16 +616,9 @@ export default function SellerSettings({ store }: Props) {
                                     <span>
                                         Pinned at: <span className="font-mono">{pin.lat.toFixed(6)}, {pin.lng.toFixed(6)}</span>
                                     </span>
-                                    <button
-                                        type="button"
-                                        className="text-red-500 underline"
-                                        onClick={() => setPin(null)}
-                                    >
-                                        Remove pin
-                                    </button>
                                 </div>
                             ) : (
-                                <p className="text-xs text-gray-400 italic">No location pinned — click the map to set a location.</p>
+                                <p className="text-xs font-medium text-amber-700">Required: click the map to pin your store. Delivery fees and staff clock-in use this spot.</p>
                             )}
 
                             {/* Manual lat/lng inputs */}
@@ -619,11 +630,10 @@ export default function SellerSettings({ store }: Props) {
                                         type="number"
                                         step="any"
                                         placeholder="14.4791"
-                                        value={pin?.lat ?? ''}
-                                        onChange={(e) => {
-                                            const v = parseFloat(e.target.value);
-                                            if (!isNaN(v)) setPin(p => ({ lat: v, lng: p?.lng ?? 120.8980 }));
-                                        }}
+                                        value={latText}
+                                        onChange={(e) => setLatText(e.target.value)}
+                                        onBlur={applyManualPin}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyManualPin(); } }}
                                         className="text-xs font-mono h-8"
                                     />
                                 </div>
@@ -634,11 +644,10 @@ export default function SellerSettings({ store }: Props) {
                                         type="number"
                                         step="any"
                                         placeholder="120.8980"
-                                        value={pin?.lng ?? ''}
-                                        onChange={(e) => {
-                                            const v = parseFloat(e.target.value);
-                                            if (!isNaN(v)) setPin(p => ({ lat: p?.lat ?? 14.4791, lng: v }));
-                                        }}
+                                        value={lngText}
+                                        onChange={(e) => setLngText(e.target.value)}
+                                        onBlur={applyManualPin}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyManualPin(); } }}
                                         className="text-xs font-mono h-8"
                                     />
                                 </div>

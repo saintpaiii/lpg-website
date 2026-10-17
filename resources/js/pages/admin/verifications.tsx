@@ -24,6 +24,9 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
 import StoreAvatar from '@/components/store-avatar';
+import StoreLocationLink from '@/components/store-location-link';
+import DocumentRow, { DocumentLink } from '@/components/document-row';
+import { IdCheckHints, IdDocumentTile } from '@/components/id-document-viewer';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',     href: '/admin/dashboard' },
@@ -44,6 +47,17 @@ type VerificationRow = {
     user_email: string;
     user_id_verified: boolean;
     reviewer_name: string | null;
+    // Applicant details
+    user_phone?: string | null;
+    user_first_name?: string | null;
+    user_middle_name?: string | null;
+    user_last_name?: string | null;
+    user_joined?: string | null;
+    email_verified?: boolean;
+    customer_address?: string | null;
+    customer_type?: string | null;
+    order_count?: number | null;
+    past_attempts?: { date: string; status: string; reason: string | null; reviewer: string | null }[];
     // Store info
     store_name: string | null;
     store_phone: string | null;
@@ -63,6 +77,8 @@ type VerificationRow = {
     doe_lpg_license_url: string | null;
     lto_permit_url: string | null;
     store_logo_url?: string | null;
+    store_latitude?: number | null;
+    store_longitude?: number | null;
     permit_expiries?: { type: string; label: string; expires_on: string | null; days_left: number | null; status: PermitStatus }[];
 };
 
@@ -91,20 +107,18 @@ const TYPE_LABELS: Record<string, string> = {
 
 function DocRow({ label, url }: { label: string; url: string | null }) {
     return (
-        <div className="flex items-center justify-between py-2 border-b last:border-0">
-            <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
-            {url ? (
-                <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                >
-                    <FileText className="h-3.5 w-3.5" /> View <ExternalLink className="h-3 w-3" />
-                </a>
-            ) : (
-                <span className="text-sm text-muted-foreground italic">Not uploaded</span>
-            )}
+        <DocumentRow label={label} className="py-2">
+            <DocumentLink url={url} />
+        </DocumentRow>
+    );
+}
+
+/** One "label: value" line in the applicant info block. */
+function InfoLine({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-2 text-sm">
+            <span className="text-muted-foreground">{label}</span>
+            <span className="min-w-0 break-words">{children}</span>
         </div>
     );
 }
@@ -326,14 +340,31 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Applicant Info</h3>
                                 <div className="rounded-md border p-3 space-y-1.5">
-                                    <div className="flex gap-2">
-                                        <span className="text-sm text-muted-foreground w-24 shrink-0">Name</span>
-                                        <span className="text-sm font-medium">{v.user_name}</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <span className="text-sm text-muted-foreground w-24 shrink-0">Email</span>
-                                        <span className="text-sm">{v.user_email}</span>
-                                    </div>
+                                    <InfoLine label="Full name">
+                                        <span className="font-medium">
+                                            {[v.user_first_name, v.user_middle_name, v.user_last_name].filter(Boolean).join(' ') || v.user_name}
+                                        </span>
+                                    </InfoLine>
+                                    <InfoLine label="Email">
+                                        {v.user_email}
+                                        {v.email_verified && <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">verified</span>}
+                                    </InfoLine>
+                                    <InfoLine label="Phone">{v.user_phone || '—'}</InfoLine>
+                                    <InfoLine label="Home address">{v.customer_address || '—'}</InfoLine>
+                                    <InfoLine label="Account created">{v.user_joined ?? '—'}</InfoLine>
+                                    {v.order_count != null && <InfoLine label="Orders so far">{v.order_count}</InfoLine>}
+                                    {(v.past_attempts?.length ?? 0) > 0 && (
+                                        <InfoLine label="Previous attempts">
+                                            <ul className="space-y-0.5">
+                                                {v.past_attempts!.map((a, i) => (
+                                                    <li key={i} className="text-xs">
+                                                        {a.date} · <span className={a.status === 'rejected' ? 'text-red-600' : a.status === 'approved' ? 'text-green-700' : ''}>{a.status}</span>
+                                                        {a.reason ? ` · ${a.reason}` : ''}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </InfoLine>
+                                    )}
                                     {v.type === 'seller_application' && <>
                                         {v.store_name && (
                                             <div className="flex gap-2">
@@ -350,6 +381,10 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                                 <span className="text-sm">{v.store_phone}</span>
                                             </div>
                                         )}
+                                        <div className="flex gap-2">
+                                            <span className="text-sm text-muted-foreground w-24 shrink-0">Store location</span>
+                                            <StoreLocationLink lat={v.store_latitude} lng={v.store_longitude} />
+                                        </div>
                                         {v.store_address && (
                                             <div className="flex gap-2">
                                                 <span className="text-sm text-muted-foreground w-24 shrink-0">Address</span>
@@ -370,37 +405,12 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
 
                                 {/* Customer ID verification: side-by-side image comparison */}
                                 {v.type === 'customer_id_verification' ? (
-                                    <div className="grid gap-3 sm:grid-cols-2">
-                                        <div>
-                                            <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Valid ID</p>
-                                            {v.valid_id_url ? (
-                                                <a href={v.valid_id_url} target="_blank" rel="noopener noreferrer">
-                                                    <img
-                                                        src={v.valid_id_url}
-                                                        alt="Valid ID"
-                                                        className="w-full rounded-lg border object-cover aspect-video hover:opacity-90 transition"
-                                                    />
-                                                </a>
-                                            ) : (
-                                                <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted text-xs text-muted-foreground">
-                                                    Not uploaded
-                                                </div>
-                                            )}
+                                    <div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <IdDocumentTile url={v.valid_id_url} label="Valid ID" />
+                                            <IdDocumentTile url={v.selfie_url} label="Selfie" />
                                         </div>
-                                        <div>
-                                            <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Selfie</p>
-                                            {v.selfie_url ? (
-                                                <img
-                                                    src={v.selfie_url}
-                                                    alt="Selfie"
-                                                    className="w-full rounded-lg border object-cover aspect-video"
-                                                />
-                                            ) : (
-                                                <div className="flex items-center justify-center aspect-video rounded-lg border bg-muted text-xs text-muted-foreground">
-                                                    Not uploaded
-                                                </div>
-                                            )}
-                                        </div>
+                                        <IdCheckHints />
                                     </div>
                                 ) : (
                                     <div className="rounded-md border px-3 divide-y">
@@ -418,10 +428,9 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                     <div className="mt-2 space-y-1 rounded-md border px-3 py-2">
                                         <p className="text-xs font-medium text-muted-foreground">Valid until (entered by the seller)</p>
                                         {v.permit_expiries!.map((p) => (
-                                            <div key={p.type} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                                                <span>{p.label}</span>
+                                            <DocumentRow key={p.type} label={p.label}>
                                                 <PermitBadge p={p} />
-                                            </div>
+                                            </DocumentRow>
                                         ))}
                                     </div>
                                 )}

@@ -141,6 +141,10 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::post('my-attendance/clock-in', [AttendanceController::class, 'myClockIn'])->name('my-attendance.clock-in');
         Route::post('my-attendance/clock-out', [AttendanceController::class, 'myClockOut'])->name('my-attendance.clock-out');
 
+        // ── My Documents (store staff; reviewed by the owner) ────────────────
+        Route::get('my-documents', [\App\Http\Controllers\StaffDocumentController::class, 'index'])->name('my-documents');
+        Route::post('my-documents', [\App\Http\Controllers\StaffDocumentController::class, 'store'])->middleware('throttle:20,1')->name('my-documents.store');
+
         // ── Payroll (seller owner + HR can view; owner-only for settings/actions)
         Route::get('payroll', [PayrollController::class, 'index'])->name('payroll');
         Route::get('payroll/export', [PayrollController::class, 'export'])->name('payroll.export');
@@ -229,6 +233,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::middleware('seller_owner')->group(function () {
             Route::get('documents', [\App\Http\Controllers\Seller\StoreDocumentController::class, 'index'])->name('documents.index');
             Route::post('documents', [\App\Http\Controllers\Seller\StoreDocumentController::class, 'store'])->middleware('throttle:20,1')->name('documents.store');
+            // Staff / rider documents (driver's license etc.) — the owner reviews them
+            Route::post('staff-documents/{document}/approve', [\App\Http\Controllers\Seller\StaffDocumentReviewController::class, 'approve'])->name('staff-documents.approve');
+            Route::post('staff-documents/{document}/reject', [\App\Http\Controllers\Seller\StaffDocumentReviewController::class, 'reject'])->name('staff-documents.reject');
         });
 
         // ── Settings ─────────────────────────────────────────────────────────

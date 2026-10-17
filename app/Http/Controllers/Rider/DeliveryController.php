@@ -246,6 +246,12 @@ class DeliveryController extends Controller
             abort(403, 'Unauthorized.');
         }
 
+        // A rider needs an approved, unexpired driver's license to pick up (checked before any photo is uploaded).
+        // Deliveries already picked up can still be finished.
+        if ($request->input('status') === 'picked_up' && ! \App\Services\StaffDocumentService::canDeliver($request->user())) {
+            return back()->with('error', \App\Services\StaffDocumentService::message($request->user()));
+        }
+
         $needsPhoto = in_array($request->input('status'), ['picked_up', 'delivered', 'failed']);
 
         $data = $request->validate([

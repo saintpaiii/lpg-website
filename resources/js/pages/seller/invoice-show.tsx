@@ -91,7 +91,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
             amount: parseFloat(recordAmount),
         }, {
             preserveScroll: true,
-            onSuccess: () => { setRecordOpen(false); toast.success('Payment recorded successfully.'); },
+            onSuccess: () => { setRecordOpen(false); },
             onError:   () => toast.error('Failed to record payment. Please try again.'),
             onFinish:  () => setRecordLoading(false),
         });

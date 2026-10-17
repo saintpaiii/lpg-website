@@ -1,7 +1,6 @@
 import { useForm, usePage } from '@inertiajs/react';
 import { Loader2, Paperclip, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -54,7 +53,7 @@ export default function WebsiteProblemDialog({ open, onOpenChange, portal }: {
         form.post(SUBMIT[portal], {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => { toast.success('Thanks! The admin team will look into it.'); reset(); onOpenChange(false); },
+            onSuccess: () => { reset(); onOpenChange(false); },
         });
     }
 

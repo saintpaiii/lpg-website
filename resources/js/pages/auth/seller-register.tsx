@@ -8,6 +8,7 @@ import React, { useRef, useState } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
+import StorePinPicker from '@/components/store-pin-picker';
 import { EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker } from '@/components/seller-application-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -153,6 +154,7 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
     // "Valid until" dates of the expiring permits, and the optional logo
     const [expiries, setExpiries] = useState<Record<string, string>>({});
     const [logo, setLogo] = useState<File | null>(null);
+    const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
 
     const [agreeTerms, setAgreeTerms]           = useState(false);
     const [agreeAuthentic, setAgreeAuthentic]   = useState(false);
@@ -181,6 +183,8 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
         }
         for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
         if (logo) formData.append('logo', logo);
+        formData.append('latitude', pin ? String(pin.lat) : '');
+        formData.append('longitude', pin ? String(pin.lng) : '');
         formData.append('terms_agreed', '1');
 
         try {
@@ -197,7 +201,7 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
             setErrors(mapped);
             // Navigate back to offending step
             const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation',
-                               'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo'];
+                               'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo', 'latitude', 'longitude'];
             const step2Keys = [...DOC_FIELDS.map(d => d.key), ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
             else if (step2Keys.some((k) => mapped[k])) setStep(2);
@@ -391,10 +395,17 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
                                         requiredBarangay
                                     />
 
+                                    <StorePinPicker latitude={pin?.lat ?? null} longitude={pin?.lng ?? null}
+                                        onChange={(lat, lng) => { setPin({ lat, lng }); setErrors((e) => ({ ...e, latitude: '', longitude: '' })); }}
+                                        error={errors.latitude || errors.longitude} />
+
                                     <Button
                                         type="button"
                                         className="h-11 w-full bg-blue-600 font-semibold text-white hover:bg-blue-700 mt-2"
-                                        onClick={() => setStep(2)}
+                                        onClick={() => {
+                                            if (!pin) { setErrors((e) => ({ ...e, latitude: "Please pin your store's location on the map." })); return; }
+                                            setStep(2);
+                                        }}
                                     >
                                         Next: Upload Documents →
                                     </Button>

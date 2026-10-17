@@ -94,6 +94,12 @@ class RefundService
 
     private static function sendReplacement(RefundRequest $refund, array $base, int $riderId, int $actingUserId): void
     {
+        // The replacement rider needs an approved, unexpired driver's license
+        $rider = \App\Models\User::find($riderId);
+        if ($rider && ($why = \App\Services\StaffDocumentService::assignmentError($rider))) {
+            throw new \RuntimeException($why);
+        }
+
         $original = $refund->order()->with('items')->firstOrFail();
 
         foreach ($original->items as $item) {

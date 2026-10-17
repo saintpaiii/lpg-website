@@ -239,3 +239,9 @@ a[role="button"]:active {
 .dark .legal-content { color: #d1d5db; }
 .dark .legal-content h1, .dark .legal-content h2, .dark .legal-content h3, .dark .legal-content strong { color: #f9fafb; }
 .dark .legal-content a { color: #60a5fa; }
+
+/* Edge adds its own password "reveal" eye — our PasswordInput already has one */
+input::-ms-reveal,
+input::-ms-clear {
+    display: none;
+}

@@ -28,3 +28,6 @@ Schedule::command('orders:cancel-unpaid')->everyFifteenMinutes()->withoutOverlap
 
 // Store permits: reminders 30/7/1 days before expiry; hide stores whose permit expired more than 7 days ago
 Schedule::command('stores:check-documents')->dailyAt('06:00')->withoutOverlapping();
+
+// Riders: driver's license reminders (30/7/1 days before) and expired notices to the rider and the store owner
+Schedule::command('staff:check-documents')->dailyAt('06:05')->withoutOverlapping();

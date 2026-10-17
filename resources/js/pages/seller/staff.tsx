@@ -58,6 +58,8 @@ type StaffMember = {
     is_active: boolean;
     created_at: string;
     deleted_at: string | null;
+    /** Riders only: driver's license status */
+    license_status?: string | null;
 };
 
 type Paginated<T> = {
@@ -83,6 +85,19 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/seller/dashboard' },
     { title: 'Staff', href: '/seller/staff' },
 ];
+
+/** Small driver's-license badge for riders in the staff list. */
+function LicenseBadge({ status }: { status: string }) {
+    const [cls, text] = ({
+        valid:    ['bg-green-100 text-green-700', 'License OK'],
+        expiring: ['bg-amber-100 text-amber-700', 'License OK'],
+        pending:  ['bg-blue-100 text-blue-700', 'Waiting approval'],
+        expired:  ['bg-red-100 text-red-700', 'Expired'],
+        rejected: ['bg-red-100 text-red-700', 'License missing'],
+        missing:  ['bg-red-100 text-red-700', 'License missing'],
+    } as Record<string, [string, string]>)[status] ?? ['bg-gray-100 text-gray-600', status];
+    return <span className={`ml-1.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{text}</span>;
+}
 
 const SUB_ROLE_LABELS: Record<string, string> = {
     cashier:   'Cashier',
@@ -596,7 +611,10 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                                                         <p className="text-xs text-gray-400">{s.email}</p>
                                                     </button>
                                                 </td>
-                                                <td className="px-4 py-3"><RoleBadge role={s.sub_role} /></td>
+                                                <td className="px-4 py-3">
+                                                    <RoleBadge role={s.sub_role} />
+                                                    {s.license_status && <LicenseBadge status={s.license_status} />}
+                                                </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">{s.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">
                                                     {isArchived ? (

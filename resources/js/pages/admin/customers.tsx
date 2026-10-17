@@ -157,7 +157,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
         e.preventDefault();
         if (!editing) return;
         put(`/admin/customers/${editing.id}`, {
-            onSuccess: () => { setDialogOpen(false); toast.success('Customer updated.'); },
+            onSuccess: () => { setDialogOpen(false); },
         });
     }
 
@@ -167,7 +167,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
     function handleArchive() {
         if (!archiveTarget) return;
         router.delete(`/admin/customers/${archiveTarget.id}`, {
-            onSuccess: () => { setArchiveTarget(null); toast.success('Customer archived.'); },
+            onSuccess: () => { setArchiveTarget(null); },
             onError: () => toast.error('Failed to archive customer.'),
         });
     }
@@ -175,7 +175,6 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
     // ── Restore ────────────────────────────────────────────────────────────────
     function handleRestore(c: Customer) {
         router.post(`/admin/customers/${c.id}/restore`, {}, {
-            onSuccess: () => toast.success('Customer restored.'),
         });
     }
 
@@ -185,7 +184,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
     function handleForceDelete() {
         if (!forceTarget) return;
         router.delete(`/admin/customers/${forceTarget.id}/force`, {
-            onSuccess: () => { setForceTarget(null); toast.success('Customer permanently deleted.'); },
+            onSuccess: () => { setForceTarget(null); },
             onError: () => toast.error('Failed to delete customer.'),
         });
     }

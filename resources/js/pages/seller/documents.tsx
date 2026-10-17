@@ -116,13 +116,13 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                         ) : (
                             <ul className="divide-y text-sm">
                                 {others.map((o) => (
-                                    <li key={o.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                                    <li key={o.id} className="grid grid-cols-1 items-center gap-x-3 gap-y-1 py-2 min-[400px]:grid-cols-[minmax(0,1fr)_auto]">
                                         <span>
                                             <span className="font-medium">{o.label}</span>
                                             <span className="text-muted-foreground"> · uploaded {o.date}{o.expires_on ? ` · valid until ${o.expires_on}` : ''}</span>
                                             {o.status === 'rejected' && o.reason && <span className="block text-xs text-red-600">Rejected: {o.reason}</span>}
                                         </span>
-                                        <span className="flex items-center gap-3">
+                                        <span className="flex items-center justify-end gap-3 whitespace-nowrap">
                                             <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold',
                                                 o.status === 'approved' ? 'bg-green-100 text-green-800' : o.status === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')}>
                                                 {o.status === 'pending' ? 'Waiting for review' : o.status === 'approved' ? 'Approved' : 'Rejected'}

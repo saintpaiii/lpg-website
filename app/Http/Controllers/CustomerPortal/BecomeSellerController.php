@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\CustomerPortal;
 
+use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\Store;
@@ -47,6 +48,8 @@ class BecomeSellerController extends Controller
                     'city'        => $store->city,
                     'barangay'    => $store->barangay,
                     'logo_url'    => $store->logo ? Storage::url($store->logo) : null,
+                    'latitude'    => $store->latitude !== null ? (float) $store->latitude : null,
+                    'longitude'   => $store->longitude !== null ? (float) $store->longitude : null,
                     // Permit "Valid until" dates are pre-filled on resubmission (still required)
                     ...collect(StoreDocuments::expiringTypes())->mapWithKeys(fn ($t) => [
                         StoreDocuments::expiryColumn($t) => $store->{StoreDocuments::expiryColumn($t)}?->toDateString(),
@@ -122,9 +125,12 @@ class BecomeSellerController extends Controller
             'doe_lpg_license'   => $docRule(),
             'lto_permit'        => $docRule(),
             'logo'              => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            // Store pin (required — delivery fees and staff clock-in use it)
+            'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
+            'longitude'             => ['required', 'numeric', 'between:-180,180'],
             ...StoreDocuments::expiryRules(),
             'terms_agreed'      => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages());
+        ], StoreDocuments::expiryMessages() + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         // Use new upload or fall back to existing path from rejected application
         $birPermitPath      = $request->hasFile('bir_permit')
@@ -170,6 +176,8 @@ class BecomeSellerController extends Controller
                 'doe_lpg_license' => $doeLicensePath,
                 'lto_permit'      => $ltoPermitPath,
                 'logo'            => $logoPath,
+                'latitude'        => $request->latitude,
+                'longitude'       => $request->longitude,
                 'business_permit_expires_at' => $request->business_permit_expires_at,
                 'fsic_permit_expires_at'     => $request->fsic_permit_expires_at,
                 'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,

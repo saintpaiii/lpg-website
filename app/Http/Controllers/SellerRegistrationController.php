@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Rules\InServiceArea;
 use App\Models\Setting;
 use App\Models\Store;
 use App\Models\User;
@@ -62,12 +63,16 @@ class SellerRegistrationController extends Controller
             // Optional store logo (same rule as Seller Settings)
             'logo'                  => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
 
+            // Store pin (required — delivery fees and staff clock-in use it)
+            'latitude'              => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
+            'longitude'             => ['required', 'numeric', 'between:-180,180'],
+
             // Permit "Valid until" dates
             ...StoreDocuments::expiryRules(),
 
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages());
+        ], StoreDocuments::expiryMessages() + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         DB::transaction(function () use ($request, $validated) {
             // Store uploaded documents — private ('local' disk, served only to the owner and reviewers)
@@ -109,6 +114,8 @@ class SellerRegistrationController extends Controller
                 'doe_lpg_license'  => $doeLicensePath,
                 'lto_permit'       => $ltoPermitPath,
                 'logo'             => $logoPath,
+                'latitude'         => $validated['latitude'],
+                'longitude'        => $validated['longitude'],
                 'business_permit_expires_at' => $validated['business_permit_expires_at'],
                 'fsic_permit_expires_at'     => $validated['fsic_permit_expires_at'],
                 'doe_lpg_license_expires_at' => $validated['doe_lpg_license_expires_at'],
@@ -139,8 +146,7 @@ class SellerRegistrationController extends Controller
             // Proof of agreement to the current Seller Terms + Privacy Policy
             LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
 
-            // Send email verification
-            $user->sendEmailVerificationNotification();
+            // Email is verified with a 6-digit code on /verify-otp (no link email)
         });
 
         NotificationService::sendToRole(

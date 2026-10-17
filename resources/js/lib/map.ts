@@ -93,15 +93,15 @@ export async function routeSegment(from: LatLng, to: LatLng, signal?: AbortSigna
 export const googleMapsDirections = (lat: number, lng: number) =>
     `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
-// ── Service area (Cavite + ~5 km margin) — same numbers as App\Support\ServiceArea ──
+// ── Service area: map pan limit (a rectangle around Cavite) — the real rule is isInServiceArea() below ──
 export const SERVICE_AREA = { south: 14.0, north: 14.6, west: 120.5, east: 121.15 } as const;
 export const SERVICE_AREA_BOUNDS = L.latLngBounds([SERVICE_AREA.south, SERVICE_AREA.west], [SERVICE_AREA.north, SERVICE_AREA.east]);
 export const SERVICE_AREA_MESSAGE = 'Please choose a location inside Cavite. We only serve addresses within Cavite.';
 /** Furthest zoom-out: the whole province. */
 export const SERVICE_AREA_MIN_ZOOM = 10;
 
-export const isInServiceArea = (lat: number, lng: number): boolean =>
-    lat >= SERVICE_AREA.south && lat <= SERVICE_AREA.north && lng >= SERVICE_AREA.west && lng <= SERVICE_AREA.east;
+// The Cavite outline check lives in service-area.ts (no Leaflet import, so it can be tested on its own)
+export { CAVITE_BOUNDARY, isInServiceArea } from '@/lib/service-area';
 
 /** Keep a map inside the service area: no panning far outside Cavite, no zooming out past the province. */
 export function applyServiceArea(map: L.Map): void {

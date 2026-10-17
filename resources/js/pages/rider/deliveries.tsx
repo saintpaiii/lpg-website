@@ -865,6 +865,9 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
     const riderId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${riderId}`, ['deliveries', 'counts', 'route'], (_e, kind) => kind === 'delivery');
     const flash = (usePage().props as any).flash as { success?: string; error?: string } | undefined;
+    // No approved, unexpired driver's license → no pickups (the server refuses too)
+    const license = usePage<SharedData>().props.rider_license;
+    const cannotDeliver = !!license && !license.can_deliver;
 
     const [view, setView] = useState<'list' | 'map'>(() =>
         typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('view') === 'map' ? 'map' : 'list');
@@ -934,6 +937,18 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                     </div>
                 )}
 
+                {cannotDeliver && license && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-red-300 bg-red-50 p-4 sm:flex-row sm:items-center dark:border-red-900 dark:bg-red-950/40">
+                        <div className="flex-1">
+                            <p className="font-semibold text-red-800 dark:text-red-200">Before you can deliver</p>
+                            <p className="text-sm text-red-700 dark:text-red-300">{license.message}</p>
+                        </div>
+                        <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => router.visit('/rider/documents')}>
+                            Upload driver's license
+                        </Button>
+                    </div>
+                )}
+
                 {/* Summary cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -992,7 +1007,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 {view === 'map' ? (
                     <RouteMapView route={route} onMessage={(stop) => router.post('/rider/messages/start', { delivery_id: stop.id })} onUploadProof={(stop) => {
                         const next = STATUS_NEXT[stop.status]?.find((s) => s !== 'failed');
-                        if (!next) return;
+                        if (!next || (next === 'picked_up' && cannotDeliver)) return;
                         // Same proof dialog as the list view — no shortcut around the photo proof
                         openStatusDialog({ id: stop.id, status: stop.status, order: { order_number: stop.order_number } } as unknown as DeliveryRow, next);
                     }} />
@@ -1155,10 +1170,12 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                         {STATUS_NEXT[d.status].map((s) => (
                                                             <DropdownMenuItem
                                                                 key={s}
+                                                                disabled={s === 'picked_up' && cannotDeliver}
                                                                 onClick={() => openStatusDialog(d, s)}
                                                                 className={s === 'failed' ? 'text-red-600' : ''}
                                                             >
                                                                 {STATUS_LABELS[s]}
+                                                                {s === 'picked_up' && cannotDeliver && <span className="ml-1 text-[10px] text-gray-400">(license needed)</span>}
                                                             </DropdownMenuItem>
                                                         ))}
                                                     </DropdownMenuContent>

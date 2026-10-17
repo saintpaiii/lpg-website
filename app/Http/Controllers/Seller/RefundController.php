@@ -49,13 +49,16 @@ class RefundController extends Controller
             'all'       => (clone $base)->count(),
         ];
 
-        $riders = User::where('store_id', $store->id)
+        $riderRows = User::where('store_id', $store->id)
             ->where('role', 'seller_staff')
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])
+            ->get(['id', 'name', 'role', 'sub_role']);
+        // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
+        $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        $riders = $riderRows
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
             ->values()
             ->all();
 

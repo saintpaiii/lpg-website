@@ -546,7 +546,7 @@ export default function OrderCreate({ products, defaultAddress, storeDelivery }:
                                                 pathOptions={{ color: '#3b82f6', weight: 3, opacity: 0.7 }}
                                             />
                                         )}
-                                        <ServiceAreaLimit />
+                                        <ServiceAreaLimit outline />
                                     </MapContainer>
                                 </div>
                                 {pin ? (

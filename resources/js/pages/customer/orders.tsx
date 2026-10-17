@@ -200,7 +200,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
             cancellation_notes:  cancelNotes,
         }, {
             preserveScroll: true,
-            onSuccess: () => { closeCancel(); toast.success('Order cancelled successfully.'); },
+            onSuccess: () => { closeCancel(); },
             onError: () => toast.error('Failed to cancel order. Please try again.'),
             onFinish: () => setCancelling(false),
         });

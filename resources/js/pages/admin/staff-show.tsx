@@ -1,5 +1,4 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { toast } from 'sonner';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -122,7 +121,6 @@ function ChangePosition({ staff }: { staff: Staff }) {
             { sub_role: selected },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Position updated.'),
                 onFinish: () => setSaving(false),
             }
         );
@@ -216,7 +214,6 @@ function PermissionManager({
             { permissions: buildPayload() },
             {
                 preserveScroll: true,
-                onSuccess: () => toast.success('Permissions saved.'),
                 onFinish: () => setSaving(false),
             }
         );
@@ -230,7 +227,6 @@ function PermissionManager({
                 preserveScroll: true,
                 onSuccess: () => {
                     setChecked({});
-                    toast.success('All permissions cleared.');
                 },
                 onFinish: () => setClearing(false),
             }
@@ -345,7 +341,6 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
             onSuccess: () => {
                 setShowDeactivate(false);
                 deactivateForm.reset();
-                toast.success(`${staff.name} has been deactivated.`);
             },
         });
     }
@@ -354,7 +349,6 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
         archiveForm.delete(`/admin/staff/${staff.id}`, {
             onSuccess: () => {
                 setShowArchive(false);
-                toast.success('Staff account archived.');
             },
         });
     }
@@ -362,7 +356,6 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
     function activate() {
         router.patch(`/admin/staff/${staff.id}/toggle`, {}, {
             preserveScroll: true,
-            onSuccess: () => toast.success(`${staff.name} has been activated.`),
         });
     }
 

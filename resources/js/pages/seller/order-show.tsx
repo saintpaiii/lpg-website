@@ -24,6 +24,7 @@ import TierBadge, { type Tier } from '@/components/tier-badge';
 import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
+import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 type OrderItem = {
     id: number;
@@ -83,7 +84,7 @@ type Order = {
     payment_record: PaymentRecord | null;
 };
 
-type Rider = { id: number; name: string; phone: string | null };
+type Rider = { id: number; name: string; phone: string | null } & RiderLicenseFields;
 
 type Props = {
     order: Order;
@@ -598,7 +599,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                             <SelectTrigger><SelectValue placeholder="Select rider…" /></SelectTrigger>
                             <SelectContent>
                                 {riders.map((r) => (
-                                    <SelectItem key={r.id} value={String(r.id)}>{r.name} {r.phone && `· ${r.phone}`}</SelectItem>
+                                    <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>{r.name} {r.phone && `· ${r.phone}`}{riderLicenseSuffix(r)}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

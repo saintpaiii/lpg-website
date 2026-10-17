@@ -508,7 +508,7 @@ function ResultsMap({ results, customer, selected, onSelect, onMoveCustomer }: {
                         <Tooltip>{i + 1}. {r.store.name} — {peso(r.total)}</Tooltip>
                     </Marker>
                 ))}
-                <ServiceAreaLimit />
+                <ServiceAreaLimit outline />
             </MapContainer>
         </div>
     );

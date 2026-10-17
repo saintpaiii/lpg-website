@@ -114,7 +114,7 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
                         />
                     )}
                     {children}
-                    <ServiceAreaLimit />
+                    <ServiceAreaLimit outline />
                 </MapContainer>
 
                 {!hasPin && !disabled && (

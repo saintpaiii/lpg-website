@@ -2,11 +2,12 @@ import { Loader2, Route, X } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 /** Floating bar shown while orders are selected for batch assignment to one rider. */
 export default function BatchAssignBar({ count, riders, onAssign, onCancel, processing }: {
     count: number;
-    riders: { id: number; name: string }[];
+    riders: ({ id: number; name: string } & RiderLicenseFields)[];
     onAssign: (riderId: number) => void;
     onCancel: () => void;
     processing: boolean;
@@ -32,7 +33,7 @@ export default function BatchAssignBar({ count, riders, onAssign, onCancel, proc
                         <Select value={riderId} onValueChange={setRiderId}>
                             <SelectTrigger className="h-9 w-48"><SelectValue placeholder="Assign to rider…" /></SelectTrigger>
                             <SelectContent>
-                                {riders.map((r) => <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>)}
+                                {riders.map((r) => <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>{r.name}{riderLicenseSuffix(r)}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     )}

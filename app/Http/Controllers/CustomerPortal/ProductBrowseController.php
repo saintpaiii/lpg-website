@@ -230,6 +230,10 @@ class ProductBrowseController extends Controller
         return Inertia::render('customer/product-show', [
             'product' => [
                 'id'             => $product->id,
+                // How many of this product the customer already has in the cart (the stepper adds on top of it)
+                'in_cart'        => $request->user()
+                    ? (int) \App\Models\CartItem::where('user_id', $request->user()->id)->where('product_id', $product->id)->value('quantity')
+                    : 0,
                 'name'           => $product->name,
                 'brand'          => $product->brand,
                 'weight'         => $product->weight,

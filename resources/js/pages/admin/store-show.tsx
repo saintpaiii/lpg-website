@@ -32,8 +32,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
 import StoreAvatar from '@/components/store-avatar';
+import StoreLocationLink from '@/components/store-location-link';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
+import DocumentRow, { DocumentHeading } from '@/components/document-row';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,8 @@ type StoreDetail = {
     suspension_notes: string | null;
     suspended_at: string | null;
     logo_url: string | null;
+    latitude: number | null;
+    longitude: number | null;
     documents_suspended: boolean;
     permits: { type: string; label: string; expires_on: string | null; days_left: number | null; status: PermitStatus }[];
 };
@@ -287,9 +291,9 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                     ))}
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div className="grid items-stretch gap-6 lg:grid-cols-2">
                     {/* Store info */}
-                    <Card>
+                    <Card className="h-full">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Building2 className="h-4 w-4 text-blue-600" /> Store Information
@@ -342,7 +346,7 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                     </Card>
 
                     {/* Owner info */}
-                    <Card>
+                    <Card className="h-full">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <BadgeCheck className="h-4 w-4 text-emerald-600" /> Owner / Documents
@@ -369,21 +373,23 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                                 </span>
                             </div>
 
+                            <div className="pt-2 border-t">
+                                <DocumentRow label={<DocumentHeading>Store location</DocumentHeading>}>
+                                    <StoreLocationLink lat={store.latitude} lng={store.longitude} />
+                                </DocumentRow>
+                            </div>
+
                             <div className="pt-2 border-t space-y-2">
-                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Documents</p>
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs text-muted-foreground">Valid ID (Owner)</span>
-                                        <DocLink url={store.valid_id_url} label="View ID" />
-                                    </div>
+                                <DocumentHeading>Documents</DocumentHeading>
+                                <div className="space-y-2">
+                                    <DocumentRow label="Valid ID (Owner)">
+                                        <DocLink url={store.valid_id_url} label="View" />
+                                    </DocumentRow>
                                     {store.permits.map((p) => (
-                                        <div key={p.type} className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                                            <span className="text-xs text-muted-foreground">{p.label}</span>
-                                            <span className="flex items-center gap-2">
-                                                <PermitBadge p={p} />
-                                                <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
-                                            </span>
-                                        </div>
+                                        <DocumentRow key={p.type} label={p.label}>
+                                            <PermitBadge p={p} />
+                                            <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
+                                        </DocumentRow>
                                     ))}
                                 </div>
                             </div>

@@ -1,5 +1,4 @@
 import { Head, useForm } from '@inertiajs/react';
-import { toast } from 'sonner';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
 import AddressSearchBox, { matchBarangay, matchCity, type GeocodeResult } from '@/components/address-search-box';
@@ -80,7 +79,6 @@ export default function CustomerProfile({ profile }: Props) {
         e.preventDefault();
         profileForm.put('/customer/profile', {
             preserveScroll: true,
-            onSuccess: () => toast.success('Profile updated.'),
         });
     }
 
@@ -88,7 +86,7 @@ export default function CustomerProfile({ profile }: Props) {
         e.preventDefault();
         passwordForm.put('/customer/profile/password', {
             preserveScroll: true,
-            onSuccess: () => { passwordForm.reset(); toast.success('Password changed.'); },
+            onSuccess: () => { passwordForm.reset(); },
         });
     }
 

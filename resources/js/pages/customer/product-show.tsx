@@ -23,6 +23,7 @@ type Product = {
     purchase_price: number;
     image_url: string | null;
     stock: number;
+    in_cart: number;
     store_id: number;
     store_name: string;
     store_logo_url: string | null;
@@ -132,6 +133,8 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
 
 export default function ProductShowPage({ product, reviews, canRate, ratingOrderId, fromStore, similar }: Props) {
     const [qty, setQty]     = useState(1);
+    // What can still be added on top of what is already in the cart
+    const maxAdd = Math.max(0, product.stock - (product.in_cart ?? 0));
     const [txType, setTxType] = useState<'refill' | 'new_purchase'>('refill');
     const [adding, setAdding] = useState(false);
 
@@ -147,7 +150,7 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
             transaction_type: txType,
         }, {
             preserveScroll: true,
-            onSuccess: () => { setAdding(false); toast.success(`${product.name} added to cart.`); },
+            onSuccess: () => { setAdding(false); setQty(1); },
             onError:   () => { setAdding(false); toast.error('Failed to add to cart.'); },
         });
     }
@@ -164,7 +167,6 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                 }],
             },
             preserveScroll: true,
-            onSuccess: () => { toast.success('Thank you for your review!'); },
             onError:   () => { toast.error('Failed to submit review. Please try again.'); },
         });
     }
@@ -241,6 +243,9 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 : <span className="text-red-500 font-medium">Out of stock</span>
                             }
                         </p>
+                        {product.in_cart > 0 && (
+                            <p className="-mt-2 text-sm text-blue-700 dark:text-blue-400">{product.in_cart} already in your cart</p>
+                        )}
 
                         {/* Store */}
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1.5 text-sm">
@@ -301,8 +306,8 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                     >−</button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button
-                                        onClick={() => setQty(q => Math.min(product.stock, q + 1))}
-                                        disabled={qty >= product.stock}
+                                        onClick={() => setQty(q => Math.min(maxAdd, q + 1))}
+                                        disabled={qty >= maxAdd}
                                         className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                                     >+</button>
                                     <span className="text-sm text-gray-500">
@@ -313,12 +318,15 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 {/* Add to cart button */}
                                 <Button
                                     onClick={addToCart}
-                                    disabled={adding}
+                                    disabled={adding || maxAdd === 0}
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
                                 >
                                     <ShoppingCart className="h-4 w-4 mr-2" />
                                     Add to Cart
                                 </Button>
+                                {maxAdd === 0 && (
+                                    <p className="text-center text-sm text-gray-500">All available stock is already in your cart</p>
+                                )}
                             </div>
                         )}
                     </div>

@@ -112,7 +112,12 @@ class CartController extends Controller
         if ($existing) {
             $newQty = $existing->quantity + (int) $request->quantity;
             if ($newQty > $stock) {
-                return back()->with('error', "Cannot add more. Only {$stock} unit(s) available for {$product->name}.");
+                // Say what is already in the cart, so "only 2 available" makes sense when adding 2 of 2
+                $inCart  = $existing->quantity;
+                $canAdd  = $stock - $inCart;
+                return back()->with('error', $canAdd > 0
+                    ? "You already have {$inCart} in your cart. Only {$stock} available, so you can add {$canAdd} more."
+                    : "You already have all {$stock} available in your cart.");
             }
             $existing->update([
                 'quantity'         => $newQty,

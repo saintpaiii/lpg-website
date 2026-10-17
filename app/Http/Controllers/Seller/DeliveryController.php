@@ -73,13 +73,16 @@ class DeliveryController extends Controller
                 ])->values()->all(),
             ]);
 
-        $riders = User::where('store_id', $store->id)
+        $riderRows = User::where('store_id', $store->id)
             ->where('role', 'seller_staff')
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'phone'])
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone])
+            ->get(['id', 'name', 'phone', 'role', 'sub_role']);
+        // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
+        $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        $riders = $riderRows
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
             ->values();
 
         // Available vehicles for this store
@@ -144,7 +147,11 @@ class DeliveryController extends Controller
 
         $order = Order::where('id', $data['order_id'])->where('store_id', $store->id)
             ->with('items.product')->firstOrFail();
-        $rider = User::where('id', $data['rider_id'])->where('store_id', $store->id)->firstOrFail();
+        $rider = User::where('id', $data['rider_id'])->where('store_id', $store->id)->where('sub_role', 'rider')->firstOrFail();
+        // Riders need an approved, unexpired driver's license
+        if ($why = \App\Services\StaffDocumentService::assignmentError($rider)) {
+            return back()->with('error', $why);
+        }
 
         $vehicle = null;
         if (! empty($data['vehicle_id'])) {
@@ -219,6 +226,12 @@ class DeliveryController extends Controller
             'status' => 'required|in:assigned,picked_up,in_transit,delivered,failed',
             'notes'  => 'nullable|string|max:500',
         ]);
+
+        // Moving a delivery out of 'assigned' (picked up / on the way / delivered) needs a rider who can deliver
+        if ($delivery->status === 'assigned' && in_array($data['status'], ['picked_up', 'in_transit', 'delivered'], true)
+            && $delivery->rider && ($why = \App\Services\StaffDocumentService::assignmentError($delivery->rider))) {
+            return back()->with('error', $why);
+        }
 
         $delivery->update([
             'status'       => $data['status'],

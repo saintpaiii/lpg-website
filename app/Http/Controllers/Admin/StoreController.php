@@ -121,6 +121,8 @@ class StoreController extends Controller
                 'suspension_notes'       => $store->suspension_notes,
                 'suspended_at'           => $store->suspended_at?->format('M d, Y g:i A'),
                 'logo_url'               => $store->logo ? Storage::url($store->logo) : null,
+                'latitude'               => $store->latitude !== null ? (float) $store->latitude : null,
+                'longitude'              => $store->longitude !== null ? (float) $store->longitude : null,
                 'documents_suspended'    => (bool) $store->documents_suspended,
                 // Private document links — the store's own file first (an approved renewal), else the application's
                 'valid_id_url' => $verification?->valid_id_path

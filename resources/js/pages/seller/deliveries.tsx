@@ -14,6 +14,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',  href: '/seller/dashboard'  },
@@ -41,7 +42,7 @@ type Delivery = {
     proofs: DeliveryProof[];
 };
 
-type Rider = { id: number; name: string; phone: string | null };
+type Rider = { id: number; name: string; phone: string | null } & RiderLicenseFields;
 type Vehicle = { id: number; vehicle_type: string; plate_number: string; max_capacity_kg: number; max_tanks: number; status: string };
 type Unassigned = { id: number; order_number: string; customer: string; status: string };
 type Counts = { active: number; completed: number };
@@ -419,8 +420,8 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                     <SelectTrigger><SelectValue placeholder="Select rider…" /></SelectTrigger>
                                     <SelectContent>
                                         {riders.map((r) => (
-                                            <SelectItem key={r.id} value={String(r.id)}>
-                                                {r.name}{r.phone ? ` · ${r.phone}` : ''}
+                                            <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>
+                                                {r.name}{r.phone ? ` · ${r.phone}` : ''}{riderLicenseSuffix(r)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
+import StorePinPicker from '@/components/store-pin-picker';
+import { lookupBarangay } from '@/components/address-map';
 import { isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type ExpiringDoc } from '@/components/seller-application-fields';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -28,6 +30,8 @@ type PreviousStore = {
     province: string;
     phone: string;
     logo_url: string | null;
+    latitude: number | null;
+    longitude: number | null;
     business_permit_expires_at: string | null;
     fsic_permit_expires_at: string | null;
     doe_lpg_license_expires_at: string | null;
@@ -121,6 +125,8 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         doe_lpg_license: File | null;
         lto_permit: File | null;
         logo: File | null;
+        latitude: number | null;
+        longitude: number | null;
         business_permit_expires_at: string;
         fsic_permit_expires_at: string;
         doe_lpg_license_expires_at: string;
@@ -141,6 +147,8 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         doe_lpg_license: null,
         lto_permit:      null,
         logo:            null,
+        latitude:        previous_store?.latitude ?? null,
+        longitude:       previous_store?.longitude ?? null,
         // Pre-filled on resubmission, still required
         business_permit_expires_at: previous_store?.business_permit_expires_at ?? '',
         fsic_permit_expires_at:     previous_store?.fsic_permit_expires_at ?? '',
@@ -168,7 +176,15 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         e.preventDefault();
         if (!allAgreed) return;
         transform(d => ({ ...d, terms_agreed: true }));
-        post('/customer/become-seller', { forceFormData: true });
+        post('/customer/become-seller', {
+            forceFormData: true,
+            // Go back to the step that has the problem (store info + pin on step 1, documents + dates on step 2)
+            onError: (errs) => {
+                const keys = Object.keys(errs);
+                if (keys.some((k) => k.startsWith('store_') || ['latitude', 'longitude', 'logo'].includes(k))) setStep(1);
+                else if (keys.some((k) => k !== 'terms_agreed')) setStep(2);
+            },
+        });
     }
 
     function validateStep1() {
@@ -178,6 +194,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         if (!data.store_address.trim())  errs.store_address  = 'Street address is required.';
         if (!data.store_city.trim())     errs.store_city     = 'City is required.';
         if (!data.store_barangay.trim()) errs.store_barangay = 'Barangay is required.';
+        if (data.latitude === null || data.longitude === null) errs.latitude = "Please pin your store's location on the map.";
         setStep1Errors(errs);
         if (Object.keys(errs).length === 0) setStep(2);
     }
@@ -346,7 +363,15 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                             barangay={data.store_barangay}
                                             onAddressChange={(v) => setData('store_address', v)}
                                             onCityChange={(v) => setData('store_city', v)}
-                                            onBarangayChange={(v) => setData('store_barangay', v)}
+                                            onBarangayChange={(v) => {
+                                                setData('store_barangay', v);
+                                                // No pin yet: start it at the barangay so the owner only needs to drag it to the entrance
+                                                if (data.latitude === null && data.store_city && v) {
+                                                    lookupBarangay(data.store_city, v).then((geo) => {
+                                                        if (geo && geo.precision !== 'none') setData((d) => (d.latitude === null ? { ...d, latitude: geo.latitude, longitude: geo.longitude } : d));
+                                                    });
+                                                }
+                                            }}
                                             errors={errors}
                                             errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
                                             requiredBarangay
@@ -354,6 +379,11 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         {step1Errors.store_address && <p className="mt-1 text-xs text-red-600">{step1Errors.store_address}</p>}
                                         {step1Errors.store_city && <p className="mt-1 text-xs text-red-600">{step1Errors.store_city}</p>}
                                         {step1Errors.store_barangay && <p className="mt-1 text-xs text-red-600">{step1Errors.store_barangay}</p>}
+                                        <div className="mt-4">
+                                            <StorePinPicker latitude={data.latitude} longitude={data.longitude}
+                                                onChange={(lat, lng) => { setData((d) => ({ ...d, latitude: lat, longitude: lng })); setStep1Errors((e) => ({ ...e, latitude: '' })); }}
+                                                error={errors.latitude || errors.longitude || step1Errors.latitude} />
+                                        </div>
                                     </CardContent>
                                 </Card>
 

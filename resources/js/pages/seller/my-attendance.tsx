@@ -63,6 +63,8 @@ type Props = {
     attendance: AttendanceToday;
     history: HistoryRow[];
     store_location: StoreLocation | null;
+    /** Clock-in allowed from 30 min before the shift until it ends (null = no schedule) */
+    clock_in_window: { opens_at_iso: string; ends_at_iso: string; opens_label: string } | null;
 };
 
 type LocStatus = 'loading' | 'granted' | 'denied' | 'unavailable';
@@ -185,6 +187,7 @@ export default function MyAttendancePage({
     attendance,
     history,
     store_location,
+    clock_in_window,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
     const isRider = auth.user.role === 'rider'
@@ -222,8 +225,8 @@ export default function MyAttendancePage({
         return haversineMeters(myCoords.lat, myCoords.lng, store_location.latitude, store_location.longitude);
     }, [myCoords, store_location]);
 
-    // Within radius: allow if no store location, or coords not yet received, or within range
-    const withinRadius = !store_location || locStatus === 'loading' || (distance !== null && distance <= store_location.radius);
+    // Within radius: coords not yet received, or within range (a store without a pin never counts as in range)
+    const withinRadius = !!store_location && (locStatus === 'loading' || (distance !== null && distance <= store_location.radius));
 
     // ── Submission ───────────────────────────────────────────────────────────
     const [submitting, setSubmitting] = useState<'in' | 'out' | null>(null);
@@ -267,7 +270,17 @@ export default function MyAttendancePage({
     const hasClockOut = !!attendance?.clock_out;
     const isDone      = hasClockIn && hasClockOut;
 
-    const clockInBlocked = locStatus === 'denied' || (!withinRadius && !!store_location);
+    const noStorePin = !store_location;
+
+    // Clock-in window (re-checked every 30 s so the button opens by itself)
+    const [nowMs, setNowMs] = useState(() => Date.now());
+    useEffect(() => {
+        const t = setInterval(() => setNowMs(Date.now()), 30_000);
+        return () => clearInterval(t);
+    }, []);
+    const beforeWindow = !!clock_in_window && nowMs < new Date(clock_in_window.opens_at_iso).getTime();
+    const shiftEnded   = !!clock_in_window && nowMs > new Date(clock_in_window.ends_at_iso).getTime();
+    const clockInBlocked = noStorePin || locStatus === 'denied' || !withinRadius || beforeWindow || shiftEnded;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -289,6 +302,14 @@ export default function MyAttendancePage({
                     <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                         <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                         <span>You haven't clocked in yet today! Please clock in below to record your attendance.</span>
+                    </div>
+                )}
+
+                {/* The store has no pin yet — clock-in/out is not possible */}
+                {noStorePin && !isDone && (
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
+                        <span>Clock-in is not available yet because the store's location is not pinned. Ask the store owner to pin it in Settings.</span>
                     </div>
                 )}
 
@@ -486,10 +507,16 @@ export default function MyAttendancePage({
                                         }
                                         Clock In
                                     </Button>
+                                    {beforeWindow && clock_in_window && (
+                                        <p className="text-xs text-amber-700 text-center">Clock-in opens at {clock_in_window.opens_label}</p>
+                                    )}
+                                    {shiftEnded && (
+                                        <p className="text-xs text-red-600 text-center">Your shift for today has ended</p>
+                                    )}
                                     {clockInBlocked && locStatus === 'denied' && (
                                         <p className="text-xs text-red-600 text-center">Enable location access to clock in</p>
                                     )}
-                                    {clockInBlocked && !withinRadius && store_location && (
+                                    {clockInBlocked && !noStorePin && locStatus !== 'denied' && !withinRadius && store_location && (
                                         <p className="text-xs text-red-600 text-center">
                                             Move closer to the store ({fmtDistance(store_location.radius)} radius)
                                         </p>
@@ -498,7 +525,7 @@ export default function MyAttendancePage({
                             ) : (
                                 <Button
                                     className="bg-blue-600 hover:bg-blue-700 text-white gap-2 px-8"
-                                    disabled={submitting !== null}
+                                    disabled={submitting !== null || noStorePin}
                                     onClick={() => setShowClockOutConfirm(true)}
                                 >
                                     {submitting === 'out'

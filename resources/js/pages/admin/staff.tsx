@@ -41,7 +41,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { toast } from 'sonner';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -189,11 +188,11 @@ function StaffFormDialog({
         e.preventDefault();
         if (isEdit) {
             put(`/admin/staff/${editTarget?.id}`, {
-                onSuccess: () => { reset(); onClose(); toast.success('Staff account updated.'); },
+                onSuccess: () => { reset(); onClose(); },
             });
         } else {
             post('/admin/staff', {
-                onSuccess: () => { reset(); onClose(); toast.success('Platform staff account created.'); },
+                onSuccess: () => { reset(); onClose(); },
             });
         }
     }
@@ -338,7 +337,7 @@ function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClos
     function handleConfirm() {
         if (!target) return;
         destroy(`/admin/staff/${target.id}`, {
-            onSuccess: () => { onClose(); toast.success('Staff account archived.'); },
+            onSuccess: () => { onClose(); },
         });
     }
 
@@ -375,7 +374,7 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
     function handleConfirm() {
         if (!target) return;
         destroy(`/admin/staff/${target.id}/force`, {
-            onSuccess: () => { onClose(); toast.success('Staff account permanently deleted.'); },
+            onSuccess: () => { onClose(); },
         });
     }
 
@@ -437,14 +436,12 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
     function handleToggle(s: StaffMember) {
         router.patch(`/admin/staff/${s.id}/toggle`, {}, {
             preserveScroll: true,
-            onSuccess: () => toast.success(s.is_active ? 'Account deactivated.' : 'Account activated.'),
         });
     }
 
     function handleRestore(s: StaffMember) {
         router.post(`/admin/staff/${s.id}/restore`, {}, {
             preserveScroll: true,
-            onSuccess: () => toast.success('Staff account restored.'),
         });
     }
 

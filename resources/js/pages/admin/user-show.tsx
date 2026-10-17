@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import IdentityDocumentsCard, { type Identity } from '@/components/identity-documents-card';
 import { fmtDate, fmtStatus } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 
@@ -64,6 +65,7 @@ interface Props {
     store: StoreInfo | null;
     orders: OrderRow[];
     legalAcceptances: { id: number; label: string; version: number | null; date: string; context: string }[];
+    identity: Identity;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -126,7 +128,7 @@ function RoleBadge({ user }: { user: UserDetail }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function UserShow({ user, store, orders, legalAcceptances }: Props) {
+export default function UserShow({ user, store, orders, legalAcceptances, identity }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Users', href: '/admin/users' },
         { title: user.name, href: `/admin/users/${user.id}` },
@@ -281,6 +283,9 @@ export default function UserShow({ user, store, orders, legalAcceptances }: Prop
                         </CardContent>
                     </Card>
                 )}
+
+                {/* Identity & documents (ID, selfie, history) */}
+                <IdentityDocumentsCard userId={user.id} identity={identity} />
 
                 {/* Order history (buyers) */}
                 {user.role === 'customer' && (

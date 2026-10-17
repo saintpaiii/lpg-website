@@ -62,13 +62,17 @@ class SettingsController extends Controller
             'fee_per_km'               => 'nullable|numeric|min:0|max:999.99',
             'max_delivery_radius_km'   => 'nullable|integer|min:1|max:200',
             'logo'                     => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
-            'latitude'          => ['nullable', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
-            'longitude'         => 'nullable|numeric|between:-180,180',
+            // The store pin is required (delivery fees and staff clock-in use it); it can be moved, not removed
+            'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
+            'longitude'         => 'required|numeric|between:-180,180',
             'attendance_radius' => 'nullable|integer|min:50|max:5000',
             'allow_cod'                => 'nullable|boolean',
             'allow_consignment'        => 'nullable|boolean',
             'min_down_payment_percent' => 'nullable|integer|min:20|max:80',
             'consignment_due_days'     => 'nullable|integer|min:1|max:90',
+        ], [
+            'latitude.required'  => "Please pin your store's location on the map.",
+            'longitude.required' => "Please pin your store's location on the map.",
         ]);
 
         $updates = [

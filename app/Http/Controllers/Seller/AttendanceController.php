@@ -26,6 +26,30 @@ function haversineMeters(float $lat1, float $lng1, float $lat2, float $lng2): fl
 
 class AttendanceController extends Controller
 {
+    /** Staff and riders may clock in from this many minutes before their shift starts. */
+    private const CLOCK_IN_EARLY_MINUTES = 30;
+
+    /**
+     * Today's clock-in window: opens CLOCK_IN_EARLY_MINUTES before the shift, closes at the shift end.
+     * Null without a schedule, or for overnight shifts (end <= start), which the attendance math doesn't support.
+     *
+     * @return array{opens: Carbon, start: Carbon, ends: Carbon}|null
+     */
+    private function clockInWindow(?string $scheduleStart, ?string $scheduleEnd): ?array
+    {
+        if (! $scheduleStart || ! $scheduleEnd) {
+            return null;
+        }
+        $today = now()->toDateString();
+        $start = Carbon::parse("{$today} {$scheduleStart}");
+        $end   = Carbon::parse("{$today} {$scheduleEnd}");
+        if ($end->lessThanOrEqualTo($start)) {
+            return null;
+        }
+
+        return ['opens' => $start->copy()->subMinutes(self::CLOCK_IN_EARLY_MINUTES), 'start' => $start, 'ends' => $end];
+    }
+
     use GeneratesExport;
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -493,6 +517,12 @@ class AttendanceController extends Controller
             'today'          => now()->format('M d, Y'),
             'schedule_start' => $user->schedule_start,
             'schedule_end'   => $user->schedule_end,
+            // When "Clock in" is allowed today (null without a schedule / for overnight shifts)
+            'clock_in_window' => ($w = $this->clockInWindow($user->schedule_start, $user->schedule_end)) ? [
+                'opens_at_iso' => $w['opens']->toIso8601String(),
+                'ends_at_iso'  => $w['ends']->toIso8601String(),
+                'opens_label'  => $w['opens']->format('h:i A'),
+            ] : null,
             'store_location' => ($store && $store->latitude && $store->longitude) ? [
                 'latitude'  => (float) $store->latitude,
                 'longitude' => (float) $store->longitude,
@@ -525,6 +555,16 @@ class AttendanceController extends Controller
             return back()->with('error', 'Cannot clock in — no schedule assigned. Contact your manager.');
         }
 
+        // Only from 30 minutes before the shift until it ends (late clock-in inside the shift is still allowed)
+        if ($window = $this->clockInWindow($user->schedule_start, $user->schedule_end)) {
+            if (now()->lessThan($window['opens'])) {
+                return back()->with('error', "You can clock in from {$window['opens']->format('h:i A')} (" . self::CLOCK_IN_EARLY_MINUTES . ' minutes before your shift).');
+            }
+            if (now()->greaterThan($window['ends'])) {
+                return back()->with('error', 'Your shift for today has ended. Ask the store owner if you need your attendance corrected.');
+            }
+        }
+
         $request->validate([
             'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
@@ -533,8 +573,11 @@ class AttendanceController extends Controller
         $store   = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
         $storeId = $store?->id ?? $user->store_id;
 
-        // ── Geolocation check (only when store has coordinates set) ──────────────
-        if ($store && $store->latitude && $store->longitude) {
+        // ── Geolocation check: the store must be pinned, and the user within its radius ──
+        if (! $store || ! $store->latitude || ! $store->longitude) {
+            return back()->with('error', "Clock-in is not available yet because the store's location is not pinned. Ask the store owner to pin it in Settings.");
+        }
+        {
             $lat = $request->input('latitude');
             $lng = $request->input('longitude');
 
@@ -601,8 +644,11 @@ class AttendanceController extends Controller
 
         $store = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
 
-        // ── Geolocation check (only when store has coordinates set) ──────────────
-        if ($store && $store->latitude && $store->longitude) {
+        // ── Geolocation check: the store must be pinned, and the user within its radius ──
+        if (! $store || ! $store->latitude || ! $store->longitude) {
+            return back()->with('error', "Clock-out is not available yet because the store's location is not pinned. Ask the store owner to pin it in Settings.");
+        }
+        {
             $lat = $request->input('latitude');
             $lng = $request->input('longitude');
 
