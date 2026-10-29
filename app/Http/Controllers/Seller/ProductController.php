@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Product;
+use App\Services\ProductMediaService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class ProductController extends Controller
             'selling_price'    => (float) ($p->selling_price ?? 0),
             'is_active'        => $p->is_active,
             'image_url'        => $p->image ? Storage::url($p->image) : null,
+            'media'            => $p->mediaPayload(),
             'stock'            => $p->inventory?->quantity ?? 0,
             'reorder_level'    => $p->inventory?->reorder_level ?? 10,
             'created_at'       => $p->created_at->format('M d, Y'),
@@ -43,7 +45,7 @@ class ProductController extends Controller
 
         $query = Product::withTrashed()
             ->where('store_id', $store->id)
-            ->with('inventory')
+            ->with(['inventory', 'media'])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings');
 
@@ -76,7 +78,23 @@ class ProductController extends Controller
             'counts'   => $counts,
             'tab'      => $tab,
             'search'   => $search ?? '',
+            // Largest total upload the server accepts (post_max_size − 1 MB margin) — checked before sending
+            'max_upload_bytes' => max(1024 * 1024, self::iniBytes((string) ini_get('post_max_size')) - 1024 * 1024),
         ]);
+    }
+
+    /** "64M" → bytes */
+    private static function iniBytes(string $value): int
+    {
+        $value = trim($value);
+        $num   = (int) $value;
+
+        return match (strtolower(substr($value, -1))) {
+            'g'     => $num * 1024 ** 3,
+            'm'     => $num * 1024 ** 2,
+            'k'     => $num * 1024,
+            default => $num ?: 8 * 1024 ** 2,
+        };
     }
 
     public function store(Request $request): RedirectResponse
@@ -92,33 +110,35 @@ class ProductController extends Controller
             'purchase_price' => 'required|numeric|min:0',
             'stock'          => 'required|integer|min:0',
             'reorder_level'  => 'required|integer|min:0',
-            'image'          => 'nullable|image|mimes:jpg,jpeg,png|max:5120',
-        ]);
+            ...ProductMediaService::rules(),
+        ], ProductMediaService::messages());
 
-        $imagePath = null;
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('store-products', 'public');
-        }
+        // Product, stock and photos/video together: a media problem leaves nothing half-saved
+        $product = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $data, $request) {
+            $product = Product::create([
+                'store_id'       => $store->id,
+                'name'           => $data['name'],
+                'brand'          => $data['brand'] ?? null,
+                'weight'         => $data['weight'] ?? null,
+                'description'    => $data['description'] ?? null,
+                'refill_price'   => $data['refill_price'],
+                'purchase_price' => $data['purchase_price'],
+                'selling_price'  => $data['purchase_price'],
+                'cost_price'     => $data['purchase_price'],
+                'is_active'      => true,
+                'image'          => null,   // set from the first photo by the media sync
+            ]);
 
-        $product = Product::create([
-            'store_id'       => $store->id,
-            'name'           => $data['name'],
-            'brand'          => $data['brand'] ?? null,
-            'weight'         => $data['weight'] ?? null,
-            'description'    => $data['description'] ?? null,
-            'refill_price'   => $data['refill_price'],
-            'purchase_price' => $data['purchase_price'],
-            'selling_price'  => $data['purchase_price'],
-            'cost_price'     => $data['purchase_price'],
-            'is_active'      => true,
-            'image'          => $imagePath,
-        ]);
+            Inventory::create([
+                'product_id'    => $product->id,
+                'quantity'      => $data['stock'],
+                'reorder_level' => $data['reorder_level'],
+            ]);
 
-        Inventory::create([
-            'product_id'    => $product->id,
-            'quantity'      => $data['stock'],
-            'reorder_level' => $data['reorder_level'],
-        ]);
+            ProductMediaService::sync($product, $request);
+
+            return $product;
+        });
 
         return redirect()->route('seller.products')->with('success', "Product \"{$product->name}\" created.");
     }
@@ -139,8 +159,11 @@ class ProductController extends Controller
             'refill_price'   => 'required|numeric|min:0',
             'purchase_price' => 'required|numeric|min:0',
             'reorder_level'  => 'required|integer|min:0',
-            'image'          => 'nullable|image|mimes:jpg,jpeg,png|max:5120',
-        ]);
+            ...ProductMediaService::rules(),
+        ], ProductMediaService::messages());
+
+        // Photos + video first (validated cross-field; files are cleaned up if anything fails)
+        ProductMediaService::sync($product, $request);
 
         $updates = [
             'name'           => $data['name'],
@@ -150,13 +173,6 @@ class ProductController extends Controller
             'refill_price'   => $data['refill_price'],
             'purchase_price' => $data['purchase_price'],
         ];
-
-        if ($request->hasFile('image')) {
-            if ($product->image) {
-                Storage::disk('public')->delete($product->image);
-            }
-            $updates['image'] = $request->file('image')->store('store-products', 'public');
-        }
 
         $product->update($updates);
 
@@ -201,9 +217,8 @@ class ProductController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($product->store_id !== $store->id) abort(403);
 
-        if ($product->image) {
-            Storage::disk('public')->delete($product->image);
-        }
+        // Permanent delete: remove every photo, video and poster (archiving keeps them)
+        ProductMediaService::deleteFiles($product);
 
         $name = $product->name;
         $product->forceDelete();

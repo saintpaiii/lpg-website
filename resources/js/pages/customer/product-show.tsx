@@ -1,6 +1,6 @@
 import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Package, ShoppingCart, Star } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { StarRating } from '@/components/ui/star-rating';
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import { fmtDate } from '@/lib/utils';
 import StoreAvatar from '@/components/store-avatar';
+import ProductCardImage from '@/components/product-card-image';
+import ProductGallery, { type GalleryMedia } from '@/components/product-gallery';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,7 @@ type Product = {
     image_url: string | null;
     stock: number;
     in_cart: number;
+    media: GalleryMedia[];
     store_id: number;
     store_name: string;
     store_logo_url: string | null;
@@ -51,6 +54,9 @@ type RelatedProduct = {
     refill_price: number;
     purchase_price: number;
     image_url: string | null;
+    hover_url?: string | null;
+    photo_count?: number;
+    has_video?: boolean;
     stock: number;
     store_name: string;
     store_id: number;
@@ -106,13 +112,8 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
             onClick={() => router.visit(`/customer/products/${p.id}`)}
         >
             <Card className="overflow-hidden hover:shadow-md transition-shadow h-full">
-                {p.image_url ? (
-                    <img src={p.image_url} alt={p.name} className="w-full h-28 object-cover" />
-                ) : (
-                    <div className="w-full h-28 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-                        <Package className="h-8 w-8 text-blue-300" />
-                    </div>
-                )}
+                <ProductCardImage imageUrl={p.image_url} hoverUrl={p.hover_url} name={p.name}
+                    photoCount={p.photo_count} hasVideo={p.has_video} className="h-28" />
                 <CardContent className="p-3">
                     <p className="font-semibold text-xs text-gray-900 truncate">{p.name}</p>
                     <p className="text-[10px] text-gray-500 mb-1">{p.brand} · {p.weight}</p>
@@ -189,21 +190,8 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
 
                 {/* ── Main product info ───────────────────────────────────── */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Image */}
-                    <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 aspect-square max-h-[400px]">
-                        {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <Package className="h-20 w-20 text-blue-200" />
-                            </div>
-                        )}
-                        {product.stock === 0 && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-2xl">
-                                <span className="bg-white text-gray-800 font-bold px-4 py-2 rounded-full text-sm">Out of Stock</span>
-                            </div>
-                        )}
-                    </div>
+                    {/* Photos & video */}
+                    <ProductGallery media={product.media ?? []} name={product.name} outOfStock={product.stock === 0} />
 
                     {/* Info */}
                     <div className="flex flex-col gap-4">

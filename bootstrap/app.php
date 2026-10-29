@@ -46,6 +46,12 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Upload bigger than post_max_size: thrown before the session starts, so answer with a plain 413 message
+        $exceptions->render(fn (\Illuminate\Http\Exceptions\PostTooLargeException $e) => response()->json(
+            ['message' => 'The files are too large to upload at once. Try a shorter video or fewer photos.'],
+            413,
+        ));
+
         $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response) {
             $status = $response->getStatusCode();
             $inertiaPages = [403 => 'errors/403', 404 => 'errors/404', 500 => 'errors/404', 503 => 'errors/404'];

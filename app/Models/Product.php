@@ -45,6 +45,47 @@ class Product extends Model
         return $this->belongsTo(Store::class);
     }
 
+    /** Photos (max 8) and the short video, in display order. The first photo is the cover (cached in products.image). */
+    public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** Gallery data for the product page / seller form: [{id, type, url, poster_url, duration, width, height}] */
+    public function mediaPayload(): array
+    {
+        return $this->media->map(fn (ProductMedia $m) => [
+            'id'         => $m->id,
+            'type'       => $m->type,
+            'url'        => $m->url(),
+            'poster_url' => $m->posterUrl(),
+            'duration'   => $m->duration_seconds,
+            'width'      => $m->width,
+            'height'     => $m->height,
+        ])->values()->all();
+    }
+
+    /** Card extras (Browse / store / similar): 2nd photo for hover, photo count, whether there is a video. */
+    public function cardMedia(): array
+    {
+        $images = $this->media->where('type', 'image')->values();
+
+        return [
+            'hover_url'   => isset($images[1]) ? $images[1]->url() : null,
+            'photo_count' => $images->count(),
+            'has_video'   => $this->media->contains('type', 'video'),
+        ];
+    }
+
+    /** Keep products.image (the cover every other page uses) in sync with the first photo. */
+    public function syncCoverFromMedia(): void
+    {
+        $cover = $this->media()->where('type', 'image')->value('path');
+        if ($this->image !== $cover) {
+            $this->forceFill(['image' => $cover])->saveQuietly();
+        }
+    }
+
     public function inventory(): HasOne
     {
         return $this->hasOne(Inventory::class);

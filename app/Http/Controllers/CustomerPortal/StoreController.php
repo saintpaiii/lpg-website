@@ -22,7 +22,7 @@ class StoreController extends Controller
 
         $search = $request->get('search', '');
 
-        $query = Product::with(['inventory'])
+        $query = Product::with(['inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('store_id', $store->id)
@@ -46,6 +46,7 @@ class StoreController extends Controller
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
             'image_url'      => $p->image ? Storage::url($p->image) : null,
+            ...$p->cardMedia(),
             'stock'          => $p->inventory?->quantity ?? 0,
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),

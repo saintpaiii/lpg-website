@@ -1,6 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ImageIcon, MessageSquare, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import React, { useRef, useState } from 'react';
+import { ImageIcon, MessageSquare, Package, Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
+import ProductMediaManager, { itemsFromExisting, type ExistingMedia, type MediaItem } from '@/components/product-media-manager';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/seller/dashboard' },
@@ -31,6 +32,7 @@ type Product = {
     purchase_price: number;
     is_active: boolean;
     image_url: string | null;
+    media: ExistingMedia[];
     stock: number;
     reorder_level: number;
     avg_rating: number;
@@ -47,7 +49,11 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    /** Largest total upload the server accepts (post_max_size − 1 MB) */
+    max_upload_bytes: number;
 };
+
+const TOO_LARGE = 'The files are too large to upload at once. Try a shorter video or fewer photos.';
 
 const TABS = [
     { key: 'active',   label: 'Active',   count_key: 'active'   },
@@ -55,7 +61,7 @@ const TABS = [
     { key: 'archived', label: 'Archived', count_key: 'archived' },
 ] as const;
 
-type FormData = {
+type ProductForm = {
     name: string;
     brand: string;
     weight: string;
@@ -64,24 +70,43 @@ type FormData = {
     purchase_price: string;
     stock: string;
     reorder_level: string;
-    image: File | null;
 };
 
-const EMPTY_FORM: FormData = {
+const EMPTY_FORM: ProductForm = {
     name: '', brand: '', weight: '', description: '',
-    refill_price: '', purchase_price: '', stock: '', reorder_level: '10', image: null,
+    refill_price: '', purchase_price: '', stock: '', reorder_level: '10',
 };
 
-export default function SellerProducts({ products, counts, tab, search }: Props) {
+export default function SellerProducts({ products, counts, tab, search, max_upload_bytes }: Props) {
     const [searchVal, setSearchVal] = useState(search);
     const [showForm, setShowForm]   = useState(false);
     const [editing, setEditing]     = useState<Product | null>(null);
     const [archiveTarget, setArchiveTarget]       = useState<Product | null>(null);
     const [forceDeleteTarget, setForceDeleteTarget] = useState<Product | null>(null);
-    const fileRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<string | null>(null);
+    // Photos & video of the product being edited (tiles), plus upload messages
+    const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const mediaBusy = mediaItems.some((m) => m.preparing);
 
-    const { data, setData, post, processing, errors, reset, transform } = useForm<FormData>(EMPTY_FORM);
+    const { data, setData, post, processing, errors, reset, transform, progress } = useForm<ProductForm>(EMPTY_FORM);
+    const mediaErrors = Object.entries(errors as Record<string, string>)
+        .filter(([k]) => /^(media_order|new_files|new_posters|new_meta)/.test(k)).map(([, v]) => v);
+
+    // Uploads bigger than post_max_size come back as a plain 413 — show the friendly message in the dialog
+    useEffect(() => {
+        if (!showForm) return;
+        const off = router.on('invalid', (event) => {
+            if (event.detail.response.status === 413) {
+                event.preventDefault();
+                setUploadError(TOO_LARGE);
+            }
+        });
+        // A missed drop must not open the file in the browser
+        const stop = (e: Event) => e.preventDefault();
+        window.addEventListener('dragover', stop);
+        window.addEventListener('drop', stop);
+        return () => { off(); window.removeEventListener('dragover', stop); window.removeEventListener('drop', stop); };
+    }, [showForm]);
 
     function goTab(t: string) {
         router.get('/seller/products', { tab: t, search: searchVal }, { preserveState: true, replace: true });
@@ -95,7 +120,8 @@ export default function SellerProducts({ products, counts, tab, search }: Props)
     function openCreate() {
         setEditing(null);
         reset();
-        setPreview(null);
+        setMediaItems([]);
+        setUploadError(null);
         setShowForm(true);
     }
 
@@ -105,34 +131,50 @@ export default function SellerProducts({ products, counts, tab, search }: Props)
             name: p.name, brand: p.brand, weight: p.weight,
             description: p.description ?? '', refill_price: String(p.refill_price),
             purchase_price: String(p.purchase_price), stock: String(p.stock),
-            reorder_level: String(p.reorder_level), image: null,
+            reorder_level: String(p.reorder_level),
         });
-        setPreview(p.image_url);
+        setMediaItems(itemsFromExisting(p.media ?? []));
+        setUploadError(null);
         setShowForm(true);
-    }
-
-    function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0] ?? null;
-        setData('image', file);
-        if (file) setPreview(URL.createObjectURL(file));
     }
 
     function submitForm(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (mediaBusy) return;
+        setUploadError(null);
+
+        // Order tokens + new files, numbered 0..n-1 at submit time (no holes for removed picks)
+        const media_order: string[] = [];
+        const new_files: File[] = [];
+        const new_posters: (Blob | null)[] = [];
+        const new_meta: string[] = [];
+        for (const item of mediaItems) {
+            if (item.existingId !== null) {
+                media_order.push(`id:${item.existingId}`);
+            } else if (item.prepared) {
+                media_order.push(`new:${new_files.length}`);
+                new_files.push(item.prepared.file);
+                new_posters.push(item.prepared.poster ? new File([item.prepared.poster], 'poster.jpg', { type: 'image/jpeg' }) : null);
+                new_meta.push(JSON.stringify({ width: item.prepared.width, height: item.prepared.height, duration: item.prepared.duration }));
+            }
+        }
+
+        const bytes = new_files.reduce((n, f) => n + f.size, 0) + new_posters.reduce((n, b) => n + (b?.size ?? 0), 0);
+        if (bytes > max_upload_bytes) {
+            setUploadError(TOO_LARGE);
+            return;
+        }
+
+        const payload = { media_order, new_files, new_posters: new_posters.map((b) => b ?? ''), new_meta };
+        const options = { forceFormData: true, onSuccess: () => { setShowForm(false); reset(); setMediaItems([]); } };
         if (editing) {
             // PHP only parses multipart bodies for POST requests.
             // Use method spoofing (POST + _method=PUT) so $_POST and $_FILES are populated.
-            transform(d => ({ ...d, _method: 'PUT' }));
-            post(`/seller/products/${editing.id}`, {
-                forceFormData: true,
-                onSuccess: () => { setShowForm(false); reset(); },
-            });
+            transform(d => ({ ...d, ...payload, _method: 'PUT' }));
+            post(`/seller/products/${editing.id}`, options);
         } else {
-            transform(d => d);
-            post('/seller/products', {
-                forceFormData: true,
-                onSuccess: () => { setShowForm(false); reset(); },
-            });
+            transform(d => ({ ...d, ...payload }));
+            post('/seller/products', options);
         }
     }
 
@@ -231,7 +273,19 @@ export default function SellerProducts({ products, counts, tab, search }: Props)
                                         <tr key={p.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                             <td className="px-4 py-3">
                                                 {p.image_url ? (
-                                                    <img src={p.image_url} alt={p.name} className="h-10 w-10 rounded object-cover" />
+                                                    <div className="relative h-10 w-10">
+                                                        <img src={p.image_url} alt={p.name} className="h-10 w-10 rounded object-cover" />
+                                                        {(p.media ?? []).filter((m) => m.type === 'image').length > 1 && (
+                                                            <span className="absolute -right-1.5 -top-1.5 rounded-full bg-black/70 px-1 text-[9px] font-semibold text-white">
+                                                                +{(p.media ?? []).filter((m) => m.type === 'image').length - 1}
+                                                            </span>
+                                                        )}
+                                                        {(p.media ?? []).some((m) => m.type === 'video') && (
+                                                            <span className="absolute bottom-0.5 left-0.5 rounded-full bg-black/60 p-0.5"><Play className="h-2.5 w-2.5 fill-white text-white" /></span>
+                                                        )}
+                                                    </div>
+                                                ) : (p.media ?? []).some((m) => m.type === 'video') ? (
+                                                    <div className="h-10 w-10 rounded bg-muted flex items-center justify-center"><Play className="h-4 w-4 text-muted-foreground" /></div>
                                                 ) : (
                                                     <div className="h-10 w-10 rounded bg-muted flex items-center justify-center">
                                                         <ImageIcon className="h-4 w-4 text-muted-foreground" />
@@ -314,33 +368,13 @@ export default function SellerProducts({ products, counts, tab, search }: Props)
 
             {/* Add/Edit Product Dialog */}
             <Dialog open={showForm} onOpenChange={(o) => { if (!o) { setShowForm(false); reset(); }}}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="sm:max-w-2xl max-h-[90dvh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>{editing ? 'Edit Product' : 'Add Product'}</DialogTitle>
                     </DialogHeader>
                     <form onSubmit={submitForm} className="space-y-4">
-                        {/* Image */}
-                        <div className="grid gap-1.5">
-                            <Label>Product Image {!editing && <span className="text-muted-foreground text-xs">(optional)</span>}</Label>
-                            <div className="flex items-center gap-3">
-                                <div className="h-16 w-16 rounded border bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                                    {preview ? (
-                                        <img src={preview} className="h-full w-full object-cover" alt="" />
-                                    ) : (
-                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                                    )}
-                                </div>
-                                <div className="flex-1">
-                                    <input ref={fileRef} type="file" accept="image/jpg,image/jpeg,image/png"
-                                        className="hidden" onChange={handleImageChange} />
-                                    <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                                        Choose Image
-                                    </Button>
-                                    <p className="text-xs text-muted-foreground mt-1">JPG/PNG, max 5MB</p>
-                                    {errors.image && <p className="text-xs text-red-500">{errors.image}</p>}
-                                </div>
-                            </div>
-                        </div>
+                        {/* Photos & video */}
+                        <ProductMediaManager items={mediaItems} onChange={(fn) => setMediaItems(fn)} serverErrors={mediaErrors} />
 
                         {/* Name + Brand */}
                         <div className="grid gap-4 sm:grid-cols-2">
@@ -405,11 +439,21 @@ export default function SellerProducts({ products, counts, tab, search }: Props)
                             </div>
                         )}
 
+                        {uploadError && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">{uploadError}</p>}
+                        {progress && processing && (
+                            <div className="space-y-1">
+                                <div className="h-1 overflow-hidden rounded-full bg-muted">
+                                    <div className="h-full bg-blue-600 transition-[width]" style={{ width: `${progress.percentage ?? 0}%` }} />
+                                </div>
+                                <p className="text-xs text-muted-foreground">Uploading {progress.percentage ?? 0}%</p>
+                            </div>
+                        )}
+
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => { setShowForm(false); reset(); }}>Cancel</Button>
-                            <Button type="submit" disabled={processing}>
+                            <Button type="submit" disabled={processing || mediaBusy}>
                                 {processing && <Spinner className="mr-1.5" />}
-                                {editing ? 'Save Changes' : 'Add Product'}
+                                {mediaBusy ? 'Preparing files…' : editing ? 'Save Changes' : 'Add Product'}
                             </Button>
                         </DialogFooter>
                     </form>

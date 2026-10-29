@@ -25,7 +25,7 @@ class ProductBrowseController extends Controller
             ? Store::where('user_id', $request->user()->id)->value('id')
             : null;
 
-        $query = Product::with(['store', 'inventory'])
+        $query = Product::with(['store', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('is_active', true)
@@ -88,6 +88,7 @@ class ProductBrowseController extends Controller
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
             'image_url'      => $p->image ? Storage::url($p->image) : null,
+            ...$p->cardMedia(),
             'stock'          => $p->inventory?->quantity ?? 0,
             'store_id'       => $p->store_id,
             'store_name'     => $p->store?->store_name ?? '',
@@ -154,7 +155,7 @@ class ProductBrowseController extends Controller
 
     public function show(Request $request, int $id): Response|RedirectResponse
     {
-        $product = Product::with(['store', 'inventory'])
+        $product = Product::with(['store', 'inventory', 'media'])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('id', $id)
@@ -204,7 +205,7 @@ class ProductBrowseController extends Controller
         }
 
         // Related: more from same store (up to 4)
-        $fromStore = Product::with('inventory')
+        $fromStore = Product::with(['inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('store_id', $product->store_id)
@@ -215,7 +216,7 @@ class ProductBrowseController extends Controller
             ->map(fn ($p) => $this->mapRelated($p));
 
         // Related: similar weight from other stores (up to 4)
-        $similar = Product::with(['store', 'inventory'])
+        $similar = Product::with(['store', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('weight', $product->weight)
@@ -242,6 +243,7 @@ class ProductBrowseController extends Controller
                 'refill_price'   => (float) $product->refill_price,
                 'purchase_price' => (float) ($product->purchase_price ?? $product->refill_price),
                 'image_url'      => $product->image ? Storage::url($product->image) : null,
+                'media'          => $product->mediaPayload(),
                 'stock'          => $product->inventory?->quantity ?? 0,
                 'store_id'       => $product->store_id,
                 'store_name'     => $product->store?->store_name ?? '',
@@ -271,6 +273,7 @@ class ProductBrowseController extends Controller
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
             'image_url'      => $p->image ? Storage::url($p->image) : null,
+            ...$p->cardMedia(),
             'stock'          => $p->inventory?->quantity ?? 0,
             'store_name'     => $p->store?->store_name ?? '',
             'store_id'       => $p->store_id,

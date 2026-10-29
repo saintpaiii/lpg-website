@@ -16,6 +16,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import CustomerLayout from '@/layouts/customer-layout';
 import { formatAddress } from '@/data/cavite-locations';
 import StoreAvatar from '@/components/store-avatar';
+import ProductCardImage from '@/components/product-card-image';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@ type Product = {
     refill_price: number;
     purchase_price: number;
     image_url: string | null;
+    hover_url?: string | null;
+    photo_count?: number;
+    has_video?: boolean;
     stock: number;
     store_id: number;
     avg_rating: number;
@@ -255,20 +259,14 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         {products.data.map((p) => (
                             <Card key={p.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
-                                <div className="relative">
-                                    {p.image_url ? (
-                                        <img src={p.image_url} alt={p.name} className="w-full h-40 object-cover" />
-                                    ) : (
-                                        <div className="w-full h-40 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 flex items-center justify-center">
-                                            <ShoppingCart className="h-10 w-10 text-blue-300" />
-                                        </div>
-                                    )}
+                                <ProductCardImage imageUrl={p.image_url} hoverUrl={p.hover_url} name={p.name}
+                                    photoCount={p.photo_count} hasVideo={p.has_video} className="h-40">
                                     {p.stock === 0 && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                             <span className="bg-white text-gray-800 text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
                                         </div>
                                     )}
-                                </div>
+                                </ProductCardImage>
                                 <CardContent className="p-4 flex flex-col flex-1">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
                                     <p className="text-xs text-gray-500 mb-2">{p.brand} · {p.weight}</p>

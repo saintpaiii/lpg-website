@@ -245,3 +245,11 @@ input::-ms-reveal,
 input::-ms-clear {
     display: none;
 }
+
+/* Hide a scrollbar but keep scrolling (product gallery tracks) */
+@utility scrollbar-none {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}

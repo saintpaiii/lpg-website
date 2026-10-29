@@ -1,1 +1,0 @@
-import{j as s,k as a,m as l,n as r}from"./leaflet-B92GtrJ5.js";const p=s(function({positions:t,...e},n){const o=new a.Polyline(t,e);return l(o,r(n,{overlayContainer:o}))},function(t,e,n){e.positions!==n.positions&&t.setLatLngs(e.positions)});export{p as P};
