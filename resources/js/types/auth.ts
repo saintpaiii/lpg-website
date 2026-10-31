@@ -49,6 +49,8 @@ export type Auth = {
     permissions: string[];
     store: SellerStore | null;
     seller_application: SellerApplication;
+    /** Customers only: false = never verified and no orders yet (history pages locked too) */
+    has_customer_history?: boolean | null;
 };
 
 export type TwoFactorSetupData = {

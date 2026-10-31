@@ -164,7 +164,12 @@ class VerificationController extends Controller
 
         if ($verification->type === 'seller_application') {
             // Promote customer to seller and approve their store
-            $verification->user?->update(['role' => 'seller', 'id_verified' => true]);
+            $verification->user?->update([
+                'role'                   => 'seller',
+                'id_verified'            => true,
+                'id_verification_status' => 'verified',
+                'id_verified_at'         => now(),
+            ]);
 
             Store::where('user_id', $verification->user_id)->update([
                 'status'      => 'approved',
@@ -207,7 +212,11 @@ class VerificationController extends Controller
         }
 
         // Fallback
-        $verification->user?->update(['id_verified' => true]);
+        $verification->user?->update([
+            'id_verified'            => true,
+            'id_verification_status' => 'verified',
+            'id_verified_at'         => now(),
+        ]);
         return back()->with('success', "Verification for {$verification->user?->name} approved.");
     }
 

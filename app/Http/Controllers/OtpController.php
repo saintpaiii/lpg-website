@@ -102,7 +102,7 @@ class OtpController extends Controller
         $user->markEmailAsVerified();
 
         // New customers are prompted to verify their identity before accessing the portal
-        if ($user->role === 'customer' && is_null($user->valid_id_path)) {
+        if ($user->role === 'customer' && $user->id_verification_status !== 'verified') {
             return redirect(route('customer.id-verification'))
                 ->with('success', 'Email verified! Please complete identity verification to place orders.');
         }

@@ -161,7 +161,11 @@ class StoreController extends Controller
         ]);
 
         // Mark owner's ID as verified
-        $store->owner?->update(['id_verified' => true]);
+        $store->owner?->update([
+            'id_verified'            => true,
+            'id_verification_status' => 'verified',
+            'id_verified_at'         => now(),
+        ]);
 
         // Approve associated seller verification request
         $store->owner?->verificationRequests()

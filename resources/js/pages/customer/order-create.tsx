@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import CustomerLayout from '@/layouts/customer-layout';
 import { formatAddress } from '@/data/cavite-locations';
 import type { FormEvent } from 'react';
+import { NotePicker } from '@/components/reason-picker';
 
 type TransactionType = 'refill' | 'new_purchase';
 type PaymentType = 'cod' | 'online';
@@ -578,12 +579,13 @@ export default function OrderCreate({ products, defaultAddress, storeDelivery }:
 
                             <div className="grid gap-1.5">
                                 <Label className="text-sm font-medium">Notes (optional)</Label>
-                                <textarea
+                                <NotePicker
+                                    context="delivery_instructions"
                                     value={notes}
-                                    onChange={(e) => setNotes(e.target.value)}
-                                    placeholder="Special instructions, gate code, etc."
+                                    onChange={(v) => setNotes(v)}
                                     rows={3}
-                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                                    placeholder="Special instructions, gate code, etc."
+                                    textareaClassName="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                                 />
                             </div>
                         </CardContent>

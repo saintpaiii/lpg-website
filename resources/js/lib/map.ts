@@ -1,5 +1,6 @@
 // Leaflet helpers shared by the rider route map and the customer tracking card.
 // Free services only: OpenStreetMap tiles + the public OSRM demo router.
+import { toast } from 'sonner';
 import L from 'leaflet';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -138,3 +139,45 @@ export const accuracyText = (m: number): string =>
 export const lowAccuracyNotice = (m: number): string =>
     `Your device's location is only accurate to about ${accuracyText(m)}. Computers without GPS guess it from your internet connection. ` +
     'Please drag the pin to your exact spot, or pick a saved address.';
+
+// ── Address from a map point (reverse geocoding via /api/reverse-geocode) ─────
+
+export type FilledAddress = { city: string; barangay: string; street: string };
+
+/**
+ * City + barangay (always names from our Cavite dropdown) and street for a point.
+ * The street only replaces `currentStreet` when that is empty, or when the user confirms.
+ * Shows the result as a toast; returns null when nothing could be found.
+ * Callers apply the result in ONE state update and must not run their barangay-change
+ * handlers (those would move the pin to the barangay centre).
+ */
+export async function fillAddressFromLocation(lat: number, lng: number, currentStreet = ''): Promise<FilledAddress | null> {
+    let data: { street: string | null; barangay: string | null; city: string | null; matched_by: 'name' | 'nearest'; message?: string };
+    try {
+        const res = await fetch(`/api/reverse-geocode?lat=${lat.toFixed(7)}&lng=${lng.toFixed(7)}`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        data = await res.json();
+        if (!res.ok) {
+            toast.error(data?.message ?? "Couldn't look up this address. Please choose your city and barangay.");
+            return null;
+        }
+    } catch {
+        toast.error("Couldn't look up this address. Please choose your city and barangay.");
+        return null;
+    }
+    if (!data.city || !data.barangay) {
+        toast.error("Couldn't find the barangay for this spot. Please choose it from the list.");
+        return null;
+    }
+
+    let street = currentStreet;
+    const found = data.street?.trim();
+    if (found && found !== currentStreet.trim()) {
+        if (!currentStreet.trim() || window.confirm(`Replace your street with '${found}'?`)) street = found;
+    }
+
+    toast.success(`Address filled from your location — please check it.${data.matched_by === 'nearest' ? ' (approximate)' : ''}`);
+    return { city: data.city, barangay: data.barangay, street };
+}

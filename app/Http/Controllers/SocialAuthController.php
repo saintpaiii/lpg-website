@@ -63,8 +63,8 @@ class SocialAuthController extends Controller
 
         Auth::login($user, true);
 
-        // New customers (no ID uploaded yet) go to identity verification step
-        if ($user->role === 'customer' && is_null($user->valid_id_path)) {
+        // Customers whose ID isn't approved yet go straight to identity verification
+        if ($user->role === 'customer' && $user->id_verification_status !== 'verified') {
             return redirect(route('customer.id-verification'))
                 ->with('success', 'Welcome, ' . $user->name . '! Please complete identity verification to place orders.');
         }

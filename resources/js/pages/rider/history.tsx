@@ -34,6 +34,7 @@ type DeliveryRow = {
     delivered_at: string | null;
     assigned_at: string | null;
     notes: string | null;
+    fail_reason_label: string | null;
     order: {
         id: number;
         order_number: string;
@@ -283,6 +284,9 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                             <p className="mt-1 text-xs text-gray-400">
                                                 {isDelivered ? 'Delivered' : 'Failed'}: {d.delivered_at ?? '—'}
                                             </p>
+                                            {!isDelivered && d.fail_reason_label && (
+                                                <p className="mt-1 text-xs font-semibold text-red-600">Reason: {d.fail_reason_label}</p>
+                                            )}
                                             {!isDelivered && d.notes && (
                                                 <p className="mt-1 text-xs text-red-500 italic">"{d.notes}"</p>
                                             )}

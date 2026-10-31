@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 type Pending = {
     id: number; store_id: number; store_name: string | null; doc_type: string; label: string; is_other: boolean; has_expiry: boolean;
@@ -183,8 +184,14 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                     </DialogHeader>
                     <form onSubmit={submitReject} className="space-y-4">
                         <div className="grid gap-1.5">
-                            <Label htmlFor="reject_reason">Reason</Label>
-                            <Input id="reject_reason" value={rejectForm.data.reason} maxLength={500} placeholder="e.g. The photo is blurry" onChange={(e) => rejectForm.setData('reason', e.target.value)} />
+                            <ReasonTextPicker
+                                context="verification_reject"
+                                reasonLabel="Reason"
+                                value={rejectForm.data.reason}
+                                onChange={(v) => rejectForm.setData('reason', v)}
+                                maxLength={500}
+                                rows={2}
+                            />
                             <InputError message={rejectForm.errors.reason} />
                         </div>
                         <div className="flex justify-end gap-2">

@@ -3,6 +3,7 @@ import { Loader2, MapPinned, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
+import LocationAddressTools from '@/components/location-address-tools';
 import AddressSearchBox, { matchBarangay, matchCity, shortPlaceName, type GeocodeResult } from '@/components/address-search-box';
 import { labelIcon, type SavedAddress } from '@/components/address-search-map';
 import {
@@ -194,6 +195,13 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                             onLocationChange={(lat, lng) => form.setData((d) => ({ ...d, latitude: lat, longitude: lng }))}
                             height="240px"
                             clickMoves
+                        />
+                        <LocationAddressTools
+                            latitude={form.data.latitude}
+                            longitude={form.data.longitude}
+                            street={form.data.address_line}
+                            onPin={(lat, lng) => form.setData((d) => ({ ...d, latitude: lat, longitude: lng }))}
+                            onAddress={(a) => { setNote(null); form.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address_line: a.street })); }}
                         />
                         {(form.errors.latitude || form.errors.longitude) && <p className="text-xs text-red-500">{form.errors.latitude ?? form.errors.longitude}</p>}
 

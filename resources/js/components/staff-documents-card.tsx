@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 export type StaffDocumentRow = {
     id: number; doc_type: string; label: string; document_number: string | null; expires: string | null; expires_on: string | null;
@@ -130,8 +131,14 @@ export default function StaffDocumentsCard({ documents, license }: {
                     </DialogHeader>
                     <form onSubmit={submitReject} className="space-y-4">
                         <div className="grid gap-1.5">
-                            <Label htmlFor="sd_reject_reason">Reason</Label>
-                            <Input id="sd_reject_reason" value={rejectForm.data.reason} maxLength={500} placeholder="e.g. The photo is blurry" onChange={(e) => rejectForm.setData('reason', e.target.value)} />
+                            <ReasonTextPicker
+                                context="verification_reject"
+                                reasonLabel="Reason"
+                                value={rejectForm.data.reason}
+                                onChange={(v) => rejectForm.setData('reason', v)}
+                                maxLength={500}
+                                rows={2}
+                            />
                             <InputError message={rejectForm.errors.reason} />
                         </div>
                         <div className="flex justify-end gap-2">

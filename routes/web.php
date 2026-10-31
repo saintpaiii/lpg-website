@@ -56,6 +56,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/api/geocode', [\App\Http\Controllers\MapServiceController::class, 'geocode'])
         ->middleware('throttle:30,1')
         ->name('api.geocode');
+    Route::get('/api/reverse-geocode', [\App\Http\Controllers\MapServiceController::class, 'reverse'])
+        ->middleware('throttle:30,1')
+        ->name('api.reverse-geocode');
     Route::get('/api/route', [\App\Http\Controllers\MapServiceController::class, 'route'])
         ->middleware('throttle:60,1')
         ->name('api.route');

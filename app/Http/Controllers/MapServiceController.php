@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BarangayCoordinate;
+use App\Support\ServiceArea;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -12,6 +14,7 @@ use Illuminate\Support\Facades\Log;
  * Server-side proxies for the free OpenStreetMap services (no API keys):
  *  - geocode(): Nominatim address search, limited to Cavite.
  *    Usage policy: max 1 request/second, identifying User-Agent, cache results.
+ *  - reverse(): Nominatim reverse lookup → street + a city/barangay from our Cavite list.
  *  - route():   OSRM road geometry for a whole multi-stop route in ONE request, cached.
  * Proxying avoids CORS issues, lets every user share the cache, and keeps us inside the rate limits.
  */
@@ -70,6 +73,147 @@ class MapServiceController extends Controller
         });
 
         return response()->json($results ?? []);
+    }
+
+    /**
+     * GET /api/reverse-geocode?lat=&lng=  →  { street, barangay, city, province, matched_by }
+     *
+     * City and barangay are always names from our address dropdown (barangay_coordinates holds
+     * one row per dropdown barangay). Nominatim's barangay name is matched first; otherwise the
+     * nearest barangay centre is used ('nearest' = approximate). Works without Nominatim too.
+     */
+    public function reverse(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'lat' => ['required', 'numeric', 'between:-90,90'],
+            'lng' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+        $lat = (float) $data['lat'];
+        $lng = (float) $data['lng'];
+
+        if (! ServiceArea::contains($lat, $lng)) {
+            return response()->json(['message' => ServiceArea::MESSAGE], 422);
+        }
+
+        $osm = $this->nominatimReverse($lat, $lng);   // null when Nominatim is unreachable
+
+        // City: only accept one of our Cavite cities
+        $cities = BarangayCoordinate::query()->distinct()->pluck('city');
+        $city   = null;
+        foreach ($osm['cities'] ?? [] as $candidate) {
+            $key  = BarangayCoordinate::normalizeCity($candidate);
+            $city = $cities->first(fn ($c) => BarangayCoordinate::normalizeCity($c) === $key);
+            if ($city) {
+                break;
+            }
+        }
+
+        $barangay  = null;
+        $matchedBy = 'nearest';
+
+        if ($city) {
+            $rows = BarangayCoordinate::where('city', $city)->get();
+            foreach ($osm['barangays'] ?? [] as $candidate) {
+                $match = $this->matchBarangay($rows, $candidate, $lat, $lng);
+                if ($match) {
+                    $barangay  = $match;
+                    $matchedBy = 'name';
+                    break;
+                }
+            }
+        }
+
+        if (! $barangay) {
+            // Nearest barangay centre — inside the city Nominatim gave, else anywhere in Cavite.
+            // Longitude is scaled by cos(latitude) (~0.97 in Cavite) so distances are roughly metric.
+            $nearest = BarangayCoordinate::query()
+                ->when($city, fn ($q) => $q->where('city', $city))
+                ->orderByRaw('POW(latitude - ?, 2) + POW((longitude - ?) * 0.97, 2)', [$lat, $lng])
+                ->first();
+            if ($nearest) {
+                $city     = $nearest->city;
+                $barangay = $nearest->barangay;
+            }
+        }
+
+        return response()->json([
+            'street'     => $osm['street'] ?? null,
+            'barangay'   => $barangay,
+            'city'       => $city,
+            'province'   => 'Cavite',
+            'matched_by' => $matchedBy,
+        ]);
+    }
+
+    /**
+     * Nominatim reverse lookup, cached for 30 days per ~10 m cell.
+     * Returns ['street' => ?string, 'barangays' => string[], 'cities' => string[]], or null on failure.
+     */
+    private function nominatimReverse(float $lat, float $lng): ?array
+    {
+        $key = sprintf('reverse-geocode:%.4f,%.4f', $lat, $lng);
+
+        return Cache::remember($key, now()->addDays(30), function () use ($lat, $lng) {
+            try {
+                $this->waitForNominatimSlot();
+                $res = Http::withHeaders(['User-Agent' => self::USER_AGENT, 'Accept-Language' => 'en'])
+                    ->timeout(5)
+                    ->get('https://nominatim.openstreetmap.org/reverse', [
+                        'lat'            => $lat,
+                        'lon'            => $lng,
+                        'format'         => 'jsonv2',
+                        'zoom'           => 18,
+                        'addressdetails' => 1,
+                    ]);
+            } catch (\Throwable $e) {
+                Log::warning('Nominatim reverse failed', ['lat' => $lat, 'lng' => $lng, 'error' => $e->getMessage()]);
+                return null;   // not cached
+            }
+            if (! $res->ok()) {
+                return null;
+            }
+
+            $a = $res->json('address') ?? [];
+
+            $road   = trim(implode(' ', array_filter([$a['house_number'] ?? null, $a['road'] ?? null])));
+            $extra  = $a['neighbourhood'] ?? $a['subdivision'] ?? null;
+            $street = $road !== '' ? ($extra && $extra !== $road ? "{$road}, {$extra}" : $road) : null;
+
+            return [
+                'street'    => $street,
+                'barangays' => array_values(array_filter([
+                    $a['quarter'] ?? null, $a['village'] ?? null, $a['suburb'] ?? null,
+                    $a['neighbourhood'] ?? null, $a['city_district'] ?? null,
+                ])),
+                'cities'    => array_values(array_filter([
+                    $a['city'] ?? null, $a['town'] ?? null, $a['municipality'] ?? null,
+                ])),
+            ];
+        });
+    }
+
+    /**
+     * Our barangay name for a Nominatim name within one city: exact (ignoring "(Poblacion)"-style
+     * suffixes), else the base name ("Talaba" → nearest of Talaba I…VII). Null when nothing fits.
+     */
+    private function matchBarangay($rows, string $candidate, float $lat, float $lng): ?string
+    {
+        $strip = fn (string $s) => trim(preg_replace('/\s*\(.*?\)\s*/', ' ', BarangayCoordinate::normalize($s)));
+        $want  = $strip($candidate);
+
+        $exact = $rows->first(fn ($r) => $strip($r->barangay) === $want);
+        if ($exact) {
+            return $exact->barangay;
+        }
+
+        $base = BarangayCoordinate::baseBarangay($want);
+        if ($base === '') {
+            return null;
+        }
+        $same = $rows->filter(fn ($r) => BarangayCoordinate::baseBarangay($strip($r->barangay)) === $base);
+
+        return $same->sortBy(fn ($r) => ($r->latitude - $lat) ** 2 + (($r->longitude - $lng) * 0.97) ** 2)
+            ->first()?->barangay;
     }
 
     /**

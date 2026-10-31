@@ -1,6 +1,9 @@
 import { Head, router } from '@inertiajs/react';
 import { Camera, ChevronDown, ChevronUp, MapPin, Search, Truck } from 'lucide-react';
 import { useState } from 'react';
+import DeliveryFailFields, { emptyFailValues, failValuesComplete } from '@/components/delivery-fail-fields';
+import type { FailInfo, FailOptions, FailValues } from '@/components/delivery-fail-fields';
+import { NotePicker } from '@/components/reason-picker';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -36,6 +39,7 @@ type Delivery = {
     assigned_at: string | null;
     delivered_at: string | null;
     notes: string | null;
+    fail_info: FailInfo | null;
     order: { id: number; order_number: string; customer: string; address: string; total_amount: number } | null;
     rider: { id: number; name: string; phone: string | null } | null;
     vehicle: { id: number; vehicle_type: string; plate_number: string } | null;
@@ -44,7 +48,7 @@ type Delivery = {
 
 type Rider = { id: number; name: string; phone: string | null } & RiderLicenseFields;
 type Vehicle = { id: number; vehicle_type: string; plate_number: string; max_capacity_kg: number; max_tanks: number; status: string };
-type Unassigned = { id: number; order_number: string; customer: string; status: string };
+type Unassigned = { id: number; order_number: string; customer: string; status: string; redelivery: FailInfo | null };
 type Counts = { active: number; completed: number };
 type Paginated = { data: Delivery[]; current_page: number; last_page: number; total: number };
 
@@ -68,6 +72,7 @@ type Props = {
     search: string;
     date_from: string;
     date_to: string;
+    fail_options: FailOptions;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -167,7 +172,7 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
     );
 }
 
-export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to }: Props) {
+export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to, fail_options }: Props) {
     const [searchVal, setSearchVal]           = useState(search);
     const [dateFrom,  setDateFrom]            = useState(date_from);
     const [dateTo,    setDateTo]              = useState(date_to);
@@ -177,6 +182,10 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     const [showAssign, setShowAssign]         = useState(false);
     const [statusTarget, setStatusTarget]     = useState<Delivery | null>(null);
     const [newStatus, setNewStatus]           = useState('');
+    const [failValues, setFailValues]         = useState<FailValues>(emptyFailValues);
+    const [statusErrors, setStatusErrors]     = useState<Record<string, string>>({});
+    const [statusNotes, setStatusNotes]       = useState('');
+    const [statusSaving, setStatusSaving]     = useState(false);
     const [expanded, setExpanded]             = useState<number | null>(null);
 
     function navigate(overrides: Record<string, string> = {}) {
@@ -211,11 +220,32 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
         });
     }
 
+    function openStatus(d: Delivery) {
+        setStatusTarget(d);
+        setNewStatus(d.status);
+        setFailValues(emptyFailValues);
+        setStatusNotes('');
+        setStatusErrors({});
+    }
+
     function submitStatusUpdate() {
         if (!statusTarget || !newStatus) return;
-        router.patch(`/seller/deliveries/${statusTarget.id}/status`, { status: newStatus }, {
+        const payload = newStatus === 'failed'
+            ? { status: newStatus, ...failValues }
+            : { status: newStatus, ...(statusNotes.trim() ? { notes: statusNotes.trim() } : {}) };
+        setStatusSaving(true);
+        router.patch(`/seller/deliveries/${statusTarget.id}/status`, payload, {
+            preserveScroll: true,
             onSuccess: () => setStatusTarget(null),
+            onError: (errs) => setStatusErrors(errs),
+            onFinish: () => setStatusSaving(false),
         });
+    }
+
+    // Reassign a failed delivery: open Assign Delivery with that order picked
+    function reassign(orderId: number) {
+        setAssignOrderId(String(orderId));
+        setShowAssign(true);
     }
 
     const TABS = [
@@ -327,6 +357,16 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                                         {STATUS_LABELS[d.status] ?? d.status}
                                                     </span>
+                                                    {d.fail_info && (
+                                                        <div className="mt-1 flex flex-col items-center gap-0.5">
+                                                            {d.fail_info.short && (
+                                                                <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800" title={d.fail_info.range_label ? `Estimated redelivery: ${d.fail_info.range_label}` : undefined}>
+                                                                    {d.fail_info.short}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-[11px] text-red-600">{d.fail_info.reason_label}</span>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
                                                     {d.assigned_at ? fmtDateTime(d.assigned_at) : '—'}
@@ -351,8 +391,13 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                         {/* Status update (active tab only) */}
                                                         {tab === 'active' && (
                                                             <Button size="sm" variant="outline" className="h-7 text-xs"
-                                                                onClick={() => { setStatusTarget(d); setNewStatus(d.status); }}>
+                                                                onClick={() => openStatus(d)}>
                                                                 Update
+                                                            </Button>
+                                                        )}
+                                                        {d.status === 'failed' && d.order && unassigned.some((u) => u.id === d.order!.id) && (
+                                                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => reassign(d.order!.id)}>
+                                                                Reassign
                                                             </Button>
                                                         )}
                                                     </div>
@@ -406,6 +451,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                     {unassigned.map((o) => (
                                         <SelectItem key={o.id} value={String(o.id)}>
                                             {o.order_number} — {o.customer}
+                                            {o.redelivery ? ` (failed${o.redelivery.short ? ` · ${o.redelivery.short}` : ''})` : ''}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -464,7 +510,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                         <AlertDialogTitle>Update Delivery Status</AlertDialogTitle>
                         <AlertDialogDescription>Order: <strong>{statusTarget?.order?.order_number}</strong></AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Select value={newStatus} onValueChange={setNewStatus}>
+                    <Select value={newStatus} onValueChange={(v) => { setNewStatus(v); setStatusErrors({}); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                             {['assigned', 'picked_up', 'in_transit', 'delivered', 'failed'].map((s) => (
@@ -472,9 +518,38 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                             ))}
                         </SelectContent>
                     </Select>
+                    {newStatus !== 'failed' && (
+                        <div className="grid gap-1.5">
+                            <p className="text-sm font-medium">Notes <span className="text-xs text-muted-foreground">(optional)</span></p>
+                            <NotePicker
+                                context="delivery_note"
+                                value={statusNotes}
+                                onChange={setStatusNotes}
+                                maxLength={500}
+                                rows={2}
+                                placeholder="Any delivery notes…"
+                                error={statusErrors.notes}
+                            />
+                        </div>
+                    )}
+                    {newStatus === 'failed' && (
+                        <DeliveryFailFields
+                            options={fail_options}
+                            values={failValues}
+                            onChange={(patch) => setFailValues((v) => ({ ...v, ...patch }))}
+                            errors={statusErrors}
+                        />
+                    )}
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={submitStatusUpdate} className="bg-blue-600 hover:bg-blue-700">Update</AlertDialogAction>
+                        {/* Plain button: the dialog stays open to show validation errors */}
+                        <Button
+                            onClick={submitStatusUpdate}
+                            disabled={statusSaving || (newStatus === 'failed' && !failValuesComplete(fail_options, failValues))}
+                            className="bg-blue-600 hover:bg-blue-700"
+                        >
+                            Update
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

@@ -36,6 +36,7 @@ import StoreLocationLink from '@/components/store-location-link';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
 import DocumentRow, { DocumentHeading } from '@/components/document-row';
+import { ReasonPicker, ReasonTextPicker } from '@/components/reason-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,17 +89,6 @@ type ActionHistory = {
     performed_by: string;
     created_at: string;
 };
-
-const SUSPEND_REASONS = [
-    'Policy Violation',
-    'Fraudulent Activity',
-    'Pending Investigation',
-    'Customer Complaints',
-    'Account Inactivity',
-    'Non-payment of Commissions',
-    'Failed Compliance Check',
-    'Other',
-];
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
     approve:   { label: 'Approved',     color: 'bg-green-100 text-green-700'   },
@@ -506,12 +496,14 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                             Provide a reason for rejecting <strong>{store.store_name}</strong>.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <textarea
-                        className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <ReasonTextPicker
+                        context="store_reject"
+                        reasonLabel="Reason"
+                        value={rejectForm.data.reason}
+                        onChange={(v) => rejectForm.setData('reason', v)}
                         rows={3}
                         placeholder="Reason for rejection…"
-                        value={rejectForm.data.reason}
-                        onChange={(e) => rejectForm.setData('reason', e.target.value)}
+                        textareaClassName="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -536,35 +528,20 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-3">
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Reason <span className="text-red-500">*</span></label>
-                            <select
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={suspendForm.data.reason}
-                                onChange={(e) => suspendForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {SUSPEND_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Additional notes <span className="text-gray-400">(optional)</span></label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                rows={3}
-                                placeholder="Provide more context if needed…"
-                                value={suspendForm.data.notes}
-                                onChange={(e) => suspendForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_store_suspend"
+                            reasonLabel="Reason"
+                            reason={suspendForm.data.reason}
+                            notes={suspendForm.data.notes}
+                            onChange={(next) => { suspendForm.setData('reason', next.reason); suspendForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={submitSuspend}
-                            disabled={!suspendForm.data.reason || suspendForm.processing}
+                            disabled={!suspendForm.data.reason || !suspendForm.data.notes.trim() || suspendForm.processing}
                             className="bg-orange-600 hover:bg-orange-700"
                         >
                             {suspendForm.processing ? 'Suspending…' : 'Suspend Store'}

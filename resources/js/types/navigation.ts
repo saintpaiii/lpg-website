@@ -14,4 +14,8 @@ export type NavItem = {
     badge?: string;
     /** 'unread' renders the badge as a blue pill (and a dot when the sidebar is collapsed). */
     badgeTone?: 'default' | 'unread';
+    /** Shown greyed with a lock and not clickable (e.g. shopping before ID approval) */
+    disabled?: boolean;
+    /** Tooltip shown on a disabled item */
+    disabledReason?: string;
 };

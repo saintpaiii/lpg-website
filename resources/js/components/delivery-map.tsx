@@ -1,6 +1,7 @@
-import { Camera, MapPinOff, MessageSquare, Navigation } from 'lucide-react';
+import { ChevronDown, MapPinOff, MessageSquare, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
+import { CompactContact } from '@/components/rider/customer-contact';
 import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
 import { dotIcon, googleMapsDirections, OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, fetchRoute, type LatLng } from '@/lib/map';
@@ -13,7 +14,9 @@ export type RouteStop = {
     status: 'assigned' | 'picked_up' | 'in_transit' | 'delivered' | 'failed';
     order_number: string | null;
     customer_name: string;
+    /** Phone / email only while active or < 24 h after it ended */
     customer_phone: string | null;
+    customer_email: string | null;
     address: string;
     lat: number | null;
     lng: number | null;
@@ -26,6 +29,53 @@ export type RouteData = {
     store: { lat: number; lng: number; approximate?: boolean } | null;
     stops: RouteStop[];
 };
+
+/** Next statuses a rider can move a stop to (same as the List view) */
+export const STOP_NEXT: Record<RouteStop['status'], RouteStop['status'][]> = {
+    assigned:   ['picked_up', 'failed'],
+    picked_up:  ['in_transit', 'failed'],
+    in_transit: ['delivered', 'failed'],
+    delivered:  [],
+    failed:     [],
+};
+const NEXT_LABEL: Record<RouteStop['status'], string> = {
+    assigned: 'Assigned', picked_up: 'Picked up', in_transit: 'In transit', delivered: 'Delivered', failed: 'Mark as Failed',
+};
+
+/** "Update status ▾" — opens the rider's status dialog (photo proof, location, Reason ▸ Details for Failed). */
+function UpdateStatusButton({ stop, onUpdateStatus, isDisabled }: {
+    stop: RouteStop;
+    onUpdateStatus: (stop: RouteStop, status: RouteStop['status']) => void;
+    isDisabled?: (status: RouteStop['status']) => string | null;
+}) {
+    const [open, setOpen] = useState(false);
+    const next = STOP_NEXT[stop.status];
+    if (next.length === 0) return null;
+    return (
+        <div className="grid gap-1">
+            <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
+                className="inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-md border border-gray-300 px-2 text-xs font-semibold hover:bg-gray-50">
+                Update status <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && (
+                <div className="grid gap-1" role="menu">
+                    {next.map((s) => {
+                        const why = isDisabled?.(s) ?? null;
+                        return (
+                            <button key={s} type="button" role="menuitem" disabled={!!why} title={why ?? undefined}
+                                onClick={() => { setOpen(false); onUpdateStatus(stop, s); }}
+                                className={`min-h-9 rounded-md px-2 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${s === 'failed'
+                                    ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
+                                {NEXT_LABEL[s]}{why && <span className="ml-1 font-normal text-gray-500">({why})</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+}
 
 const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const isDone = (s: RouteStop['status']) => s === 'delivered' || s === 'failed';
@@ -59,10 +109,13 @@ function FitToPoints({ points }: { points: LatLng[] }) {
  * "already driven" path (store → done stops); the solid blue path continues from the
  * last finished stop (or the store) through the stops still to deliver.
  */
-export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage, height = 480 }: {
+export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDisabled, onMessage, height = 480 }: {
     route: RouteData;
     riderPos: LatLng | null;
-    onUploadProof: (stop: RouteStop) => void;
+    /** "Update status ▾" in each stop popup / list row — opens the same dialog as the List view */
+    onUpdateStatus: (stop: RouteStop, status: RouteStop['status']) => void;
+    /** Reason a next status can't be chosen yet (e.g. no driver's license), or null */
+    statusDisabled?: (status: RouteStop['status']) => string | null;
     /** Optional "Message" action in the popup (rider → customer chat for this delivery). */
     onMessage?: (stop: RouteStop) => void;
     height?: number;
@@ -137,6 +190,7 @@ export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage,
                                     <div className="space-y-1 text-sm">
                                         <p className="font-semibold">#{s.number} — {s.customer_name}</p>
                                         <p className="text-xs text-gray-600">{s.address || 'No address on file'}</p>
+                                        <CompactContact phone={s.customer_phone} email={s.customer_email} />
                                         <p className="text-xs">
                                             {peso(s.amount)} ({s.payment_label})
                                             {s.amount_to_collect > 0 && <span className="font-semibold text-amber-700"> · collect {peso(s.amount_to_collect)}</span>}
@@ -146,21 +200,20 @@ export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage,
                                         </p>
                                         {s.order_number && <p className="font-mono text-[11px] text-gray-500">{s.order_number}</p>}
                                         {!isDone(s.status) && (
-                                            <div className="flex gap-1.5 pt-1.5">
-                                                <a href={googleMapsDirections(s.lat!, s.lng!)} target="_blank" rel="noopener noreferrer"
-                                                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1.5 text-xs font-semibold !text-white hover:bg-blue-700">
-                                                    <Navigation className="h-3 w-3" /> Navigate
-                                                </a>
-                                                <button type="button" onClick={() => onUploadProof(s)}
-                                                    className="inline-flex flex-1 items-center justify-center gap-1 rounded-md border border-gray-300 px-2 py-1.5 text-xs font-semibold hover:bg-gray-50">
-                                                    <Camera className="h-3 w-3" /> Upload Proof
-                                                </button>
-                                                {onMessage && (
-                                                    <button type="button" onClick={() => onMessage(s)} aria-label={`Message ${s.customer_name}`} title="Message customer"
-                                                        className="inline-flex items-center justify-center rounded-md border border-gray-300 px-2 py-1.5 hover:bg-gray-50">
-                                                        <MessageSquare className="h-3 w-3" />
-                                                    </button>
-                                                )}
+                                            <div className="grid gap-1.5 pt-1.5">
+                                                <div className="flex gap-1.5">
+                                                    <a href={googleMapsDirections(s.lat!, s.lng!)} target="_blank" rel="noopener noreferrer"
+                                                        className="inline-flex min-h-9 flex-1 items-center justify-center gap-1 rounded-md bg-blue-600 px-2 text-xs font-semibold !text-white hover:bg-blue-700">
+                                                        <Navigation className="h-3 w-3" /> Navigate
+                                                    </a>
+                                                    {onMessage && (
+                                                        <button type="button" onClick={() => onMessage(s)} aria-label={`Message ${s.customer_name}`} title="Message customer"
+                                                            className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-300 px-2.5 hover:bg-gray-50">
+                                                            <MessageSquare className="h-3 w-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <UpdateStatusButton stop={s} onUpdateStatus={onUpdateStatus} isDisabled={statusDisabled} />
                                             </div>
                                         )}
                                     </div>
@@ -202,12 +255,17 @@ export default function DeliveryMap({ route, riderPos, onUploadProof, onMessage,
                     <p className="mb-1 flex items-center gap-1.5 font-semibold"><MapPinOff className="h-4 w-4" /> Location not available</p>
                     {unmapped.map((s) => (
                         <div key={s.id} className="flex items-center justify-between gap-2 py-0.5">
-                            <span>
-                                #{s.number} {s.customer_name} — {s.address || 'no address'}
-                                <span className="ml-1 font-semibold" style={{ color: stopStyle(s.status).color }}>({stopStyle(s.status).legend})</span>
-                            </span>
+                            <div className="min-w-0 flex-1 space-y-1">
+                                <span>
+                                    #{s.number} {s.customer_name} — {s.address || 'no address'}
+                                    <span className="ml-1 font-semibold" style={{ color: stopStyle(s.status).color }}>({stopStyle(s.status).legend})</span>
+                                </span>
+                                <CompactContact phone={s.customer_phone} email={s.customer_email} />
+                            </div>
                             {!isDone(s.status) && (
-                                <button type="button" onClick={() => onUploadProof(s)} className="text-xs font-semibold underline">Upload Proof</button>
+                                <div className="w-36 shrink-0">
+                                    <UpdateStatusButton stop={s} onUpdateStatus={onUpdateStatus} isDisabled={statusDisabled} />
+                                </div>
                             )}
                         </div>
                     ))}

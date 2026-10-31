@@ -18,6 +18,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { ReasonPicker } from '@/components/reason-picker';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/seller/dashboard' },
@@ -28,6 +29,8 @@ type Order = {
     id: number;
     order_number: string;
     status: string;
+    /** Failed delivery waiting for a new rider */
+    redelivery: { short: string | null; reason_label: string | null; range_label: string | null } | null;
     transaction_type: string;
     total_amount: number;
     payment_method: string | null;
@@ -173,7 +176,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
     function handleCancel() {
         if (!dialog || dialog.type !== 'cancel') return;
-        if (!cancelReason) { toast.error('Please select a cancellation reason.'); return; }
+        if (!cancelReason || !cancelNotes.trim()) { toast.error('Please select a cancellation reason.'); return; }
         patchStatus(dialog.order.id, 'cancelled', {
             cancellation_reason: cancelReason,
             cancellation_notes:  cancelNotes,
@@ -348,6 +351,14 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
                                                     {o.status.replace('_', ' ')}
                                                 </span>
+                                                {o.redelivery && (
+                                                    <p className="mt-0.5">
+                                                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+                                                            title={[o.redelivery.reason_label, o.redelivery.range_label && `Estimated: ${o.redelivery.range_label}`].filter(Boolean).join(' · ')}>
+                                                            {o.redelivery.short ?? 'Delivery failed'}
+                                                        </span>
+                                                    </p>
+                                                )}
                                                 {o.status === 'cancelled' && o.cancelled_by && (
                                                     <p className="text-[10px] text-muted-foreground mt-0.5">
                                                         by {o.cancelled_by === 'customer' ? 'Customer' : 'Seller'}
@@ -461,35 +472,18 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-3 px-1 pb-2">
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">Reason <span className="text-red-500">*</span></label>
-                            <select
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                            >
-                                <option value="">Select a reason…</option>
-                                <option value="Out of stock">Out of stock</option>
-                                <option value="Cannot fulfill order">Cannot fulfill order</option>
-                                <option value="Customer requested cancellation">Customer requested cancellation</option>
-                                <option value="Store temporarily closed">Store temporarily closed</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">Notes <span className="text-muted-foreground text-xs">(optional)</span></label>
-                            <textarea
-                                value={cancelNotes}
-                                onChange={(e) => setCancelNotes(e.target.value)}
-                                rows={2}
-                                placeholder="Additional details…"
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="store_cancel"
+                            reasonLabel="Reason"
+                            reason={cancelReason}
+                            notes={cancelNotes}
+                            onChange={(next) => { setCancelReason(next.reason); setCancelNotes(next.notes); }}
+                            rows={2}
+                        />
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={loading}>Keep Order</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleCancel} disabled={loading || !cancelReason}
+                        <AlertDialogAction onClick={handleCancel} disabled={loading || !cancelReason || !cancelNotes.trim()}
                             className="bg-red-600 hover:bg-red-700">
                             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
                             Cancel Order

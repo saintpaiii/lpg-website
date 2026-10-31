@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'guest'            => RedirectIfAuthenticated::class,
             'permission'       => RequirePermission::class,
             'password.changed' => EnsurePasswordChanged::class,
+            'id.verified'      => \App\Http\Middleware\EnsureIdVerified::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

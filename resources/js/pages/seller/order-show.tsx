@@ -25,6 +25,8 @@ import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import type { FailInfo } from '@/components/delivery-fail-fields';
+import { ReasonPicker } from '@/components/reason-picker';
 
 type OrderItem = {
     id: number;
@@ -40,6 +42,7 @@ type Delivery = {
     rider: { id: number; name: string; phone: string | null } | null;
     assigned_at: string | null;
     delivered_at: string | null;
+    fail_info: FailInfo | null;
 };
 
 type PaymentRecord = {
@@ -148,7 +151,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
     }
 
     function submitCancel() {
-        if (!cancelReason) return;
+        if (!cancelReason || !cancelNotes.trim()) return;
         router.patch(`/seller/orders/${order.id}/status`, {
             status:              'cancelled',
             cancellation_reason: cancelReason,
@@ -479,6 +482,13 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-1.5"><Truck className="h-3.5 w-3.5" /> Delivery</CardTitle></CardHeader>
                                 <CardContent className="text-sm space-y-1">
                                     <p><span className="text-muted-foreground">Status:</span> <span className="capitalize font-medium">{order.delivery.status.replace('_', ' ')}</span></p>
+                                    {order.delivery.fail_info && (
+                                        <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                            {order.delivery.fail_info.short && <p className="font-semibold">{order.delivery.fail_info.short}</p>}
+                                            <p>Reason: {order.delivery.fail_info.reason_label}</p>
+                                            <p className="mt-0.5 text-amber-700">Assign a rider again to retry.</p>
+                                        </div>
+                                    )}
                                     {order.delivery.rider && <p><span className="text-muted-foreground">Rider:</span> {order.delivery.rider.name}</p>}
                                     {canMessage && order.delivery.rider && (
                                         <MessageButton portal="seller" params={{ rider_id: order.delivery.rider.id }} label="Message rider" className="mt-1.5 gap-1.5" />
@@ -550,35 +560,18 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-3 px-1 pb-2">
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">Reason <span className="text-red-500">*</span></label>
-                            <select
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                            >
-                                <option value="">Select a reason…</option>
-                                <option value="Out of stock">Out of stock</option>
-                                <option value="Cannot fulfill order">Cannot fulfill order</option>
-                                <option value="Customer requested cancellation">Customer requested cancellation</option>
-                                <option value="Store temporarily closed">Store temporarily closed</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">Notes <span className="text-muted-foreground text-xs">(optional)</span></label>
-                            <textarea
-                                value={cancelNotes}
-                                onChange={(e) => setCancelNotes(e.target.value)}
-                                rows={2}
-                                placeholder="Additional details…"
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring resize-none"
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="store_cancel"
+                            reasonLabel="Reason"
+                            reason={cancelReason}
+                            notes={cancelNotes}
+                            onChange={(next) => { setCancelReason(next.reason); setCancelNotes(next.notes); }}
+                            rows={2}
+                        />
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Go Back</AlertDialogCancel>
-                        <AlertDialogAction onClick={submitCancel} disabled={!cancelReason} className="bg-red-600 hover:bg-red-700">
+                        <AlertDialogAction onClick={submitCancel} disabled={!cancelReason || !cancelNotes.trim()} className="bg-red-600 hover:bg-red-700">
                             Cancel Order
                         </AlertDialogAction>
                     </AlertDialogFooter>

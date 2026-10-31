@@ -8,6 +8,7 @@ import { AlertTriangle, ArrowLeft, Banknote, Camera, Handshake, CheckCircle2, Ci
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import type { FailInfo } from '@/components/delivery-fail-fields';
 import { fmtDate } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -20,6 +21,7 @@ import {
 import CustomerLayout from '@/layouts/customer-layout';
 import TrackingCard from '@/components/tracking-card';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
+import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
 
 type Payment = {
     id: number;
@@ -29,15 +31,6 @@ type Payment = {
     payment_method: string | null;
     paid_at: string | null;
 };
-
-const CANCEL_REASONS = [
-    'Changed my mind',
-    'Found a better price',
-    'Ordered by mistake',
-    'Delivery takes too long',
-    'Want to change order details',
-    'Other',
-];
 
 type StoreLocation = { lat: number; lng: number; name: string };
 
@@ -89,6 +82,8 @@ type Order = {
         status: string;
         rider_name: string | null;
         assigned_at: string | null;
+        /** Only while the last attempt is failed */
+        fail_info: FailInfo | null;
         proofs: {
             status: string;
             photo_url: string | null;
@@ -368,7 +363,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
     }
 
     function submitCancel() {
-        if (!cancelReason) return;
+        if (!cancelReason || !cancelNotes.trim()) return;
         setCancelling(true);
         router.post(`/customer/orders/${order.id}/cancel`, {
             cancellation_reason: cancelReason,
@@ -436,7 +431,8 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
         setRefundSubmitting(true);
         const fd = new FormData();
         fd.append('amount', refundAmount);
-        fd.append('reason', refundReason);
+        // Several reasons share one server value (e.g. seal problem / gas ran out → quality_issue)
+        fd.append('reason', reasonSubmitValue('refund_issue', refundReason));
         fd.append('preferred_resolution', refundResolution);
         fd.append('description', refundDesc);
         refundFiles.forEach((f) => fd.append('evidence[]', f));
@@ -603,6 +599,26 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         <StatusStepper status={order.status} order={order} />
                         {order.status === 'out_for_delivery' && (
                             <TrackingCard orderId={order.id} />
+                        )}
+                        {order.delivery?.fail_info && (
+                            <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                                <Clock className="mt-0.5 h-4 w-4 shrink-0" />
+                                <div>
+                                    {order.delivery.fail_info.range_label ? (
+                                        <p className="font-semibold">
+                                            Redelivery expected: {order.delivery.fail_info.range_label}
+                                            {order.delivery.fail_info.reason_label && <span className="font-normal"> · Reason: {order.delivery.fail_info.reason_label}</span>}
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <p className="font-semibold">The delivery didn't push through. The store will contact you.</p>
+                                            {order.delivery.fail_info.reason_label && (
+                                                <p className="mt-0.5 text-xs">Reason: {order.delivery.fail_info.reason_label}</p>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         )}
                         {order.delivery && (
                             <>
@@ -893,33 +909,14 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                             Cancel order <strong className="font-mono">{order.order_number}</strong>?
                             {order.status === 'confirmed' && ' Stock will be restored to the seller.'}
                         </p>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">
-                                Reason <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Select a reason…</option>
-                                {CANCEL_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">
-                                Additional notes <span className="text-gray-400 text-xs">(optional)</span>
-                            </label>
-                            <textarea
-                                value={cancelNotes}
-                                onChange={(e) => setCancelNotes(e.target.value)}
-                                rows={3}
-                                placeholder="Any additional details…"
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="customer_cancel"
+                            reasonLabel="Reason"
+                            reason={cancelReason}
+                            notes={cancelNotes}
+                            onChange={(next) => { setCancelReason(next.reason); setCancelNotes(next.notes); }}
+                            rows={3}
+                        />
                         {order.payment_status === 'paid' && (
                             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                 Your order was paid. A refund will be processed by the seller.
@@ -933,7 +930,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         <Button
                             variant="destructive"
                             onClick={submitCancel}
-                            disabled={cancelling || !cancelReason}
+                            disabled={cancelling || !cancelReason || !cancelNotes.trim()}
                         >
                             {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
                         </Button>
@@ -968,12 +965,13 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                         value={state.rating}
                                         onChange={(v) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], rating: v } }))}
                                     />
-                                    <textarea
-                                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                                    <NotePicker
+                                        context="review"
+                                        value={state.review}
+                                        onChange={(v) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], review: v } }))}
                                         rows={2}
                                         placeholder="Write a review (optional)…"
-                                        value={state.review}
-                                        onChange={(e) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], review: e.target.value } }))}
+                                        textareaClassName="w-full rounded-md border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                     />
                                 </div>
                             );
@@ -1025,25 +1023,14 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                 <option value="store_discount">Store Discount</option>
                             </select>
                         </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Reason <span className="text-red-500">*</span></label>
-                            <select value={refundReason} onChange={(e) => setRefundReason(e.target.value)}
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-                                <option value="">Select a reason…</option>
-                                <option value="damaged_product">Damaged Product</option>
-                                <option value="leaking_tank">Leaking Tank</option>
-                                <option value="wrong_product">Wrong Product Received</option>
-                                <option value="missing_items">Missing Items</option>
-                                <option value="quality_issue">Quality Issue</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Description <span className="text-red-500">*</span></label>
-                            <textarea value={refundDesc} onChange={(e) => setRefundDesc(e.target.value)}
-                                rows={3} placeholder="Describe the issue in detail…"
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
-                        </div>
+                        <ReasonPicker
+                            context="refund_issue"
+                            reasonLabel="What's wrong?"
+                            reason={refundReason}
+                            notes={refundDesc}
+                            onChange={(next) => { setRefundReason(next.reason); setRefundDesc(next.notes); }}
+                            rows={3}
+                        />
                         <div className="grid gap-1.5">
                             <label className="text-xs font-medium">Evidence Photos (optional, max 5)</label>
                             <input ref={refundFileRef} type="file" multiple accept="image/*"

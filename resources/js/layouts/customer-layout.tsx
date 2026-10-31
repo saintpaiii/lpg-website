@@ -1,9 +1,12 @@
 import WebsiteProblemSidebar from '@/components/reports/website-problem-sidebar';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    Bell,
+    ChevronRight,
     Clock,
     Flag,
     Flame,
+    Lock,
     LogOut,
     Package,
     Receipt,
@@ -72,6 +75,14 @@ export default function CustomerLayout({ children, title }: Props) {
     const idStatus     = auth.user.id_verification_status;
     const hasSubmittedId = !!(auth.user as any).valid_id_path;
     const isVerified   = idStatus === 'verified';
+    // Customers can't shop until an admin approves their ID (sellers/admins are never locked)
+    const shopLocked   = auth.user.role === 'customer' && !isVerified;
+    const LOCK_REASON  = 'Verify your ID first';
+    const lockProps    = shopLocked ? { disabled: true, disabledReason: LOCK_REASON } : {};
+    // Brand-new customer (never verified, no orders): the history pages are empty and blocked too.
+    // Customers whose verification was revoked keep their history pages (has_customer_history = true).
+    const lockedNewcomer = shopLocked && auth.has_customer_history === false;
+    const [lockedOpen, setLockedOpen] = useState(false);
 
     const [logoutOpen, setLogoutOpen]         = useState(false);
     const [searchOpen, setSearchOpen]         = useState(false);
@@ -93,9 +104,18 @@ export default function CustomerLayout({ children, title }: Props) {
     const unreadMessages = useUnreadMessages('customer');
 
     // ── Sidebar nav items ───────────────────────────────────────────────────
+    const verifyNavItem: NavItem = {
+        title: 'Verify ID',
+        href:  '/customer/id-verification',
+        icon:  ShieldCheck,
+        badge: !isVerified ? (idStatus === 'pending' && hasSubmittedId ? 'Pending' : '!') : undefined,
+    };
+
     const mainNavItems: NavItem[] = [
-        { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag },
-        { title: 'Find a Store', href: '/customer/find-store',    icon: Navigation  },
+        // Until verified, Verify ID sits at the top of the menu
+        ...(shopLocked ? [verifyNavItem] : []),
+        { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag, ...lockProps },
+        { title: 'Find a Store', href: '/customer/find-store',    icon: Navigation,  ...lockProps },
         { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
         { title: 'Messages',    href: '/customer/messages',       icon: MessageSquare,
           ...(unreadMessages > 0 ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const } : {}) },
@@ -106,12 +126,7 @@ export default function CustomerLayout({ children, title }: Props) {
     ];
 
     const accountNavItems: NavItem[] = [
-        {
-            title: 'Verify ID',
-            href:  '/customer/id-verification',
-            icon:  ShieldCheck,
-            badge: !isVerified ? (idStatus === 'pending' && hasSubmittedId ? 'Pending' : '!') : undefined,
-        },
+        ...(shopLocked ? [] : [verifyNavItem]),
         { title: 'Profile', href: '/customer/profile', icon: User },
         { title: 'My Addresses', href: '/customer/addresses', icon: MapPinned },
     ];
@@ -125,13 +140,25 @@ export default function CustomerLayout({ children, title }: Props) {
     } else if (sellerApp?.status === 'rejected') {
         sellerNavItem = { title: 'Reapply as Seller', href: '/customer/become-seller', icon: XCircle as any };
     } else {
-        sellerNavItem = { title: 'Start Selling', href: '/customer/become-seller', icon: Store };
+        sellerNavItem = { title: 'Start Selling', href: '/customer/become-seller', icon: Store, ...lockProps };
     }
 
     // Derive page title from nav items or the prop
     const pageTitle = title ??
         [...mainNavItems, ...accountNavItems].find(i => currentPath === i.href || currentPath.startsWith(i.href + '/'))?.title ??
         'Customer Portal';
+
+    // Newcomer menu: what they can use now, and everything else in one collapsed, locked group
+    const newcomerNavItems: NavItem[] = [
+        verifyNavItem,
+        { title: 'Profile', href: '/customer/profile', icon: User },
+        { title: 'My Addresses', href: '/customer/addresses', icon: MapPinned },
+    ];
+    const lockedNavItems: NavItem[] = [
+        ...mainNavItems.filter((i) => i !== verifyNavItem),
+        ...(sellerNavItem ? [sellerNavItem] : []),
+    ].map(({ badge, badgeTone, ...i }) => ({ ...i, disabled: true, disabledReason: LOCK_REASON }));
+    const onVerifyPage = currentPath.startsWith('/customer/id-verification');
 
     return (
         <AppShell variant="sidebar">
@@ -142,7 +169,7 @@ export default function CustomerLayout({ children, title }: Props) {
                     <SidebarMenu>
                         <SidebarMenuItem>
                             <SidebarMenuButton size="lg" asChild>
-                                <Link href="/customer/products" prefetch>
+                                <Link href={shopLocked ? '/customer/id-verification' : '/customer/products'} prefetch>
                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white shrink-0">
                                         <Flame className="h-4 w-4" />
                                     </div>
@@ -158,11 +185,32 @@ export default function CustomerLayout({ children, title }: Props) {
 
                 {/* Nav links */}
                 <SidebarContent>
-                    {/* Show all items for customers; only Browse for admins previewing */}
-                    <NavMain items={isAdmin ? mainNavItems.slice(0, 1) : mainNavItems} />
-                    {!isAdmin && <WebsiteProblemSidebar portal="customer" />}
+                    {lockedNewcomer && (
+                        <>
+                            <NavMain items={newcomerNavItems} />
+                            <WebsiteProblemSidebar portal="customer" />
+                            <SidebarSeparator className="mx-3 my-1" />
+                            <div className="px-2 py-1 group-data-[collapsible=icon]:hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setLockedOpen((v) => !v)}
+                                    aria-expanded={lockedOpen}
+                                    className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:bg-sidebar-accent"
+                                >
+                                    <Lock className="size-3.5 shrink-0" />
+                                    <span className="flex-1 text-left">Available after verification</span>
+                                    <ChevronRight className={`size-3.5 shrink-0 transition-transform ${lockedOpen ? 'rotate-90' : ''}`} />
+                                </button>
+                                {lockedOpen && <NavMain items={lockedNavItems} />}
+                            </div>
+                        </>
+                    )}
 
-                    {!isAdmin && (
+                    {/* Show all items for customers; only Browse for admins previewing */}
+                    {!lockedNewcomer && <NavMain items={isAdmin ? mainNavItems.slice(0, 1) : mainNavItems} />}
+                    {!isAdmin && !lockedNewcomer && <WebsiteProblemSidebar portal="customer" />}
+
+                    {!isAdmin && !lockedNewcomer && (
                         <>
                             <SidebarSeparator className="mx-3 my-1" />
                             <NavMain items={accountNavItems} />
@@ -200,13 +248,14 @@ export default function CustomerLayout({ children, title }: Props) {
 
                     {/* Right: search, cart, notifications, logout */}
                     <div className="flex shrink-0 items-center gap-1">
-                        {/* Search toggle */}
-                        {!isAdmin && (
+                        {/* Search toggle (hidden for brand-new customers) */}
+                        {!isAdmin && !lockedNewcomer && (
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                                title="Search products"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground disabled:opacity-40"
+                                title={shopLocked ? LOCK_REASON : 'Search products'}
+                                disabled={shopLocked}
                                 onClick={() => {
                                     setSearchOpen(v => !v);
                                     setTimeout(() => searchRef.current?.focus(), 50);
@@ -220,7 +269,17 @@ export default function CustomerLayout({ children, title }: Props) {
                         <NotificationBell />
 
                         {/* Cart */}
-                        {!isAdmin && (
+                        {!isAdmin && shopLocked && !lockedNewcomer && (
+                            <span
+                                className="relative inline-flex h-8 w-8 cursor-not-allowed items-center justify-center text-muted-foreground opacity-40"
+                                title={LOCK_REASON}
+                                aria-disabled="true"
+                            >
+                                <ShoppingCart className="size-4" />
+                                <Lock className="absolute bottom-1 right-1 size-2.5" />
+                            </span>
+                        )}
+                        {!isAdmin && !shopLocked && (
                             <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
                                 <Link href="/customer/cart" title="Cart">
                                     <ShoppingCart className="size-4" />
@@ -249,7 +308,7 @@ export default function CustomerLayout({ children, title }: Props) {
                 </header>
 
                 {/* Search bar (drops below header) */}
-                {searchOpen && (
+                {searchOpen && !shopLocked && (
                     <div className="border-b bg-background px-4 py-3">
                         <form onSubmit={handleSearch} className="flex gap-2">
                             <input
@@ -275,7 +334,7 @@ export default function CustomerLayout({ children, title }: Props) {
                 )}
 
                 {/* ID verification banner */}
-                {!isAdmin && auth.user.role === 'customer' && !isVerified && !bannerDismissed && (
+                {!isAdmin && auth.user.role === 'customer' && !isVerified && !bannerDismissed && !onVerifyPage && (
                     <div className={`border-b px-4 py-2.5 ${
                         idStatus === 'rejected'
                             ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
@@ -317,14 +376,37 @@ export default function CustomerLayout({ children, title }: Props) {
                 {/* Mobile bottom tab bar */}
                 <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-sidebar-border pb-safe">
                     <div className="flex items-center justify-around h-14">
-                        {[
-                            { label: 'Browse',  href: '/customer/products', icon: ShoppingBag },
+                        {(lockedNewcomer ? [
+                            { label: 'Verify ID',     href: '/customer/id-verification', icon: ShieldCheck },
+                            { label: 'Addresses',     href: '/customer/addresses',       icon: MapPinned   },
+                            { label: 'Notifications', href: '/customer/notifications',   icon: Bell        },
+                            { label: 'Profile',       href: '/customer/profile',         icon: User        },
+                        ] : [
+                            shopLocked
+                                ? { label: 'Verify ID', href: '/customer/id-verification', icon: ShieldCheck }
+                                : { label: 'Browse',    href: '/customer/products',        icon: ShoppingBag },
                             { label: 'Orders',  href: '/customer/orders',   icon: Package     },
                             { label: 'Messages', href: '/customer/messages', icon: MessageSquare },
-                            { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart },
+                            { label: 'Cart',    href: '/customer/cart',     icon: ShoppingCart, locked: shopLocked },
                             { label: 'Profile', href: '/customer/profile',  icon: User        },
-                        ].map(({ label, href, icon: Icon }) => {
+                        ]).map(({ label, href, icon: Icon, locked }: { label: string; href: string; icon: typeof User; locked?: boolean }) => {
                             const active = currentPath === href || currentPath.startsWith(href + '/');
+                            if (locked) {
+                                return (
+                                    <span
+                                        key={href}
+                                        title={LOCK_REASON}
+                                        aria-disabled="true"
+                                        className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-muted-foreground opacity-40"
+                                    >
+                                        <div className="relative">
+                                            <Icon className="h-5 w-5" />
+                                            <Lock className="absolute -bottom-0.5 -right-1.5 h-3 w-3" />
+                                        </div>
+                                        <span className="text-[10px] font-medium">{label}</span>
+                                    </span>
+                                );
+                            }
                             return (
                                 <Link
                                     key={href}

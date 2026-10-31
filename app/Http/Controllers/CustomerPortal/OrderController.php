@@ -565,6 +565,7 @@ class OrderController extends Controller
                     'status'      => $order->delivery->status,
                     'rider_name'  => $order->delivery->rider?->name,
                     'assigned_at' => $order->delivery->assigned_at?->format('M d, Y g:i A'),
+                    'fail_info'   => $order->delivery->failInfo(),
                     'proofs'      => $order->delivery->proofs->map(fn ($p) => [
                         'status'        => $p->status,
                         'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,

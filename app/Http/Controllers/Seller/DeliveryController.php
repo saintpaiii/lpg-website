@@ -50,6 +50,7 @@ class DeliveryController extends Controller
                 'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
                 'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
                 'notes'        => $d->notes,
+                'fail_info'    => $d->failInfo(),
                 'order' => $d->order ? [
                     'id'           => $d->order->id,
                     'order_number' => $d->order->order_number,
@@ -101,11 +102,12 @@ class DeliveryController extends Controller
             ])
             ->values();
 
-        // Orders needing assignment (confirmed/preparing, no delivery)
+        // Orders needing assignment (confirmed/preparing, no delivery yet or the last attempt failed)
         $unassigned = Order::where('store_id', $store->id)
             ->whereIn('status', ['confirmed', 'preparing'])
-            ->whereDoesntHave('delivery')
-            ->with('customer')
+            ->where(fn ($q) => $q->whereDoesntHave('delivery')
+                ->orWhereHas('delivery', fn ($d) => $d->where('status', 'failed')))
+            ->with(['customer', 'delivery'])
             ->latest()
             ->take(50)
             ->get()
@@ -114,6 +116,7 @@ class DeliveryController extends Controller
                 'order_number' => $o->order_number,
                 'customer'     => $o->customer?->name ?? '—',
                 'status'       => $o->status,
+                'redelivery'   => $o->delivery?->failInfo(),
             ])
             ->values();
 
@@ -132,6 +135,7 @@ class DeliveryController extends Controller
             'search'     => $search ?? '',
             'date_from'  => $request->get('date_from') ?: '',
             'date_to'    => $request->get('date_to')   ?: '',
+            'fail_options' => Delivery::failOptions(),
         ]);
     }
 
@@ -225,7 +229,8 @@ class DeliveryController extends Controller
         $data = $request->validate([
             'status' => 'required|in:assigned,picked_up,in_transit,delivered,failed',
             'notes'  => 'nullable|string|max:500',
-        ]);
+            ...Delivery::failureRules($request),
+        ], Delivery::failureMessages());
 
         // Moving a delivery out of 'assigned' (picked up / on the way / delivered) needs a rider who can deliver
         if ($delivery->status === 'assigned' && in_array($data['status'], ['picked_up', 'in_transit', 'delivered'], true)
@@ -233,10 +238,12 @@ class DeliveryController extends Controller
             return back()->with('error', $why);
         }
 
+        // Failure details go in the same update as the status so the observer's message sees them
         $delivery->update([
             'status'       => $data['status'],
             'notes'        => $data['notes'] ?? $delivery->notes,
             'delivered_at' => $data['status'] === 'delivered' ? now() : $delivery->delivered_at,
+            ...($data['status'] === 'failed' ? Delivery::failureUpdates($data) : []),
         ]);
 
         // Sync order status

@@ -27,6 +27,7 @@ import StoreAvatar from '@/components/store-avatar';
 import StoreLocationLink from '@/components/store-location-link';
 import DocumentRow, { DocumentLink } from '@/components/document-row';
 import { IdCheckHints, IdDocumentTile } from '@/components/id-document-viewer';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',     href: '/admin/dashboard' },
@@ -514,13 +515,14 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                 Provide a reason for rejecting <strong>{v.user_name}</strong>'s application.
                                 This will be shown to the applicant so they know what to fix.
                             </p>
-                            <textarea
-                                className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
+                            <ReasonTextPicker
+                                context="verification_reject"
+                                reasonLabel="Reason"
+                                value={data.reason}
+                                onChange={(v) => setData('reason', v)}
                                 rows={4}
                                 placeholder="e.g. BIR certificate appears expired. Please re-upload a current copy."
-                                value={data.reason}
-                                onChange={(e) => setData('reason', e.target.value)}
-                                autoFocus
+                                textareaClassName="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                             />
                             <div className="flex justify-end gap-2 pt-2 border-t">
                                 <Button variant="outline" onClick={() => setRejectMode(false)}>

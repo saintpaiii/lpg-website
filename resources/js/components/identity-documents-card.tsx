@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 export type Identity = {
     status: 'verified' | 'pending' | 'rejected' | 'not_submitted';
@@ -136,10 +137,16 @@ export default function IdentityDocumentsCard({ userId, identity: id }: { userId
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         <div className="grid gap-1.5">
-                            <Label htmlFor="revoke_reason">Reason</Label>
-                            <textarea id="revoke_reason" rows={3} maxLength={255} value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)}
+                            <ReasonTextPicker
+                                context="verification_reject"
+                                reasonLabel="Reason"
+                                value={form.data.reason}
+                                onChange={(v) => form.setData('reason', v)}
+                                maxLength={255}
+                                rows={3}
                                 placeholder="e.g. The ID photo is blurry — please upload a clearer one."
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50" />
+                                textareaClassName="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                            />
                             <InputError message={form.errors.reason} />
                         </div>
                         <div className="flex justify-end gap-2">

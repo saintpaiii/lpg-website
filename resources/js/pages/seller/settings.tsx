@@ -15,8 +15,9 @@ import {
 import { Circle, MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import ServiceAreaLimit from '@/components/service-area-limit';
 import LocationAccuracyNotice from '@/components/location-accuracy-notice';
+import LocationAddressTools from '@/components/location-address-tools';
 import {
-    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, SERVICE_AREA_MESSAGE,
+    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, fillAddressFromLocation, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, SERVICE_AREA_MESSAGE, type FilledAddress,
 } from '@/lib/map';
 import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -154,8 +155,14 @@ export default function SellerSettings({ store }: Props) {
             if (!isInServiceArea(loc.lat, loc.lng)) { setPinMsg(OUTSIDE_SERVICE_AREA_DEVICE); return; }
             setPin({ lat: loc.lat, lng: loc.lng });
             setRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
+            fillAddressFromLocation(loc.lat, loc.lng, data.address).then((a) => a && applyFoundAddress(a));
         }).catch(() => setPinMsg(DEVICE_LOCATION_FAILED))
             .finally(() => setLocating(false));
+    }
+
+    // City + barangay + street together, without the barangay handler (keeps the GPS pin where it is)
+    function applyFoundAddress(a: FilledAddress) {
+        setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address: a.street }));
     }
 
     // Fix Leaflet default icon paths (broken by bundler)
@@ -664,6 +671,7 @@ export default function SellerSettings({ store }: Props) {
                                 {locating ? <Spinner className="mr-1.5 h-4 w-4" /> : <Crosshair className="mr-1.5 h-4 w-4" />}
                                 Use My Current Location
                             </Button>
+                            <LocationAddressTools latitude={pin?.lat ?? null} longitude={pin?.lng ?? null} street={data.address} onAddress={applyFoundAddress} />
                             {roughM !== null && <LocationAccuracyNotice accuracyM={roughM} onConfirm={() => setRoughM(null)} />}
                             {pinMsg && <p className="text-xs text-red-600">{pinMsg}</p>}
                             {!pinMsg && locationError && <p className="text-xs text-red-600">{locationError}</p>}

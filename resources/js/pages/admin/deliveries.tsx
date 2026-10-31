@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Archive,
@@ -50,6 +50,9 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
+import DeliveryFailFields, { emptyFailValues, failValuesComplete } from '@/components/delivery-fail-fields';
+import type { FailOptions, FailValues } from '@/components/delivery-fail-fields';
+import { NotePicker } from '@/components/reason-picker';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -388,12 +391,10 @@ function UpdateStatusDialog({
     targetStatus: DeliveryStatus | null;
     onClose: () => void;
 }) {
-    const { data, setData, patch, processing, errors, reset } = useForm<{
-        status: string;
-        notes: string;
-    }>({
+    const failOptions = (usePage().props as { fail_options?: FailOptions }).fail_options;
+    const { data, setData, patch, processing, errors, reset, transform } = useForm<FailValues & { status: string }>({
+        ...emptyFailValues,
         status: targetStatus ?? '',
-        notes: '',
     });
 
     // Keep form in sync when target changes
@@ -404,6 +405,8 @@ function UpdateStatusDialog({
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
         if (!delivery) return;
+        // Not failed: only the status + optional note
+        transform((d) => (d.status === 'failed' ? d : { status: d.status, notes: d.notes }));
         patch(`/admin/deliveries/${delivery.id}/status`, {
             onSuccess: () => { reset(); onClose(); toast.success('Delivery status updated.'); },
         });
@@ -418,7 +421,7 @@ function UpdateStatusDialog({
 
     return (
         <Dialog open={!!delivery && !!targetStatus} onOpenChange={(o) => !o && handleClose()}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className={isFailed ? "max-w-md" : "max-w-sm"}>
                 <DialogHeader>
                     <DialogTitle className={`flex items-center gap-2 ${isFailed ? 'text-red-600' : ''}`}>
                         {isFailed ? <AlertTriangle className="h-4 w-4" /> : <Truck className="h-4 w-4 text-blue-600" />}
@@ -433,23 +436,23 @@ function UpdateStatusDialog({
                         }
                     </p>
 
-                    <div className="grid gap-1.5">
-                        <Label>{isFailed ? <>Reason <span className="text-red-500">*</span></> : 'Notes'}</Label>
-                        <textarea
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                            placeholder={isFailed ? 'e.g. Customer not home, wrong address…' : 'Optional notes…'}
-                            rows={3}
-                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    {isFailed && failOptions ? (
+                        <DeliveryFailFields
+                            options={failOptions}
+                            values={data}
+                            onChange={(patch) => setData((d) => ({ ...d, ...patch }))}
+                            errors={errors}
                         />
-                        {errors.notes && <p className="text-xs text-red-500">{errors.notes}</p>}
-                    </div>
+                    ) : (
+                        <NotePicker context="delivery_note" label="Notes" value={data.notes} onChange={(v) => setData('notes', v)}
+                            maxLength={500} error={errors.notes} />
+                    )}
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
                             type="submit"
-                            disabled={processing || (isFailed && !data.notes.trim())}
+                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data))}
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >

@@ -11,6 +11,7 @@ import { fmtDate } from '@/lib/utils';
 import StoreAvatar from '@/components/store-avatar';
 import ProductCardImage from '@/components/product-card-image';
 import ProductGallery, { type GalleryMedia } from '@/components/product-gallery';
+import { NotePicker } from '@/components/reason-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -401,12 +402,13 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                     {ratingForm.errors.rating && <p className="text-xs text-red-500 mt-1">{ratingForm.errors.rating}</p>}
                                 </div>
                                 <div>
-                                    <textarea
+                                    <NotePicker
+                                        context="review"
                                         value={ratingForm.data.review}
-                                        onChange={e => ratingForm.setData('review', e.target.value)}
-                                        placeholder="Write a review… (optional)"
+                                        onChange={(v) => ratingForm.setData('review', v)}
                                         rows={3}
-                                        className="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 dark:bg-gray-800 dark:text-white"
+                                        placeholder="Write a review… (optional)"
+                                        textareaClassName="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 dark:bg-gray-800 dark:text-white"
                                     />
                                 </div>
                                 <Button

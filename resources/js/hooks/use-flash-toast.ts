@@ -8,11 +8,12 @@ import { toast } from 'sonner';
  */
 export function useFlashToast() {
     const flash = (usePage().props as any).flash as
-        | { success?: string; error?: string }
+        | { success?: string; error?: string; info?: string }
         | undefined;
 
     useEffect(() => {
         if (flash?.success) toast.success(flash.success, { id: `flash-success:${flash.success}`, duration: 3000 });
         if (flash?.error)   toast.error(flash.error,     { id: `flash-error:${flash.error}`,     duration: 3000 });
-    }, [flash?.success, flash?.error]);
+        if (flash?.info)    toast.info(flash.info,       { id: `flash-info:${flash.info}`,       duration: 5000 });
+    }, [flash?.success, flash?.error, flash?.info]);
 }

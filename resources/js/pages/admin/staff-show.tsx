@@ -29,6 +29,7 @@ import {
     UserX,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { ReasonPicker } from '@/components/reason-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -86,19 +87,6 @@ interface Props {
     userOverrides: UserOverride[];
     history: ActionHistory[];
 }
-
-const DEACTIVATE_REASONS = [
-    'Policy Violation',
-    'Fraudulent Activity',
-    'Inappropriate Behavior',
-    'Account Inactivity',
-    'Duplicate Account',
-    'Failed Identity Verification',
-    'Staff Resignation',
-    'Staff Termination',
-    'Pending Investigation',
-    'Other',
-];
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
     deactivate: { label: 'Deactivated',  color: 'bg-red-100 text-red-700'      },
@@ -535,35 +523,20 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-3">
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Reason <span className="text-red-500">*</span></label>
-                            <select
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={deactivateForm.data.reason}
-                                onChange={(e) => deactivateForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {DEACTIVATE_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Additional notes <span className="text-gray-400">(optional)</span></label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                rows={3}
-                                placeholder="Provide more context if needed…"
-                                value={deactivateForm.data.notes}
-                                onChange={(e) => deactivateForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_staff"
+                            reasonLabel="Reason"
+                            reason={deactivateForm.data.reason}
+                            notes={deactivateForm.data.notes}
+                            onChange={(next) => { deactivateForm.setData('reason', next.reason); deactivateForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={submitDeactivate}
-                            disabled={!deactivateForm.data.reason || deactivateForm.processing}
+                            disabled={!deactivateForm.data.reason || !deactivateForm.data.notes.trim() || deactivateForm.processing}
                             className="bg-amber-600 hover:bg-amber-700"
                         >
                             {deactivateForm.processing ? 'Deactivating…' : 'Deactivate Account'}
@@ -582,35 +555,20 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <div className="space-y-3">
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Reason <span className="text-red-500">*</span></label>
-                            <select
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                value={archiveForm.data.reason}
-                                onChange={(e) => archiveForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {DEACTIVATE_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium text-gray-700">Additional notes <span className="text-gray-400">(optional)</span></label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                rows={3}
-                                placeholder="Provide more context if needed…"
-                                value={archiveForm.data.notes}
-                                onChange={(e) => archiveForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_staff"
+                            reasonLabel="Reason"
+                            reason={archiveForm.data.reason}
+                            notes={archiveForm.data.notes}
+                            onChange={(next) => { archiveForm.setData('reason', next.reason); archiveForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={submitArchive}
-                            disabled={!archiveForm.data.reason || archiveForm.processing}
+                            disabled={!archiveForm.data.reason || !archiveForm.data.notes.trim() || archiveForm.processing}
                             className="bg-red-600 hover:bg-red-700"
                         >
                             {archiveForm.processing ? 'Archiving…' : 'Archive Account'}

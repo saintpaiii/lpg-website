@@ -5,7 +5,8 @@ import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
 import AddressSearchMap, { locationFromSaved, type ChangeReason, type DeliveryLocation, type SavedAddress } from '@/components/address-search-map';
-import { ACCURATE_ENOUGH_M, fetchRoute, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon } from '@/lib/map';
+import { ACCURATE_ENOUGH_M, fetchRoute, fillAddressFromLocation, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon, type FilledAddress } from '@/lib/map';
+import LocationAddressTools from '@/components/location-address-tools';
 import LocationAccuracyNotice from '@/components/location-accuracy-notice';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import CustomerLayout from '@/layouts/customer-layout';
 import { allocateDiscount, type CouponRules } from '@/lib/coupons';
 import TierBadge, { TIER_LABELS, type Tier } from '@/components/tier-badge';
 import type { SharedData } from '@/types';
+import { NotePicker } from '@/components/reason-picker';
 
 type CartItem = {
     product_id: number;
@@ -225,6 +227,13 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
 
     const pin = delivery.lat != null && delivery.lng != null ? { lat: delivery.lat, lng: delivery.lng } : null;
 
+    // Address found for a point: becomes a new delivery address (city + barangay + street in one update,
+    // pin left where it is) and that point is now "my address" for the drift reminder.
+    function applyFoundAddress(a: FilledAddress, at: { lat: number; lng: number }) {
+        setDelivery((d) => ({ ...d, addressId: null, city: a.city, barangay: a.barangay, line: a.street }));
+        setAnchor(at);
+    }
+
     // How far the pin has drifted from the chosen address — only a reminder, never blocks the order
     const pinDriftKm = pin && anchor ? haversineKm(anchor.lat, anchor.lng, pin.lat, pin.lng) : null;
     const deliveryText = formatAddress(delivery.line, delivery.barangay, delivery.city);
@@ -268,8 +277,11 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
         setGpsLoading(true);
         getDeviceLocation().then((loc) => {
             if (!isInServiceArea(loc.lat, loc.lng)) { toast.error(OUTSIDE_SERVICE_AREA_DEVICE); return; }
-            handlePinChange(+loc.lat.toFixed(7), +loc.lng.toFixed(7));
+            const lat = +loc.lat.toFixed(7);
+            const lng = +loc.lng.toFixed(7);
+            handlePinChange(lat, lng);
             setGpsRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
+            fillAddressFromLocation(lat, lng, delivery.line).then((a) => a && applyFoundAddress(a, { lat, lng }));
         }).catch(() => {
             toast.error('Could not get location. Please click on the map.');
         }).finally(() => setGpsLoading(false));
@@ -489,6 +501,14 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                                     <Polyline positions={osrmRoute.coords} pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.75 }} />
                                 )}
                             </AddressSearchMap>
+                            <div className="pt-2">
+                                <LocationAddressTools
+                                    latitude={delivery.lat}
+                                    longitude={delivery.lng}
+                                    street={delivery.line}
+                                    onAddress={(a) => pin && applyFoundAddress(a, pin)}
+                                />
+                            </div>
                         </CardContent>
                         <CardContent className="p-0">
                             {/* Distance & fee info per store */}
@@ -804,12 +824,13 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                         <CardTitle className="text-base">Order Notes (optional)</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <textarea
+                        <NotePicker
+                            context="delivery_instructions"
                             value={notes}
-                            onChange={e => setNotes(e.target.value)}
-                            placeholder="Any special instructions for your delivery…"
+                            onChange={(v) => setNotes(v)}
                             rows={3}
-                            className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                            placeholder="Any special instructions for your delivery…"
+                            textareaClassName="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                         />
                     </CardContent>
                 </Card>

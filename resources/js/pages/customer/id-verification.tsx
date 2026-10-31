@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import axios from 'axios';
 import {
     AlertCircle,
@@ -193,7 +193,7 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
             await axios.post('/customer/id-verification', fd, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            window.location.href = '/customer/products';
+            window.location.href = '/customer/id-verification';
         } catch (err: any) {
             const responseErrors = err?.response?.data?.errors ?? {};
             const mapped: Record<string, string> = {};
@@ -222,17 +222,10 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                         </h2>
                         <p className="mt-2 text-sm text-blue-700 dark:text-blue-300">
                             Your identity documents have been submitted and are currently being reviewed.
-                            This usually takes 1–2 business days.
                         </p>
                         <p className="mt-3 text-sm text-blue-600 dark:text-blue-400">
-                            You can browse products and add them to your cart while you wait.
+                            We'll notify you as soon as it's approved — usually within 24 hours.
                         </p>
-                        <Link
-                            href="/customer/products"
-                            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                        >
-                            Browse Products
-                        </Link>
                     </div>
 
                     {/* Show uploaded docs preview */}
@@ -481,12 +474,9 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
 
                     {/* Submit */}
                     <div className="flex items-center justify-between gap-4">
-                        <Link
-                            href="/customer/products"
-                            className="text-sm text-gray-500 hover:text-blue-600 hover:underline"
-                        >
-                            Skip for now — browse products
-                        </Link>
+                        <p className="text-sm text-gray-500">
+                            We'll notify you as soon as it's approved — usually within 24 hours.
+                        </p>
                         <Button
                             type="submit"
                             disabled={processing}
@@ -513,7 +503,7 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                     <ul className="mt-2 space-y-1 text-blue-600 dark:text-blue-400 text-xs">
                         <li className="flex items-start gap-1.5">
                             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                            Our team reviews your documents within 1–2 business days.
+                            Our team reviews your documents usually within 24 hours.
                         </li>
                         <li className="flex items-start gap-1.5">
                             <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />

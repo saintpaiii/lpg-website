@@ -5,6 +5,8 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import DeliveryMap, { type RouteData, type RouteStop } from '@/components/delivery-map';
 import { fetchRoute } from '@/lib/map';
+import CustomerContactCard from '@/components/rider/customer-contact';
+import DeliveryFailFields, { emptyFailValues, failValuesComplete, type FailInfo, type FailOptions, type FailValues } from '@/components/delivery-fail-fields';
 import {
     AlertTriangle,
     Banknote,
@@ -19,7 +21,6 @@ import {
     MapPin,
     Navigation,
     Package,
-    Phone,
     Radio,
     Truck,
     X,
@@ -49,6 +50,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
+import { NotePicker } from '@/components/reason-picker';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -65,8 +67,13 @@ type OrderItem = {
 type CustomerRef = {
     id: number;
     name: string;
+    /** Phone / email only while the delivery is active or ended < 24 h ago (null otherwise) */
+    contact_visible: boolean;
     phone: string | null;
+    email: string | null;
     address: string | null;
+    province: string | null;
+    delivery_notes: string | null;
     barangay: string | null;
     city: string | null;
 };
@@ -99,6 +106,7 @@ type DeliveryRow = {
     /** Rider may report the customer (active, or finished within 7 days) — decided by the server */
     can_report: boolean;
     notes: string | null;
+    fail_info: FailInfo | null;
     assigned_at: string | null;
     delivered_at: string | null;
     order: OrderRef | null;
@@ -241,17 +249,17 @@ function UpdateStatusDialog({
     targetStatus: DeliveryStatus | null;
     onClose: () => void;
 }) {
-    const { data, setData, post, processing, errors, reset, transform } = useForm<{
+    const failOptions = (usePage().props as { fail_options?: FailOptions }).fail_options;
+    const { data, setData, post, processing, errors, reset, transform } = useForm<FailValues & {
         status: string;
-        notes: string;
         location_note: string;
         photo: File | null;
         rider_latitude: string;
         rider_longitude: string;
         rider_accuracy: string;
     }>({
+        ...emptyFailValues,
         status:          targetStatus ?? '',
-        notes:           '',
         location_note:   '',
         photo:           null,
         rider_latitude:  '',
@@ -467,24 +475,34 @@ function UpdateStatusDialog({
                         </div>
                     )}
 
-                    {/* Notes */}
-                    <div className="grid gap-1.5">
-                        <Label>{isFailed ? 'Reason *' : 'Notes (optional)'}</Label>
-                        <textarea
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                            placeholder={isFailed ? 'e.g. Customer not home, wrong address…' : 'Any delivery notes…'}
-                            rows={2}
-                            className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    {/* Failed: reason + redelivery date / time + notes; otherwise optional notes */}
+                    {isFailed && failOptions ? (
+                        <DeliveryFailFields
+                            options={failOptions}
+                            values={data}
+                            onChange={(patch) => setData((d) => ({ ...d, ...patch }))}
+                            errors={errors}
                         />
-                        {errors.notes && <p className="text-xs text-red-500">{errors.notes}</p>}
-                    </div>
+                    ) : (
+                        <div className="grid gap-1.5">
+                            <Label>Notes (optional)</Label>
+                            <NotePicker
+                                context="delivery_note"
+                                value={data.notes}
+                                onChange={(v) => setData('notes', v)}
+                                rows={2}
+                                placeholder="Any delivery notes…"
+                                textareaClassName="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            />
+                            {errors.notes && <p className="text-xs text-red-500">{errors.notes}</p>}
+                        </div>
+                    )}
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
                             type="submit"
-                            disabled={processing || (isFailed && !data.notes.trim()) || (needsPhoto && !data.photo)}
+                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data)) || (needsPhoto && !data.photo)}
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >
@@ -514,6 +532,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
     if (!o) return null;
 
     const isActive = ['picked_up', 'in_transit'].includes(delivery.status);
+    const isOpen   = ['assigned', 'picked_up', 'in_transit'].includes(delivery.status);
 
     const [osrmCoords, setOsrmCoords] = useState<[number, number][] | null>(null);
     const [riderPos, setRiderPos]     = useState<[number, number] | null>(null);
@@ -636,41 +655,36 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
             {/* Customer info + action buttons */}
             {o.customer && (
                 <div>
-                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">Deliver to</p>
-                    <p className="font-semibold text-gray-900 text-base">{o.customer.name}</p>
-                    <p className="flex items-start gap-1 text-gray-500 mt-0.5 text-xs">
-                        <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-                        {[o.customer.address, o.customer.barangay, o.customer.city].filter(Boolean).join(', ') || '—'}
-                    </p>
+                    <CustomerContactCard
+                        customer={o.customer}
+                        orderNumber={o.order_number}
+                        contactVisible={o.customer.contact_visible}
+                        extraActions={
+                            <>
+                                {isOpen && (
+                                    <MessageButton portal="rider" params={{ delivery_id: delivery.id }} label="Chat" className="min-h-11 flex-1 basis-[calc(50%-0.25rem)] gap-1.5 sm:flex-none sm:basis-auto" />
+                                )}
+                                {navHref && (
+                                    <a
+                                        href={navHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex min-h-11 flex-1 basis-[calc(50%-0.25rem)] items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors sm:flex-none sm:basis-auto"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Navigate
+                                    </a>
+                                )}
+                            </>
+                        }
+                    />
                     {(o.delivery_distance_km || o.estimated_delivery_minutes) && (
-                        <p className="mt-0.5 text-xs text-blue-600">
+                        <p className="mt-1.5 text-xs text-blue-600">
                             {o.delivery_distance_km ? `${o.delivery_distance_km.toFixed(1)} km` : ''}
                             {o.delivery_distance_km && o.estimated_delivery_minutes ? ' · ' : ''}
                             {o.estimated_delivery_minutes ? `~${o.estimated_delivery_minutes} min` : ''}
                         </p>
                     )}
-                    <div className="mt-2 flex gap-2 flex-wrap">
-                        {o.customer.phone && (
-                            <a
-                                href={`tel:${o.customer.phone}`}
-                                className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition-colors"
-                            >
-                                <Phone className="h-3 w-3" />
-                                Call {o.customer.phone}
-                            </a>
-                        )}
-                        {navHref && (
-                            <a
-                                href={navHref}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
-                            >
-                                <ExternalLink className="h-3 w-3" />
-                                Navigate
-                            </a>
-                        )}
-                    </div>
                 </div>
             )}
 
@@ -804,7 +818,12 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 const refreshRoute = () => router.reload({ only: ['route', 'counts'] });
 
 /** Map of today's route. While visible, follows the rider's GPS and shares it every 60s. */
-function RouteMapView({ route, onUploadProof, onMessage }: { route: RouteData; onUploadProof: (stop: RouteStop) => void; onMessage?: (stop: RouteStop) => void }) {
+function RouteMapView({ route, onUpdateStatus, statusDisabled, onMessage }: {
+    route: RouteData;
+    onUpdateStatus: (stop: RouteStop, status: DeliveryStatus) => void;
+    statusDisabled?: (status: DeliveryStatus) => string | null;
+    onMessage?: (stop: RouteStop) => void;
+}) {
     const [pos, setPos] = useState<[number, number] | null>(null);
     const [gpsError, setGpsError] = useState<string | null>(null);
     const latest = useRef<[number, number] | null>(null);
@@ -853,7 +872,7 @@ function RouteMapView({ route, onUploadProof, onMessage }: { route: RouteData; o
                     {gpsError ?? (pos ? 'Sharing your location every minute while this map is open' : 'Getting your location…')}
                 </p>
             </div>
-            <DeliveryMap route={route} riderPos={pos} onUploadProof={onUploadProof} onMessage={onMessage} />
+            <DeliveryMap route={route} riderPos={pos} onUpdateStatus={onUpdateStatus} statusDisabled={statusDisabled} onMessage={onMessage} />
         </div>
     );
 }
@@ -1005,12 +1024,17 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 </div>
 
                 {view === 'map' ? (
-                    <RouteMapView route={route} onMessage={(stop) => router.post('/rider/messages/start', { delivery_id: stop.id })} onUploadProof={(stop) => {
-                        const next = STATUS_NEXT[stop.status]?.find((s) => s !== 'failed');
-                        if (!next || (next === 'picked_up' && cannotDeliver)) return;
-                        // Same proof dialog as the list view — no shortcut around the photo proof
-                        openStatusDialog({ id: stop.id, status: stop.status, order: { order_number: stop.order_number } } as unknown as DeliveryRow, next);
-                    }} />
+                    <RouteMapView
+                        route={route}
+                        onMessage={(stop) => router.post('/rider/messages/start', { delivery_id: stop.id })}
+                        statusDisabled={(s) => (s === 'picked_up' && cannotDeliver ? 'license needed' : null)}
+                        onUpdateStatus={(stop, next) => {
+                            if (!STATUS_NEXT[stop.status]?.includes(next) || (next === 'picked_up' && cannotDeliver)) return;
+                            // Same dialog as the List view (photo proof, location, Reason ▸ Details, redelivery range);
+                            // on success the page reloads `route`, so the pin changes colour
+                            openStatusDialog({ id: stop.id, status: stop.status, order: { order_number: stop.order_number } } as unknown as DeliveryRow, next);
+                        }}
+                    />
                 ) : (
                 <>
                 {/* Tabs */}
@@ -1110,10 +1134,15 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                 {d.vehicle.vehicle_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} · {d.vehicle.plate_number}
                                             </p>
                                         )}
-                                        {d.notes && d.status === 'failed' && (
+                                        {d.status === 'failed' && (d.fail_info || d.notes) && (
                                             <p className="mt-1 flex items-start gap-1 text-xs text-red-500">
                                                 <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                                {d.notes}
+                                                <span>
+                                                    {d.fail_info?.reason_label && <span className="font-semibold">{d.fail_info.reason_label}</span>}
+                                                    {d.fail_info?.reason_label && d.notes && ' — '}
+                                                    {d.notes}
+                                                    {d.fail_info?.short && <span className="ml-1 text-amber-600">· {d.fail_info.short}</span>}
+                                                </span>
                                             </p>
                                         )}
                                     </div>

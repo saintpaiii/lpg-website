@@ -34,14 +34,23 @@ class DeliveryController extends Controller
             && ($d->delivered_at ?? $d->updated_at)?->gte(now()->subDays(7));
     }
 
+    /** Customer email: the customer record, else their account's login email. */
+    private static function customerEmail(Delivery $d): ?string
+    {
+        return $d->order?->customer?->email ?: $d->order?->customer?->user?->email;
+    }
+
     private function formatDelivery(Delivery $d): array
     {
+        $showContact = $d->customerContactVisible();
+
         return [
             'id'           => $d->id,
             'status'       => $d->status,
             'store_name'   => $d->order?->store?->store_name,
             'can_report'   => self::canReport($d),
             'notes'        => $d->notes,
+            'fail_info'    => $d->failInfo(),
             'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
             'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
             'vehicle' => $d->vehicle ? [
@@ -74,10 +83,17 @@ class DeliveryController extends Controller
                 'customer' => $d->order->customer ? [
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,
-                    'phone'   => $d->order->customer->phone,
-                    'address' => $d->order->deliveryAddressParts()['address'],
-                    'barangay'=> $d->order->deliveryAddressParts()['barangay'],
-                    'city'    => $d->order->deliveryAddressParts()['city'],
+                    // Contact details only while active or within 24 h after it ended
+                    'contact_visible' => $showContact,
+                    'phone'   => $showContact ? $d->order->customer->phone : null,
+                    'email'   => $showContact ? self::customerEmail($d) : null,
+                    // Older history: name only (address and notes hidden too)
+                    'address' => $showContact ? $d->order->deliveryAddressParts()['address'] : null,
+                    'barangay'=> $showContact ? $d->order->deliveryAddressParts()['barangay'] : null,
+                    'city'    => $showContact ? $d->order->deliveryAddressParts()['city'] : null,
+                    'province' => $showContact ? 'Cavite' : null,
+                    // The customer's "special instructions for your delivery" from checkout (orders.notes)
+                    'delivery_notes' => $showContact ? ($d->order->notes ?: null) : null,
                 ] : null,
                 'items' => $d->order->items->map(fn ($item) => [
                     'id'         => $item->id,
@@ -101,7 +117,7 @@ class DeliveryController extends Controller
         $tab  = $request->input('tab', 'active');
         $user = auth()->user();
 
-        $query = Delivery::with(['order.customer', 'order.items.product', 'order.store', 'vehicle'])
+        $query = Delivery::with(['order.customer.user', 'order.items.product', 'order.store', 'vehicle'])
             ->where('rider_id', $user->id);
 
         if ($tab === 'history') {
@@ -137,6 +153,7 @@ class DeliveryController extends Controller
             ],
             'filters' => $request->only('tab'),
             'route'   => $this->routeData($user),
+            'fail_options' => Delivery::failOptions(),
         ]);
     }
 
@@ -147,7 +164,7 @@ class DeliveryController extends Controller
      */
     private function routeData($user): array
     {
-        $stops = Delivery::with(['order.customer', 'order.store'])
+        $stops = Delivery::with(['order.customer.user', 'order.store'])
             ->where('rider_id', $user->id)
             ->where(fn ($q) => $q->whereIn('status', ['assigned', 'picked_up', 'in_transit'])
                 ->orWhere(fn ($w) => $w->whereIn('status', ['delivered', 'failed'])->where('updated_at', '>=', now()->startOfDay())))
@@ -161,6 +178,7 @@ class DeliveryController extends Controller
             'store' => \App\Services\DeliveryRouteService::storeLocation($user->store_id ? \App\Models\Store::find($user->store_id) : null),
             'stops' => $stops->map(function (Delivery $d, int $i) use ($modeLabels) {
                 $o = $d->order;
+                $showContact = $d->customerContactVisible();
                 return [
                     'id'                => $d->id,
                     'number'            => $i + 1,
@@ -169,7 +187,8 @@ class DeliveryController extends Controller
                     'status'            => $d->status,
                     'order_number'      => $o?->order_number,
                     'customer_name'     => $o?->customer?->name ?? '—',
-                    'customer_phone'    => $o?->customer?->phone,
+                    'customer_phone'    => $showContact ? $o?->customer?->phone : null,
+                    'customer_email'    => $showContact ? self::customerEmail($d) : null,
                     'address'           => $o?->deliveryAddressText() ?? '',
                     'lat'               => $o?->delivery_latitude ? (float) $o->delivery_latitude : null,
                     'lng'               => $o?->delivery_longitude ? (float) $o->delivery_longitude : null,
@@ -201,6 +220,7 @@ class DeliveryController extends Controller
                 'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
                 'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
                 'notes'        => $d->notes,
+                'fail_reason_label' => $d->status === 'failed' ? Delivery::failReasonLabel($d->fail_reason) : null,
                 'order' => $d->order ? [
                     'id'           => $d->order->id,
                     'order_number' => $d->order->order_number,
@@ -257,21 +277,18 @@ class DeliveryController extends Controller
         $data = $request->validate([
             'status'            => 'required|in:picked_up,in_transit,delivered,failed',
             'notes'             => 'nullable|string|max:500',
+            ...Delivery::failureRules($request),
             'location_note'     => 'nullable|string|max:255',
             'photo'             => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg|max:5120',
             'rider_latitude'    => 'nullable|numeric|between:-90,90',
             'rider_longitude'   => 'nullable|numeric|between:-180,180',
             'rider_accuracy'    => 'nullable|numeric|min:0',
-        ]);
+        ], Delivery::failureMessages());
 
         $newStatus = $data['status'];
 
         if (in_array($delivery->status, ['delivered', 'failed'])) {
             return back()->with('error', 'Cannot change status of a completed delivery.');
-        }
-
-        if ($newStatus === 'failed' && empty($data['notes'])) {
-            return back()->with('error', 'Please provide a reason when marking delivery as failed.');
         }
 
         // Validate progression
@@ -305,9 +322,11 @@ class DeliveryController extends Controller
             }
 
             if ($newStatus === 'failed') {
+                $updates += Delivery::failureUpdates($data);
                 $delivery->order?->update(['status' => 'preparing']);
             }
 
+            // Status + failure details in ONE update so the observer's message sees them
             $delivery->update($updates);
 
             // Store proof record

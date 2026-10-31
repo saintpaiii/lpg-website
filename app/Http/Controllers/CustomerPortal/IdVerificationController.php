@@ -93,7 +93,7 @@ class IdVerificationController extends Controller
             );
         }
 
-        return redirect('/customer/products')
-            ->with('success', 'Your identity documents have been submitted. Your account is being reviewed — you can browse products in the meantime.');
+        return redirect('/customer/id-verification')
+            ->with('success', "Your identity documents have been submitted. We'll notify you as soon as it's approved — usually within 24 hours.");
     }
 }

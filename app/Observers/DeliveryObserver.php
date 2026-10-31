@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Events\DeliveryUpdated;
 use App\Models\Delivery;
 use App\Services\ChatService;
+use App\Services\NotificationService;
 use App\Support\Realtime;
 use Illuminate\Support\Facades\Log;
 
@@ -42,6 +43,9 @@ class DeliveryObserver
         }
         if ($delivery->wasChanged('status')) {
             $this->statusUpdate($delivery);
+            if ($delivery->status === 'failed') {
+                $this->failedNotify($delivery);
+            }
         }
         if ($delivery->wasChanged(['status', 'rider_id'])) {
             $this->broadcast($delivery);
@@ -91,7 +95,9 @@ class DeliveryObserver
                 'in_transit' => ['delivery_in_transit', "I'm on the way with your order {$n}."
                     . ($order->estimated_delivery_minutes ? " Estimated arrival: about {$order->estimated_delivery_minutes} minutes." : '')],
                 'delivered'  => ['delivery_delivered', "Your order {$n} has been delivered. Thank you!" . OrderObserver::balanceNote($order->refresh())],
-                'failed'     => ['delivery_failed', "I wasn't able to complete the delivery of order {$n}. The store will contact you."],
+                // One message per failed attempt (a second failure posts again)
+                'failed'     => ['delivery_failed:' . ($delivery->failed_at?->timestamp ?? now()->timestamp),
+                    $delivery->fail_reason ? $delivery->failureMessage($n) : "I wasn't able to complete the delivery of order {$n}. The store will contact you."],
                 default      => [null, null],
             };
             if (! $kind) {
@@ -104,6 +110,28 @@ class DeliveryObserver
                 if (in_array($delivery->status, ['delivered', 'failed'], true)) {
                     ChatService::riderLeave($delivery, $delivery->rider_id);
                 }
+            }
+        });
+    }
+
+    /** Customer (if the order has an account — walk-ins don't) and the store hear about a failed attempt. */
+    private function failedNotify(Delivery $delivery): void
+    {
+        $this->safely($delivery, 'failed-notify', function () use ($delivery) {
+            $delivery->loadMissing('order.customer');
+            $order = $delivery->order;
+            if (! $order) {
+                return;
+            }
+            $text = $delivery->failureMessage($order->order_number);
+
+            if ($userId = $order->customer?->user_id) {
+                NotificationService::send($userId, 'order_update', 'Delivery didn\'t push through', $text,
+                    ['order_id' => $order->id, 'order_number' => $order->order_number, 'link' => '/customer/orders/' . $order->id]);
+            }
+            if ($storeId = $delivery->store_id ?? $order->store_id) {
+                NotificationService::sendToStore($storeId, 'order_update', 'Delivery failed — reassign a rider', $text,
+                    ['order_id' => $order->id, 'order_number' => $order->order_number, 'link' => '/seller/deliveries?tab=completed']);
             }
         });
     }

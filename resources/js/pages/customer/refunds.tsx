@@ -20,6 +20,7 @@ import {
     RESOLUTION_LABELS,
     type RefundItem,
 } from '@/lib/refunds';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 type Coupon = {
     id: number;
@@ -185,13 +186,14 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                         <p className="text-muted-foreground">
                             A platform admin will review the store's decision. You can only escalate a request once.
                         </p>
-                        <label className="text-xs font-medium">Why do you disagree? <span className="text-red-500">*</span></label>
-                        <textarea
+                        <ReasonTextPicker
+                            context="refund_escalate"
+                            reasonLabel="Why do you disagree?"
                             value={reason}
-                            onChange={(e) => setReason(e.target.value)}
+                            onChange={(v) => setReason(v)}
                             rows={4}
                             placeholder="Explain why the store's decision is not acceptable…"
-                            className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                            textareaClassName="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                         />
                     </div>
                     <DialogFooter>

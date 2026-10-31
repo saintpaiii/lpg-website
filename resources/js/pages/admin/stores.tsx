@@ -32,17 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
-
-const SUSPEND_REASONS = [
-    'Policy violation',
-    'Fraudulent activity',
-    'Customer complaints',
-    'Failure to fulfill orders',
-    'Unauthorized products',
-    'Misrepresentation',
-    'Payment issues',
-    'Other',
-];
+import { ReasonPicker, ReasonTextPicker } from '@/components/reason-picker';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/admin/dashboard' },
@@ -354,12 +344,14 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                             Provide a reason for rejecting <strong>{rejectTarget?.store_name}</strong>. This will be recorded on the verification request.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <textarea
-                        className="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    <ReasonTextPicker
+                        context="store_reject"
+                        reasonLabel="Reason"
+                        value={rejectData.reason}
+                        onChange={(v) => setRejectData('reason', v)}
                         rows={3}
                         placeholder="Reason for rejection…"
-                        value={rejectData.reason}
-                        onChange={(e) => setRejectData('reason', e.target.value)}
+                        textareaClassName="w-full rounded-md border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -419,29 +411,14 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-2">
-                        <div className="grid gap-1.5">
-                            <Label>Reason <span className="text-red-500">*</span></Label>
-                            <select
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                value={suspendForm.data.reason}
-                                onChange={(e) => suspendForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {SUSPEND_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                                rows={3}
-                                placeholder="Additional context…"
-                                value={suspendForm.data.notes}
-                                onChange={(e) => suspendForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_stores_suspend"
+                            reasonLabel="Reason"
+                            reason={suspendForm.data.reason}
+                            notes={suspendForm.data.notes}
+                            onChange={(next) => { suspendForm.setData('reason', next.reason); suspendForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setSuspendTarget(null); suspendForm.reset(); }}>
@@ -449,7 +426,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                         </Button>
                         <Button
                             className="bg-orange-600 hover:bg-orange-700 text-white"
-                            disabled={!suspendForm.data.reason || suspendForm.processing}
+                            disabled={!suspendForm.data.reason || !suspendForm.data.notes.trim() || suspendForm.processing}
                             onClick={submitSuspend}
                         >
                             {suspendForm.processing ? 'Suspending…' : 'Suspend Store'}

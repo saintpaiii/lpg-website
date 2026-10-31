@@ -15,6 +15,10 @@ class DashboardController extends Controller
 {
     public function index(Request $request): RedirectResponse
     {
-        return redirect()->route('customer.products');
+        $user = $request->user();
+
+        return $user->role === 'customer' && $user->id_verification_status !== 'verified'
+            ? redirect()->route('customer.id-verification')
+            : redirect()->route('customer.products');
     }
 }

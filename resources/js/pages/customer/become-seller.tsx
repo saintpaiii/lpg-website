@@ -382,6 +382,11 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         <div className="mt-4">
                                             <StorePinPicker latitude={data.latitude} longitude={data.longitude}
                                                 onChange={(lat, lng) => { setData((d) => ({ ...d, latitude: lat, longitude: lng })); setStep1Errors((e) => ({ ...e, latitude: '' })); }}
+                                                street={data.store_address}
+                                                onAddressFound={(a) => {
+                                                    setData((d) => ({ ...d, store_city: a.city, store_barangay: a.barangay, store_address: a.street }));
+                                                    setStep1Errors((e) => ({ ...e, store_city: '', store_barangay: '', store_address: a.street ? '' : e.store_address }));
+                                                }}
                                                 error={errors.latitude || errors.longitude || step1Errors.latitude} />
                                         </div>
                                     </CardContent>

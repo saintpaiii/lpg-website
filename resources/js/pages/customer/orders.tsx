@@ -17,15 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { fmtDate } from '@/lib/utils';
 import CustomerLayout from '@/layouts/customer-layout';
-
-const CANCEL_REASONS = [
-    'Changed my mind',
-    'Found a better price',
-    'Ordered by mistake',
-    'Delivery takes too long',
-    'Want to change order details',
-    'Other',
-];
+import { ReasonPicker } from '@/components/reason-picker';
 
 type Order = {
     id: number;
@@ -193,7 +185,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
     }
 
     function submitCancel() {
-        if (!cancelOrder || !cancelReason) return;
+        if (!cancelOrder || !cancelReason || !cancelNotes.trim()) return;
         setCancelling(true);
         router.post(`/customer/orders/${cancelOrder.id}/cancel`, {
             cancellation_reason: cancelReason,
@@ -440,33 +432,14 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                             Cancel order <strong className="font-mono">{cancelOrder?.order_number}</strong>?
                             {cancelOrder?.status === 'confirmed' && ' Stock will be restored to the seller.'}
                         </p>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">
-                                Reason <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={cancelReason}
-                                onChange={(e) => setCancelReason(e.target.value)}
-                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Select a reason…</option>
-                                {CANCEL_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <label className="text-sm font-medium">
-                                Additional notes <span className="text-gray-400 text-xs">(optional)</span>
-                            </label>
-                            <textarea
-                                value={cancelNotes}
-                                onChange={(e) => setCancelNotes(e.target.value)}
-                                rows={3}
-                                placeholder="Any additional details…"
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="customer_cancel"
+                            reasonLabel="Reason"
+                            reason={cancelReason}
+                            notes={cancelNotes}
+                            onChange={(next) => { setCancelReason(next.reason); setCancelNotes(next.notes); }}
+                            rows={3}
+                        />
                         {cancelOrder?.payment_status === 'paid' && (
                             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                 Your order was paid. A refund will be processed by the seller.
@@ -480,7 +453,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                         <Button
                             variant="destructive"
                             onClick={submitCancel}
-                            disabled={cancelling || !cancelReason}
+                            disabled={cancelling || !cancelReason || !cancelNotes.trim()}
                         >
                             {cancelling ? 'Cancelling…' : 'Confirm Cancellation'}
                         </Button>

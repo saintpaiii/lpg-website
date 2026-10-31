@@ -61,6 +61,8 @@ class OrderController extends Controller
             'coupon_type'         => (float) $o->coupon_discount > 0 ? $o->coupon?->type : null,
             'coupon_discount'     => (float) ($o->coupon_discount ?? 0),
             'notes'               => $o->notes,
+            // Failed delivery waiting to be reassigned ("Redeliver Nov 4 · PM")
+            'redelivery'          => $o->relationLoaded('delivery') ? $o->delivery?->failInfo() : null,
             'ordered_at'       => $o->ordered_at?->format('M d, Y g:i A'),
             'delivered_at'     => $o->delivered_at?->format('M d, Y g:i A'),
             'created_at'       => $o->created_at->format('M d, Y g:i A'),
@@ -99,7 +101,7 @@ class OrderController extends Controller
         $store = request()->attributes->get('seller_store');
         $tab   = $request->input('tab', 'active');
 
-        $query = Order::with(['customer', 'items.product', 'invoice'])
+        $query = Order::with(['customer', 'items.product', 'invoice', 'delivery'])
             ->where('store_id', $store->id);
 
         if ($tab === 'archived') {
@@ -387,6 +389,7 @@ class OrderController extends Controller
                         : null,
                     'assigned_at'  => $order->delivery->assigned_at?->format('M d, Y g:i A'),
                     'delivered_at' => $order->delivery->delivered_at?->format('M d, Y g:i A'),
+                    'fail_info'    => $order->delivery->failInfo(),
                 ] : null,
                 'payment_record' => $latestPayment ? [
                     'status'    => $latestPayment->status,

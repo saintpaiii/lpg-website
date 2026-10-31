@@ -35,6 +35,7 @@ export type SharedData = {
     flash: {
         success?: string | null;
         error?: string | null;
+        info?: string | null;
         cart_conflict?: CartConflict | null;
         deactivation_info?: { reason: string | null; notes: string | null } | null;
         store_suspension_info?: { reason: string | null; notes: string | null } | null;

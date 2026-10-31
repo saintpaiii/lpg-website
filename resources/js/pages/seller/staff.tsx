@@ -41,6 +41,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { ReasonPicker } from '@/components/reason-picker';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -112,19 +113,6 @@ const SUB_ROLE_STYLES: Record<string, string> = {
     rider:     'bg-blue-100 text-blue-700',
     hr:        'bg-purple-100 text-purple-700',
 };
-
-const DEACTIVATE_REASONS = [
-    'Violation of terms of service',
-    'Fraudulent activity',
-    'Account security concern',
-    'Customer complaint',
-    'Inactivity',
-    'Duplicate account',
-    'User request',
-    'Suspicious behavior',
-    'Non-payment',
-    'Other',
-];
 
 // ── Small components ───────────────────────────────────────────────────────────
 
@@ -372,35 +360,20 @@ function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClos
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-2">
-                    <div className="grid gap-1.5">
-                        <Label>Reason <span className="text-red-500">*</span></Label>
-                        <select
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                            value={data.reason}
-                            onChange={(e) => setData('reason', e.target.value)}
-                        >
-                            <option value="">Select a reason…</option>
-                            {DEACTIVATE_REASONS.map((r) => (
-                                <option key={r} value={r}>{r}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                        <textarea
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                            rows={3}
-                            placeholder="Additional context…"
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                        />
-                    </div>
+                    <ReasonPicker
+                        context="account_seller_staff"
+                        reasonLabel="Reason"
+                        reason={data.reason}
+                        notes={data.notes}
+                        onChange={(next) => { setData('reason', next.reason); setData('notes', next.notes); }}
+                        rows={3}
+                    />
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={handleClose}>Cancel</Button>
                     <Button
                         className="bg-amber-600 hover:bg-amber-700 text-white"
-                        disabled={!data.reason || processing}
+                        disabled={!data.reason || !data.notes.trim() || processing}
                         onClick={() => target && destroy(`/seller/staff/${target.id}`, {
                             onSuccess: handleClose,
                         })}
@@ -688,29 +661,14 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-2">
-                        <div className="grid gap-1.5">
-                            <Label>Reason <span className="text-red-500">*</span></Label>
-                            <select
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                value={deactivateForm.data.reason}
-                                onChange={(e) => deactivateForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {DEACTIVATE_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                                rows={3}
-                                placeholder="Additional context…"
-                                value={deactivateForm.data.notes}
-                                onChange={(e) => deactivateForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_seller_staff"
+                            reasonLabel="Reason"
+                            reason={deactivateForm.data.reason}
+                            notes={deactivateForm.data.notes}
+                            onChange={(next) => { deactivateForm.setData('reason', next.reason); deactivateForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setDeactivateTarget(null); deactivateForm.reset(); }}>
@@ -718,7 +676,7 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                         </Button>
                         <Button
                             variant="destructive"
-                            disabled={!deactivateForm.data.reason || deactivateForm.processing}
+                            disabled={!deactivateForm.data.reason || !deactivateForm.data.notes.trim() || deactivateForm.processing}
                             onClick={submitDeactivate}
                         >
                             {deactivateForm.processing ? 'Deactivating…' : 'Deactivate'}

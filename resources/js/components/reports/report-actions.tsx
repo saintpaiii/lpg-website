@@ -2,9 +2,11 @@ import { Link, router, useForm } from '@inertiajs/react';
 import { BellRing, CheckCircle2, ImagePlus, Loader2, RotateCcw, Search, Send, ShieldAlert, Store, X, XCircle } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { relativeTime } from '@/components/chat/format';
+import { NotePicker, ReasonTextPicker } from '@/components/reason-picker';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import type { NoteContext, ReasonContext } from '@/data/reason-catalog';
 import { cn } from '@/lib/utils';
 import ReportQuickReplies from './quick-replies';
 import type { ReportDetail, ReportPortal } from './types';
@@ -98,13 +100,13 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
 
             {/* Dialogs */}
             <TextDialog open={dialog === 'investigate'} onClose={() => setDialog(null)} title="Start investigating"
-                label="Note for the reporter (optional)" field="note" url={`${base}/start-investigating`} submit="Start investigating" optional max={1000} />
+                label="Note for the reporter (optional)" field="note" url={`${base}/start-investigating`} submit="Start investigating" optional max={1000} picker={{ kind: 'note', context: 'report_reply' }} />
             <ProposeDialog open={dialog === 'propose'} onClose={() => setDialog(null)} url={`${base}/propose-resolution`} needsPhoto={f.proposal_needs_photo} />
             <TextDialog open={dialog === 'not_solved'} onClose={() => setDialog(null)} title="Not solved"
-                label="What is still wrong?" field="reason" url={`${base}/not-solved`} submit="Send" max={1000}
+                label="What is still wrong?" field="reason" url={`${base}/not-solved`} submit="Send" max={1000} picker={{ kind: 'reason', context: 'report_still_wrong' }}
                 note={report.route !== 'admin' && !report.escalated && !report.is_system ? 'We will also send your report to the platform admin.' : undefined} />
             <TextDialog open={dialog === 'escalate'} onClose={() => setDialog(null)} title="Send to the platform admin"
-                label="What is still wrong?" field="reason" url={`${base}/escalate`} submit="Send to admin" max={1000} />
+                label="What is still wrong?" field="reason" url={`${base}/escalate`} submit="Send to admin" max={1000} picker={{ kind: 'reason', context: 'report_still_wrong' }} />
             <ConfirmDialog open={dialog === 'hand'} onClose={() => setDialog(null)} title="Send to the store to fix?"
                 body="The store will see this report and who filed it. Continue?" url={`${base}/hand-to-store`} submit="Yes, send to the store" />
             {report.admin && <CloseDialog open={dialog === 'close'} onClose={() => setDialog(null)} report={report} url={`${base}/close`} />}
@@ -124,8 +126,13 @@ function ReplyBox({ base, allowInternal, quickReplies }: { base: string; allowIn
     return (
         <form onSubmit={submit} className="space-y-2 rounded-lg border p-3">
             <ReportQuickReplies groups={quickReplies} onPick={(t) => form.setData('body', form.data.body.trim() ? `${form.data.body.trimEnd()} ${t}` : t)} />
-            <textarea value={form.data.body} onChange={(e) => form.setData('body', e.target.value)} rows={3} maxLength={2000}
-                placeholder={form.data.internal ? 'Private note (only admins can see this)…' : 'Write a reply…'} className={textareaCls} aria-label="Reply" />
+            {quickReplies.length === 0 && !form.data.internal ? (
+                <NotePicker context="report_reply" label="Reply" value={form.data.body} onChange={(v) => form.setData('body', v)} rows={3} maxLength={2000}
+                    placeholder="Write a reply…" textareaClassName={textareaCls} />
+            ) : (
+                <textarea value={form.data.body} onChange={(e) => form.setData('body', e.target.value)} rows={3} maxLength={2000}
+                    placeholder={form.data.internal ? 'Private note (only admins can see this)…' : 'Write a reply…'} className={textareaCls} aria-label="Reply" />
+            )}
             {form.data.images.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                     {form.data.images.map((file, i) => (
@@ -171,10 +178,17 @@ function ProposeDialog({ open, onClose, url, needsPhoto }: { open: boolean; onCl
                     <DialogDescription>We'll ask the reporter to confirm. If they don't reply within 3 days, the report closes.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={(e) => { e.preventDefault(); form.post(url, { forceFormData: true, preserveScroll: true, onSuccess: () => { form.reset(); onClose(); } }); }} className="space-y-3">
-                    <label className="grid gap-1.5 text-sm">
-                        What was done to solve it?
-                        <textarea value={form.data.note} onChange={(e) => form.setData('note', e.target.value)} rows={4} maxLength={1000} className={textareaCls} autoFocus />
-                    </label>
+                    <div className="grid gap-1.5 text-sm">
+                        <ReasonTextPicker
+                            context="report_resolution"
+                            reasonLabel="What was done to solve it?"
+                            value={form.data.note}
+                            onChange={(v) => form.setData('note', v)}
+                            maxLength={1000}
+                            rows={4}
+                            textareaClassName={textareaCls}
+                        />
+                    </div>
                     {errors.note && <p className="text-xs text-red-600">{errors.note}</p>}
                     <div className="space-y-1.5 text-sm">
                         <p>Photos {needsPhoto ? <span className="text-red-600">(required — show the fix)</span> : '(optional)'}, up to 3</p>
@@ -245,17 +259,24 @@ function CloseDialog({ open, onClose, report, url }: { open: boolean; onClose: (
                     </div>
                     {errors.outcome && <p className="text-xs text-red-600">{errors.outcome}</p>}
                     {effect && <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">{effect}</p>}
-                    <label className="grid gap-1.5 text-sm">
-                        Reason (at least 10 characters)
-                        <textarea value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} rows={3} maxLength={2000} className={textareaCls} />
-                    </label>
+                    <div className="grid gap-1.5 text-sm">
+                        <ReasonTextPicker
+                            context="report_resolution"
+                            reasonLabel="Reason (at least 10 characters)"
+                            value={form.data.reason}
+                            onChange={(v) => form.setData('reason', v)}
+                            maxLength={2000}
+                            rows={3}
+                            textareaClassName={textareaCls}
+                        />
+                    </div>
                     {errors.reason && <p className="text-xs text-red-600">{errors.reason}</p>}
                     {report.flags.needs_safety_note && (
-                        <label className="grid gap-1.5 text-sm">
+                        <div className="grid gap-1.5 text-sm">
                             <span className="flex items-center gap-1 font-medium text-red-700"><ShieldAlert className="h-4 w-4" /> Safety note (required)</span>
                             <span className="text-xs text-gray-500">The store hasn't sent a fix with photos. What was confirmed about the tank's safety, and with whom?</span>
-                            <textarea value={form.data.safety_note} onChange={(e) => form.setData('safety_note', e.target.value)} rows={3} maxLength={1000} className={textareaCls} />
-                        </label>
+                            <NotePicker context="report_safety_note" required value={form.data.safety_note} onChange={(v) => form.setData('safety_note', v)} rows={3} maxLength={1000} textareaClassName={textareaCls} />
+                        </div>
                     )}
                     {errors.safety_note && <p className="text-xs text-red-600">{errors.safety_note}</p>}
                     <DialogFooter className="gap-2">
@@ -271,9 +292,11 @@ function CloseDialog({ open, onClose, report, url }: { open: boolean; onClose: (
     );
 }
 
-function TextDialog({ open, onClose, title, label, field, url, submit, note, max = 2000, optional = false }: {
+function TextDialog({ open, onClose, title, label, field, url, submit, note, max = 2000, optional = false, picker }: {
     open: boolean; onClose: () => void; title: string; label: string; field: string; url: string; submit: string;
     note?: string; max?: number; optional?: boolean;
+    /** Ready-made options (data/reason-catalog.ts): an optional note, or Reason ▸ Details */
+    picker?: { kind: 'note'; context: NoteContext } | { kind: 'reason'; context: ReasonContext };
 }) {
     const form = useForm<Record<string, string>>({ [field]: '' });
     const errs = form.errors as Record<string, string | undefined>;
@@ -290,10 +313,18 @@ function TextDialog({ open, onClose, title, label, field, url, submit, note, max
                     e.preventDefault();
                     form.post(url, { preserveScroll: true, onSuccess: () => { form.reset(); onClose(); } });
                 }} className="space-y-3">
-                    <label className="grid gap-1.5 text-sm">
-                        {label}
-                        <textarea value={form.data[field] ?? ''} onChange={(e) => form.setData(field, e.target.value)} rows={4} maxLength={max} className={textareaCls} autoFocus />
-                    </label>
+                    {picker?.kind === 'note' ? (
+                        <NotePicker context={picker.context} label={label} value={form.data[field] ?? ''} onChange={(v) => form.setData(field, v)}
+                            rows={4} maxLength={max} textareaClassName={textareaCls} />
+                    ) : picker?.kind === 'reason' ? (
+                        <ReasonTextPicker context={picker.context} reasonLabel={label} value={form.data[field] ?? ''} onChange={(v) => form.setData(field, v)}
+                            rows={4} maxLength={max} textareaClassName={textareaCls} />
+                    ) : (
+                        <label className="grid gap-1.5 text-sm">
+                            {label}
+                            <textarea value={form.data[field] ?? ''} onChange={(e) => form.setData(field, e.target.value)} rows={4} maxLength={max} className={textareaCls} autoFocus />
+                        </label>
+                    )}
                     {err && <p className="text-xs text-red-600">{err}</p>}
                     <DialogFooter className="gap-2">
                         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

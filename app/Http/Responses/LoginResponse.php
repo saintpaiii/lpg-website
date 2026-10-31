@@ -49,7 +49,9 @@ class LoginResponse implements LoginResponseContract
                 => route('rider.deliveries'),
 
             $user->role === 'customer'
-                => route('customer.products'),
+                => $user->id_verification_status === 'verified'
+                    ? route('customer.products')
+                    : route('customer.id-verification'),
 
             default => route('home'),
         };

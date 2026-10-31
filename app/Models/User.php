@@ -254,6 +254,27 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(Store::class, 'user_id');
     }
 
+    private ?bool $customerHistoryCache = null;
+
+    /**
+     * Has this account ever been a real customer: verified at least once (revoking keeps id_verified_at)
+     * or placed an order. Brand-new unverified customers have no history, so their empty
+     * history pages (orders, messages, invoices…) are locked too.
+     */
+    public function hasCustomerHistory(): bool
+    {
+        return $this->customerHistoryCache ??= $this->id_verified_at !== null
+            || Order::whereHas('customer', fn ($q) => $q->where('user_id', $this->id))->exists();
+    }
+
+    /** Customer who was never verified and has no orders — only Verify ID, Profile, Addresses stay open. */
+    public function isLockedNewcomer(): bool
+    {
+        return $this->role === 'customer'
+            && $this->id_verification_status !== 'verified'
+            && ! $this->hasCustomerHistory();
+    }
+
     public function orders(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(Order::class, 'created_by');

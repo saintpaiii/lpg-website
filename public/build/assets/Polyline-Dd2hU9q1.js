@@ -1,0 +1,1 @@
+import{k as s,m as a,n as l,o as r}from"./leaflet-YzBdCiP4.js";const p=s(function({positions:t,...e},n){const o=new a.Polyline(t,e);return l(o,r(n,{overlayContainer:o}))},function(t,e,n){e.positions!==n.positions&&t.setLatLngs(e.positions)});export{p as P};

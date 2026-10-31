@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lpg-cavite-v1';
+const CACHE_NAME = 'lpg-cavite-v2';
 const OFFLINE_URL = '/offline';
 const PRECACHE_URLS = ['/', '/manifest.json', '/offline'];
 
@@ -27,50 +27,53 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// ── Fetch — Network-first, cache fallback ────────────────────────────────────
+// ── Fetch ─────────────────────────────────────────────────────────────────────
+// Only two things are handled here:
+//   1. Full page navigations → network, with the offline page as fallback.
+//   2. Static assets → network-first, cached copy as fallback.
+// Everything else (Inertia/axios XHRs, auth flows, uploads, files) goes straight
+// to the network without the service worker in the way.
+const BYPASS_PREFIXES = [
+    '/auth/', '/login', '/logout', '/register', '/verify-otp', '/email/',
+    '/api/', '/sanctum/', '/broadcasting/', '/storage/', '/documents/',
+];
+
+const isStaticAsset = (pathname) =>
+    pathname.startsWith('/build/') ||
+    pathname.startsWith('/icons/') ||
+    pathname === '/manifest.json' ||
+    pathname === '/favicon.ico' ||
+    pathname === '/favicon.svg';
+
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests
-    if (event.request.method !== 'GET') return;
+    const request = event.request;
+    if (request.method !== 'GET') return;
 
-    const url = new URL(event.request.url);
+    const url = new URL(request.url);
 
-    // Skip cross-origin requests (PayMongo, OSRM, Nominatim, etc.)
+    // Skip cross-origin requests (PayMongo, OSRM, Nominatim, Google, etc.)
     if (url.origin !== self.location.origin) return;
 
-    // Skip API/webhook/Sanctum routes — always network only
-    if (
-        url.pathname.startsWith('/api/') ||
-        url.pathname.startsWith('/sanctum/') ||
-        url.pathname.startsWith('/broadcasting/')
-    ) return;
+    if (BYPASS_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return;
+
+    if (request.mode === 'navigate') {
+        event.respondWith(
+            fetch(request).catch(async () => (await caches.match(OFFLINE_URL)) || Response.error())
+        );
+        return;
+    }
+
+    if (!isStaticAsset(url.pathname)) return;
 
     event.respondWith(
-        fetch(event.request)
+        fetch(request)
             .then((response) => {
-                // Cache successful static assets (JS, CSS, fonts, images, icons)
-                if (
-                    response.status === 200 &&
-                    (url.pathname.startsWith('/build/') ||
-                     url.pathname.startsWith('/icons/') ||
-                     url.pathname === '/manifest.json' ||
-                     url.pathname === '/favicon.ico' ||
-                     url.pathname === '/favicon.svg')
-                ) {
+                if (response.status === 200) {
                     const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
                 }
                 return response;
             })
-            .catch(async () => {
-                // Try cache
-                const cached = await caches.match(event.request);
-                if (cached) return cached;
-
-                // For navigation requests, show offline page
-                if (event.request.destination === 'document') {
-                    const offline = await caches.match(OFFLINE_URL);
-                    if (offline) return offline;
-                }
-            })
+            .catch(async () => (await caches.match(request)) || Response.error())
     );
 });

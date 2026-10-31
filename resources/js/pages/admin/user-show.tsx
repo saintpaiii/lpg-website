@@ -27,6 +27,7 @@ import AppLayout from '@/layouts/app-layout';
 import IdentityDocumentsCard, { type Identity } from '@/components/identity-documents-card';
 import { fmtDate, fmtStatus } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
+import { ReasonPicker } from '@/components/reason-picker';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -69,19 +70,6 @@ interface Props {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-
-const DEACTIVATE_REASONS = [
-    'Violation of terms of service',
-    'Fraudulent activity',
-    'Account security concern',
-    'Customer complaint',
-    'Inactivity',
-    'Duplicate account',
-    'User request',
-    'Suspicious behavior',
-    'Non-payment',
-    'Other',
-];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -370,29 +358,14 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-2">
-                        <div className="grid gap-1.5">
-                            <Label>Reason <span className="text-red-500">*</span></Label>
-                            <select
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                value={deactivateForm.data.reason}
-                                onChange={(e) => deactivateForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {DEACTIVATE_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                                rows={3}
-                                placeholder="Additional context…"
-                                value={deactivateForm.data.notes}
-                                onChange={(e) => deactivateForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_user"
+                            reasonLabel="Reason"
+                            reason={deactivateForm.data.reason}
+                            notes={deactivateForm.data.notes}
+                            onChange={(next) => { deactivateForm.setData('reason', next.reason); deactivateForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setShowDeactivate(false); deactivateForm.reset(); }}>
@@ -400,7 +373,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                         </Button>
                         <Button
                             variant="destructive"
-                            disabled={!deactivateForm.data.reason || deactivateForm.processing}
+                            disabled={!deactivateForm.data.reason || !deactivateForm.data.notes.trim() || deactivateForm.processing}
                             onClick={submitDeactivate}
                         >
                             {deactivateForm.processing ? 'Deactivating…' : 'Deactivate'}
@@ -422,29 +395,14 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-2">
-                        <div className="grid gap-1.5">
-                            <Label>Reason <span className="text-red-500">*</span></Label>
-                            <select
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                value={archiveForm.data.reason}
-                                onChange={(e) => archiveForm.setData('reason', e.target.value)}
-                            >
-                                <option value="">Select a reason…</option>
-                                {DEACTIVATE_REASONS.map((r) => (
-                                    <option key={r} value={r}>{r}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="grid gap-1.5">
-                            <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                            <textarea
-                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-                                rows={3}
-                                placeholder="Additional context…"
-                                value={archiveForm.data.notes}
-                                onChange={(e) => archiveForm.setData('notes', e.target.value)}
-                            />
-                        </div>
+                        <ReasonPicker
+                            context="account_user"
+                            reasonLabel="Reason"
+                            reason={archiveForm.data.reason}
+                            notes={archiveForm.data.notes}
+                            onChange={(next) => { archiveForm.setData('reason', next.reason); archiveForm.setData('notes', next.notes); }}
+                            rows={3}
+                        />
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => { setShowArchive(false); archiveForm.reset(); }}>
@@ -452,7 +410,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                         </Button>
                         <Button
                             className="bg-red-600 hover:bg-red-700 text-white"
-                            disabled={!archiveForm.data.reason || archiveForm.processing}
+                            disabled={!archiveForm.data.reason || !archiveForm.data.notes.trim() || archiveForm.processing}
                             onClick={submitArchive}
                         >
                             {archiveForm.processing ? 'Archiving…' : 'Archive'}

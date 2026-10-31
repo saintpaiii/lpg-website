@@ -15,6 +15,7 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDateTime } from '@/lib/utils';
+import { NotePicker } from '@/components/reason-picker';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -293,7 +294,13 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                         </div>
                         <div className="grid gap-1.5">
                             <Label>Notes</Label>
-                            <Input value={data.notes} onChange={(e) => setData('notes', e.target.value)} placeholder="Optional" />
+                            <NotePicker
+                                context="stock_note"
+                                value={data.notes}
+                                onChange={(v) => setData('notes', v)}
+                                rows={2}
+                                placeholder="Optional"
+                            />
                         </div>
                         <AlertDialogFooter>
                             <AlertDialogCancel type="button">Cancel</AlertDialogCancel>

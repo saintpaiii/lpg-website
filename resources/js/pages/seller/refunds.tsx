@@ -21,6 +21,7 @@ import {
 } from '@/lib/refunds';
 import type { BreadcrumbItem } from '@/types';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { NotePicker, ReasonTextPicker } from '@/components/reason-picker';
 
 type Counts = { pending: number; approved: number; processed: number; rejected: number; escalated: number; all: number };
 
@@ -332,8 +333,13 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
 
                         <div className="grid gap-1.5">
                             <label className="text-xs font-medium">Note to customer (optional)</label>
-                            <textarea rows={2} value={form.seller_notes} onChange={(e) => setForm((f) => ({ ...f, seller_notes: e.target.value }))}
-                                className={`${inputCls} resize-none`} />
+                            <NotePicker
+                                context="refund_seller_notes"
+                                value={form.seller_notes}
+                                onChange={(v) => setForm((f) => ({ ...f, seller_notes: v }))}
+                                rows={2}
+                                textareaClassName={`${inputCls} resize-none`}
+                            />
                         </div>
                     </div>
                     <DialogFooter>
@@ -352,9 +358,15 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                         <DialogTitle>Reject Refund — {rejecting?.order_number}</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-1.5 text-sm">
-                        <label className="text-xs font-medium">Reason <span className="text-red-500">*</span></label>
-                        <textarea rows={4} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)}
-                            placeholder="Explain why this request is being rejected…" className={`${inputCls} resize-none`} />
+                        <ReasonTextPicker
+                            context="refund_seller_reject"
+                            reasonLabel="Reason"
+                            value={rejectReason}
+                            onChange={(v) => setRejectReason(v)}
+                            rows={4}
+                            placeholder="Explain why this request is being rejected…"
+                            textareaClassName={`${inputCls} resize-none`}
+                        />
                         <p className="text-xs text-muted-foreground">The customer will see this and may escalate to the platform admin.</p>
                     </div>
                     <DialogFooter>

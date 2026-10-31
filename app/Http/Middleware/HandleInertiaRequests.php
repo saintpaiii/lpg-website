@@ -77,6 +77,8 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user'               => $user,
+                // Customers only: false = brand-new unverified customer (history pages locked too)
+                'has_customer_history' => fn () => $user && $user->role === 'customer' ? $user->hasCustomerHistory() : null,
                 'permissions'        => $user ? $user->getPermissions() : [],
                 'store'              => $store ? [
                     'id'                   => $store->id,
@@ -99,6 +101,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success'              => fn () => $request->session()->get('success'),
                 'error'                => fn () => $request->session()->get('error'),
+                'info'                 => fn () => $request->session()->get('info'),
 'deactivation_info'    => fn () => $request->session()->get('deactivation_info'),
                 'store_suspension_info'=> fn () => $request->session()->get('store_suspension_info'),
             ],

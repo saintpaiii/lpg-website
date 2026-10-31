@@ -135,6 +135,7 @@ class DeliveryController extends Controller
             'archivedCount' => $archivedCount,
             'tab'           => $tab,
             'filters'       => $request->only('status', 'rider_id', 'date_from', 'date_to', 'tab'),
+            'fail_options'  => Delivery::failOptions(),
         ]);
     }
 
@@ -179,19 +180,17 @@ class DeliveryController extends Controller
 
     public function updateStatus(Request $request, Delivery $delivery): RedirectResponse
     {
+        // Same failure rules as the rider and seller forms (reason, redelivery range, notes for "Other")
         $data = $request->validate([
             'status' => 'required|in:assigned,picked_up,in_transit,delivered,failed',
             'notes'  => 'nullable|string|max:500',
-        ]);
+            ...Delivery::failureRules($request),
+        ], Delivery::failureMessages());
 
         $newStatus = $data['status'];
 
         if (in_array($delivery->status, ['delivered', 'failed'])) {
             return back()->with('error', 'Cannot change status of a completed delivery.');
-        }
-
-        if ($newStatus === 'failed' && empty($data['notes'])) {
-            return back()->with('error', 'Please provide a reason when marking delivery as failed.');
         }
 
         DB::transaction(function () use ($delivery, $newStatus, $data) {
@@ -213,10 +212,12 @@ class DeliveryController extends Controller
             }
 
             if ($newStatus === 'failed') {
+                $updates += Delivery::failureUpdates($data);
                 // Revert order back to preparing so admin can re-assign
                 $delivery->order?->update(['status' => 'preparing']);
             }
 
+            // Status + failure details in ONE update so the observer's message sees them
             $delivery->update($updates);
         });
 

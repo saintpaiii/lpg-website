@@ -17,6 +17,7 @@ import {
     type RefundItem,
 } from '@/lib/refunds';
 import type { BreadcrumbItem } from '@/types';
+import { ReasonTextPicker } from '@/components/reason-picker';
 
 type Counts = { open: number; decided: number; all: number };
 
@@ -206,9 +207,14 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                             ))}
                         </div>
                         <div className="grid gap-1.5">
-                            <label className="text-xs font-medium">Notes to both parties <span className="text-red-500">*</span></label>
-                            <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)}
-                                className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none" />
+                            <ReasonTextPicker
+                                context="refund_admin_decision"
+                                reasonLabel="Decision"
+                                value={notes}
+                                onChange={(v) => setNotes(v)}
+                                rows={3}
+                                textareaClassName="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                            />
                         </div>
                     </div>
                     <DialogFooter>

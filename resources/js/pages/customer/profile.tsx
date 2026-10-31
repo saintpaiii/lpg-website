@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
+import LocationAddressTools from '@/components/location-address-tools';
 import AddressSearchBox, { matchBarangay, matchCity, type GeocodeResult } from '@/components/address-search-box';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -203,6 +204,13 @@ export default function CustomerProfile({ profile }: Props) {
                                     }}
                                     height="260px"
                                     clickMoves
+                                />
+                                <LocationAddressTools
+                                    latitude={profileForm.data.latitude}
+                                    longitude={profileForm.data.longitude}
+                                    street={profileForm.data.address}
+                                    onPin={(lat, lng) => { profileForm.setData((d) => ({ ...d, latitude: lat, longitude: lng })); setPinNote(null); }}
+                                    onAddress={(a) => profileForm.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address: a.street }))}
                                 />
                                 {(profileForm.errors.latitude || profileForm.errors.longitude) && (
                                     <p className="text-xs text-red-500">{profileForm.errors.latitude ?? profileForm.errors.longitude}</p>
