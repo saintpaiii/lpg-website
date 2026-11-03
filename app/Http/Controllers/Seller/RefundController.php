@@ -63,7 +63,8 @@ class RefundController extends Controller
             ->all();
 
         return Inertia::render('seller/refunds', [
-            'items'  => $query->paginate(20)->withQueryString()->through(fn (RefundRequest $r) => static::format($r)),
+            'items'  => $query->paginate(20)->withQueryString()->through(fn (RefundRequest $r) => static::format($r) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $r)]),
+            'since'  => \App\Services\SectionVisitService::sinceIso($request),
             'counts' => $counts,
             'tab'    => $tab,
             'search' => $search,

@@ -34,6 +34,7 @@ class InvoiceController extends Controller
                 ->withQueryString()
                 ->through(fn ($inv) => [
                     'id'             => $inv->id,
+                    'seen'           => \App\Services\SectionVisitService::flagsFor($request, $inv),
                     'invoice_number' => $inv->invoice_number,
                     'total_amount'   => (float) $inv->total_amount,
                     'payment_status' => $inv->payment_status,
@@ -48,6 +49,7 @@ class InvoiceController extends Controller
         }
 
         return Inertia::render('customer/invoices', [
+            'since'     => \App\Services\SectionVisitService::sinceIso($request),
             'invoices'  => $invoices,
             'date_from' => $request->get('date_from') ?: '',
             'date_to'   => $request->get('date_to')   ?: '',

@@ -58,6 +58,18 @@ class ProfileController extends Controller
             'latitude'    => ['nullable', 'numeric', 'between:4,22', 'required_with:longitude', new InServiceArea('longitude')],
             'longitude'   => 'nullable|numeric|between:116,127|required_with:latitude',
         ]);
+
+        static::saveDetails($request->user(), $data);
+
+        return back()->with('success', 'Profile updated successfully.');
+    }
+
+    /**
+     * Save name, phone and home address: the users row, the customers row (created for Google sign-ups)
+     * and the "Home" saved address. Shared with the ID verification "Your details" step.
+     */
+    public static function saveDetails(\App\Models\User $user, array $data): void
+    {
         // No pin: place it at the barangay (or city) centre
         $pin = isset($data['latitude'], $data['longitude'])
             ? [(float) $data['latitude'], (float) $data['longitude']]
@@ -69,7 +81,6 @@ class ProfileController extends Controller
             . ' ' . $data['last_name']
         );
 
-        $user = $request->user();
         $user->update([
             'name'        => $fullName,
             'first_name'  => $data['first_name'],
@@ -78,7 +89,7 @@ class ProfileController extends Controller
             'phone'       => $data['phone'] ?? null,
         ]);
 
-        $customer = $this->getCustomer($request);
+        $customer = Customer::where('user_id', $user->id)->first();
         if ($customer) {
             $customer->update([
                 'name'     => $fullName,
@@ -123,8 +134,6 @@ class ProfileController extends Controller
                 'is_default' => ! CustomerAddress::where('user_id', $user->id)->where('is_default', true)->exists(),
             ]);
         }
-
-        return back()->with('success', 'Profile updated successfully.');
     }
 
     /** The saved address labelled "Home" (the default one first), if any. */

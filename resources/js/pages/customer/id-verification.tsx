@@ -18,9 +18,12 @@ import { useEffect, useRef, useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import IdDetailsStep, { type IdDetails } from '@/components/customer/id-details-step';
 import CustomerLayout from '@/layouts/customer-layout';
 
 type Props = {
+    details: IdDetails;
+    details_complete: boolean;
     status: 'pending' | 'verified' | 'rejected';
     rejection_reason: string | null;
     has_pending: boolean;
@@ -38,7 +41,48 @@ const ACCEPTED_IDS = [
     'Postal ID',
 ];
 
-export default function IdVerification({ status, rejection_reason, has_pending, valid_id_url, selfie_url }: Props) {
+/** "1 Your details → 2 Upload ID & selfie" */
+function Stepper({ step, detailsDone, onStep1 }: { step: 1 | 2; detailsDone: boolean; onStep1: () => void }) {
+    const items = [
+        { n: 1 as const, label: 'Your details' },
+        { n: 2 as const, label: 'Upload ID & selfie' },
+    ];
+    return (
+        <ol className="flex items-center gap-2 text-sm">
+            {items.map(({ n, label }, i) => {
+                const active = step === n;
+                const done = n === 1 && detailsDone && step === 2;
+                return (
+                    <li key={n} className="flex min-w-0 items-center gap-2">
+                        {i > 0 && <span className="h-px w-6 shrink-0 bg-gray-300 sm:w-10 dark:bg-gray-700" />}
+                        <button
+                            type="button"
+                            onClick={n === 1 && step === 2 ? onStep1 : undefined}
+                            disabled={!(n === 1 && step === 2)}
+                            className="flex min-w-0 items-center gap-2 disabled:cursor-default"
+                        >
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                active ? 'bg-blue-600 text-white'
+                                    : done ? 'bg-green-600 text-white'
+                                        : 'bg-gray-200 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                            }`}>
+                                {done ? <CheckCircle2 className="h-4 w-4" /> : n}
+                            </span>
+                            <span className={`truncate ${active ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-500'} ${done ? 'underline-offset-2 hover:underline' : ''}`}>
+                                {label}
+                            </span>
+                        </button>
+                    </li>
+                );
+            })}
+        </ol>
+    );
+}
+
+export default function IdVerification({ details, details_complete, status, rejection_reason, has_pending, valid_id_url, selfie_url }: Props) {
+    // ── Step: 1 = your details (only when something is missing), 2 = upload ──
+    const [step, setStep] = useState<1 | 2>(details_complete ? 2 : 1);
+
     // ── File states ──────────────────────────────────────────────────────────
     const [idFile, setIdFile]         = useState<File | null>(null);
     const [idPreview, setIdPreview]   = useState<string | null>(null);
@@ -200,6 +244,13 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
             for (const [key, messages] of Object.entries(responseErrors)) {
                 mapped[key] = (messages as string[])[0];
             }
+            // Phone / address missing — back to step 1
+            if (mapped.details) {
+                toast.error(mapped.details);
+                setStep(1);
+                setProcessing(false);
+                return;
+            }
             if (Object.keys(mapped).length === 0 && err?.response?.data?.message) {
                 toast.error(err.response.data.message);
             }
@@ -286,13 +337,18 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                     </div>
                 )}
 
+                <Stepper step={step} detailsDone={details_complete} onStep1={() => setStep(1)} />
+
+                {step === 1 && <IdDetailsStep details={details} onSaved={() => setStep(2)} />}
+
+                {step === 2 && (
                 <form onSubmit={handleSubmit} className="space-y-5">
                     {/* ── Valid ID upload ── */}
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <FileText className="h-4 w-4 text-blue-600" />
-                                Step 1 — Upload Valid ID
+                                Upload Valid ID
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -349,7 +405,7 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Camera className="h-4 w-4 text-blue-600" />
-                                Step 2 — Take or Upload a Selfie
+                                Take or Upload a Selfie
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
@@ -494,6 +550,7 @@ export default function IdVerification({ status, rejection_reason, has_pending, 
                         </Button>
                     </div>
                 </form>
+                )}
 
                 {/* Info box */}
                 <div className="rounded-lg border border-blue-100 bg-blue-50 p-4 text-sm dark:border-blue-900 dark:bg-blue-900/20">

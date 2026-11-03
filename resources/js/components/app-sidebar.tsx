@@ -44,6 +44,7 @@ import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { usePermission } from '@/hooks/use-permission';
+import { badgeProps, useSidebarBadges } from '@/hooks/use-sidebar-badges';
 import {
     Sidebar,
     SidebarContent,
@@ -73,9 +74,8 @@ export function AppSidebar() {
         ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const }
         : {};
 
-    // Reports waiting on the store / the admin (shared prop, refreshed on navigation and by report pages)
-    const reportBadges = usePage<SharedData>().props.reportBadges;
-    const badgeFor = (n?: number) => (n && n > 0 ? { badge: n > 99 ? '99+' : String(n), badgeTone: 'unread' as const } : {});
+    // New / updated since the last visit, per section (SidebarBadgeService) — keys like "seller.orders"
+    const sb = useSidebarBadges();
 
     // ── Seller portal navigation ──────────────────────────────────────────────
     if (isSeller) {
@@ -85,13 +85,13 @@ export function AppSidebar() {
         const sellerItems: NavItem[] = [
             (isActualSeller || can('dashboard.view'))   && { title: 'Dashboard',    href: '/seller/dashboard',  icon: LayoutDashboard },
             (isActualSeller || can('products.view'))    && { title: 'Products',     href: '/seller/products',   icon: Package         },
-            (isActualSeller || can('orders.view'))      && { title: 'Orders',       href: '/seller/orders',     icon: ShoppingCart    },
+            (isActualSeller || can('orders.view'))      && { title: 'Orders',       href: '/seller/orders',     icon: ShoppingCart, ...badgeProps(sb['seller.orders']) },
             (isActualSeller || can('messages.view'))    && { title: 'Messages',     href: '/seller/messages',   icon: MessageSquare, ...unreadBadge },
-            (isActualSeller || can('deliveries.view'))  && { title: 'Deliveries',   href: '/seller/deliveries', icon: Truck           },
+            (isActualSeller || can('deliveries.view'))  && { title: 'Deliveries',   href: '/seller/deliveries', icon: Truck, ...badgeProps(sb['seller.deliveries']) },
             isActualSeller                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
             (isActualSeller || can('invoices.view'))    && { title: 'Invoices',     href: '/seller/invoices',   icon: Receipt         },
             (isActualSeller || can('inventory.view'))   && { title: 'Inventory',    href: '/seller/inventory',  icon: Warehouse       },
-            isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog         },
+            isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog, ...badgeProps(sb['seller.staff']) },
             (isActualSeller || isHR)                   && { title: 'Attendance',   href: '/seller/attendance',      icon: CalendarDays      },
             (!isActualSeller && !isHR)                 && { title: 'My Attendance',href: '/seller/my-attendance',  icon: CalendarDays      },
             (!isActualSeller)                          && { title: 'My Documents', href: '/seller/my-documents',   icon: IdCard            },
@@ -99,15 +99,15 @@ export function AppSidebar() {
             (isActualSeller || isHR)                   && { title: 'Payroll',      href: '/seller/payroll',        icon: BadgeDollarSign   },
             isActualSeller                             && { title: 'Revenue',      href: '/seller/revenue',        icon: TrendingUp        },
             isActualSeller                             && { title: 'Commission',   href: '/seller/commission',     icon: HandCoins         },
-            (isActualSeller || can('orders.view'))     && { title: 'Refunds',      href: '/seller/refunds',        icon: RefreshCcw        },
-            (isActualSeller || can('customer_reports.manage')) && { title: 'Customer Reports', href: '/seller/customer-reports', icon: Flag, ...badgeFor(reportBadges?.store) },
+            (isActualSeller || can('orders.view'))     && { title: 'Refunds',      href: '/seller/refunds',        icon: RefreshCcw, ...badgeProps(sb['seller.refunds']) },
+            (isActualSeller || can('customer_reports.manage')) && { title: 'Customer Reports', href: '/seller/customer-reports', icon: Flag, ...badgeProps(sb['seller.customer_reports']) },
             isActualSeller                             && { title: 'Coupons',      href: '/seller/coupons',        icon: TicketPercent     },
             (isActualSeller || can('reports.view'))     && { title: 'Reports',      href: '/seller/reports',    icon: LineChart       },
             (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain           },
             isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award     },
             (isActualSeller || isHR)                    && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users     },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
-            isActualSeller                              && { title: 'Store Documents', href: '/seller/documents', icon: FileText     },
+            isActualSeller                              && { title: 'Store Documents', href: '/seller/documents', icon: FileText, ...badgeProps(sb['seller.store_documents']) },
             { title: 'Notifications', href: '/notifications', icon: Bell   },
             { title: 'Profile',       href: '/settings/profile', icon: User },
         ].filter(Boolean) as NavItem[];
@@ -171,22 +171,22 @@ export function AppSidebar() {
         // Platform admin + platform staff with explicit permission
         (isPlatformAdmin || can('users.view'))         && { title: 'Users',            href: '/admin/users',          icon: Users      },
         isPlatformAdmin                                && { title: 'Platform Staff',   href: '/admin/staff',          icon: UserCog    },
-        (isPlatformAdmin || can('stores.view'))        && { title: 'Stores',           href: '/admin/stores',         icon: Store      },
-        (isPlatformAdmin || can('verifications.view')) && { title: 'Verifications',    href: '/admin/verifications',  icon: BadgeCheck },
-        (isPlatformAdmin || can('verifications.view') || can('stores.view')) && { title: 'Store Documents', href: '/admin/store-documents', icon: FileCheck },
+        (isPlatformAdmin || can('stores.view'))        && { title: 'Stores',           href: '/admin/stores',         icon: Store, ...badgeProps(sb['admin.stores']) },
+        (isPlatformAdmin || can('verifications.view')) && { title: 'Verifications',    href: '/admin/verifications',  icon: BadgeCheck, ...badgeProps(sb['admin.verifications']) },
+        (isPlatformAdmin || can('verifications.view') || can('stores.view')) && { title: 'Store Documents', href: '/admin/store-documents', icon: FileCheck, ...badgeProps(sb['admin.store_documents']) },
         // Riders have dedicated delivery pages
-        isRider && { title: 'My Deliveries',   href: '/rider/deliveries',    icon: Truck          },
+        isRider && { title: 'My Deliveries',   href: '/rider/deliveries',    icon: Truck, ...badgeProps(sb['rider.deliveries']) },
         isRider && { title: 'Delivery History', href: '/rider/history',      icon: History        },
         isRider && { title: 'Messages',         href: '/rider/messages',     icon: MessageSquare, ...unreadBadge },
         isRider && { title: 'My Reports',       href: '/rider/reports',      icon: Flag           },
         isRider && { title: 'My Attendance',    href: '/rider/my-attendance', icon: CalendarDays  },
-        isRider && { title: 'My Documents',     href: '/rider/documents',    icon: IdCard         },
+        isRider && { title: 'My Documents',     href: '/rider/documents',    icon: IdCard, ...badgeProps(sb['rider.documents']) },
         isRider && { title: 'My Payslips',      href: '/rider/my-payslips',  icon: ClipboardList  },
         !isPlatformAdmin && !isRider && can('customers.view') && { title: 'Customers', href: '/admin/customers', icon: Users },
         can('invoices.view')   && { title: 'Invoices',           href: '/admin/invoices',                                     icon: Receipt         },
         can('reports.view')    && { title: 'Reports',            href: '/admin/reports',                                      icon: BarChart3       },
-        isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag, ...badgeFor(reportBadges?.admin) },
-        isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw      },
+        isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag, ...badgeProps(sb['admin.user_reports']) },
+        isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw, ...badgeProps(sb['admin.refunds']) },
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
         isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },

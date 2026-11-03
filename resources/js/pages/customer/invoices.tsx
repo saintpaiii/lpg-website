@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Receipt, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { fmtDate } from '@/lib/utils';
@@ -46,6 +47,8 @@ const PAY_STYLES: Record<string, string> = {
 };
 
 export default function Invoices({ invoices, date_from, date_to }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(invoices.data);
     const [dateFrom, setDateFrom] = useState(date_from);
     const [dateTo,   setDateTo]   = useState(date_to);
 
@@ -96,6 +99,8 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
+                            <SeenNote counts={seen.counts} onClear={seen.clear} />
+
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -110,7 +115,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {invoices.data.map((inv) => (
-                                        <tr key={inv.id} className="hover:bg-gray-50/60">
+                                        <tr key={inv.id} className={`hover:bg-gray-50/60 ${seenRowClass(seen.get(inv.id))}`}>
                                             <td className="px-4 py-3">
                                                 <Link
                                                     href={`/customer/invoices/${inv.id}`}
@@ -118,6 +123,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                                 >
                                                     {inv.invoice_number}
                                                 </Link>
+                                                <SeenPill flags={seen.get(inv.id)} className="ml-1.5" />
                                             </td>
                                             <td className="px-4 py-3 text-xs font-mono text-gray-500">
                                                 {inv.order_number ?? '—'}

@@ -1,6 +1,6 @@
 import { useId, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ChoiceSelect } from '@/components/choice-select';
 import { NOTE_CATALOG, REASON_CATALOG } from '@/data/reason-catalog';
 import type { NoteContext, ReasonContext, ReasonOption } from '@/data/reason-catalog';
 import { cn } from '@/lib/utils';
@@ -19,7 +19,6 @@ const OTHER = '__other';
 const NONE = '__none';
 const OTHER_LABEL = 'Other — type my own';
 
-const selectCls = 'h-11 w-full';
 export const reasonTextareaClass =
     'flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring dark:bg-input/30';
 
@@ -72,26 +71,22 @@ function ReasonFields({ textareaRef, ...p }: FieldsProps) {
                 <Label htmlFor={`${uid}-reason`}>
                     {p.reasonLabel}{p.required && <span className="text-red-500"> *</span>}
                 </Label>
-                <Select value={p.reason || undefined} disabled={p.disabled}
-                    onValueChange={(v) => { const o = p.options.find((x) => x.value === v); if (o) p.onReason(o); }}>
-                    <SelectTrigger id={`${uid}-reason`} className={selectCls}><SelectValue placeholder="Choose a reason" /></SelectTrigger>
-                    <SelectContent>
-                        {p.options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                </Select>
+                <ChoiceSelect
+                    id={`${uid}-reason`} label={p.reasonLabel} value={p.reason} disabled={p.disabled} placeholder="Choose a reason"
+                    groups={[{ items: p.options.map((o) => ({ value: o.value, label: o.label })) }]}
+                    onValueChange={(v) => { const o = p.options.find((x) => x.value === v); if (o) p.onReason(o); }}
+                />
                 {p.reasonError && <p className="text-xs text-red-500">{p.reasonError}</p>}
             </div>
 
             {hasDetails && (
                 <div className="grid gap-1.5">
                     <Label htmlFor={`${uid}-detail`}>{p.detailsLabel}</Label>
-                    <Select value={p.detail || undefined} onValueChange={p.onDetail} disabled={p.disabled}>
-                        <SelectTrigger id={`${uid}-detail`} className={selectCls}><SelectValue placeholder="Choose a detail" /></SelectTrigger>
-                        <SelectContent>
-                            {option!.details.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                            <SelectItem value={OTHER}>{OTHER_LABEL}</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <ChoiceSelect
+                        id={`${uid}-detail`} label={p.detailsLabel} value={p.detail} onValueChange={p.onDetail} disabled={p.disabled}
+                        placeholder="Choose a detail"
+                        groups={[{ items: [...option!.details.map((d) => ({ value: d, label: d })), { value: OTHER, label: OTHER_LABEL }] }]}
+                    />
                 </div>
             )}
 
@@ -253,24 +248,19 @@ export function NotePicker({ context, value, onChange, label, required = false, 
             {label && (
                 <Label htmlFor={`${uid}-note`}>{label}{required && <span className="text-red-500"> *</span>}</Label>
             )}
-            <Select value={selected || undefined} onValueChange={pick} disabled={disabled}>
-                <SelectTrigger id={`${uid}-note`} className={selectCls}>
-                    <SelectValue placeholder={required ? 'Choose a note' : 'Add a note (optional)'} />
-                </SelectTrigger>
-                <SelectContent>
-                    {!required && <SelectItem value={NONE} className="text-muted-foreground">None</SelectItem>}
-                    {groups.map((g) => (
-                        <SelectGroup key={g.group}>
-                            <SelectLabel>{g.group}</SelectLabel>
-                            {g.items.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
-                        </SelectGroup>
-                    ))}
-                    <SelectGroup>
-                        <SelectLabel>Other</SelectLabel>
-                        <SelectItem value={OTHER}>{OTHER_LABEL}</SelectItem>
-                    </SelectGroup>
-                </SelectContent>
-            </Select>
+            <ChoiceSelect
+                id={`${uid}-note`}
+                label={label ?? (required ? 'Choose a note' : 'Add a note')}
+                value={selected}
+                onValueChange={pick}
+                disabled={disabled}
+                placeholder={required ? 'Choose a note' : 'Add a note (optional)'}
+                groups={[
+                    ...(!required ? [{ items: [{ value: NONE, label: 'None', muted: true }] }] : []),
+                    ...groups.map((g) => ({ label: g.group, items: g.items.map((item) => ({ value: item, label: item })) })),
+                    { label: 'Other', items: [{ value: OTHER, label: OTHER_LABEL }] },
+                ]}
+            />
             {showText && (
                 <textarea
                     ref={textareaRef}

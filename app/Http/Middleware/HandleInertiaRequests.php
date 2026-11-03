@@ -116,6 +116,8 @@ class HandleInertiaRequests extends Middleware
             'systemReportCategories' => fn () => $user ? config('reports.system_categories') : [],
             'systemReportAreas'      => fn () => $user ? config('reports.system_areas') : [],
             'reportBadges'        => fn () => \App\Services\ReportService::badgesFor($user),
+            // Per-menu-item "needs action" counts (-1 = "!"), cached 20 s per user
+            'sidebarBadges'       => fn () => \App\Services\SidebarBadgeService::for($user),
             // Riders only: may they make deliveries (approved, unexpired driver's license)?
             'rider_license'       => fn () => $user && $user->isRider() ? [
                 'can_deliver' => \App\Services\StaffDocumentService::canDeliver($user),

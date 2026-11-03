@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Gavel, RefreshCcw, Search, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
@@ -39,6 +40,8 @@ const TABS: { key: string; label: string; countKey: keyof Counts }[] = [
 type Decision = 'favor_customer' | 'favor_seller';
 
 export default function AdminRefundDisputes({ items, counts, tab, search }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(items.data);
     const [searchInput, setSearchInput] = useState(search);
     const [deciding, setDeciding]       = useState<RefundItem | null>(null);
     const [decision, setDecision]       = useState<Decision>('favor_customer');
@@ -106,7 +109,7 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                         >
                             {t.label}
                             {counts[t.countKey] > 0 && (
-                                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-xs font-semibold">
+                                <span className={`ml-1.5 inline-flex items-center justify-center rounded-full bg-muted px-1.5 text-xs font-semibold ${t.key === 'open' ? actionGlow(counts[t.countKey]) : ''}`}>
                                     {counts[t.countKey]}
                                 </span>
                             )}
@@ -120,12 +123,14 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                     </div>
                 ) : (
                     <div className="space-y-3">
+                        <SeenNote counts={seen.counts} onClear={seen.clear} />
                         {items.data.map((r) => (
-                            <div key={r.id} className="rounded-xl border bg-card p-4 space-y-3">
+                            <div key={r.id} className={`rounded-xl border bg-card p-4 space-y-3 ${seenRowClass(seen.get(r.id))}`}>
                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-mono font-semibold">{r.order_number ?? '—'}</span>
+                                            <SeenPill flags={seen.get(r.id)} />
                                             <span className="text-sm font-bold">{peso(r.amount)}</span>
                                             <span className="text-xs text-muted-foreground">of {peso(r.order_total)}</span>
                                         </div>

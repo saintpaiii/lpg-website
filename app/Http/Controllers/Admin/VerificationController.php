@@ -74,7 +74,8 @@ class VerificationController extends Controller
             ->orderByDesc('created_at')->get()->groupBy(fn ($h) => $h->user_id . '|' . $h->type);
 
         return Inertia::render('admin/verifications', [
-            'verifications' => $paginated->through(function ($v) use ($stores, $previousApps, $docFields, $customers, $orderCounts, $history) {
+            'since'         => \App\Services\SectionVisitService::sinceIso($request),
+            'verifications' => $paginated->through(function ($v) use ($stores, $previousApps, $docFields, $customers, $orderCounts, $history, $request) {
                 $store          = $stores->get($v->user_id);
                 $prevApp        = $previousApps->get($v->user_id);
                 $isResubmission = $prevApp !== null;
@@ -91,6 +92,7 @@ class VerificationController extends Controller
 
                 return [
                     'id'               => $v->id,
+                    'seen'             => \App\Services\SectionVisitService::flagsFor($request, $v),
                     'type'             => $v->type,
                     'status'           => $v->status,
                     'rejection_reason' => $v->rejection_reason,

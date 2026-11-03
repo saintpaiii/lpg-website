@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { RefreshCcw, ShieldAlert, TicketPercent } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -41,6 +42,8 @@ type Props = {
 };
 
 export default function CustomerRefunds({ refunds, coupons }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(refunds.data);
     const [escalating, setEscalating] = useState<RefundItem | null>(null);
     const [reason, setReason]         = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -105,14 +108,16 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                     </div>
                 ) : (
                     <div className="space-y-3">
+                        <SeenNote counts={seen.counts} onClear={seen.clear} />
                         {refunds.data.map((r) => (
-                            <div key={r.id} className="rounded-xl border bg-white dark:bg-card p-4 space-y-3">
+                            <div key={r.id} className={`rounded-xl border bg-white dark:bg-card p-4 space-y-3 ${seenRowClass(seen.get(r.id))}`}>
                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <Link href={`/customer/orders/${r.order_id}`} className="font-semibold font-mono hover:underline">
                                                 {r.order_number ?? '—'}
                                             </Link>
+                                            <SeenPill flags={seen.get(r.id)} />
                                             <span className="text-sm font-bold text-blue-700">{peso(r.amount)}</span>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-0.5">

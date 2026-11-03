@@ -50,13 +50,17 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                         : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:translate-x-0.5',
                                 )}
                             >
-                                <Link href={item.href} prefetch>
+                                {/* No prefetch while a badge shows: a prefetched page would skip the visit that clears it */}
+                                <Link href={item.href} prefetch={!item.badge}>
                                     {item.icon && (
                                         <span className="relative mr-2 shrink-0">
                                             <item.icon className={cn('size-4', active ? 'text-white' : '')} />
-                                            {item.badge && item.badgeTone === 'unread' && (
+                                            {item.badge && item.badgeTone && item.badgeTone !== 'default' && (
                                                 // Dot on the icon, visible when the sidebar is collapsed to icons
-                                                <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-blue-600 ring-2 ring-sidebar group-data-[collapsible=icon]:block" />
+                                                <span className={cn(
+                                                    'absolute -right-1 -top-1 hidden h-2 w-2 rounded-full ring-2 ring-sidebar group-data-[collapsible=icon]:block',
+                                                    item.badgeTone === 'alert' ? 'bg-red-600' : item.badgeTone === 'warning' ? 'bg-amber-500' : 'bg-blue-600',
+                                                )} />
                                             )}
                                         </span>
                                     )}
@@ -67,6 +71,10 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                                 'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
                                                 item.badgeTone === 'unread'
                                                     ? (active ? 'bg-white text-blue-700' : 'bg-blue-600 text-white')
+                                                    : item.badgeTone === 'alert'
+                                                    ? (active ? 'bg-white text-red-600' : 'bg-red-600 text-white')
+                                                    : item.badgeTone === 'warning'
+                                                    ? (active ? 'bg-white text-amber-600' : 'bg-amber-500 text-white')
                                                     : active
                                                         ? 'bg-white/20 text-white'
                                                         : 'bg-muted text-muted-foreground',

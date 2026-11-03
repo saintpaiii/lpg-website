@@ -2,6 +2,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
 import LocationAddressTools from '@/components/location-address-tools';
+import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import AddressSearchBox, { matchBarangay, matchCity, type GeocodeResult } from '@/components/address-search-box';
 import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
@@ -40,12 +41,19 @@ export default function CustomerProfile({ profile }: Props) {
         longitude: profile.longitude,
     });
     const [pinNote, setPinNote] = useState<string | null>(null);
+    // Moving the pin fills city / barangay (and the street when it wasn't typed) — one update, pin stays put
+    const autoFill = useAutoFillAddress({
+        street: profileForm.data.address,
+        pinned: profile.latitude != null,
+        apply: (a) => { profileForm.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address: a.street })); setPinNote(null); },
+    });
 
     /** Barangay picked → move the pin to that barangay's centre (the customer then drags to their house). */
     async function pinFromBarangay(city: string, barangay: string) {
-        if (!city || !barangay) return;
+        // Only an unplaced pin follows the barangay — a pin the user put down stays exactly there
+        if (!city || !barangay || autoFill.isPinned()) return;
         const geo = await lookupBarangay(city, barangay);
-        if (!geo || geo.precision === 'none') return;
+        if (!geo || geo.precision === 'none' || autoFill.isPinned()) return;
         profileForm.setData((d) => ({ ...d, latitude: geo.latitude, longitude: geo.longitude }));
         setPinNote(geo.found ? null : (geo.message ?? null));
     }
@@ -58,6 +66,7 @@ export default function CustomerProfile({ profile }: Props) {
 
     /** Search result → pin there, and fill city/barangay/street when we can match them. */
     function pickSearchResult(r: GeocodeResult) {
+        autoFill.setPinned(true);
         const city = matchCity(r.city);
         const barangay = city ? matchBarangay(city, r.barangay) : null;
         profileForm.setData((d) => ({
@@ -183,6 +192,7 @@ export default function CustomerProfile({ profile }: Props) {
                                     pinFromBarangay(profileForm.data.city, v);
                                 }}
                                 errors={profileForm.errors}
+                                autoFill={autoFill}
                             />
 
                             <div className="grid gap-1.5">
@@ -201,16 +211,14 @@ export default function CustomerProfile({ profile }: Props) {
                                     onLocationChange={(lat, lng) => {
                                         profileForm.setData((d) => ({ ...d, latitude: lat, longitude: lng }));
                                         setPinNote(null);
+                                        autoFill.onPinMoved(lat, lng);
                                     }}
                                     height="260px"
                                     clickMoves
                                 />
                                 <LocationAddressTools
-                                    latitude={profileForm.data.latitude}
-                                    longitude={profileForm.data.longitude}
-                                    street={profileForm.data.address}
                                     onPin={(lat, lng) => { profileForm.setData((d) => ({ ...d, latitude: lat, longitude: lng })); setPinNote(null); }}
-                                    onAddress={(a) => profileForm.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address: a.street }))}
+                                    autoFill={autoFill}
                                 />
                                 {(profileForm.errors.latitude || profileForm.errors.longitude) && (
                                     <p className="text-xs text-red-500">{profileForm.errors.latitude ?? profileForm.errors.longitude}</p>

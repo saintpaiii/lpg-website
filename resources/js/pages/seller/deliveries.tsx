@@ -1,9 +1,11 @@
 import { Head, router } from '@inertiajs/react';
+import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Camera, ChevronDown, ChevronUp, MapPin, Search, Truck } from 'lucide-react';
 import { useState } from 'react';
 import DeliveryFailFields, { emptyFailValues, failValuesComplete } from '@/components/delivery-fail-fields';
 import type { FailInfo, FailOptions, FailValues } from '@/components/delivery-fail-fields';
 import { NotePicker } from '@/components/reason-picker';
+import { deliveryNoteContext } from '@/data/reason-catalog';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -173,6 +175,8 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
 }
 
 export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to, fail_options }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(deliveries.data);
     const [searchVal, setSearchVal]           = useState(search);
     const [dateFrom,  setDateFrom]            = useState(date_from);
     const [dateTo,    setDateTo]              = useState(date_to);
@@ -311,6 +315,8 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                     {(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={clearDates}>Clear</Button>}
                 </div>
 
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
+
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
@@ -330,11 +336,11 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                         <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No deliveries found.</td></tr>
                                     ) : deliveries.data.map((d) => (
                                         <>
-                                            <tr key={d.id} className={`border-b transition-colors ${expanded === d.id ? 'bg-muted/10' : 'hover:bg-muted/20'}`}>
+                                            <tr key={d.id} className={`border-b transition-colors ${expanded === d.id ? 'bg-muted/10' : `hover:bg-muted/20 ${seenRowClass(seen.get(d.id))}`}`}>
                                                 <td className="px-4 py-3">
                                                     {d.order ? (
                                                         <>
-                                                            <p className="font-mono text-xs font-medium text-blue-600">{d.order.order_number}</p>
+                                                            <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-medium text-blue-600">{d.order.order_number}<SeenPill flags={seen.get(d.id)} className="font-sans" /></p>
                                                             <p className="text-xs text-muted-foreground">₱{d.order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
                                                         </>
                                                     ) : '—'}
@@ -510,7 +516,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                         <AlertDialogTitle>Update Delivery Status</AlertDialogTitle>
                         <AlertDialogDescription>Order: <strong>{statusTarget?.order?.order_number}</strong></AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Select value={newStatus} onValueChange={(v) => { setNewStatus(v); setStatusErrors({}); }}>
+                    <Select value={newStatus} onValueChange={(v) => { setNewStatus(v); setStatusNotes(''); setStatusErrors({}); }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                             {['assigned', 'picked_up', 'in_transit', 'delivered', 'failed'].map((s) => (
@@ -522,7 +528,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                         <div className="grid gap-1.5">
                             <p className="text-sm font-medium">Notes <span className="text-xs text-muted-foreground">(optional)</span></p>
                             <NotePicker
-                                context="delivery_note"
+                                context={deliveryNoteContext(newStatus)}
                                 value={statusNotes}
                                 onChange={setStatusNotes}
                                 maxLength={500}

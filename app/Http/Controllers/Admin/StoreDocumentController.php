@@ -46,11 +46,12 @@ class StoreDocumentController extends Controller
         usort($rows['expired'], fn ($a, $b) => $a['days_left'] <=> $b['days_left']);
 
         $pending = StoreDocumentSubmission::with(['store', 'submitter:id,name'])->where('status', 'pending')->oldest()->get()
-            ->map(function ($d) {
+            ->map(function ($d) use ($request) {
                 $isPermit = $d->doc_type !== 'other';
 
                 return [
                     'id'              => $d->id,
+                    'seen'            => \App\Services\SectionVisitService::flagsFor($request, $d),
                     'store_id'        => $d->store_id,
                     'store_name'      => $d->store?->store_name,
                     'doc_type'        => $d->doc_type,
@@ -67,6 +68,7 @@ class StoreDocumentController extends Controller
             })->values();
 
         return Inertia::render('admin/store-documents', [
+            'since'    => \App\Services\SectionVisitService::sinceIso($request),
             'tab'      => $tab,
             'pending'  => $pending,
             'expiring' => $rows['expiring'],

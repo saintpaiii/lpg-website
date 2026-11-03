@@ -15,9 +15,9 @@ import {
 import { Circle, MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet';
 import ServiceAreaLimit from '@/components/service-area-limit';
 import LocationAccuracyNotice from '@/components/location-accuracy-notice';
-import LocationAddressTools from '@/components/location-address-tools';
+import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import {
-    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, fillAddressFromLocation, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, SERVICE_AREA_MESSAGE, type FilledAddress,
+    ACCURATE_ENOUGH_M, DEVICE_LOCATION_FAILED, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, SERVICE_AREA_MESSAGE, type FilledAddress,
 } from '@/lib/map';
 import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -128,7 +128,8 @@ export default function SellerSettings({ store }: Props) {
         setRoughM(null);
         return true;
     };
-    onPickRef.current = (lat, lng) => { placePin(lat, lng); };
+    // Tapping the map / dropping the pin fills the address (autoFill is declared below; this runs on click)
+    onPickRef.current = (lat, lng) => { if (placePin(lat, lng)) autoFill.onPinMoved(lat, lng); };
 
     // Manual Latitude / Longitude boxes: typed freely, applied on blur / Enter (outside Cavite → message, pin stays)
     const [latText, setLatText] = useState(pin ? String(pin.lat) : '');
@@ -155,7 +156,7 @@ export default function SellerSettings({ store }: Props) {
             if (!isInServiceArea(loc.lat, loc.lng)) { setPinMsg(OUTSIDE_SERVICE_AREA_DEVICE); return; }
             setPin({ lat: loc.lat, lng: loc.lng });
             setRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
-            fillAddressFromLocation(loc.lat, loc.lng, data.address).then((a) => a && applyFoundAddress(a));
+            autoFill.fillNow(loc.lat, loc.lng);
         }).catch(() => setPinMsg(DEVICE_LOCATION_FAILED))
             .finally(() => setLocating(false));
     }
@@ -215,6 +216,9 @@ export default function SellerSettings({ store }: Props) {
         consignment_due_days:     String(store.consignment_due_days ?? 7),
         logo:                   null,
     });
+
+    // Moving the store pin fills city / barangay (and the street when it wasn't typed)
+    const autoFill = useAutoFillAddress({ street: data.address, apply: applyFoundAddress });
 
     function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0] ?? null;
@@ -532,6 +536,7 @@ export default function SellerSettings({ store }: Props) {
                                 onCityChange={(v) => setData('city', v)}
                                 onBarangayChange={(v) => setData('barangay', v)}
                                 errors={allErrors}
+                                autoFill={autoFill}
                             />
 
                             <div className="grid grid-cols-2 gap-4">
@@ -604,6 +609,7 @@ export default function SellerSettings({ store }: Props) {
                                                         if (!m) return;
                                                         const { lat, lng } = m.getLatLng();
                                                         if (!placePin(+lat.toFixed(7), +lng.toFixed(7))) m.setLatLng([pin.lat, pin.lng]);
+                                                        else autoFill.onPinMoved(+lat.toFixed(7), +lng.toFixed(7));
                                                     },
                                                 }} />
                                             <Circle
@@ -671,7 +677,6 @@ export default function SellerSettings({ store }: Props) {
                                 {locating ? <Spinner className="mr-1.5 h-4 w-4" /> : <Crosshair className="mr-1.5 h-4 w-4" />}
                                 Use My Current Location
                             </Button>
-                            <LocationAddressTools latitude={pin?.lat ?? null} longitude={pin?.lng ?? null} street={data.address} onAddress={applyFoundAddress} />
                             {roughM !== null && <LocationAccuracyNotice accuracyM={roughM} onConfirm={() => setRoughM(null)} />}
                             {pinMsg && <p className="text-xs text-red-600">{pinMsg}</p>}
                             {!pinMsg && locationError && <p className="text-xs text-red-600">{locationError}</p>}

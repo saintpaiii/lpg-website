@@ -12,8 +12,11 @@ export type NavItem = {
     icon?: LucideIcon | null;
     isActive?: boolean;
     badge?: string;
-    /** 'unread' renders the badge as a blue pill (and a dot when the sidebar is collapsed). */
-    badgeTone?: 'default' | 'unread';
+    /**
+     * 'unread' = blue pill, 'alert' = red pill (needs action), 'warning' = amber pill ("!").
+     * All three also show a dot on the icon when the sidebar is collapsed.
+     */
+    badgeTone?: 'default' | 'unread' | 'alert' | 'warning';
     /** Shown greyed with a lock and not clickable (e.g. shopping before ID approval) */
     disabled?: boolean;
     /** Tooltip shown on a disabled item */

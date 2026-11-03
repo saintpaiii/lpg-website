@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -625,18 +626,19 @@ export default function ProductsPage({ products, filters, cities, brands, weight
             </Dialog>
 
             {/* Floating "Edit Banners" button for admin */}
-            {isAdminPreview && (
+            {/* Portaled to <body>: an ancestor with a transform would otherwise pin `fixed` to it, not the viewport */}
+            {isAdminPreview && typeof document !== 'undefined' && createPortal(
                 <button
                     onClick={() => setBannerPanelOpen(true)}
-                    className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                    className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 text-sm font-semibold shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
                 >
                     <ImageIcon className="h-4 w-4" />
                     Edit Banners
                 </button>
-            )}
+            , document.body)}
 
             {/* Admin Banner Management Slide-over */}
-            {isAdminPreview && bannerPanelOpen && (
+            {isAdminPreview && bannerPanelOpen && typeof document !== 'undefined' && createPortal(
                 <>
                     {/* Backdrop */}
                     <div
@@ -651,7 +653,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         />
                     </div>
                 </>
-            )}
+            , document.body)}
 
         </CustomerLayout>
     );

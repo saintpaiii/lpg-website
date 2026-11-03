@@ -8,6 +8,7 @@ import AddressSearchBox, { matchBarangay, matchCity, shortPlaceName, type Geocod
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import type { AutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { isInServiceArea, SERVICE_AREA_MESSAGE, type LatLng } from '@/lib/map';
 
 export type SavedAddress = {
@@ -47,13 +48,15 @@ const LABELS = ['Home', 'Office', 'Other'];
  * Checkout delivery address picker: saved addresses, OpenStreetMap search, and a map pin the
  * customer can drag / tap to fine-tune. New addresses can be saved for future orders.
  */
-export default function AddressSearchMap({ savedAddresses, value, onChange, onSaved, height = '300px', fitTo = [], children }: {
+export default function AddressSearchMap({ savedAddresses, value, onChange, onSaved, height = '300px', fitTo = [], autoFill, children }: {
     savedAddresses: SavedAddress[];
     value: DeliveryLocation;
     onChange: (next: DeliveryLocation, reason: ChangeReason) => void;
     onSaved?: (addresses: SavedAddress[], saved: SavedAddress) => void;
     height?: string;
     fitTo?: LatLng[];
+    /** Pin auto-fill ("Finding address…", the filled note); also says whether the user placed the pin */
+    autoFill?: AutoFillAddress;
     children?: ReactNode;
 }) {
     const isNew = value.addressId === null;
@@ -64,6 +67,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
 
     function pickSaved(a: SavedAddress) {
         setNote(null);
+        autoFill?.setPinned(false);   // the pin is the saved address's again — typing a new barangay may re-pin it
         onChange(locationFromSaved(a), 'saved');
     }
 
@@ -74,6 +78,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
 
     function pickSearchResult(r: GeocodeResult) {
         if (!isInServiceArea(r.lat, r.lng)) { toast.error(SERVICE_AREA_MESSAGE); return; }
+        autoFill?.setPinned(true);
         const city = matchCity(r.city) ?? '';
         const barangay = matchBarangay(city, r.barangay) ?? '';
         setNote(city
@@ -90,9 +95,10 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
     async function changeFields(next: Partial<DeliveryLocation>) {
         const merged = { ...value, ...next, addressId: null };
         onChange(merged, 'fields');
-        if (next.barangay && merged.city) {
+        // A pin the user put down (drag, tap, location, search) stays exactly there
+        if (next.barangay && merged.city && !autoFill?.isPinned()) {
             const geo = await lookupBarangay(merged.city, next.barangay);
-            if (geo && geo.precision !== 'none') {
+            if (geo && geo.precision !== 'none' && !autoFill?.isPinned()) {
                 onChange({ ...merged, lat: geo.latitude, lng: geo.longitude }, 'fields');
                 setNote(geo.found ? null : geo.message ?? null);
             }
@@ -177,6 +183,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
                         onCityChange={(v) => changeFields({ city: v, barangay: '' })}
                         onBarangayChange={(v) => changeFields({ barangay: v })}
                         compact
+                        autoFill={autoFill}
                     />
                     {note && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">{note}</p>}
                 </div>

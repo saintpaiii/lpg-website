@@ -133,7 +133,7 @@ class OrderController extends Controller
         if ($dateTo)   $query->whereDate('created_at', '<=', $dateTo);
 
         $orders = $query->latest()->paginate(20)->withQueryString()
-            ->through(fn ($o) => $this->formatOrder($o));
+            ->through(fn ($o) => $this->formatOrder($o) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $o)]);
 
         $counts = [
             'pending'          => Order::where('store_id', $store->id)->where('status', 'pending')->count(),
@@ -166,6 +166,7 @@ class OrderController extends Controller
             'counts'  => $counts,
             'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to', 'balance'),
             'riders'  => $riders,
+            'since'   => \App\Services\SectionVisitService::sinceIso($request),
         ]);
     }
 

@@ -105,6 +105,7 @@ class OrderController extends Controller
                     'items_summary'     => $o->items->map(fn ($i) => $i->product?->name)->filter()->implode(', '),
                     'invoice_id'        => $o->invoice?->id,
                     'cancelled_by'      => $o->cancelled_by,
+                    'seen'              => \App\Services\SectionVisitService::flagsFor($request, $o),
                 ]);
         }
 
@@ -113,6 +114,7 @@ class OrderController extends Controller
             'date_from' => $request->get('date_from') ?: '',
             'date_to'   => $request->get('date_to')   ?: '',
             'status'    => $request->get('status') ?: '',
+            'since'     => \App\Services\SectionVisitService::sinceIso($request),
         ]);
     }
 

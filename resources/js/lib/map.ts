@@ -143,15 +143,13 @@ export const lowAccuracyNotice = (m: number): string =>
 // ── Address from a map point (reverse geocoding via /api/reverse-geocode) ─────
 
 export type FilledAddress = { city: string; barangay: string; street: string };
+export type FoundAddress = { city: string; barangay: string; street: string | null; approximate: boolean };
 
 /**
- * City + barangay (always names from our Cavite dropdown) and street for a point.
- * The street only replaces `currentStreet` when that is empty, or when the user confirms.
- * Shows the result as a toast; returns null when nothing could be found.
- * Callers apply the result in ONE state update and must not run their barangay-change
- * handlers (those would move the pin to the barangay centre).
+ * City + barangay (always names from our Cavite dropdown) and the street for a point, or null (an error toast
+ * is shown). Use it through useAutoFillAddress, which decides whether the street may be replaced.
  */
-export async function fillAddressFromLocation(lat: number, lng: number, currentStreet = ''): Promise<FilledAddress | null> {
+export async function lookupAddress(lat: number, lng: number): Promise<FoundAddress | null> {
     let data: { street: string | null; barangay: string | null; city: string | null; matched_by: 'name' | 'nearest'; message?: string };
     try {
         const res = await fetch(`/api/reverse-geocode?lat=${lat.toFixed(7)}&lng=${lng.toFixed(7)}`, {
@@ -172,12 +170,12 @@ export async function fillAddressFromLocation(lat: number, lng: number, currentS
         return null;
     }
 
-    let street = currentStreet;
-    const found = data.street?.trim();
-    if (found && found !== currentStreet.trim()) {
-        if (!currentStreet.trim() || window.confirm(`Replace your street with '${found}'?`)) street = found;
-    }
+    return { city: data.city, barangay: data.barangay, street: data.street?.trim() || null, approximate: data.matched_by === 'nearest' };
+}
 
-    toast.success(`Address filled from your location — please check it.${data.matched_by === 'nearest' ? ' (approximate)' : ''}`);
-    return { city: data.city, barangay: data.barangay, street };
+/** Straight-line distance in metres. */
+export function distanceM(aLat: number, aLng: number, bLat: number, bLng: number): number {
+    const r = (d: number) => (d * Math.PI) / 180;
+    const h = Math.sin(r(bLat - aLat) / 2) ** 2 + Math.cos(r(aLat)) * Math.cos(r(bLat)) * Math.sin(r(bLng - aLng) / 2) ** 2;
+    return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }

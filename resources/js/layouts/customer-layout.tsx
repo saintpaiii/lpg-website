@@ -57,6 +57,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useFlashToast } from '@/hooks/use-flash-toast';
+import { badgeProps, useSidebarBadges } from '@/hooks/use-sidebar-badges';
 import type { NavItem, SharedData } from '@/types';
 import { Toaster } from 'sonner';
 
@@ -102,6 +103,8 @@ export default function CustomerLayout({ children, title }: Props) {
     }
 
     const unreadMessages = useUnreadMessages('customer');
+    // "New since your last visit" per section (SidebarBadgeService)
+    const sb = useSidebarBadges();
 
     // ── Sidebar nav items ───────────────────────────────────────────────────
     const verifyNavItem: NavItem = {
@@ -116,12 +119,12 @@ export default function CustomerLayout({ children, title }: Props) {
         ...(shopLocked ? [verifyNavItem] : []),
         { title: 'Browse',      href: '/customer/products',       icon: ShoppingBag, ...lockProps },
         { title: 'Find a Store', href: '/customer/find-store',    icon: Navigation,  ...lockProps },
-        { title: 'My Orders',   href: '/customer/orders',         icon: Package     },
+        { title: 'My Orders',   href: '/customer/orders',         icon: Package, ...badgeProps(sb['customer.orders']) },
         { title: 'Messages',    href: '/customer/messages',       icon: MessageSquare,
           ...(unreadMessages > 0 ? { badge: unreadMessages > 99 ? '99+' : String(unreadMessages), badgeTone: 'unread' as const } : {}) },
         { title: 'My Loyalty',  href: '/customer/loyalty',        icon: Star        },
-        { title: 'My Invoices', href: '/customer/invoices',       icon: Receipt     },
-        { title: 'My Refunds',  href: '/customer/refunds',        icon: RotateCcw   },
+        { title: 'My Invoices', href: '/customer/invoices',       icon: Receipt, ...badgeProps(sb['customer.invoices']) },
+        { title: 'My Refunds',  href: '/customer/refunds',        icon: RotateCcw, ...badgeProps(sb['customer.refunds']) },
         { title: 'My Reports',  href: '/customer/reports',        icon: Flag        },
     ];
 
@@ -420,6 +423,11 @@ export default function CustomerLayout({ children, title }: Props) {
                                         {label === 'Messages' && unreadMessages > 0 && (
                                             <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 rounded-full bg-blue-600 px-0.5 text-white text-[9px] font-bold flex items-center justify-center">
                                                 {unreadMessages > 9 ? '9+' : unreadMessages}
+                                            </span>
+                                        )}
+                                        {label === 'Orders' && (sb['customer.orders'] ?? 0) > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 h-4 min-w-4 rounded-full bg-red-600 px-0.5 text-white text-[9px] font-bold flex items-center justify-center">
+                                                {sb['customer.orders'] > 9 ? '9+' : sb['customer.orders']}
                                             </span>
                                         )}
                                         {label === 'Cart' && cart_count > 0 && (

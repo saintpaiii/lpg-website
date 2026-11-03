@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Check, RefreshCcw, Search, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { toast } from 'sonner';
@@ -57,6 +58,8 @@ type AcceptForm = {
 };
 
 export default function SellerRefunds({ items, counts, tab, search, riders }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(items.data);
     const [searchInput, setSearchInput] = useState(search);
     const [accepting, setAccepting]     = useState<RefundItem | null>(null);
     const [rejecting, setRejecting]     = useState<RefundItem | null>(null);
@@ -167,7 +170,7 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                         >
                             {t.label}
                             {counts[t.countKey] > 0 && (
-                                <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 text-xs font-semibold ${t.key === 'pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-muted'}`}>
+                                <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 text-xs font-semibold ${t.key === 'pending' ? `bg-yellow-100 text-yellow-800 ${actionGlow(counts[t.countKey])}` : 'bg-muted'}`}>
                                     {counts[t.countKey]}
                                 </span>
                             )}
@@ -181,14 +184,16 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                     </div>
                 ) : (
                     <div className="space-y-3">
+                        <SeenNote counts={seen.counts} onClear={seen.clear} />
                         {items.data.map((r) => (
-                            <div key={r.id} className="rounded-xl border bg-card p-4 space-y-3">
+                            <div key={r.id} className={`rounded-xl border bg-card p-4 space-y-3 ${seenRowClass(seen.get(r.id))}`}>
                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <Link href={`/seller/orders/${r.order_id}`} className="font-mono font-semibold text-blue-600 hover:underline">
                                                 {r.order_number ?? '—'}
                                             </Link>
+                                            <SeenPill flags={seen.get(r.id)} />
                                             <span className="text-sm font-bold">{peso(r.amount)}</span>
                                             <span className="text-xs text-muted-foreground">of {peso(r.order_total)}</span>
                                         </div>

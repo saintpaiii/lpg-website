@@ -1,4 +1,5 @@
 import { useLiveReload, type OrderEvent } from '@/lib/echo';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { CheckCircle, Eye, FileDown, Loader2, MapPinOff, Package, Search, ShoppingCart, Truck, XCircle } from 'lucide-react';
@@ -27,6 +28,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type Order = {
     id: number;
+    seen?: SeenFlags;
     order_number: string;
     status: string;
     /** Failed delivery waiting for a new rider */
@@ -61,6 +63,7 @@ type Props = {
     tab:     string;
     filters: { status?: string; search?: string; date_from?: string; date_to?: string; balance?: string };
     riders:  Rider[];
+    since?:  string | null;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -88,6 +91,8 @@ type ActionDialog =
     | null;
 
 export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(orders.data);
     // Live: new orders and status changes for this store
     const storeId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
     useLiveReload(storeId ? `store.${storeId}` : null, ['orders', 'counts'], () => true, (e, kind) => {
@@ -203,7 +208,8 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
     ];
 
     const ACTIVE_STATUS_COUNTS = [
-        { label: 'Pending',          value: counts.pending,          color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+        // Pending = waiting for this store to confirm → glows while > 0
+        { label: 'Pending',          value: counts.pending,          color: `text-yellow-700 bg-yellow-50 border-yellow-200 ${actionGlow(counts.pending)}` },
         { label: 'Confirmed',        value: counts.confirmed,        color: 'text-blue-700 bg-blue-50 border-blue-200'       },
         { label: 'Preparing',        value: counts.preparing,        color: 'text-purple-700 bg-purple-50 border-purple-200' },
         { label: 'Out for Delivery', value: counts.out_for_delivery, color: 'text-orange-700 bg-orange-50 border-orange-200' },
@@ -297,6 +303,8 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                     {(dateFrom || dateTo) && <Button size="sm" variant="ghost" onClick={clearDates}>Clear</Button>}
                 </div>
 
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
+
                 {/* Table */}
                 <Card>
                     <CardContent className="p-0">
@@ -325,7 +333,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                     {orders.data.length === 0 ? (
                                         <tr><td colSpan={tab === 'active' ? 8 : 7} className="text-center py-12 text-muted-foreground">No orders found.</td></tr>
                                     ) : orders.data.map((o) => (
-                                        <tr key={o.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${selected.includes(o.id) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}`}>
+                                        <tr key={o.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${selected.includes(o.id) ? 'bg-blue-50/60 dark:bg-blue-950/20' : seenRowClass(seen.get(o.id))}`}>
                                             {tab === 'active' && (
                                                 <td className="w-10 pl-4 py-3">
                                                     {isDispatchable(o) && (o.has_coordinates ? (
@@ -340,7 +348,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                 </td>
                                             )}
                                             <td className="px-4 py-3">
-                                                <p className="font-mono text-xs text-blue-600 font-medium">{o.order_number}</p>
+                                                <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-blue-600 font-medium">{o.order_number}<SeenPill flags={seen.get(o.id)} className="font-sans" /></p>
                                                 <p className="text-xs text-muted-foreground capitalize">{o.transaction_type.replace('_', ' ')}</p>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{o.customer?.name ?? '—'}</td>

@@ -44,8 +44,10 @@ class StoreController extends Controller
         ];
 
         return Inertia::render('admin/stores', [
+            'since'  => \App\Services\SectionVisitService::sinceIso($request),
             'stores' => $stores->paginate(20)->withQueryString()->through(fn ($s) => [
                 'id'             => $s->id,
+                'seen'           => \App\Services\SectionVisitService::flagsFor($request, $s, newOnly: true),
                 'store_name'     => $s->store_name,
                 'city'           => $s->city,
                 'province'       => $s->province,

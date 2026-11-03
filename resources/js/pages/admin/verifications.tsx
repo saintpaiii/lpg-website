@@ -1,4 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import { BadgeCheck, CheckCircle2, ExternalLink, Eye, FileText, Search, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -38,6 +39,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type VerificationRow = {
     id: number;
+    seen?: SeenFlags;
     type: string;
     status: string;
     rejection_reason: string | null;
@@ -91,6 +93,7 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    since?: string | null;
 };
 
 const TABS = [
@@ -127,6 +130,8 @@ function InfoLine({ label, children }: { label: string; children: React.ReactNod
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Verifications({ verifications, counts, tab, search }: Props) {
+    // New / updated submissions since the last visit (until the admin leaves the page)
+    const seen = useSeenRows(verifications.data);
     const [searchVal, setSearchVal]         = useState(search);
     const [detailTarget, setDetailTarget]   = useState<VerificationRow | null>(null);
     const [rejectMode, setRejectMode]       = useState(false);
@@ -215,13 +220,15 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                             {counts[count_key] > 0 && (
                                 <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                                     tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
-                                }`}>
+                                } ${key === 'pending' ? actionGlow(counts.pending) : ''}`}>
                                     {counts[count_key]}
                                 </span>
                             )}
                         </button>
                     ))}
                 </div>
+
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
 
                 {/* Table */}
                 <Card>
@@ -245,9 +252,9 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                             </td>
                                         </tr>
                                     ) : verifications.data.map((row) => (
-                                        <tr key={row.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                                        <tr key={row.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${seenRowClass(seen.get(row.id))}`}>
                                             <td className="px-4 py-3">
-                                                <p className="font-medium">{row.user_name}</p>
+                                                <p className="flex flex-wrap items-center gap-1.5 font-medium">{row.user_name}<SeenPill flags={seen.get(row.id)} /></p>
                                                 <p className="text-xs text-muted-foreground">{row.user_email}</p>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">

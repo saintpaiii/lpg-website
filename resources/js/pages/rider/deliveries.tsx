@@ -1,4 +1,5 @@
 import ReportCustomerButton from '@/components/reports/report-customer-button';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import { useLiveReload } from '@/lib/echo';
 import MessageButton from '@/components/chat/message-button';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -51,6 +52,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { NotePicker } from '@/components/reason-picker';
+import { deliveryNoteContext } from '@/data/reason-catalog';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -101,6 +103,7 @@ type OrderRef = {
 
 type DeliveryRow = {
     id: number;
+    seen?: SeenFlags;
     status: DeliveryStatus;
     store_name: string | null;
     /** Rider may report the customer (active, or finished within 7 days) — decided by the server */
@@ -135,6 +138,7 @@ type Props = {
     tab: string;
     counts: Counts;
     filters: { tab?: string };
+    since?: string | null;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -487,7 +491,7 @@ function UpdateStatusDialog({
                         <div className="grid gap-1.5">
                             <Label>Notes (optional)</Label>
                             <NotePicker
-                                context="delivery_note"
+                                context={deliveryNoteContext(targetStatus)}
                                 value={data.notes}
                                 onChange={(v) => setData('notes', v)}
                                 rows={2}
@@ -880,6 +884,8 @@ function RouteMapView({ route, onUpdateStatus, statusDisabled, onMessage }: {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function RiderDeliveries({ deliveries, tab, counts, filters, route }: Props & { route: RouteData }) {
+    // New assignments / store changes since the last visit (until the rider leaves the page)
+    const seen = useSeenRows(deliveries.data);
     // Live: my deliveries (assigned / reassigned / status) refresh the list, counters and map pins
     const riderId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${riderId}`, ['deliveries', 'counts', 'route'], (_e, kind) => kind === 'delivery');
@@ -970,7 +976,8 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                 {/* Summary cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
+                    {/* Assigned = waiting for the rider to pick up → glows while > 0 */}
+                    <Card className={actionGlow(counts.assigned)}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Assigned</CardTitle>
                             <Truck className="h-4 w-4 text-blue-500" />
@@ -1064,6 +1071,8 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 </div>
 
                 {/* Deliveries list */}
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
+
                 {deliveries.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
@@ -1084,7 +1093,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                         {deliveries.data.map((d) => (
                             <Card key={d.id} className="overflow-hidden">
                                 <div
-                                    className="flex cursor-pointer items-start gap-3 p-4 hover:bg-gray-50/60"
+                                    className={`flex cursor-pointer items-start gap-3 p-4 hover:bg-gray-50/60 ${seenRowClass(seen.get(d.id))}`}
                                     onClick={() => setExpanded(expanded === d.id ? null : d.id)}
                                 >
                                     {/* Status icon */}
@@ -1107,6 +1116,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                             <span className="font-mono text-sm font-semibold text-blue-600">
                                                 {d.order?.order_number ?? '—'}
                                             </span>
+                                            <SeenPill flags={seen.get(d.id)} />
                                             <StatusBadge status={d.status} />
                                         </div>
                                         <p className="mt-0.5 font-medium text-gray-900">

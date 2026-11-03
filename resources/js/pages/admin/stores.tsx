@@ -1,4 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { AlertTriangle, Building2, CheckCircle2, Eye, MoreHorizontal, PauseCircle, Search, Store, Trash2, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -84,6 +85,8 @@ const TABS = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Stores({ stores, counts, tab, search }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(stores.data);
     const [searchVal, setSearchVal] = useState(search);
     const [rejectTarget, setRejectTarget]   = useState<StoreRow | null>(null);
     const [destroyTarget, setDestroyTarget] = useState<StoreRow | null>(null);
@@ -191,13 +194,15 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                             {counts[count_key] > 0 && (
                                 <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
                                     tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
-                                }`}>
+                                } ${key === 'pending' ? actionGlow(counts[count_key]) : ''}`}>
                                     {counts[count_key]}
                                 </span>
                             )}
                         </button>
                     ))}
                 </div>
+
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
 
                 {/* Table */}
                 <Card>
@@ -223,7 +228,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                             </td>
                                         </tr>
                                     ) : stores.data.map((store) => (
-                                        <tr key={store.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                                        <tr key={store.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${seenRowClass(seen.get(store.id))}`}>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/30 shrink-0">
@@ -233,6 +238,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                                         <Link href={`/admin/stores/${store.id}`} className="font-semibold text-gray-900 dark:text-white hover:text-blue-600">
                                                             {store.store_name}
                                                         </Link>
+                                                        <SeenPill flags={seen.get(store.id)} className="ml-1.5" />
                                                     </div>
                                                 </div>
                                             </td>

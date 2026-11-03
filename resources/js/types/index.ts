@@ -48,6 +48,8 @@ export type SharedData = {
     reportCategories?: Record<string, import('@/components/reports/types').ReportCategory>;
     /** Reports waiting on this user's store / on the admin */
     reportBadges?: { store: number; admin: number };
+    /** Per-menu-item "needs action" counts (-1 = "!") — SidebarBadgeService */
+    sidebarBadges?: Record<string, number>;
     /** "Report a website problem" catalog */
     systemReportCategories?: Record<string, import('@/components/reports/types').SystemCategory>;
     systemReportAreas?: Record<string, string[]>;

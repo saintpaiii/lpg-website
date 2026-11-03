@@ -1,4 +1,5 @@
 import { statusLabel, useLiveReload } from '@/lib/echo';
+import { SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import axios from 'axios';
@@ -21,6 +22,7 @@ import { ReasonPicker } from '@/components/reason-picker';
 
 type Order = {
     id: number;
+    seen?: SeenFlags;
     order_number: string;
     store_name: string;
     status: string;
@@ -53,6 +55,7 @@ type Props = {
     date_from: string;
     date_to: string;
     status: string;
+    since?: string | null;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -89,6 +92,8 @@ const STATUS_TABS = [
 ] as const;
 
 export default function Orders({ orders, date_from, date_to, status }: Props) {
+    // Orders the store changed since the last visit (until the customer leaves the page)
+    const seen = useSeenRows(orders.data);
     // Live: any of my orders changing refreshes the list
     const meId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${meId}`, ['orders'], () => true, (e, kind) => {
@@ -243,6 +248,8 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                     </div>
                 </div>
 
+                <SeenNote counts={seen.counts} onClear={seen.clear} />
+
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-base">
@@ -277,7 +284,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                         {orders.data.map((order, i) => (
-                                            <tr key={order.id} className={`transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10 ${i % 2 === 1 ? 'bg-gray-50/50 dark:bg-gray-800/20' : ''}`}>
+                                            <tr key={order.id} className={`transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10 ${seenRowClass(seen.get(order.id)) || (i % 2 === 1 ? 'bg-gray-50/50 dark:bg-gray-800/20' : '')}`}>
                                                 <td className="px-4 py-3">
                                                     <Link
                                                         href={`/customer/orders/${order.id}`}
@@ -285,6 +292,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     >
                                                         {order.order_number}
                                                     </Link>
+                                                    <SeenPill flags={seen.get(order.id)} className="ml-1.5" />
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-gray-700 font-medium">{order.store_name}</td>
                                                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(order.created_at)}</td>

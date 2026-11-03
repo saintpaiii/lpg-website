@@ -89,6 +89,7 @@ Route::middleware(['auth', 'verified', 'customer'])
         // Identity verification
         Route::get('id-verification',  [IdVerificationController::class, 'create'])->name('id-verification');
         Route::post('id-verification', [IdVerificationController::class, 'store'])->name('id-verification.store');
+        Route::post('id-verification/details', [IdVerificationController::class, 'details'])->name('id-verification.details');
 
         // Loyalty status per store
         Route::get('loyalty', [\App\Http\Controllers\LoyaltyController::class, 'getMyLoyalty'])->middleware('id.verified:history')->name('loyalty');

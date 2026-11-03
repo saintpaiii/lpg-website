@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { caviteCities, getBarangays } from '@/data/cavite-locations';
+import { AutoFillBusy, AutoFillNote, type AutoFillAddress } from '@/hooks/use-auto-fill-address';
 
 interface AddressFieldsProps {
     /** Street / house number / building */
@@ -19,6 +20,8 @@ interface AddressFieldsProps {
     /** Whether to render in a two-column grid for city+barangay */
     compact?: boolean;
     disabled?: boolean;
+    /** Map pin auto-fill (useAutoFillAddress): "Finding address…" and the short "filled from your location" note */
+    autoFill?: AutoFillAddress | null;
 }
 
 const SELECT_CLS =
@@ -39,6 +42,7 @@ export function AddressFields({
     requiredBarangay = false,
     compact = false,
     disabled = false,
+    autoFill = null,
 }: AddressFieldsProps) {
     const addrKey  = errorKeys.address  ?? 'address';
     const cityKey  = errorKeys.city     ?? 'city';
@@ -65,17 +69,19 @@ export function AddressFields({
         <div className="grid gap-4">
             {/* Street address — full width */}
             <div className="grid gap-1.5">
-                <Label htmlFor="addr-street" className="text-sm font-medium">
-                    Street Address <span className="text-red-500">*</span>
+                <Label htmlFor="addr-street" className="flex items-center gap-2 text-sm font-medium">
+                    <span>Street Address <span className="text-red-500">*</span></span>
+                    <AutoFillBusy auto={autoFill} />
                 </Label>
                 <Input
                     id="addr-street"
                     value={address}
-                    onChange={(e) => onAddressChange(e.target.value)}
+                    onChange={(e) => { autoFill?.dismissNote(); onAddressChange(e.target.value); }}
                     placeholder="e.g. 123 Rizal Street"
                     disabled={disabled}
                     className="h-11"
                 />
+                <AutoFillNote auto={autoFill} />
                 {errors[addrKey] && (
                     <p className="text-xs text-red-500">{errors[addrKey]}</p>
                 )}
@@ -91,7 +97,7 @@ export function AddressFields({
                     <select
                         id="addr-city"
                         value={city}
-                        onChange={(e) => handleCityChange(e.target.value)}
+                        onChange={(e) => { autoFill?.dismissNote(); handleCityChange(e.target.value); }}
                         disabled={disabled}
                         className={SELECT_CLS}
                     >
@@ -115,7 +121,7 @@ export function AddressFields({
                     <select
                         id="addr-barangay"
                         value={barangay}
-                        onChange={(e) => onBarangayChange(e.target.value)}
+                        onChange={(e) => { autoFill?.dismissNote(); onBarangayChange(e.target.value); }}
                         disabled={disabled || !city}
                         className={SELECT_CLS}
                     >

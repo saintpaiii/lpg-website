@@ -46,7 +46,9 @@ class RefundController extends Controller
         return Inertia::render('admin/refunds', [
             'items'  => $query->paginate(20)->withQueryString()->through(fn (RefundRequest $r) => SellerRefundController::format($r) + [
                 'customer_email' => $r->customer?->user?->email,
+                'seen'           => \App\Services\SectionVisitService::flagsFor($request, $r, 'escalated_at'),
             ]),
+            'since'  => \App\Services\SectionVisitService::sinceIso($request),
             'counts' => $counts,
             'tab'    => $tab,
             'search' => $search,

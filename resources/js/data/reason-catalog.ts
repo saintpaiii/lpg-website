@@ -38,13 +38,26 @@ export type ReasonContext =
 export type NoteContext =
     | 'delivery_instructions'
     | 'delivery_note'
+    | 'delivery_note_picked_up'
+    | 'delivery_note_in_transit'
+    | 'delivery_note_delivered'
     | 'review'
     | 'report_reply'
     | 'report_safety_note'
     | 'refund_seller_notes'
     | 'stock_note';
 
-const OTHER: ReasonOption = { value: 'Other', label: 'Other', details: [] };
+/** Note list that matches the delivery status being set (Failed uses Reason ▸ Details instead). */
+export function deliveryNoteContext(status: string | null | undefined): NoteContext {
+    switch (status) {
+        case 'picked_up':  return 'delivery_note_picked_up';
+        case 'in_transit': return 'delivery_note_in_transit';
+        case 'delivered':  return 'delivery_note_delivered';
+        default:           return 'delivery_note';
+    }
+}
+
+const OTHER: ReasonOption ={ value: 'Other', label: 'Other', details: [] };
 
 /** Options whose value is the label the server already stores */
 const byLabel = (rows: [label: string, details: string[]][]): ReasonOption[] =>
@@ -199,11 +212,23 @@ export const NOTE_CATALOG: Record<NoteContext, { group: string; items: string[] 
         { group: 'Timing',   items: ['Deliver in the morning', 'Deliver in the afternoon'] },
         { group: 'Tank',     items: ['Please exchange my empty tank (same size)'] },
     ],
-    // Rider / admin / seller status notes when NOT failed
+    // Rider / admin / seller status notes when NOT failed — one list per target status (deliveryNoteContext)
+    delivery_note_picked_up: [
+        { group: 'Pickup',       items: ['Picked up from the store', 'Empty tank loaded for exchange'] },
+        { group: 'Safety check', items: ['Tank checked — no leaks', 'Seal is intact'] },
+    ],
+    delivery_note_in_transit: [
+        { group: 'On the way', items: ['On the way to the customer', 'Arriving in about 15 minutes'] },
+        { group: 'Delay',      items: ['Running late — heavy traffic', 'Customer informed of the delay'] },
+    ],
+    delivery_note_delivered: [
+        { group: 'Handover', items: ['Delivered to the customer', 'Received by a family member', 'Left with the guard'] },
+        { group: 'Payment',  items: ['Customer paid in cash', 'Already paid online'] },
+        { group: 'Tank',     items: ['Empty tank collected', 'No empty tank to collect'] },
+    ],
+    // Back to "Assigned" (seller / admin correcting a status)
     delivery_note: [
-        { group: 'Delivered', items: ['Delivered to the customer', 'Received by a family member', 'Left with the guard'] },
-        { group: 'Payment',   items: ['Customer paid in cash'] },
-        { group: 'Tank',      items: ['Empty tank collected'] },
+        { group: 'Assignment', items: ['Reassigned to this rider', 'Waiting for the order to be prepared'] },
     ],
     review: [
         { group: 'Good',            items: ['Fast delivery', 'Tank in good condition', 'Friendly rider', 'Good price'] },

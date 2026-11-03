@@ -1,4 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
+import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import InputError from '@/components/input-error';
@@ -37,6 +38,8 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date }: Props) {
+    // New / updated since the last visit (until the user leaves the page)
+    const seen = useSeenRows(pending);
     const [tab, setTab] = useState<Tab>(initialTab);
     const [approving, setApproving] = useState<Pending | null>(null);
     const [rejecting, setRejecting] = useState<Pending | null>(null);
@@ -92,10 +95,11 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                         <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">Nothing is waiting for review.</p>
                     ) : (
                         <ul className="space-y-2">
+                            <SeenNote counts={seen.counts} onClear={seen.clear} />
                             {pending.map((p) => (
-                                <li key={p.id} className="flex flex-col gap-3 rounded-lg border bg-white px-4 py-3 sm:flex-row sm:items-center dark:bg-gray-950">
+                                <li key={p.id} className={`flex flex-col gap-3 rounded-lg border bg-white px-4 py-3 sm:flex-row sm:items-center dark:bg-gray-950 ${seenRowClass(seen.get(p.id))}`}>
                                     <div className="min-w-0 flex-1 space-y-0.5 text-sm">
-                                        <p className="font-semibold">{p.label}{p.is_other && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(extra document)</span>}</p>
+                                        <p className="font-semibold"><SeenPill flags={seen.get(p.id)} className="mr-1.5" />{p.label}{p.is_other && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(extra document)</span>}</p>
                                         <p>
                                             <Link href={`/admin/stores/${p.store_id}`} className="text-blue-600 hover:underline">{p.store_name}</Link>
                                             <span className="text-muted-foreground"> · submitted {p.submitted_on}{p.submitted_by ? ` by ${p.submitted_by}` : ''}</span>

@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
 import LocationAddressTools from '@/components/location-address-tools';
+import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import AddressSearchBox, { matchBarangay, matchCity, shortPlaceName, type GeocodeResult } from '@/components/address-search-box';
 import { labelIcon, type SavedAddress } from '@/components/address-search-map';
 import {
@@ -40,12 +41,19 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
     const [note, setNote]         = useState<string | null>(null);
 
     const form = useForm<FormData>(blank);
+    // Moving the pin fills city / barangay (and the street when it wasn't typed) — one update, pin stays put
+    const autoFill = useAutoFillAddress({
+        street: form.data.address_line,
+        apply: (a) => { setNote(null); form.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address_line: a.street })); },
+    });
 
     function openNew() {
         setEditing(null);
         form.clearErrors();
         form.setData({ ...blank, label: addresses.some((a) => a.label === 'Home') ? 'Office' : 'Home', is_default: addresses.length === 0 });
         setNote(null);
+        autoFill.setPinned(false);
+        autoFill.dismissNote();
         setOpen(true);
     }
 
@@ -57,10 +65,13 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
             latitude: a.latitude, longitude: a.longitude, is_default: a.is_default,
         });
         setNote(null);
+        autoFill.setPinned(a.latitude != null);
+        autoFill.dismissNote();
         setOpen(true);
     }
 
     function pickSearchResult(r: GeocodeResult) {
+        autoFill.setPinned(true);
         const city = matchCity(r.city) ?? form.data.city;
         const barangay = matchBarangay(city, r.barangay) ?? '';
         form.setData((d) => ({
@@ -73,9 +84,10 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
 
     /** City/barangay picked from the dropdowns → pin at that barangay (then drag to the exact spot). */
     async function pinFromBarangay(city: string, barangay: string) {
-        if (!city || !barangay) return;
+        // Only an unplaced pin follows the barangay — a pin the user put down stays exactly there
+        if (!city || !barangay || autoFill.isPinned()) return;
         const geo = await lookupBarangay(city, barangay);
-        if (geo && geo.precision !== 'none') {
+        if (geo && geo.precision !== 'none' && !autoFill.isPinned()) {
             form.setData((d) => ({ ...d, latitude: geo.latitude, longitude: geo.longitude }));
             setNote(geo.found ? null : geo.message ?? null);
         }
@@ -186,22 +198,20 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                             errors={form.errors as Record<string, string>}
                             errorKeys={{ address: 'address_line' }}
                             compact
+                            autoFill={autoFill}
                         />
                         {note && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">{note}</p>}
 
                         <AddressMap
                             latitude={form.data.latitude}
                             longitude={form.data.longitude}
-                            onLocationChange={(lat, lng) => form.setData((d) => ({ ...d, latitude: lat, longitude: lng }))}
+                            onLocationChange={(lat, lng) => { form.setData((d) => ({ ...d, latitude: lat, longitude: lng })); autoFill.onPinMoved(lat, lng); }}
                             height="240px"
                             clickMoves
                         />
                         <LocationAddressTools
-                            latitude={form.data.latitude}
-                            longitude={form.data.longitude}
-                            street={form.data.address_line}
                             onPin={(lat, lng) => form.setData((d) => ({ ...d, latitude: lat, longitude: lng }))}
-                            onAddress={(a) => { setNote(null); form.setData((d) => ({ ...d, city: a.city, barangay: a.barangay, address_line: a.street })); }}
+                            autoFill={autoFill}
                         />
                         {(form.errors.latitude || form.errors.longitude) && <p className="text-xs text-red-500">{form.errors.latitude ?? form.errors.longitude}</p>}
 

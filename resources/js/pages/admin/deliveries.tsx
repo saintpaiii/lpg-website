@@ -53,6 +53,7 @@ import { formatAddress } from '@/data/cavite-locations';
 import DeliveryFailFields, { emptyFailValues, failValuesComplete } from '@/components/delivery-fail-fields';
 import type { FailOptions, FailValues } from '@/components/delivery-fail-fields';
 import { NotePicker } from '@/components/reason-picker';
+import { deliveryNoteContext } from '@/data/reason-catalog';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -444,7 +445,7 @@ function UpdateStatusDialog({
                             errors={errors}
                         />
                     ) : (
-                        <NotePicker context="delivery_note" label="Notes" value={data.notes} onChange={(v) => setData('notes', v)}
+                        <NotePicker context={deliveryNoteContext(targetStatus)} label="Notes" value={data.notes} onChange={(v) => setData('notes', v)}
                             maxLength={500} error={errors.notes} />
                     )}
 

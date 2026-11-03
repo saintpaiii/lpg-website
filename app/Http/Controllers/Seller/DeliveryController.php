@@ -46,6 +46,7 @@ class DeliveryController extends Controller
             ->latest()->paginate(20)->withQueryString()
             ->through(fn ($d) => [
                 'id'           => $d->id,
+                'seen'         => \App\Services\SectionVisitService::flagsFor($request, $d),
                 'status'       => $d->status,
                 'assigned_at'  => $d->assigned_at?->format('M d, Y g:i A'),
                 'delivered_at' => $d->delivered_at?->format('M d, Y g:i A'),
@@ -126,6 +127,7 @@ class DeliveryController extends Controller
         ];
 
         return Inertia::render('seller/deliveries', [
+            'since'      => \App\Services\SectionVisitService::sinceIso($request),
             'deliveries' => $deliveries,
             'riders'     => $riders,
             'vehicles'   => $vehicles,

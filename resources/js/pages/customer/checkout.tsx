@@ -5,8 +5,8 @@ import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
 import AddressSearchMap, { locationFromSaved, type ChangeReason, type DeliveryLocation, type SavedAddress } from '@/components/address-search-map';
-import { ACCURATE_ENOUGH_M, fetchRoute, fillAddressFromLocation, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon, type FilledAddress } from '@/lib/map';
-import LocationAddressTools from '@/components/location-address-tools';
+import { ACCURATE_ENOUGH_M, fetchRoute, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon, type FilledAddress } from '@/lib/map';
+import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import LocationAccuracyNotice from '@/components/location-accuracy-notice';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -217,7 +217,11 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
     function handleDeliveryChange(next: DeliveryLocation, reason: ChangeReason) {
         setGpsRoughM(null);
         setDelivery(next);
-        if (reason === 'pin') { setPinIsAuto(false); return; }
+        if (reason === 'pin') {
+            setPinIsAuto(false);
+            if (next.lat != null && next.lng != null) autoFill.onPinMoved(next.lat, next.lng);
+            return;
+        }
         if (next.lat != null && next.lng != null) setAnchor({ lat: next.lat, lng: next.lng });
     }
     const handlePinChange = useCallback((lat: number, lng: number) => {
@@ -229,10 +233,18 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
 
     // Address found for a point: becomes a new delivery address (city + barangay + street in one update,
     // pin left where it is) and that point is now "my address" for the drift reminder.
-    function applyFoundAddress(a: FilledAddress, at: { lat: number; lng: number }) {
+    function applyFoundAddress(a: FilledAddress, at: { lat: number; lng: number } | null) {
         setDelivery((d) => ({ ...d, addressId: null, city: a.city, barangay: a.barangay, line: a.street }));
-        setAnchor(at);
+        if (at) setAnchor(at);
     }
+    const pinRef = useRef(pin);
+    pinRef.current = pin;
+    // Moving the pin of a NEW address fills it (a saved address keeps its text; the drift reminder covers it)
+    const autoFill = useAutoFillAddress({
+        street: delivery.line,
+        apply: (a) => applyFoundAddress(a, pinRef.current),
+        enabled: delivery.addressId === null,
+    });
 
     // How far the pin has drifted from the chosen address — only a reminder, never blocks the order
     const pinDriftKm = pin && anchor ? haversineKm(anchor.lat, anchor.lng, pin.lat, pin.lng) : null;
@@ -281,7 +293,7 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
             const lng = +loc.lng.toFixed(7);
             handlePinChange(lat, lng);
             setGpsRoughM(loc.accuracy_m > ACCURATE_ENOUGH_M ? loc.accuracy_m : null);
-            fillAddressFromLocation(lat, lng, delivery.line).then((a) => a && applyFoundAddress(a, { lat, lng }));
+            autoFill.fillNow(lat, lng);
         }).catch(() => {
             toast.error('Could not get location. Please click on the map.');
         }).finally(() => setGpsLoading(false));
@@ -491,6 +503,7 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                                 onSaved={(list) => setAddresses(list)}
                                 height="300px"
                                 fitTo={stores.filter((sg) => sg.store_lat && sg.store_lng).map((sg) => [sg.store_lat!, sg.store_lng!] as [number, number])}
+                                autoFill={autoFill}
                             >
                                 {/* Store pins */}
                                 {stores.filter((sg) => sg.store_lat && sg.store_lng).map((sg) => (
@@ -501,14 +514,6 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                                     <Polyline positions={osrmRoute.coords} pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.75 }} />
                                 )}
                             </AddressSearchMap>
-                            <div className="pt-2">
-                                <LocationAddressTools
-                                    latitude={delivery.lat}
-                                    longitude={delivery.lng}
-                                    street={delivery.line}
-                                    onAddress={(a) => pin && applyFoundAddress(a, pin)}
-                                />
-                            </div>
                         </CardContent>
                         <CardContent className="p-0">
                             {/* Distance & fee info per store */}

@@ -130,7 +130,7 @@ class DeliveryController extends Controller
             ->latest()
             ->paginate(20)
             ->withQueryString()
-            ->through(fn ($d) => $this->formatDelivery($d));
+            ->through(fn ($d) => $this->formatDelivery($d) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $d)]);
 
         // Summary counts
         $counts = Delivery::where('rider_id', $user->id)
@@ -144,6 +144,7 @@ class DeliveryController extends Controller
 
         return Inertia::render('rider/deliveries', [
             'deliveries'  => $deliveries,
+            'since'       => \App\Services\SectionVisitService::sinceIso($request),
             'tab'         => $tab,
             'counts'      => [
                 'assigned'        => (int) ($counts->assigned_count ?? 0),

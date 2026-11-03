@@ -31,7 +31,7 @@ class RefundController extends Controller
                 ->where('customer_id', $customer->id)
                 ->latest()
                 ->paginate(20)
-                ->through(fn (RefundRequest $r) => SellerRefundController::format($r))
+                ->through(fn (RefundRequest $r) => SellerRefundController::format($r) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $r)])
             : collect([]);
 
         $coupons = $customer
@@ -49,6 +49,7 @@ class RefundController extends Controller
             : [];
 
         return Inertia::render('customer/refunds', [
+            'since'   => \App\Services\SectionVisitService::sinceIso($request),
             'refunds' => $refunds,
             'coupons' => $coupons,
         ]);

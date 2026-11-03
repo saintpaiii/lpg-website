@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import StorePinPicker from '@/components/store-pin-picker';
+import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { lookupBarangay } from '@/components/address-map';
 import { isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type ExpiringDoc } from '@/components/seller-application-fields';
 
@@ -155,6 +156,15 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         doe_lpg_license_expires_at: previous_store?.doe_lpg_license_expires_at ?? '',
         lto_permit_expires_at:      previous_store?.lto_permit_expires_at ?? '',
         terms_agreed:    false,
+    });
+
+    // Moving the store pin fills city / barangay (and the street when it wasn't typed) — one update, pin stays put
+    const autoFill = useAutoFillAddress({
+        street: data.store_address,
+        apply: (a) => {
+            setData((d) => ({ ...d, store_city: a.city, store_barangay: a.barangay, store_address: a.street }));
+            setStep1Errors((e) => ({ ...e, store_city: '', store_barangay: '', store_address: a.street ? '' : e.store_address }));
+        },
     });
 
     const idRef             = useRef<HTMLInputElement>(null);
@@ -375,6 +385,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                             errors={errors}
                                             errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
                                             requiredBarangay
+                                            autoFill={autoFill}
                                         />
                                         {step1Errors.store_address && <p className="mt-1 text-xs text-red-600">{step1Errors.store_address}</p>}
                                         {step1Errors.store_city && <p className="mt-1 text-xs text-red-600">{step1Errors.store_city}</p>}
@@ -382,11 +393,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         <div className="mt-4">
                                             <StorePinPicker latitude={data.latitude} longitude={data.longitude}
                                                 onChange={(lat, lng) => { setData((d) => ({ ...d, latitude: lat, longitude: lng })); setStep1Errors((e) => ({ ...e, latitude: '' })); }}
-                                                street={data.store_address}
-                                                onAddressFound={(a) => {
-                                                    setData((d) => ({ ...d, store_city: a.city, store_barangay: a.barangay, store_address: a.street }));
-                                                    setStep1Errors((e) => ({ ...e, store_city: '', store_barangay: '', store_address: a.street ? '' : e.store_address }));
-                                                }}
+                                                autoFill={autoFill}
                                                 error={errors.latitude || errors.longitude || step1Errors.latitude} />
                                         </div>
                                     </CardContent>
