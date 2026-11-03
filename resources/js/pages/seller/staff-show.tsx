@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { BreadcrumbItem } from '@/types';
+import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
+import { toast } from 'sonner';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,6 +27,9 @@ interface StaffMember {
     phone: string | null;
     sub_role: string;
     is_active: boolean;
+    paused_by_plan?: boolean;
+    /** Rider with an active delivery (can't be paused) */
+    busy?: boolean;
     created_at: string;
 }
 
@@ -46,6 +51,7 @@ interface Props {
     userOverrides: UserOverride[];
     documents: StaffDocumentRow[];
     license: { status: string; message: string } | null;
+    planLimit?: PlanLimit;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -217,7 +223,16 @@ function PermissionManager({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides, documents, license }: Props) {
+export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides, documents, license, planLimit }: Props) {
+    // Plan limit: pause this account / activate it again (the server checks the limit)
+    function togglePlanPause() {
+        if (staff.paused_by_plan && staff.is_active && planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
+        router.patch(`/seller/staff/${staff.id}/plan-pause`, {}, { preserveScroll: true });
+    }
+
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Staff', href: '/seller/staff' },
@@ -248,6 +263,7 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${staff.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                                             {staff.is_active ? 'Active' : 'Inactive'}
                                         </span>
+                                        {staff.paused_by_plan && <span className={PAUSED_BADGE}>Paused — over plan limit</span>}
                                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[staff.sub_role] ?? 'bg-gray-100 text-gray-600'}`}>
                                             {SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role}
                                         </span>
@@ -259,7 +275,15 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                                     </div>
                                 </div>
                             </div>
+                            {(staff.paused_by_plan || planLimit?.limit != null) && (
+                                <Button variant="outline" size="sm" onClick={togglePlanPause}
+                                    disabled={!staff.paused_by_plan && staff.busy}
+                                    title={!staff.paused_by_plan && staff.busy ? 'Finish or reassign their active delivery first.' : undefined}>
+                                    {staff.paused_by_plan ? 'Activate' : 'Pause (plan limit)'}
+                                </Button>
+                            )}
                         </div>
+                        <PlanLimitBar label="Staff accounts" planLimit={planLimit} className="mt-4" />
                     </CardContent>
                 </Card>
 

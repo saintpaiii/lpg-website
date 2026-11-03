@@ -28,6 +28,13 @@ class EnsureIsSeller
                 ->with('deactivation_info', ['reason' => $reason, 'notes' => $notes]);
         }
 
+        if ($user->paused_by_plan) {
+            auth()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('login')->withErrors(['email' => \App\Models\User::PAUSED_BY_PLAN_MESSAGE]);
+        }
+
         $isSeller      = $user->role === 'seller';
         $isSellerStaff = $user->role === 'seller_staff' && $user->sub_role !== 'rider';
 

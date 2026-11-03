@@ -1,4 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
+import { PlansDialogLink } from '@/components/plans-dialog-link';
+import type { PlanCatalog } from '@/types/plans';
 import axios from 'axios';
 import {
     ArrowLeft, BadgeCheck, Building2, CheckSquare, FileText,
@@ -123,7 +125,7 @@ const BENEFITS = [
     { icon: Building2,   title: 'Manage Your Store',    desc: 'Full dashboard for orders, inventory, deliveries, invoices, and reports.' },
 ];
 
-export default function SellerRegister({ seller_terms, commission_rate }: { seller_terms: SellerTerms; commission_rate: number }) {
+export default function SellerRegister({ seller_terms, plan_catalog }: { seller_terms: SellerTerms; plan_catalog?: PlanCatalog | null }) {
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors]         = useState<Record<string, string>>({});
     const [step, setStep]             = useState<1 | 2 | 3>(1);
@@ -158,8 +160,8 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
 
     const [agreeTerms, setAgreeTerms]           = useState(false);
     const [agreeAuthentic, setAgreeAuthentic]   = useState(false);
-    const [agreeCommission, setAgreeCommission] = useState(false);
-    const allAgreed = agreeTerms && agreeAuthentic && agreeCommission;
+    const [agreePlan, setAgreePlan] = useState(false);
+    const allAgreed = agreeTerms && agreeAuthentic && agreePlan;
 
     function set(key: keyof typeof fields, value: string) {
         setFields((prev) => ({ ...prev, [key]: value }));
@@ -470,10 +472,10 @@ export default function SellerRegister({ seller_terms, commission_rate }: { sell
                                         <AgreementCheckbox checked={agreeAuthentic} onChange={setAgreeAuthentic} id="reg_agree_authentic">
                                             I confirm that all uploaded documents are authentic and valid
                                         </AgreementCheckbox>
-                                        <AgreementCheckbox checked={agreeCommission} onChange={setAgreeCommission} id="reg_agree_commission">
-                                            I understand and agree to the platform commission of{' '}
-                                            <strong>{commission_rate}% per completed order</strong>
+                                        <AgreementCheckbox checked={agreePlan} onChange={setAgreePlan} id="reg_agree_plan">
+                                            I understand that my store gets a free 30-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
                                         </AgreementCheckbox>
+                                        <PlansDialogLink catalog={plan_catalog} />
                                     </div>
 
                                     {errors.terms_agreed && (

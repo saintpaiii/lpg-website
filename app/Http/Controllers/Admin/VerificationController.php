@@ -178,6 +178,9 @@ class VerificationController extends Controller
                 'approved_at' => now(),
                 'approved_by' => $request->user()->id,
             ]);
+            // Newly approved stores get the one-time 30-day Premium trial
+            Store::where('user_id', $verification->user_id)->get()
+                ->each(fn (Store $store) => \App\Services\SubscriptionService::startTrial($store));
 
             if ($verification->user_id) {
                 NotificationService::send(

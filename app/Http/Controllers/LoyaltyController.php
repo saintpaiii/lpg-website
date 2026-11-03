@@ -240,6 +240,8 @@ class LoyaltyController extends Controller
             ->where('user_id', $request->user()->id)
             ->whereHas('store.loyaltySettings', fn ($q) => $q->where('is_enabled', true))
             ->get()
+            // Hidden while the store's plan doesn't include loyalty (kept, back after an upgrade)
+            ->filter(fn (CustomerLoyalty $l) => $l->store && \App\Services\SubscriptionService::hasFeature($l->store, 'loyalty'))
             ->map(function (CustomerLoyalty $l) {
                 $settings = $l->store->loyaltySettings;
                 $next     = $settings->nextTier($l->tier);
@@ -300,12 +302,20 @@ class LoyaltyController extends Controller
             ->orderByDesc('customer_loyalties_count')
             ->limit(5)
             ->get()
-            ->map(fn (Store $s) => ['id' => $s->id, 'store_name' => $s->store_name, 'customers' => $s->customer_loyalties_count])
+            ->map(fn (Store $s) => [
+                'id' => $s->id, 'store_name' => $s->store_name, 'customers' => $s->customer_loyalties_count,
+                'locked' => ! \App\Services\SubscriptionService::hasFeature($s, 'loyalty'),
+            ])
             ->values();
+
+        // Switched on by the store, but its plan doesn't include loyalty → "Locked (plan)"
+        $enabledStores = Store::whereHas('loyaltySettings', fn ($q) => $q->where('is_enabled', true))->get();
+        $lockedCount   = $enabledStores->reject(fn (Store $s) => \App\Services\SubscriptionService::hasFeature($s, 'loyalty'))->count();
 
         return Inertia::render('admin/loyalty', [
             'stats' => [
-                'stores_enabled'  => StoreLoyaltySettings::where('is_enabled', true)->count(),
+                'stores_enabled'  => $enabledStores->count() - $lockedCount,
+                'stores_locked'   => $lockedCount,
                 'total_customers' => CustomerLoyalty::count(),
                 'avg_trust'       => round((float) CustomerLoyalty::avg('trust_score'), 2),
                 'tiers'           => collect(CustomerLoyalty::TIERS)->mapWithKeys(fn ($t) => [$t => (int) ($tierCounts[$t] ?? 0)]),

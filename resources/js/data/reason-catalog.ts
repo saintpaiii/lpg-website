@@ -166,7 +166,7 @@ export const REASON_CATALOG: Record<ReasonContext, ReasonOption[]> = {
         ['Duplicate application',  ['Store already registered']],
     ]),
 
-    // "Non-payment of Commissions" / "Non-payment" removed (commission is being removed)
+    // (commission was removed — no non-payment reasons)
     account_store_suspend: account([
         'Policy Violation', 'Fraudulent Activity', 'Pending Investigation', 'Customer Complaints',
         'Account Inactivity', 'Failed Compliance Check',

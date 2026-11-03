@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { Lock } from 'lucide-react';
+import { openUpgrade } from '@/lib/plans';
 import { cn } from '@/lib/utils';
 import {
     SidebarGroup,
@@ -30,6 +31,30 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                         {item.icon && <item.icon className="mr-2 size-4 shrink-0" />}
                                         <span className="flex-1 truncate">{item.title}</span>
                                         <Lock className="ml-auto size-3.5 shrink-0" />
+                                    </span>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        );
+                    }
+
+                    if (item.lockedPlan) {
+                        // Not on this plan: same row with a lock + tag; opens the upgrade dialog instead of the page
+                        return (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton
+                                    tooltip={{ children: `${item.title} — ${item.lockedPlan} plan` }}
+                                    onClick={() => openUpgrade(item.lockedFeature ?? '')}
+                                    className="h-9 rounded-md px-3 text-sm font-medium text-muted-foreground transition-all duration-150 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                                >
+                                    {item.icon && <item.icon className="mr-2 size-4 shrink-0" />}
+                                    <span className="flex-1 truncate">{item.title}</span>
+                                    <span className={cn(
+                                        'ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold leading-none',
+                                        item.lockedPlan === 'Premium'
+                                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                            : 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+                                    )}>
+                                        <Lock className="size-2.5" /> {item.lockedPlan}
                                     </span>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>

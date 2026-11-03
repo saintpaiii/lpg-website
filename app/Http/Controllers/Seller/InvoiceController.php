@@ -47,7 +47,7 @@ class InvoiceController extends Controller
                 'id'                  => $i->id,
                 'invoice_number'      => $i->invoice_number,
                 'total_amount'        => (float) $i->total_amount,
-                // What the customer pays the store: items + delivery fee (commission is billed separately)
+                // What the customer pays the store: items + delivery fee
                 'grand_total'         => (float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0),
                 'paid_amount'         => (float) $i->paid_amount,
                 'payment_status'      => $i->payment_status,
@@ -136,7 +136,6 @@ class InvoiceController extends Controller
                 'summaryItems' => [
                     ['label' => 'Total Invoices', 'value' => count($rows)],
                     ['label' => 'Total',          'value' => $this->peso($grandTotal)],
-                    ['label' => 'Note',           'value' => 'Platform commission is billed separately'],
                 ],
                 'columns'   => $columns,
                 'rows'      => $rows,
@@ -184,8 +183,6 @@ class InvoiceController extends Controller
                     : (float) $invoice->paid_amount,
                 'payment_status'      => $invoice->payment_status,
                 'payment_method'      => $invoice->payment_method,
-                // Commission is owed to the platform and billed separately — never deducted here
-                'commission'          => $this->commissionInfo($invoice),
                 'due_date'            => $invoice->due_date?->format('M d, Y'),
                 'paid_at'             => $invoice->paid_at?->format('M d, Y'),
                 'created_at'          => $invoice->created_at->format('M d, Y g:i A'),
@@ -217,40 +214,6 @@ class InvoiceController extends Controller
     /**
      * Record a manual (COD) payment for an invoice.
      */
-    /**
-     * Commission the store owes the platform for this sale. Uses the recorded
-     * commission once the order is delivered + paid, otherwise an estimate.
-     */
-    private function commissionInfo(Invoice $invoice): array
-    {
-        $commission = $invoice->order_id
-            ? \App\Models\Commission::with('invoice')->where('order_id', $invoice->order_id)->first()
-            : null;
-
-        if ($commission) {
-            return [
-                'amount'         => (float) $commission->commission_amount,
-                'rate'           => (float) $commission->commission_rate,
-                'status'         => $commission->status,
-                'is_estimate'    => false,
-                'invoice_id'     => $commission->commission_invoice_id,
-                'invoice_number' => $commission->invoice?->invoice_number,
-            ];
-        }
-
-        $store = request()->attributes->get('seller_store');
-        $rate  = (float) ($store?->commission_rate ?: \App\Models\Commission::DEFAULT_RATE);
-
-        return [
-            'amount'         => round((float) $invoice->total_amount * $rate / 100, 2),
-            'rate'           => $rate,
-            'status'         => null,
-            'is_estimate'    => true,
-            'invoice_id'     => null,
-            'invoice_number' => null,
-        ];
-    }
-
     public function recordPayment(Request $request, Invoice $invoice): RedirectResponse
     {
         $store = request()->attributes->get('seller_store');
@@ -285,9 +248,6 @@ class InvoiceController extends Controller
                 'payment_method' => $data['payment_method'],
             ] + ($status === 'paid' && $invoice->order->payment_mode === 'consignment' ? ['remaining_balance' => 0] : []));
 
-            if ($status === 'paid') {
-                \App\Services\OrderPaymentService::recordCommission($invoice->order->fresh());
-            }
             if ($settlesConsignment) {
                 \App\Services\LoyaltyService::recordBalancePaid($invoice->order->fresh());
             }

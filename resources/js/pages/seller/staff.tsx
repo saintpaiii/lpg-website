@@ -42,6 +42,8 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { ReasonPicker } from '@/components/reason-picker';
+import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
+import { toast } from 'sonner';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ type StaffMember = {
     schedule_start: string | null;
     schedule_end: string | null;
     is_active: boolean;
+    paused_by_plan: boolean;
     created_at: string;
     deleted_at: string | null;
     /** Riders only: driver's license status */
@@ -77,6 +80,8 @@ type Props = {
     staff: Paginated<StaffMember>;
     tab: string;
     archivedCount: number;
+    pausedCount?: number;
+    planLimit?: PlanLimit;
     filters: { search?: string };
 };
 
@@ -416,7 +421,7 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerStaff({ staff, tab, archivedCount, filters }: Props) {
+export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters }: Props) {
     const [formOpen, setFormOpen]               = useState(false);
     const [editTarget, setEditTarget]           = useState<StaffMember | null>(null);
     const [archiveTarget, setArchiveTarget]     = useState<StaffMember | null>(null);
@@ -457,6 +462,24 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
         router.post(`/seller/staff/${s.id}/restore`, {}, { preserveScroll: true });
     }
 
+    // Plan limit: pause one account / activate a paused one (the server checks the limit)
+    function togglePlanPause(s: StaffMember) {
+        if (s.paused_by_plan && s.is_active && planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
+        router.patch(`/seller/staff/${s.id}/plan-pause`, {}, { preserveScroll: true });
+    }
+
+    function openAdd() {
+        if (planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
+        setEditTarget(null);
+        setFormOpen(true);
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Staff" />
@@ -473,11 +496,13 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                         <p className="mt-0.5 text-sm text-gray-500">Manage your store's staff accounts and permissions.</p>
                     </div>
                     {!isArchived && (
-                        <Button onClick={() => { setEditTarget(null); setFormOpen(true); }} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 text-white">
                             <Plus className="mr-1.5 h-4 w-4" /> Add Staff
                         </Button>
                     )}
                 </div>
+
+                <PlanLimitBar label="Staff accounts" planLimit={planLimit} />
 
                 {/* Summary cards */}
                 {!isArchived && (
@@ -520,14 +545,17 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                 {/* Tabs */}
                 <div className="border-b border-gray-200">
                     <nav className="-mb-px flex gap-6">
-                        {['active', 'archived'].map((t) => (
+                        {['active', 'paused', 'archived'].map((t) => (
                             <button key={t} onClick={() => switchTab(t)}
                                 className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors capitalize flex items-center gap-1.5 ${
                                     tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}>
-                                {t}
+                                {t === 'paused' ? 'Paused (plan)' : t}
                                 {t === 'archived' && archivedCount > 0 && (
                                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{archivedCount}</span>
+                                )}
+                                {t === 'paused' && pausedCount > 0 && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{pausedCount}</span>
                                 )}
                             </button>
                         ))}
@@ -592,6 +620,8 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                                                 <td className="px-4 py-3">
                                                     {isArchived ? (
                                                         <span className="text-xs text-gray-400">Archived {s.deleted_at ? fmtDate(s.deleted_at) : ''}</span>
+                                                    ) : s.paused_by_plan ? (
+                                                        <span className={PAUSED_BADGE}>Paused — over plan limit</span>
                                                     ) : (
                                                         <StatusBadge active={s.is_active} />
                                                     )}
@@ -620,6 +650,12 @@ export default function SellerStaff({ staff, tab, archivedCount, filters }: Prop
                                                                     className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Edit">
                                                                     <Pencil className="h-3.5 w-3.5" />
                                                                 </Button>
+                                                                {(s.paused_by_plan || planLimit?.limit != null) && (
+                                                                    <Button size="sm" variant="outline" onClick={() => togglePlanPause(s)}
+                                                                        className="h-7 px-2 text-xs" title={s.paused_by_plan ? 'Activate (counts against your plan)' : 'Pause (plan limit)'}>
+                                                                        {s.paused_by_plan ? 'Activate' : 'Pause (plan limit)'}
+                                                                    </Button>
+                                                                )}
                                                                 <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}
                                                                     className={`h-7 w-7 p-0 ${s.is_active ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
                                                                     title={s.is_active ? 'Deactivate' : 'Activate'}>

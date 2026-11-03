@@ -4,72 +4,78 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Http\Controllers\Controller;
-use App\Models\Commission;
+use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Seller revenue overview. Replaces the old wallet: the platform no longer holds
- * seller funds, so this page only reports sales and the commission owed per order.
+ * Seller sales overview: the store's delivered and paid orders. The platform takes no cut,
+ * so every peso of these sales belongs to the store.
  */
 class RevenueController extends Controller
 {
     use GeneratesExport;
 
+    /** When a sale counts: delivered_at, or created_at for old orders without it */
+    private const SALE_DATE = 'COALESCE(orders.delivered_at, orders.created_at)';
+
+    private function sales(int $storeId)
+    {
+        return Order::where('store_id', $storeId)->where('status', 'delivered')->where('payment_status', 'paid');
+    }
+
     private function filteredQuery(Request $request, int $storeId)
     {
-        $query = Commission::with('order')->where('store_id', $storeId);
+        $query = $this->sales($storeId);
 
-        if ($df = $request->get('date_from')) $query->whereDate('created_at', '>=', $df);
-        if ($dt = $request->get('date_to'))   $query->whereDate('created_at', '<=', $dt);
-        if ($st = $request->get('status'))    $query->where('status', $st);
+        if ($df = $request->get('date_from')) $query->whereDate(DB::raw(self::SALE_DATE), '>=', $df);
+        if ($dt = $request->get('date_to'))   $query->whereDate(DB::raw(self::SALE_DATE), '<=', $dt);
 
-        return $query->orderByDesc('created_at');
+        return $query->orderByRaw(self::SALE_DATE . ' DESC');
+    }
+
+    /** Items + delivery fee */
+    private static function saleTotal($q): float
+    {
+        return (float) (clone $q)->sum('total_amount') + (float) (clone $q)->sum('shipping_fee');
     }
 
     public function index(Request $request): Response
     {
         $store = $request->attributes->get('seller_store');
 
-        $base = Commission::where('store_id', $store->id)->where('status', '!=', 'failed');
+        $all   = $this->sales($store->id);
+        $month = $this->sales($store->id)
+            ->whereBetween(DB::raw(self::SALE_DATE), [now()->startOfMonth(), now()->endOfMonth()]);
 
-        $totalRevenue   = (float) (clone $base)->sum('order_total');
-        $monthRevenue   = (float) (clone $base)
-            ->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])
-            ->sum('order_total');
-        $commissionPaid = (float) Commission::where('store_id', $store->id)->where('status', 'collected')->sum('commission_amount');
-        $commissionDue  = (float) Commission::where('store_id', $store->id)->whereIn('status', ['pending', 'invoiced'])->sum('commission_amount');
-        $netRevenue     = (float) (clone $base)->sum('seller_amount');
+        $totalSales = self::saleTotal($all);
+        $orderCount = (clone $all)->count();
 
-        $commissions = $this->filteredQuery($request, $store->id)
+        $orders = $this->filteredQuery($request, $store->id)
             ->paginate(20)
             ->withQueryString()
-            ->through(fn (Commission $c) => [
-                'id'                => $c->id,
-                'order_id'          => $c->order_id,
-                'order_number'      => $c->order?->order_number,
-                'payment_mode'      => $c->order?->payment_mode,
-                'order_total'       => (float) $c->order_total,
-                'commission_rate'   => (float) $c->commission_rate,
-                'commission_amount' => (float) $c->commission_amount,
-                'seller_amount'     => (float) $c->seller_amount,
-                'status'            => $c->status,
-                'collected_at'      => $c->collected_at?->format('M d, Y'),
-                'created_at'        => $c->created_at->format('M d, Y g:i A'),
+            ->through(fn (Order $o) => [
+                'id'             => $o->id,
+                'order_number'   => $o->order_number,
+                'delivered_on'   => ($o->delivered_at ?? $o->created_at)->format('M d, Y'),
+                'payment_mode'   => $o->payment_mode ?? 'full',
+                'payment_method' => $o->payment_method,
+                'subtotal'       => (float) $o->total_amount,
+                'shipping_fee'   => (float) $o->shipping_fee,
+                'total'          => $o->grandTotal(),
             ]);
 
         return Inertia::render('seller/revenue', [
             'summary' => [
-                'total_revenue'   => $totalRevenue,
-                'month_revenue'   => $monthRevenue,
-                'commission_paid' => $commissionPaid,
-                'commission_due'  => $commissionDue,
-                'net_revenue'     => $netRevenue,
-                'commission_rate' => (float) ($store->commission_rate ?: Commission::DEFAULT_RATE),
+                'total_sales'         => $totalSales,
+                'month_sales'         => self::saleTotal($month),
+                'orders'              => $orderCount,
+                'average_order_value' => $orderCount > 0 ? round($totalSales / $orderCount, 2) : 0,
             ],
-            'commissions' => $commissions,
-            'filters'     => $request->only('date_from', 'date_to', 'status'),
+            'orders'  => $orders,
+            'filters' => $request->only('date_from', 'date_to'),
         ]);
     }
 
@@ -81,50 +87,47 @@ class RevenueController extends Controller
 
         $from     = $request->get('date_from') ?: now()->startOfMonth()->toDateString();
         $to       = $request->get('date_to')   ?: now()->toDateString();
-        $filename = $this->exportFilename('revenue', $store->store_name, $from, $to, $format);
+        $filename = $this->exportFilename('sales', $store->store_name, $from, $to, $format);
 
-        $data = $rows->map(fn (Commission $c) => [
-            'date'       => $c->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
-            'order'      => $c->order?->order_number ?? '—',
-            'total'      => $this->peso((float) $c->order_total),
-            'rate'       => number_format((float) $c->commission_rate, 2) . '%',
-            'commission' => $this->peso((float) $c->commission_amount),
-            'net'        => $this->peso((float) $c->seller_amount),
-            'status'     => ucfirst($c->status),
+        $data = $rows->map(fn (Order $o) => [
+            'order'     => $o->order_number,
+            'delivered' => ($o->delivered_at ?? $o->created_at)->setTimezone('Asia/Manila')->format('M d, Y'),
+            'payment'   => ucfirst($o->payment_mode ?? 'full') . ($o->payment_method ? ' · ' . str_replace('_', ' ', $o->payment_method) : ''),
+            'subtotal'  => $this->peso((float) $o->total_amount),
+            'shipping'  => $this->peso((float) $o->shipping_fee),
+            'total'     => $this->peso($o->grandTotal()),
         ])->values()->all();
 
-        $sumTotal = $rows->sum(fn ($c) => (float) $c->order_total);
-        $sumComm  = $rows->sum(fn ($c) => (float) $c->commission_amount);
-        $sumNet   = $rows->sum(fn ($c) => (float) $c->seller_amount);
+        $sumSub   = $rows->sum(fn ($o) => (float) $o->total_amount);
+        $sumShip  = $rows->sum(fn ($o) => (float) $o->shipping_fee);
+        $sumTotal = $rows->sum(fn (Order $o) => $o->grandTotal());
 
         if ($format === 'pdf') {
             return $this->pdfResponse($filename, [
-                'title'        => 'Revenue & Commission Report',
+                'title'        => 'Sales Report',
                 'orgName'      => $store->store_name,
                 'orgSub'       => $store->city ?? 'Cavite, Philippines',
                 'dateRange'    => \Carbon\Carbon::parse($from)->format('M d, Y') . ' – ' . \Carbon\Carbon::parse($to)->format('M d, Y'),
                 'summaryItems' => [
-                    ['label' => 'Gross Revenue', 'value' => $this->peso($sumTotal)],
-                    ['label' => 'Commission',    'value' => $this->peso($sumComm)],
-                    ['label' => 'Net Revenue',   'value' => $this->peso($sumNet)],
+                    ['label' => 'Orders',      'value' => count($data)],
+                    ['label' => 'Total Sales', 'value' => $this->peso($sumTotal)],
                 ],
                 'columns' => [
-                    ['key' => 'date',       'label' => 'Date'],
-                    ['key' => 'order',      'label' => 'Order #', 'class' => 'mono'],
-                    ['key' => 'total',      'label' => 'Order Total', 'align' => 'right'],
-                    ['key' => 'rate',       'label' => 'Rate', 'align' => 'right'],
-                    ['key' => 'commission', 'label' => 'Commission', 'align' => 'right'],
-                    ['key' => 'net',        'label' => 'Net', 'align' => 'right'],
-                    ['key' => 'status',     'label' => 'Status'],
+                    ['key' => 'order',     'label' => 'Order #', 'class' => 'mono'],
+                    ['key' => 'delivered', 'label' => 'Delivered on'],
+                    ['key' => 'payment',   'label' => 'Payment'],
+                    ['key' => 'subtotal',  'label' => 'Items Subtotal', 'align' => 'right'],
+                    ['key' => 'shipping',  'label' => 'Delivery Fee', 'align' => 'right'],
+                    ['key' => 'total',     'label' => 'Total', 'align' => 'right'],
                 ],
                 'rows'      => $data,
-                'totalsRow' => ['date' => 'TOTAL', 'order' => '', 'total' => $this->peso($sumTotal), 'rate' => '', 'commission' => $this->peso($sumComm), 'net' => $this->peso($sumNet), 'status' => ''],
+                'totalsRow' => ['order' => 'TOTAL', 'delivered' => '', 'payment' => '', 'subtotal' => $this->peso($sumSub), 'shipping' => $this->peso($sumShip), 'total' => $this->peso($sumTotal)],
             ]);
         }
 
         $csv   = array_map(fn ($r) => array_values($r), $data);
-        $csv[] = ['TOTAL', '', $this->peso($sumTotal), '', $this->peso($sumComm), $this->peso($sumNet), ''];
+        $csv[] = ['TOTAL', '', '', $this->peso($sumSub), $this->peso($sumShip), $this->peso($sumTotal)];
 
-        return $this->csvResponse($filename, ['Date', 'Order #', 'Order Total', 'Rate', 'Commission', 'Net', 'Status'], $csv);
+        return $this->csvResponse($filename, ['Order #', 'Delivered on', 'Payment', 'Items Subtotal', 'Delivery Fee', 'Total'], $csv);
     }
 }

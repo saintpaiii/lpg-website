@@ -2,8 +2,10 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import { CommissionSuspensionBanner } from '@/components/commission-suspension-banner';
 import { DocumentSuspensionBanner } from '@/components/document-suspension-banner';
+import { PlanExpiryDialog } from '@/components/plan-expiry-dialog';
+import { PlanStatusBanner } from '@/components/plan-status-banner';
+import { UpgradeDialog } from '@/components/upgrade-dialog';
 import { StoreLocationBanner } from '@/components/store-location-banner';
 import { RiderLicenseBanner } from '@/components/rider-license-banner';
 import { InstallAppBanner } from '@/components/install-app-banner';
@@ -22,7 +24,7 @@ export default function AppSidebarLayout({
             <AppSidebar />
             <AppContent variant="sidebar" className="overflow-x-hidden">
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
-                <CommissionSuspensionBanner />
+                <PlanStatusBanner />
                 <DocumentSuspensionBanner />
                 <StoreLocationBanner />
                 <RiderLicenseBanner />
@@ -30,6 +32,8 @@ export default function AppSidebarLayout({
             </AppContent>
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
             <InstallAppBanner />
+            <PlanExpiryDialog />
+            <UpgradeDialog />
         </AppShell>
     );
 }

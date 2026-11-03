@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -23,6 +24,7 @@ class VehicleController extends Controller
     {
         $store = $request->attributes->get('seller_store');
 
+        $busy = SubscriptionService::busyVehicleIds($store->id);
         $vehicles = Vehicle::withTrashed()
             ->where('store_id', $store->id)
             ->with('assignedRider:id,name')
@@ -36,6 +38,8 @@ class VehicleController extends Controller
                 'max_tanks'         => $v->max_tanks,
                 'description'       => $v->description,
                 'status'            => $v->status,
+                'paused_by_plan'    => (bool) $v->paused_by_plan,
+                'busy'              => in_array($v->id, $busy),
                 'assigned_rider'    => $v->assignedRider ? ['id' => $v->assignedRider->id, 'name' => $v->assignedRider->name] : null,
                 'deleted_at'        => $v->deleted_at?->toISOString(),
             ])
@@ -53,6 +57,13 @@ class VehicleController extends Controller
         return Inertia::render('seller/vehicles', [
             'vehicles' => $vehicles,
             'riders'   => $riders,
+            'planLimit' => [
+                'used'    => SubscriptionService::usage($store)['vehicles'],
+                'limit'   => SubscriptionService::limits($store)['vehicles'],
+                'plan'    => SubscriptionService::summary($store)['last_name'] ?? 'Basic',
+                'message' => SubscriptionService::limitMessage($store, 'vehicles'),
+                'can_add' => SubscriptionService::canAdd($store, 'vehicles'),
+            ],
         ]);
     }
 
@@ -77,6 +88,9 @@ class VehicleController extends Controller
             ->exists();
         if ($exists) {
             return back()->withErrors(['plate_number' => 'This plate number already exists for your store.']);
+        }
+        if (! SubscriptionService::canAdd($store, 'vehicles')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'vehicles'));
         }
 
         Vehicle::create([
@@ -119,6 +133,11 @@ class VehicleController extends Controller
         if ($conflict) {
             return back()->withErrors(['plate_number' => 'This plate number already exists for your store.']);
         }
+        // Bringing a retired vehicle back counts against the plan (a paused one doesn't count yet)
+        if ($vehicle->status === 'retired' && $data['status'] !== 'retired' && ! $vehicle->paused_by_plan
+            && ! SubscriptionService::canAdd($store, 'vehicles')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'vehicles'));
+        }
 
         $vehicle->update([
             'vehicle_type'      => $data['vehicle_type'],
@@ -149,7 +168,35 @@ class VehicleController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($vehicle->store_id !== $store->id) abort(403);
 
+        if ($vehicle->status !== 'retired' && ! $vehicle->paused_by_plan && ! SubscriptionService::canAdd($store, 'vehicles')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'vehicles'));
+        }
+
         $vehicle->restore();
         return back()->with('success', 'Vehicle restored.');
+    }
+
+    /** Pause (plan limit) / Activate — the owner chooses which vehicles stay usable. */
+    public function togglePlanPause(Vehicle $vehicle): RedirectResponse
+    {
+        $this->ownerOnly();
+        $store = request()->attributes->get('seller_store');
+        if ($vehicle->store_id !== $store->id) abort(403);
+
+        if (! $vehicle->paused_by_plan) {
+            if ($vehicle->status === 'in_use' || in_array($vehicle->id, SubscriptionService::busyVehicleIds($store->id))) {
+                return back()->with('error', 'This vehicle is on a delivery. Pause it after the delivery is finished.');
+            }
+            $vehicle->update(['paused_by_plan' => true]);
+
+            return back()->with('success', "Vehicle {$vehicle->plate_number} paused.");
+        }
+
+        if ($vehicle->status !== 'retired' && ! SubscriptionService::canAdd($store, 'vehicles')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'vehicles'));
+        }
+        $vehicle->update(['paused_by_plan' => false]);
+
+        return back()->with('success', "Vehicle {$vehicle->plate_number} activated.");
     }
 }

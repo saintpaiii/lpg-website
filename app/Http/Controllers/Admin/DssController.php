@@ -343,10 +343,8 @@ class DssController extends Controller
             ? round((($thisRevenue - $lastRevenue) / $lastRevenue) * 100, 1)
             : null;
 
-        // Commission earned this month
-        $commissionThisMonth = (float) Invoice::whereNull('deleted_at')
-            ->where('created_at', '>=', $thisStart)
-            ->sum('platform_commission');
+        // Platform sales (GMV of delivered orders) this month
+        $salesThisMonth = \App\Support\PlatformSales::between($thisStart);
 
         // New sellers this month (stores created this month, any status)
         $newSellersThisMonth = Store::where('created_at', '>=', $thisStart)->count();
@@ -419,7 +417,8 @@ class DssController extends Controller
             'this_month_revenue'     => round($thisRevenue, 2),
             'last_month_revenue'     => round($lastRevenue, 2),
             'revenue_change_pct'     => $revenueChangePct,
-            'commission_this_month'  => round($commissionThisMonth, 2),
+            'sales_this_month'       => round($salesThisMonth, 2),
+            'subscription_income_this_month' => \App\Services\SubscriptionService::income($thisStart),
             'new_sellers_this_month' => $newSellersThisMonth,
             'pending_verifications'  => $pendingVerifications,
             'new_customers_this_month' => $newCustomersThisMonth,

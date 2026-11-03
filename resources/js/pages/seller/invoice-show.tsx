@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Info, Printer } from 'lucide-react';
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,13 +15,6 @@ import AppLayout from '@/layouts/app-layout';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import type { BreadcrumbItem } from '@/types';
 
-const COMMISSION_STATUS_LABELS: Record<string, string> = {
-    pending:   'not yet invoiced',
-    invoiced:  'invoiced, awaiting payment',
-    collected: 'paid',
-    failed:    'cancelled',
-    waived:    'waived',
-};
 
 type InvoiceItem = { product: string; brand: string; qty: number; price: number; subtotal: number };
 
@@ -33,14 +26,7 @@ type Invoice = {
     paid_amount: number;
     payment_status: string;
     payment_method: string | null;
-    commission: {
-        amount: number;
-        rate: number;
-        status: 'pending' | 'invoiced' | 'collected' | 'failed' | 'waived' | null;
-        is_estimate: boolean;
-        invoice_id: number | null;
-        invoice_number: string | null;
-    };
+
     due_date: string | null;
     paid_at: string | null;
     created_at: string;
@@ -185,28 +171,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
                                 </tfoot>
                             </table>
 
-                            {/* Commission owed — informational, not deducted */}
-                            <div className="m-4 flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
-                                <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                                <div className="flex-1 space-y-0.5">
-                                    <p>
-                                        {invoice.commission.is_estimate ? 'Estimated commission owed' : 'Commission owed'} to the platform:{' '}
-                                        <strong>{fmt(invoice.commission.amount)}</strong> ({invoice.commission.rate}%)
-                                        {invoice.commission.status && <> · <span className="font-medium">{COMMISSION_STATUS_LABELS[invoice.commission.status]}</span></>}
-                                    </p>
-                                    <p className="text-xs opacity-80">
-                                        This is not deducted from the total above. It is billed separately via{' '}
-                                        {invoice.commission.invoice_id ? (
-                                            <Link href={`/seller/commission/${invoice.commission.invoice_id}`} className="font-semibold underline">
-                                                commission invoice {invoice.commission.invoice_number}
-                                            </Link>
-                                        ) : (
-                                            <Link href="/seller/commission" className="font-semibold underline">Commission Invoices</Link>
-                                        )}
-                                        {invoice.commission.is_estimate && ' once the order is delivered and fully paid'}.
-                                    </p>
-                                </div>
-                            </div>
+
                         </CardContent>
                     </Card>
 

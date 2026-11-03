@@ -38,8 +38,6 @@ type Invoice = {
     total_amount: number;
     paid_amount: number;
     balance: number;
-    platform_commission: number;
-    net_amount: number;
     payment_method: string | null;
     paid_at: string | null;
     due_date: string | null;
@@ -457,20 +455,6 @@ export default function InvoiceShowPage({ invoice, company, breakdown }: Props &
                                         {peso(invoice.balance)}
                                     </span>
                                 </div>
-
-                                {invoice.platform_commission > 0 && (
-                                    <>
-                                        <Separator />
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-amber-600">Platform Fee</span>
-                                            <span className="tabular-nums text-amber-600">-{peso(invoice.platform_commission)}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm font-semibold">
-                                            <span>Net to Seller</span>
-                                            <span className="tabular-nums text-emerald-600">{peso(invoice.net_amount)}</span>
-                                        </div>
-                                    </>
-                                )}
 
                                 {invoice.payment_method && (
                                     <div className="flex justify-between text-sm">

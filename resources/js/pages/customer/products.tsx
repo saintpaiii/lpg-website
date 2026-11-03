@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { FeaturedBadge } from '@/components/featured-badge';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -34,6 +35,7 @@ type Product = {
     stock: number;
     store_id: number;
     store_name: string;
+    store_featured?: boolean;
     store_logo_url: string | null;
     store_city: string;
     store_barangay: string;
@@ -41,7 +43,6 @@ type Product = {
     delivery_fee: number;
     avg_rating: number;
     review_count: number;
-    promo_code: string | null;
 };
 
 type PaginatedProducts = {
@@ -438,11 +439,6 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                             >
                                 <ProductCardImage imageUrl={p.image_url} hoverUrl={p.hover_url} name={p.name}
                                     photoCount={p.photo_count} hasVideo={p.has_video} className="h-40">
-                                    {p.promo_code && (
-                                        <span className="absolute left-2 top-2 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-bold text-white shadow" title={`Participating in ${p.promo_code}`}>
-                                            🔥 Promo
-                                        </span>
-                                    )}
                                     {p.stock === 0 && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                             <span className="bg-white text-gray-800 text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
@@ -462,6 +458,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         </button>
                                         <span>· {formatCity(p.store_city)}</span>
                                     </div>
+                                    {p.store_featured && <FeaturedBadge className="mb-1.5" />}
                                     <div className="mb-2">
                                         <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                                     </div>

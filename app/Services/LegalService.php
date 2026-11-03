@@ -101,36 +101,32 @@ class LegalService
         return array_values(array_filter(array_map(fn ($t) => static::current($t)?->id, $types)));
     }
 
-    /** Safe HTML of a document with {company_name}, {company_email}, {commission_rate} filled in. Works on unsaved models. */
+    /**
+     * Safe HTML of a document with {company_name} and {company_email} filled in. Works on unsaved models.
+     * Old published versions may still contain the retired {commission_rate} placeholder — it renders as nothing.
+     */
     public static function render(LegalDocument $doc): string
     {
-        $rate  = (float) Setting::get('default_commission_rate', '5.00');
         $email = (string) Setting::get('company_email', '');
 
         $text = strtr((string) $doc->body, [
             '{company_name}'    => (string) (Setting::get('company_name') ?: 'LPG Marketplace Cavite'),
             '{company_email}'   => $email !== '' ? $email : (string) config('mail.from.address'),
-            '{commission_rate}' => static::formatRate($rate) . '%',
+            '{commission_rate}' => '',
         ]);
 
         return Str::markdown($text, ['html_input' => 'strip', 'allow_unsafe_links' => false]);
     }
 
-    /** Props for the seller application forms: the current Seller Terms (rendered) and the commission rate the seller agrees to. */
+    /** Props for the seller application forms: the current Seller Terms (rendered) and the plans ("See plans and prices"). */
     public static function sellerTermsProps(): array
     {
         $doc = static::current('seller_terms');
 
         return [
-            'seller_terms'    => $doc ? ['id' => $doc->id, 'title' => $doc->title, 'version' => $doc->version, 'html' => static::render($doc)] : null,
-            'commission_rate' => (float) static::formatRate((float) Setting::get('default_commission_rate', '5.00')),
+            'seller_terms' => $doc ? ['id' => $doc->id, 'title' => $doc->title, 'version' => $doc->version, 'html' => static::render($doc)] : null,
+            'plan_catalog' => SubscriptionService::publicPlans(),
         ];
-    }
-
-    /** 5.00 → "5", 5.50 → "5.5" */
-    public static function formatRate(float $rate): string
-    {
-        return rtrim(rtrim(number_format($rate, 2, '.', ''), '0'), '.');
     }
 
     /** Publish a draft as the next version of its type. */

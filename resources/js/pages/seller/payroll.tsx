@@ -1,4 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { ExportLink } from '@/components/export-link';
 import {
     BadgeDollarSign,
     ChevronDown,
@@ -228,14 +229,14 @@ export default function PayrollPage({ payrolls, period_start, period_end, settin
                                 Settings
                             </Button>
                         )}
-                        <a href={`/seller/payroll/export?format=csv&period_start=${period_start}&period_end=${period_end}`}
+                        <ExportLink href={`/seller/payroll/export?format=csv&period_start=${period_start}&period_end=${period_end}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> CSV
-                        </a>
-                        <a href={`/seller/payroll/export?format=pdf&period_start=${period_start}&period_end=${period_end}`}
+                            CSV
+                        </ExportLink>
+                        <ExportLink href={`/seller/payroll/export?format=pdf&period_start=${period_start}&period_end=${period_end}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> PDF
-                        </a>
+                            PDF
+                        </ExportLink>
                     </div>
                 </div>
 

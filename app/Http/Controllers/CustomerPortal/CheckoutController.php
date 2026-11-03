@@ -101,8 +101,10 @@ class CheckoutController extends Controller
                 $stores[$storeId] = [
                     'store_id'               => $storeId,
                     'store_name'             => $store->store_name,
+                    // False when the store is hidden (plan ended, permit expired…) — the order can't be placed
+                    'store_available'        => $store->isOpenToCustomers(),
                     'delivery_fee'           => (float) ($store->delivery_fee ?? 0),
-                    'store_lat'              => $store->latitude  ? (float) $store->latitude  : null,
+                    'store_lat'            => $store->latitude  ? (float) $store->latitude  : null,
                     'store_lng'              => $store->longitude ? (float) $store->longitude : null,
                     'base_delivery_fee'      => $store->base_delivery_fee ? (float) $store->base_delivery_fee : null,
                     'fee_per_km'             => $store->fee_per_km        ? (float) $store->fee_per_km        : null,
@@ -355,7 +357,12 @@ class CheckoutController extends Controller
                     'transaction_type' => $ci->transaction_type,
                 ];
             }
-            $checkoutStores = array_values($checkoutStores);
+            // Stores that are hidden right now (plan ended, permit expired…) are left out; the checkout page shows
+            // them greyed. The per-store check inside the transaction below still guards against races.
+            $checkoutStores = array_values(array_filter($checkoutStores, fn ($s) => $s['store_ref']?->isOpenToCustomers()));
+            if (empty($checkoutStores)) {
+                return $error('The selected stores are not available right now.');
+            }
 
             // Block checkout if any selected items are from the user's own store
             $ownStoreId = Store::where('user_id', auth()->id())->value('id');
@@ -576,7 +583,7 @@ class CheckoutController extends Controller
                     ];
                 }
 
-                // One coupon_uses row per discounted order (who pays + agreed commission rate),
+                // One coupon_uses row per discounted order,
                 // grouped by checkout_ref so a multi-store checkout counts as a single use.
                 if ($promo) {
                     $checkoutRef = (string) \Illuminate\Support\Str::uuid();
@@ -585,16 +592,11 @@ class CheckoutController extends Controller
                         if ($cut <= 0) {
                             continue;
                         }
-                        $split      = CouponService::split($promo, $cut);
-                        $normalRate = (float) ($entry['store']->commission_rate ?: \App\Models\Commission::DEFAULT_RATE);
                         CouponUse::create([
                             'coupon_id'        => $promo->id,
                             'user_id'          => $request->user()->id,
                             'order_id'         => $entry['order']->id,
                             'discount_applied' => $cut,
-                            'admin_absorbed'   => $split['admin'],
-                            'seller_absorbed'  => $split['seller'],
-                            'commission_rate'  => CouponService::promoCommissionRate($promo, $normalRate),
                             'checkout_ref'     => $checkoutRef,
                         ]);
                     }

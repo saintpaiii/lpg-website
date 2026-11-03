@@ -58,7 +58,6 @@ class OrderController extends Controller
             'discount_amount'     => (float) ($o->discount_amount ?? 0),
             'has_coordinates'     => $o->delivery_latitude !== null && $o->delivery_longitude !== null,
             'coupon_code'         => (float) $o->coupon_discount > 0 ? $o->coupon?->code : null,
-            'coupon_type'         => (float) $o->coupon_discount > 0 ? $o->coupon?->type : null,
             'coupon_discount'     => (float) ($o->coupon_discount ?? 0),
             'notes'               => $o->notes,
             // Failed delivery waiting to be reassigned ("Redeliver Nov 4 · PM")
@@ -454,7 +453,6 @@ class OrderController extends Controller
                 }
 
                 if (! $order->invoice()->exists()) {
-                    $commission = (float) $store->commission_rate / 100 * (float) $order->total_amount;
                     Invoice::create([
                         'store_id'           => $store->id,
                         'invoice_number'     => $this->generateInvoiceNumber(),
@@ -470,7 +468,6 @@ class OrderController extends Controller
                         'payment_method'     => $order->payment_method,
                         'paid_at'            => $order->payment_status === 'paid' ? now() : null,
                         'due_date'           => now()->addDays(7),
-                        'platform_commission'=> $commission,
                     ]);
                 }
             }

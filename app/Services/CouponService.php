@@ -7,9 +7,9 @@ use App\Models\CouponUse;
 use App\Models\Store;
 
 /**
- * Coupon validation and discount math. The same rules are mirrored in
- * resources/js/lib/coupons.ts for the live checkout total and the
- * admin/seller preview calculator — keep both in sync.
+ * Store coupon validation and discount math (each coupon belongs to one store, which pays for it).
+ * The same rules are mirrored in resources/js/lib/coupons.ts for the live checkout total and the
+ * seller preview calculator — keep both in sync.
  */
 class CouponService
 {
@@ -47,29 +47,19 @@ class CouponService
                 : "You've already used this coupon.");
         }
 
-        if ($coupon->type === 'store') {
-            if (! $coupon->store || ! array_key_exists($coupon->store_id, $productTotals)) {
-                $name = $coupon->store?->store_name ?? 'another store';
-                throw new CouponException("This coupon is only valid at {$name}.");
-            }
-            if (! $coupon->store->isOpenToCustomers()) {
-                throw new CouponException('This coupon is not available right now.');
-            }
+        // Store coupons only — valid at their own store
+        if ($coupon->type !== 'store' || ! $coupon->store || ! array_key_exists($coupon->store_id, $productTotals)) {
+            $name = $coupon->store?->store_name ?? 'another store';
+            throw new CouponException($coupon->type === 'store' ? "This coupon is only valid at {$name}." : 'This coupon code is not valid.');
         }
-
-        // Platform coupon: stores that opted out of the promo are not eligible
-        if ($coupon->type === 'platform') {
-            $excluded = array_intersect(array_keys($productTotals), $coupon->excludedStoreIds());
-            if ($excluded && count($excluded) === count($productTotals)) {
-                $names = \App\Models\Store::whereIn('id', $excluded)->pluck('store_name')->implode(', ');
-                throw new CouponException("Not valid at {$names} — this store is not participating in the promo.");
-            }
+        // Closed store, or its plan doesn't include coupons (kept, but switched off until it upgrades)
+        if (! $coupon->store->isOpenToCustomers() || ! SubscriptionService::hasFeature($coupon->store, 'coupons')) {
+            throw new CouponException('This coupon is not available right now.');
         }
 
         $eligibleProduct = static::eligibleProductTotal($coupon, $productTotals);
         if ((float) $coupon->min_order_amount > 0 && $eligibleProduct < (float) $coupon->min_order_amount) {
-            $where = $coupon->type === 'store' ? " at {$coupon->store->store_name}" : '';
-            throw new CouponException('Minimum order of ₱' . number_format((float) $coupon->min_order_amount, 2) . " required{$where}.");
+            throw new CouponException('Minimum order of ₱' . number_format((float) $coupon->min_order_amount, 2) . " required at {$coupon->store->store_name}.");
         }
 
         return $coupon;
@@ -82,19 +72,14 @@ class CouponService
     }
 
     /**
-     * Stores in the checkout the coupon can discount: the coupon's own store,
-     * or for platform coupons every store that has not opted out.
+     * Stores in the checkout the coupon can discount: only the coupon's own store.
      *
      * @param  int[]  $storeIds
      * @return int[]
      */
     public static function eligibleStoreIds(Coupon $coupon, array $storeIds): array
     {
-        if ($coupon->type === 'store') {
-            return in_array($coupon->store_id, $storeIds) ? [(int) $coupon->store_id] : [];
-        }
-
-        return array_values(array_diff($storeIds, $coupon->excludedStoreIds()));
+        return in_array($coupon->store_id, $storeIds) ? [(int) $coupon->store_id] : [];
     }
 
     /** Checkouts (not orders) in which the user used this coupon. */
@@ -105,28 +90,6 @@ class CouponService
             ->value('n');
     }
 
-    /**
-     * Who pays for a discount. Platform coupons are shared by admin_share_percent;
-     * store coupons are funded entirely by the store.
-     *
-     * @return array{admin: float, seller: float}
-     */
-    public static function split(Coupon $coupon, float $discount): array
-    {
-        $admin = $coupon->type === 'platform'
-            ? round($discount * max(0, min(100, (int) $coupon->admin_share_percent)) / 100, 2)
-            : 0.0;
-
-        return ['admin' => $admin, 'seller' => round($discount - $admin, 2)];
-    }
-
-    /** Commission rate for an order using this coupon (promo rate for platform coupons). */
-    public static function promoCommissionRate(Coupon $coupon, float $normalRate): float
-    {
-        return $coupon->type === 'platform' && $coupon->seller_commission_during_promo !== null
-            ? (float) $coupon->seller_commission_during_promo
-            : $normalRate;
-    }
 
     /**
      * Total discount for the given product and shipping amounts.
@@ -226,41 +189,7 @@ class CouponService
             'min_order_amount'    => (float) $coupon->min_order_amount,
             'max_discount_amount' => $coupon->max_discount_amount !== null ? (float) $coupon->max_discount_amount : null,
             'label'               => $coupon->label(),
-            'excluded_store_ids'  => $coupon->excludedStoreIds(),
         ];
-    }
-
-    // ── Visibility boost ──────────────────────────────────────────────────────
-
-    /**
-     * Stores participating in a running, featured platform promotion.
-     *
-     * @return array<int, string>  store_id => promo code (first matching promo)
-     */
-    public static function promoStoreCodes(): array
-    {
-        static $cache = null;
-        if ($cache !== null) {
-            return $cache;
-        }
-
-        $promos = Coupon::runningPlatform()->where('featured_boost', true)->with('exclusions')->orderBy('created_at')->get();
-        if ($promos->isEmpty()) {
-            return $cache = [];
-        }
-
-        $storeIds = Store::visibleToCustomers()->pluck('id');
-        $map = [];
-        foreach ($promos as $promo) {
-            $excluded = $promo->exclusions->pluck('store_id')->all();
-            foreach ($storeIds as $id) {
-                if (! isset($map[$id]) && ! in_array($id, $excluded)) {
-                    $map[$id] = $promo->code;
-                }
-            }
-        }
-
-        return $cache = $map;
     }
 
     // ── Announcements ─────────────────────────────────────────────────────────
@@ -271,25 +200,16 @@ class CouponService
         if (! $coupon->is_active || $coupon->state() === 'expired') {
             return;
         }
+        $owner = $coupon->store ?? Store::find($coupon->store_id);
+        if (! $owner || ! SubscriptionService::hasFeature($owner, 'coupons')) {
+            return;
+        }
 
         $when = $coupon->starts_at && $coupon->starts_at->isFuture()
             ? ' Starts ' . $coupon->starts_at->format('M d') . '.'
             : '';
         $until = $coupon->expires_at ? ' Valid until ' . $coupon->expires_at->format('M d, Y') . '.' : '';
 
-        if ($coupon->type === 'platform') {
-            NotificationService::sendToRole('customer', 'promo', 'New Promo!',
-                "Use code {$coupon->code} for {$coupon->label()}!{$when}{$until}",
-                ['coupon_code' => $coupon->code, 'link' => '/customer/products']);
-
-            $rate = $coupon->seller_commission_during_promo !== null
-                ? ' Commission during the promo: ' . rtrim(rtrim(number_format((float) $coupon->seller_commission_during_promo, 2), '0'), '.') . '%.'
-                : '';
-            NotificationService::sendToRole('seller', 'promo', 'New Platform Promotion',
-                "New promotion {$coupon->code} ({$coupon->label()}). The platform covers {$coupon->admin_share_percent}% of the discount.{$rate} Review and choose whether to participate — you're opted in by default.",
-                ['coupon_code' => $coupon->code, 'link' => '/seller/coupons?tab=platform']);
-            return;
-        }
 
         $store = $coupon->store ?? Store::find($coupon->store_id);
         NotificationService::sendToMany(static::storeCustomerUserIds($coupon->store_id), 'promo',

@@ -10,6 +10,7 @@ use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Services\NotificationService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -31,6 +32,8 @@ class StaffController extends Controller
 
         if ($tab === 'archived') {
             $query->onlyTrashed();
+        } elseif ($tab === 'paused') {
+            $query->whereNull('deleted_at')->where('paused_by_plan', true);
         } else {
             $query->whereNull('deleted_at');
         }
@@ -58,6 +61,7 @@ class StaffController extends Controller
                 'schedule_start' => $u->schedule_start,
                 'schedule_end'   => $u->schedule_end,
                 'is_active'      => $u->is_active,
+                'paused_by_plan' => (bool) $u->paused_by_plan,
                 'created_at'     => $u->created_at->format('M d, Y'),
                 'deleted_at'     => $u->deleted_at?->format('M d, Y'),
                 'license_status' => $u->sub_role === 'rider' ? ($license[$u->id]['license_status'] ?? 'missing') : null,
@@ -71,6 +75,8 @@ class StaffController extends Controller
         return Inertia::render('seller/staff', [
             'staff'         => $staff,
             'archivedCount' => $counts['archived'],
+            'pausedCount'   => User::where('store_id', $store->id)->where('role', 'seller_staff')->where('paused_by_plan', true)->count(),
+            'planLimit'     => $this->planLimit($store),
             'tab'           => $tab,
             'filters'       => ['search' => $search ?? ''],
         ]);
@@ -90,6 +96,11 @@ class StaffController extends Controller
             'schedule_start' => 'required|string|max:10',
             'schedule_end'   => 'required|string|max:10',
         ]);
+
+        // Plan limit: refuse BEFORE the account is created / the email is sent
+        if (! SubscriptionService::canAdd($store, 'staff')) {
+            return back()->withErrors(['email' => SubscriptionService::limitMessage($store, 'staff')]);
+        }
 
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
         $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
@@ -184,8 +195,11 @@ class StaffController extends Controller
                 'schedule_start' => $user->schedule_start,
                 'schedule_end'   => $user->schedule_end,
                 'is_active'      => (bool) $user->is_active,
+                'paused_by_plan' => (bool) $user->paused_by_plan,
+                'busy'           => SubscriptionService::riderIsBusy($user),
                 'created_at'     => $user->created_at->format('M d, Y'),
             ],
+            'planLimit'      => $this->planLimit($store),
             'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
             'userOverrides'  => $userOverrides,
@@ -320,6 +334,11 @@ class StaffController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($user->store_id !== $store->id) abort(403);
 
+        // Restoring re-activates the account: it counts against the plan unless it is paused
+        if (! $user->paused_by_plan && ! SubscriptionService::canAdd($store, 'staff')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'staff'));
+        }
+
         $user->restore();
         $user->update([
             'is_active'           => true,
@@ -374,6 +393,11 @@ class StaffController extends Controller
             return back()->with('success', "{$user->name} deactivated.");
         }
 
+        // A paused account doesn't count until it is un-paused
+        if (! $user->paused_by_plan && ! SubscriptionService::canAdd($store, 'staff')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'staff'));
+        }
+
         $user->update([
             'is_active'           => true,
             'deactivation_reason' => null,
@@ -390,6 +414,43 @@ class StaffController extends Controller
         ]);
 
         return back()->with('success', "{$user->name} activated.");
+    }
+
+    /** Pause (plan limit) / Activate — lets the owner choose which accounts stay active. */
+    public function togglePlanPause(Request $request, User $user): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        if ($user->store_id !== $store->id || $user->role !== 'seller_staff') abort(403);
+
+        if (! $user->paused_by_plan) {
+            if (SubscriptionService::riderIsBusy($user)) {
+                return back()->with('error', 'Finish or reassign their active delivery first.');
+            }
+            $user->update(['paused_by_plan' => true]);
+            SubscriptionService::revokeTokens([$user->id]);
+            SubscriptionService::forgetSummary($store->id);
+
+            return back()->with('success', "{$user->name} paused. They can't log in until you activate them again.");
+        }
+
+        if ($user->is_active && ! SubscriptionService::canAdd($store, 'staff')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'staff'));
+        }
+        $user->update(['paused_by_plan' => false]);
+        SubscriptionService::forgetSummary($store->id);
+
+        return back()->with('success', "{$user->name} activated.");
+    }
+
+    private function planLimit($store): array
+    {
+        return [
+            'used'    => SubscriptionService::usage($store)['staff'],
+            'limit'   => SubscriptionService::limits($store)['staff'],
+            'plan'    => SubscriptionService::summary($store)['last_name'] ?? 'Basic',
+            'message' => SubscriptionService::limitMessage($store, 'staff'),
+            'can_add' => SubscriptionService::canAdd($store, 'staff'),
+        ];
     }
 
     private function parseTime(?string $value): ?string

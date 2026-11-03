@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuthLog;
-use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
+use App\Support\PlatformSales;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,23 +31,19 @@ class DashboardController extends Controller
         $totalOrders = Order::whereNull('deleted_at')->count();
         $ordersToday = Order::whereNull('deleted_at')->whereDate('created_at', $today)->count();
 
-        $totalCommissions     = (float) Invoice::sum('platform_commission');
-        $commissionsThisMonth = (float) Invoice::whereMonth('created_at', $now->month)
-            ->whereYear('created_at', $now->year)
-            ->sum('platform_commission');
-        $commissionsToday = (float) Invoice::whereDate('created_at', $today)
-            ->sum('platform_commission');
+        // Platform sales (GMV) — delivered orders, items + delivery fee
+        $salesAllTime   = PlatformSales::between();
+        $salesThisMonth = PlatformSales::between($now->copy()->startOfMonth(), $now->copy()->endOfMonth());
 
         $pendingVerifications = VerificationRequest::where('status', 'pending')->count();
 
-        // ── Commissions per week — last 12 weeks ──────────────────────────────
-        $commissionsChart = collect(range(11, 0))->map(function (int $weeksAgo) use ($now) {
+        // ── Platform sales per week — last 12 weeks ───────────────────────────
+        $salesChart = collect(range(11, 0))->map(function (int $weeksAgo) use ($now) {
             $start = $now->copy()->startOfWeek()->subWeeks($weeksAgo);
             $end   = $start->copy()->endOfWeek();
             return [
-                'week'       => $start->format('M j'),
-                'commission' => (float) Invoice::whereBetween('created_at', [$start, $end])
-                    ->sum('platform_commission'),
+                'week'  => $start->format('M j'),
+                'sales' => PlatformSales::between($start, $end),
             ];
         })->values();
 
@@ -136,12 +132,15 @@ class DashboardController extends Controller
                 'newUsersThisWeek'     => $newUsersThisWeek,
                 'totalOrders'          => $totalOrders,
                 'ordersToday'          => $ordersToday,
-                'totalCommissions'     => $totalCommissions,
-                'commissionsThisMonth' => $commissionsThisMonth,
-                'commissionsToday'     => $commissionsToday,
+                'salesAllTime'         => $salesAllTime,
+                'salesThisMonth'       => $salesThisMonth,
+                // Store plans
+                'subscriptionIncomeMonth' => \App\Services\SubscriptionService::income($now->copy()->startOfMonth(), $now->copy()->endOfMonth()),
+                'subscriptionIncomeTotal' => \App\Services\SubscriptionService::income(),
                 'pendingVerifications' => $pendingVerifications,
             ],
-            'commissionsChart'   => $commissionsChart,
+            'salesChart'         => $salesChart,
+            'storesByPlan'       => \App\Services\SubscriptionService::storesByPlan(),
             'registrationsChart' => $registrationsChart,
             'ordersChart'        => $ordersChart,
             'recentActivity'     => $recentActivity,

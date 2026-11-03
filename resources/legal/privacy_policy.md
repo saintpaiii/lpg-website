@@ -21,7 +21,7 @@
 ## 4. Why we use your information
 - To create and secure your account and verify your identity.
 - To process, deliver and track orders, compute delivery fees and find stores near you.
-- To process payments, refunds, commission invoices and coupons.
+- To process payments, refunds, subscription payments and coupons.
 - To send notifications and emails about your account and orders.
 - To handle reports, disputes and safety issues.
 - To prevent fraud and keep the Platform safe.

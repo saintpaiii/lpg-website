@@ -31,6 +31,9 @@ class AuthController extends Controller
                 'email' => ['Your account has been deactivated.'],
             ]);
         }
+        if ($user->paused_by_plan) {
+            throw ValidationException::withMessages(['email' => [User::PAUSED_BY_PLAN_MESSAGE]]);
+        }
 
         $token = $user->createToken('mobile', ['*'], now()->addDays(30))->plainTextToken;
 

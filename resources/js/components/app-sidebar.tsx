@@ -5,7 +5,6 @@ import {
     Award,
     BadgeCheck,
     BadgeDollarSign,
-    Banknote,
     BarChart3,
     Bell,
     Flag,
@@ -14,7 +13,7 @@ import {
     CalendarDays,
     Car,
     ClipboardList,
-    HandCoins,
+    Crown,
     History,
     Image,
     LayoutDashboard,
@@ -44,6 +43,8 @@ import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { usePermission } from '@/hooks/use-permission';
+import { FEATURE_INFO, planNeedsAttention } from '@/lib/plans';
+import { usePlan } from '@/hooks/use-plan';
 import { badgeProps, useSidebarBadges } from '@/hooks/use-sidebar-badges';
 import {
     Sidebar,
@@ -58,8 +59,16 @@ import {
 import type { NavItem, SharedData } from '@/types';
 
 export function AppSidebar() {
-    const { auth } = usePage<SharedData>().props;
+    const { auth, plan } = usePage<SharedData>().props;
+    // My Plan badge: amber "!" in the last 3 days, red "!" once the plan has ended
+    const planState = planNeedsAttention(plan);
+    const planBadge = planState === 'expired'
+        ? { badge: '!', badgeTone: 'alert' as const }
+        : planState === 'ending' ? { badge: '!', badgeTone: 'warning' as const } : {};
     const { can } = usePermission();
+    // Feature not on the store's plan → lock + "Pro" / "Premium" tag (opens the upgrade dialog)
+    const { has } = usePlan();
+    const lock = (feature: string) => (has(feature) ? {} : { lockedPlan: FEATURE_INFO[feature]?.plan ?? 'Pro', lockedFeature: feature });
 
     const role        = auth.user.role;
     const subRole     = auth.user.sub_role as string | null | undefined;
@@ -96,16 +105,16 @@ export function AppSidebar() {
             (!isActualSeller && !isHR)                 && { title: 'My Attendance',href: '/seller/my-attendance',  icon: CalendarDays      },
             (!isActualSeller)                          && { title: 'My Documents', href: '/seller/my-documents',   icon: IdCard            },
             (!isActualSeller)                          && { title: 'My Payslips',  href: '/seller/my-payslips',    icon: ClipboardList     },
-            (isActualSeller || isHR)                   && { title: 'Payroll',      href: '/seller/payroll',        icon: BadgeDollarSign   },
+            (isActualSeller || isHR)                   && { title: 'Payroll',      href: '/seller/payroll',        icon: BadgeDollarSign, ...lock('payroll') },
+            isActualSeller                             && { title: 'My Plan',      href: '/seller/plan',           icon: Crown, ...planBadge },
             isActualSeller                             && { title: 'Revenue',      href: '/seller/revenue',        icon: TrendingUp        },
-            isActualSeller                             && { title: 'Commission',   href: '/seller/commission',     icon: HandCoins         },
             (isActualSeller || can('orders.view'))     && { title: 'Refunds',      href: '/seller/refunds',        icon: RefreshCcw, ...badgeProps(sb['seller.refunds']) },
             (isActualSeller || can('customer_reports.manage')) && { title: 'Customer Reports', href: '/seller/customer-reports', icon: Flag, ...badgeProps(sb['seller.customer_reports']) },
-            isActualSeller                             && { title: 'Coupons',      href: '/seller/coupons',        icon: TicketPercent     },
+            isActualSeller                             && { title: 'Coupons',      href: '/seller/coupons',        icon: TicketPercent, ...lock('coupons') },
             (isActualSeller || can('reports.view'))     && { title: 'Reports',      href: '/seller/reports',    icon: LineChart       },
-            (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain           },
-            isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award     },
-            (isActualSeller || isHR)                    && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users     },
+            (isActualSeller || can('dss.view'))         && { title: 'DSS Insights', href: '/seller/dss',        icon: Brain, ...lock('dss') },
+            isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award, ...lock('loyalty') },
+            (isActualSeller || isHR)                    && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users, ...lock('loyalty') },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
             isActualSeller                              && { title: 'Store Documents', href: '/seller/documents', icon: FileText, ...badgeProps(sb['seller.store_documents']) },
             { title: 'Notifications', href: '/notifications', icon: Bell   },
@@ -188,11 +197,10 @@ export function AppSidebar() {
         isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag, ...badgeProps(sb['admin.user_reports']) },
         isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw, ...badgeProps(sb['admin.refunds']) },
         can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
+        isPlatformAdmin        && { title: 'Subscriptions',      href: '/admin/subscriptions',                                icon: Crown           },
         isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
         can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
         isPlatformAdmin        && { title: 'Terms & Policies',   href: '/admin/legal',                                        icon: ScrollText      },
-        isPlatformAdmin        && { title: 'Commissions',        href: '/admin/commissions',                                  icon: Banknote        },
-        isPlatformAdmin        && { title: 'Coupons',            href: '/admin/coupons',                                      icon: TicketPercent   },
         isPlatformAdmin        && { title: 'Auth Logs',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },
         { title: 'Notifications', href: '/notifications', icon: Bell },
         { title: 'Profile', href: '/settings/profile', icon: User },

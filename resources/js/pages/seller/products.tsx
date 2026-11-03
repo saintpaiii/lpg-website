@@ -1,6 +1,8 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ImageIcon, MessageSquare, Package, Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import { toast } from 'sonner';
+import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -31,6 +33,7 @@ type Product = {
     refill_price: number;
     purchase_price: number;
     is_active: boolean;
+    paused_by_plan: boolean;
     image_url: string | null;
     media: ExistingMedia[];
     stock: number;
@@ -41,7 +44,7 @@ type Product = {
     deleted_at: string | null;
 };
 
-type Counts = { active: number; inactive: number; archived: number };
+type Counts = { active: number; inactive: number; paused: number; archived: number };
 type Paginated = { data: Product[]; current_page: number; last_page: number; total: number };
 
 type Props = {
@@ -51,6 +54,7 @@ type Props = {
     search: string;
     /** Largest total upload the server accepts (post_max_size − 1 MB) */
     max_upload_bytes: number;
+    planLimit?: PlanLimit;
 };
 
 const TOO_LARGE = 'The files are too large to upload at once. Try a shorter video or fewer photos.';
@@ -58,6 +62,7 @@ const TOO_LARGE = 'The files are too large to upload at once. Try a shorter vide
 const TABS = [
     { key: 'active',   label: 'Active',   count_key: 'active'   },
     { key: 'inactive', label: 'Inactive', count_key: 'inactive' },
+    { key: 'paused',   label: 'Paused (plan)', count_key: 'paused' },
     { key: 'archived', label: 'Archived', count_key: 'archived' },
 ] as const;
 
@@ -77,7 +82,7 @@ const EMPTY_FORM: ProductForm = {
     refill_price: '', purchase_price: '', stock: '', reorder_level: '10',
 };
 
-export default function SellerProducts({ products, counts, tab, search, max_upload_bytes }: Props) {
+export default function SellerProducts({ products, counts, tab, search, max_upload_bytes, planLimit }: Props) {
     const [searchVal, setSearchVal] = useState(search);
     const [showForm, setShowForm]   = useState(false);
     const [editing, setEditing]     = useState<Product | null>(null);
@@ -179,6 +184,11 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
     }
 
     function toggleProduct(p: Product) {
+        // Publishing at the plan limit is refused (the server checks too)
+        if (!p.is_active && planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
         router.patch(`/seller/products/${p.id}/toggle`);
     }
 
@@ -235,8 +245,10 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                     </div>
                 </div>
 
+                <PlanLimitBar label="Published" planLimit={planLimit} />
+
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b">
                     {TABS.map(({ key, label, count_key }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -295,6 +307,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">{p.name}</p>
                                                 <p className="text-xs text-muted-foreground">{p.brand} {p.weight && `· ${p.weight}`}</p>
+                                                {p.paused_by_plan && <span className={`mt-1 inline-block ${PAUSED_BADGE}`}>Unpublished — over plan limit</span>}
                                             </td>
                                             <td className="px-4 py-3 text-right font-medium">
                                                 ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}

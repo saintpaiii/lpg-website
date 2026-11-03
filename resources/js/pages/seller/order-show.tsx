@@ -69,7 +69,6 @@ type Order = {
     discount_amount: number;
     coupon_code: string | null;
     coupon_discount: number;
-    coupon_type: 'platform' | 'store' | null;
     notes: string | null;
     cancellation_reason: string | null;
     cancellation_notes: string | null;
@@ -431,7 +430,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 {order.coupon_discount > 0 && (
                                     <div className="flex justify-between text-xs">
                                         <span className="text-muted-foreground">
-                                            Coupon {order.coupon_code} ({order.coupon_type === 'platform' ? 'platform promo — cost shared with the platform' : 'your store promo'})
+                                            Coupon {order.coupon_code}
                                         </span>
                                         <span className="text-emerald-600">−{fmt(order.coupon_discount)}</span>
                                     </div>

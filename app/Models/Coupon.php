@@ -9,9 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 /**
- * Promo coupons. 'platform' coupons are created by the admin (the platform
- * absorbs the cost by waiving its commission); 'store' coupons are created by
- * a seller for their own store (commission is still charged on the original price).
+ * Store promo coupons: created by a seller for their own store, which pays for the discount.
+ * (Old orders may still point to a removed platform coupon — Order::coupon() uses withTrashed().)
  */
 class Coupon extends Model
 {
@@ -32,9 +31,6 @@ class Coupon extends Model
         'starts_at',
         'expires_at',
         'is_active',
-        'admin_share_percent',
-        'seller_commission_during_promo',
-        'featured_boost',
         'expiry_notified_at',
         'created_by',
     ];
@@ -52,9 +48,6 @@ class Coupon extends Model
             'expires_at'          => 'datetime',
             'expiry_notified_at'  => 'datetime',
             'is_active'           => 'boolean',
-            'admin_share_percent' => 'integer',
-            'seller_commission_during_promo' => 'decimal:2',
-            'featured_boost'      => 'boolean',
         ];
     }
 
@@ -85,29 +78,6 @@ class Coupon extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
-    }
-
-    public function exclusions(): HasMany
-    {
-        return $this->hasMany(CouponStoreExclusion::class);
-    }
-
-    /** @return int[] store ids that opted out of this (platform) coupon */
-    public function excludedStoreIds(): array
-    {
-        return $this->type === 'platform'
-            ? $this->exclusions()->pluck('store_id')->map(fn ($id) => (int) $id)->all()
-            : [];
-    }
-
-    /** Active (or scheduled) platform coupons that have not expired. */
-    public function scopeRunningPlatform(\Illuminate\Database\Eloquent\Builder $q, bool $includeScheduled = false): \Illuminate\Database\Eloquent\Builder
-    {
-        return $q->where('type', 'platform')
-            ->where('is_active', true)
-            ->where(fn ($w) => $w->whereNull('expires_at')->orWhere('expires_at', '>', now()))
-            ->when(! $includeScheduled, fn ($w) => $w->where(fn ($s) => $s->whereNull('starts_at')->orWhere('starts_at', '<=', now())))
-            ->where(fn ($w) => $w->whereNull('max_uses')->orWhereColumn('used_count', '<', 'max_uses'));
     }
 
     /** Human label, e.g. "10% off (max ₱100)" or "₱50 off delivery". */

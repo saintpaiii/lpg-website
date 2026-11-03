@@ -21,4 +21,7 @@ export type NavItem = {
     disabled?: boolean;
     /** Tooltip shown on a disabled item */
     disabledReason?: string;
+    /** Plan feature the store doesn't have: shows a lock + tag and opens the upgrade dialog instead of the page */
+    lockedPlan?: 'Pro' | 'Premium';
+    lockedFeature?: string;
 };

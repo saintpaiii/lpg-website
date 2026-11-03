@@ -37,9 +37,10 @@ class HandleInertiaRequests extends Middleware
      *
      * @return array<string, mixed>
      */
-    /** Store columns the layout needs (sidebar, suspension banners). */
+    /** Store columns the layout needs (sidebar, suspension banners, plan). Without the plan columns every store would look expired. */
     private const STORE_COLUMNS = [
-        'id', 'store_name', 'status', 'commission_suspended', 'documents_suspended',
+        'id', 'store_name', 'status', 'documents_suspended',
+        'subscription_plan', 'subscription_expires_at', 'is_featured', 'trial_used_at',
         'business_permit_expires_at', 'fsic_permit_expires_at', 'doe_lpg_license_expires_at', 'lto_permit_expires_at',
         'latitude', 'longitude',
     ];
@@ -84,11 +85,6 @@ class HandleInertiaRequests extends Middleware
                     'id'                   => $store->id,
                     'store_name'           => $store->store_name,
                     'status'               => $store->status,
-                    'commission_suspended' => (bool) $store->commission_suspended,
-                    // Amount needed to lift a commission suspension (only computed when suspended)
-                    'commission_owed'      => $store->commission_suspended
-                        ? \App\Services\CommissionBillingService::outstandingFor($store->id)
-                        : 0,
                     // Permit problems for the seller banner (from the store row only)
                     'documents_suspended'  => (bool) $store->documents_suspended,
                     'documents_alert'      => \App\Support\StoreDocuments::alertFor($store),
@@ -97,11 +93,19 @@ class HandleInertiaRequests extends Middleware
                 ] : null,
                 'seller_application' => $sellerApplication,
             ],
+            // Store plan (owner, staff and riders of a store) — sidebar badge, banner and popup need it on every page
+            'plan' => fn () => $store
+                ? \Illuminate\Support\Facades\Cache::remember(\App\Services\SubscriptionService::summaryCacheKey($store->id), 30,
+                    fn () => \App\Services\SubscriptionService::summary($store))
+                : null,
+            // Plan comparison for the owner's "plan ends soon / ended" popup and the upgrade dialog (staff see it too)
+            'planCatalog' => fn () => $store && in_array($user->role, ['seller', 'seller_staff'], true) ? \App\Services\SubscriptionService::publicPlans() : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [
                 'success'              => fn () => $request->session()->get('success'),
                 'error'                => fn () => $request->session()->get('error'),
                 'info'                 => fn () => $request->session()->get('info'),
+                'warning'              => fn () => $request->session()->get('warning'),
 'deactivation_info'    => fn () => $request->session()->get('deactivation_info'),
                 'store_suspension_info'=> fn () => $request->session()->get('store_suspension_info'),
             ],

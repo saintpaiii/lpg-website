@@ -47,6 +47,9 @@ class GoogleAuthController extends Controller
                 }
                 return redirect('/login')->with($flash)->withErrors(['email' => 'Your account has been deactivated.']);
             }
+            if ($user->paused_by_plan) {
+                return redirect('/login')->withErrors(['email' => \App\Models\User::PAUSED_BY_PLAN_MESSAGE]);
+            }
         } else {
             // New user — create a customer account
             $nameParts = explode(' ', trim($googleUser->getName()), 2);

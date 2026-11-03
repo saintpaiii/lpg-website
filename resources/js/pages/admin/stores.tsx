@@ -1,4 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ADMIN_PLAN_STATUS } from '@/lib/plans';
 import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { AlertTriangle, Building2, CheckCircle2, Eye, MoreHorizontal, PauseCircle, Search, Store, Trash2, XCircle } from 'lucide-react';
 import { useState } from 'react';
@@ -48,7 +49,8 @@ type StoreRow = {
     city: string;
     province: string;
     status: string;
-    commission_rate: number;
+    plan?: string;
+    plan_status?: 'trial' | 'active' | 'ending' | 'expired' | 'none';
     created_at: string;
     deleted_at: string | null;
     owner_name: string;
@@ -214,7 +216,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Store</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Location</th>
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden lg:table-cell">Owner</th>
-                                        <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Commission</th>
+                                        <th className="text-left px-4 py-2.5 font-medium text-muted-foreground hidden md:table-cell">Plan</th>
                                         <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Status</th>
                                         <th className="text-right px-4 py-2.5 font-medium text-muted-foreground hidden sm:table-cell">Joined</th>
                                         <th className="px-4 py-2.5" />
@@ -249,10 +251,13 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                                 <p className="font-medium text-sm">{store.owner_name}</p>
                                                 <p className="text-xs text-muted-foreground">{store.owner_email}</p>
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-50 text-blue-700">
-                                                    {store.commission_rate}%
-                                                </span>
+                                            <td className="px-4 py-3 hidden md:table-cell">
+                                                <p className="text-sm">{store.plan ?? '—'}</p>
+                                                {store.plan_status && (
+                                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ADMIN_PLAN_STATUS[store.plan_status]?.cls}`}>
+                                                        {ADMIN_PLAN_STATUS[store.plan_status]?.label}
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>

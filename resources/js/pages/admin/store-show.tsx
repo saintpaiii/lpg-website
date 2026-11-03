@@ -5,6 +5,7 @@ import {
     Building2,
     CheckCircle2,
     Clock,
+    Crown,
     ExternalLink,
     FileText,
     Mail,
@@ -28,6 +29,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { ADMIN_PLAN_STATUS } from '@/lib/plans';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
@@ -51,7 +53,6 @@ type StoreDetail = {
     phone: string | null;
     email: string | null;
     status: string;
-    commission_rate: number;
     approved_at: string | null;
     created_at: string;
     owner_name: string | null;
@@ -104,12 +105,24 @@ type StoreStats = {
     total_revenue: number;
     total_products: number;
     active_products: number;
-    commissions: number;
+    delivered_orders: number;
+};
+
+type StoreSubscription = {
+    plan: string;
+    status: 'trial' | 'active' | 'ending' | 'expired' | 'none';
+    expires: string | null;
+    days_left: number;
+    usage?: { products: number; staff: number; vehicles: number };
+    limits?: { products: number | null; staff: number | null; vehicles: number | null };
+    paused?: { products: number; staff: number; vehicles: number };
+    payments: { id: number; receipt_number: string | null; plan: string; amount: number; method: string; period: string; paid_at: string | null }[];
 };
 
 type Props = {
     store: StoreDetail;
     stats: StoreStats;
+    subscription?: StoreSubscription;
     history: ActionHistory[];
     documentHistory: DocumentHistoryRow[];
 };
@@ -143,7 +156,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function StoreShow({ store, stats, history, documentHistory }: Props) {
+export default function StoreShow({ store, stats, subscription, history, documentHistory }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/admin/dashboard' },
         { title: 'Stores',    href: '/admin/stores' },
@@ -157,12 +170,6 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
 
     const suspendForm = useForm({ reason: '', notes: '' });
 
-    const {
-        data: commData,
-        setData: setCommData,
-        patch: patchComm,
-        processing: commProcessing,
-    } = useForm({ commission_rate: String(store.commission_rate) });
 
     function approve() {
         router.patch(`/admin/stores/${store.id}/approve`);
@@ -188,7 +195,7 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
         { label: 'Total Orders',    value: stats.total_orders,    icon: ShoppingCart,    color: 'text-blue-600',    bg: 'bg-blue-50 dark:bg-blue-900/20'    },
         { label: 'Total Revenue',   value: fmt(stats.total_revenue),  icon: PhilippinePeso,  color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
         { label: 'Products',        value: `${stats.active_products} / ${stats.total_products}`, icon: Package, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/20' },
-        { label: 'Commission Paid', value: fmt(stats.commissions),    icon: PhilippinePeso,  color: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-900/20'   },
+        { label: 'Delivered Orders', value: stats.delivered_orders, icon: ShoppingCart,    color: 'text-amber-600',   bg: 'bg-amber-50 dark:bg-amber-900/20'   },
     ];
 
     return (
@@ -309,29 +316,6 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                                     <span>{store.email}</span>
                                 </div>
                             )}
-                            <div className="pt-2 border-t">
-                                <p className="text-xs text-muted-foreground mb-1.5">Commission Rate</p>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="0.01"
-                                        value={commData.commission_rate}
-                                        onChange={(e) => setCommData('commission_rate', e.target.value)}
-                                        className="w-24 h-8 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring tabular-nums"
-                                    />
-                                    <span className="text-sm text-muted-foreground">%</span>
-                                    <Button
-                                        size="sm"
-                                        className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                                        disabled={commProcessing}
-                                        onClick={() => patchComm(`/admin/stores/${store.id}/commission-rate`)}
-                                    >
-                                        Save
-                                    </Button>
-                                </div>
-                            </div>
                         </CardContent>
                     </Card>
 
@@ -399,6 +383,87 @@ export default function StoreShow({ store, stats, history, documentHistory }: Pr
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Plan */}
+                {subscription && (
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                                <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Plan</span>
+                                <span className="flex gap-3 text-xs font-medium">
+                                    <Link href={`/admin/subscriptions?tab=stores&search=${encodeURIComponent(store.store_name)}`} className="text-blue-600 hover:underline">
+                                        Give free days / record cash
+                                    </Link>
+                                    <Link href={`/admin/subscriptions?tab=payments&search=${encodeURIComponent(store.store_name)}`} className="text-blue-600 hover:underline">
+                                        All payments
+                                    </Link>
+                                </span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                                <span><span className="text-muted-foreground">Plan:</span> <strong>{subscription.plan}</strong></span>
+                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ADMIN_PLAN_STATUS[subscription.status]?.cls}`}>
+                                    {ADMIN_PLAN_STATUS[subscription.status]?.label}
+                                </span>
+                                <span><span className="text-muted-foreground">Expires:</span> {subscription.expires ?? '—'}</span>
+                                {subscription.status !== 'expired' && subscription.status !== 'none' && (
+                                    <span><span className="text-muted-foreground">Days left:</span> {subscription.days_left}</span>
+                                )}
+                            </div>
+                            {subscription.usage && subscription.limits && (
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    {([['products', 'Published products'], ['staff', 'Staff accounts'], ['vehicles', 'Vehicles']] as const).map(([k, label]) => {
+                                        const used = subscription.usage![k];
+                                        const limit = subscription.limits![k];
+                                        const paused = subscription.paused?.[k] ?? 0;
+                                        return (
+                                            <div key={k} className={`rounded-lg border px-3 py-2 ${limit != null && used >= limit ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30' : ''}`}>
+                                                <p className="text-xs text-muted-foreground">{label}</p>
+                                                <p className="font-semibold tabular-nums">{used} / {limit ?? 'Unlimited'}</p>
+                                                {paused > 0 && <p className="text-xs text-amber-700 dark:text-amber-400">{paused} paused (plan limit)</p>}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                            {subscription.payments.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                <th className="py-2 pr-4">Receipt #</th>
+                                                <th className="py-2 pr-4">Plan</th>
+                                                <th className="py-2 pr-4">Method</th>
+                                                <th className="py-2 pr-4">Period</th>
+                                                <th className="py-2 pr-4 text-right">Amount</th>
+                                                <th className="py-2" />
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {subscription.payments.map((p) => (
+                                                <tr key={p.id}>
+                                                    <td className="py-2 pr-4 font-mono text-xs">{p.receipt_number ?? '—'}</td>
+                                                    <td className="py-2 pr-4">{p.plan}</td>
+                                                    <td className="py-2 pr-4">{p.method}</td>
+                                                    <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">{p.period}</td>
+                                                    <td className="py-2 pr-4 text-right tabular-nums">₱{p.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
+                                                    <td className="py-2 text-right">
+                                                        {p.receipt_number && (
+                                                            <a href={`/admin/subscriptions/payments/${p.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs font-medium text-blue-600 hover:underline">Receipt</a>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground">No plan payments yet.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Action History */}
                 {history.length > 0 && (

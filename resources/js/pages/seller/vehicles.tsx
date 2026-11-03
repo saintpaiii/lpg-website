@@ -1,4 +1,6 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { toast } from 'sonner';
+import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
 import {
     AlertTriangle,
     Car,
@@ -52,6 +54,9 @@ type Vehicle = {
     max_tanks: number;
     description: string | null;
     status: VehicleStatus;
+    paused_by_plan: boolean;
+    /** On an active delivery (can't be paused) */
+    busy: boolean;
     assigned_rider: { id: number; name: string } | null;
     deleted_at: string | null;
 };
@@ -61,6 +66,7 @@ type Rider = { id: number; name: string };
 type Props = {
     vehicles: Vehicle[];
     riders: Rider[];
+    planLimit?: PlanLimit;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -120,7 +126,10 @@ function blankForm() {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function VehiclesPage({ vehicles, riders }: Props) {
+export default function VehiclesPage({ vehicles, riders, planLimit }: Props) {
+    // ?filter=paused (from My Plan) shows only the vehicles paused by the plan limit
+    const { url } = usePage();
+    const [onlyPaused, setOnlyPaused] = useState(url.includes('filter=paused'));
     const [showForm,    setShowForm]    = useState(false);
     const [editTarget,  setEditTarget]  = useState<Vehicle | null>(null);
     const [archiveTarget, setArchiveTarget] = useState<Vehicle | null>(null);
@@ -129,6 +138,10 @@ export default function VehiclesPage({ vehicles, riders }: Props) {
     const [submitting, setSubmitting] = useState(false);
 
     function openAdd() {
+        if (planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
         setForm(blankForm());
         setErrors({});
         setEditTarget(null);
@@ -194,7 +207,17 @@ export default function VehiclesPage({ vehicles, riders }: Props) {
         router.post(`/seller/vehicles/${v.id}/restore`, {}, { preserveScroll: true });
     }
 
-    const active   = vehicles.filter(v => !v.deleted_at);
+    // Plan limit: pause one vehicle / activate a paused one (the server checks the limit)
+    function togglePlanPause(v: Vehicle) {
+        if (v.paused_by_plan && v.status !== 'retired' && planLimit && !planLimit.can_add) {
+            toast.error(planLimit.message);
+            return;
+        }
+        router.patch(`/seller/vehicles/${v.id}/plan-pause`, {}, { preserveScroll: true });
+    }
+
+    const pausedCount = vehicles.filter(v => !v.deleted_at && v.paused_by_plan).length;
+    const active   = vehicles.filter(v => !v.deleted_at && (!onlyPaused || v.paused_by_plan));
     const archived = vehicles.filter(v =>  v.deleted_at);
 
     return (
@@ -218,10 +241,20 @@ export default function VehiclesPage({ vehicles, riders }: Props) {
                     </Button>
                 </div>
 
+                <PlanLimitBar label="Vehicles" planLimit={planLimit} />
+
                 {/* Vehicle table */}
                 <Card>
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Active Vehicles</CardTitle>
+                        <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                            {onlyPaused ? 'Paused (plan)' : 'Active Vehicles'}
+                            {(pausedCount > 0 || onlyPaused) && (
+                                <button type="button" onClick={() => setOnlyPaused((x) => !x)}
+                                    className="text-xs font-medium text-blue-600 hover:underline">
+                                    {onlyPaused ? 'Show all vehicles' : `Paused (plan) · ${pausedCount}`}
+                                </button>
+                            )}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {active.length === 0 ? (
@@ -261,12 +294,23 @@ export default function VehiclesPage({ vehicles, riders }: Props) {
                                                     {v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[v.status]}`}>
-                                                        {STATUS_LABELS[v.status]}
-                                                    </span>
+                                                    {v.paused_by_plan ? (
+                                                        <span className={PAUSED_BADGE}>Inactive — over plan limit</span>
+                                                    ) : (
+                                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[v.status]}`}>
+                                                            {STATUS_LABELS[v.status]}
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-1.5">
+                                                        {(v.paused_by_plan || (planLimit?.limit != null && v.status !== 'retired')) && (
+                                                            <Button size="sm" variant="outline" className="h-7 px-2 text-xs" onClick={() => togglePlanPause(v)}
+                                                                disabled={!v.paused_by_plan && (v.busy || v.status === 'in_use')}
+                                                                title={!v.paused_by_plan && (v.busy || v.status === 'in_use') ? 'On a delivery — pause it after the delivery is finished' : undefined}>
+                                                                {v.paused_by_plan ? 'Activate' : 'Pause (plan limit)'}
+                                                            </Button>
+                                                        )}
                                                         <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => openEdit(v)}>
                                                             <Pencil className="h-3.5 w-3.5" />
                                                         </Button>

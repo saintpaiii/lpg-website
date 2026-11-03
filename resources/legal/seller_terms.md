@@ -25,14 +25,14 @@ These Seller Terms apply to every store owner ("Seller") who sells LPG on {compa
 - Online payments: processed through the Platform's payment partner, PayMongo.
 - Consignment: if you allow it, you set the terms for eligible customers and you are responsible for collecting the balance.
 
-## 6. Platform commission
-- The Platform charges a commission of {commission_rate} on every completed order, based on the product subtotal (delivery fee not included).
-- The commission rate may be changed by the Platform. You will be informed before a new rate applies.
-- Commission is billed through a commission invoice for each billing period (monthly by default). You can view and pay it in the Commission page.
-- If an invoice is not paid within the due date and grace period, your store is automatically suspended and your products are hidden from customers until it is paid.
-- Your store's commission rate is shown in your Commission page. Commission is only charged on orders that are delivered and fully paid.
-- If a store coupon is used, commission is based on the original price before the coupon.
-- Platform-run promotions may use a different promo commission rate, and the Platform's share of the discount is credited back to your store on your commission invoice.
+## 6. Subscription plans
+- The Platform does not charge commission. You keep the full amount of your sales.
+- After your store is approved, it gets a free 30-day Premium trial (once per store).
+- After the trial, your store needs a monthly plan (Basic, Pro or Premium) for your products to be visible to customers. The price, limits and features of each plan are shown on the My Plan page. The Platform may change prices; a new price only applies to your next purchase.
+- Plans are prepaid for 30 days through PayMongo and do not renew automatically. You are reminded during the last 3 days.
+- When your plan ends without renewal, your products are hidden from customers right away. You can still log in and finish orders that were already placed.
+- Buying a different plan starts it immediately at full price; unused days of the previous plan are not refunded. If your store has more products, staff or vehicles than the new plan allows, the extras are paused (never deleted) until you are within the limit or upgrade.
+- Store coupons are paid for by your store.
 
 ## 7. Refunds and customer reports
 - You must review refund requests and customer reports fairly and on time.

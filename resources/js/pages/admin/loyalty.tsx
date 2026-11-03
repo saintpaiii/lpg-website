@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { BreadcrumbItem } from '@/types';
 
 type Props = {
-    stats: { stores_enabled: number; total_customers: number; avg_trust: number; tiers: { [K in Tier]: number } };
-    top_stores: { id: number; store_name: string; customers: number }[];
+    stats: { stores_enabled: number; stores_locked?: number; total_customers: number; avg_trust: number; tiers: { [K in Tier]: number } };
+    top_stores: { id: number; store_name: string; customers: number; locked?: boolean }[];
     records: {
         data: { id: number; store_name: string; customer_name: string; tier: Tier; trust_score: number; total_orders: number; total_spent: number; last_order_at: string | null }[];
         current_page: number; last_page: number; total: number; from: number | null; to: number | null;
@@ -45,7 +45,12 @@ export default function AdminLoyalty({ stats, top_stores, records, stores, filte
                             <CardTitle className="text-sm font-medium text-muted-foreground">Stores with Loyalty Enabled</CardTitle>
                             <Store className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
-                        <CardContent><div className="text-2xl font-bold">{stats.stores_enabled}</div></CardContent>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.stores_enabled}</div>
+                            {!!stats.stores_locked && (
+                                <p className="text-xs text-muted-foreground">+ {stats.stores_locked} Locked (plan)</p>
+                            )}
+                        </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -89,6 +94,7 @@ export default function AdminLoyalty({ stats, top_stores, records, stores, filte
                                 <button key={s.id} type="button" onClick={() => visit({ store_id: s.id, page: 1 })}
                                     className="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted">
                                     <span className="text-muted-foreground">#{i + 1}</span> {s.store_name} · <strong>{s.customers}</strong>
+                                    {s.locked && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Locked (plan)</span>}
                                 </button>
                             ))}
                         </CardContent>

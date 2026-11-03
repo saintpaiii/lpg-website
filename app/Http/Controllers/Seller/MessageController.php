@@ -92,7 +92,7 @@ class MessageController extends BaseMessageController
         $user     = $conversation->customer;
         $customer = $user ? Customer::where('user_id', $user->id)->first() : null;
         $orders   = Order::where('store_id', $storeId)->whereHas('customer', fn ($q) => $q->where('user_id', $user?->id));
-        $loyaltyOn = (bool) StoreLoyaltySettings::where('store_id', $storeId)->value('is_enabled');
+        $loyaltyOn = \App\Services\LoyaltyService::isOn($storeId);
         $loyalty  = $loyaltyOn && $user ? CustomerLoyalty::where('user_id', $user->id)->where('store_id', $storeId)->first() : null;
 
         $counted = (clone $orders)->where('status', '!=', 'cancelled');

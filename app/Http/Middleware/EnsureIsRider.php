@@ -31,6 +31,13 @@ class EnsureIsRider
             ]);
         }
 
+        if ($user->paused_by_plan) {
+            auth()->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+            return redirect()->route('login')->withErrors(['email' => \App\Models\User::PAUSED_BY_PLAN_MESSAGE]);
+        }
+
         return $next($request);
     }
 }

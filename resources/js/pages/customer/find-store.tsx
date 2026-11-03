@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { FeaturedBadge } from '@/components/featured-badge';
 import axios from 'axios';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -25,7 +26,7 @@ type Type = 'refill' | 'new_purchase';
 type Sort = 'nearest' | 'cheapest';
 
 type Result = {
-    store: { id: number; name: string; logo_url: string | null; area: string; approximate_location: boolean; lat: number; lng: number };
+    store: { id: number; name: string; featured?: boolean; logo_url: string | null; area: string; approximate_location: boolean; lat: number; lng: number };
     product: { id: number; name: string; brand: string | null; weight: string; size_label: string; image_url: string | null };
     type: Type;
     quantity: number;
@@ -411,6 +412,7 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                             ? <img src={r.store.logo_url} alt="" className="h-7 w-7 rounded-full border object-cover" />
                             : <StoreIcon className="h-5 w-5 text-gray-400" />}
                         <span className="font-semibold text-gray-900 dark:text-white">{r.store.name}</span>
+                        {r.store.featured && <FeaturedBadge />}
                         {r.badges.includes('Nearest') && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/50 dark:text-green-300">Nearest</span>}
                         {r.badges.includes('Cheapest') && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Cheapest</span>}
                     </div>

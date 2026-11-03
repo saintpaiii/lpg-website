@@ -15,7 +15,7 @@ use App\Http\Controllers\Seller\SettingsController;
 use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\RefundController as SellerRefundController;
 use App\Http\Controllers\Seller\RevenueController;
-use App\Http\Controllers\Seller\CommissionController as SellerCommissionController;
+use App\Http\Controllers\Seller\SubscriptionController as SellerSubscriptionController;
 use App\Http\Controllers\Seller\CouponController as SellerCouponController;
 use App\Http\Controllers\Seller\PayrollController;
 use App\Http\Controllers\Seller\StaffController;
@@ -51,7 +51,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         // ── Orders ───────────────────────────────────────────────────────────
         Route::middleware('permission:orders.view')->group(function () {
             Route::get('orders', [OrderController::class, 'index'])->name('orders');
-            Route::get('orders/export', [OrderController::class, 'export'])->name('orders.export');
+            Route::get('orders/export', [OrderController::class, 'export'])->middleware('plan.feature:export')->name('orders.export');
             Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
 
@@ -91,13 +91,14 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::post('vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
         Route::put('vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
         Route::delete('vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
+        Route::patch('vehicles/{vehicle}/plan-pause', [VehicleController::class, 'togglePlanPause'])->name('vehicles.plan-pause');
         Route::post('vehicles/{vehicle}/restore', [VehicleController::class, 'restore'])
             ->withTrashed()->name('vehicles.restore');
 
         // ── Invoices ─────────────────────────────────────────────────────────
         Route::middleware('permission:invoices.view')->group(function () {
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
-            Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
+            Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('plan.feature:export')->name('invoices.export');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
             Route::post('invoices/{invoice}/record-payment', [InvoiceController::class, 'recordPayment'])->name('invoices.record-payment');
         });
@@ -117,6 +118,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('staff/{user}', [StaffController::class, 'show'])->name('staff.show');
             Route::put('staff/{user}', [StaffController::class, 'update'])->name('staff.update');
             Route::patch('staff/{user}/toggle', [StaffController::class, 'toggle'])->name('staff.toggle');
+            Route::patch('staff/{user}/plan-pause', [StaffController::class, 'togglePlanPause'])->name('staff.plan-pause');
             Route::put('staff/{user}/permissions', [StaffController::class, 'updatePermissions'])->name('staff.permissions');
             Route::delete('staff/{user}/permissions', [StaffController::class, 'resetPermissions'])->name('staff.permissions.reset');
             Route::delete('staff/{user}', [StaffController::class, 'destroy'])->name('staff.destroy');
@@ -128,7 +130,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── Attendance (seller owner + HR staff) ─────────────────────────────
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance');
-        Route::get('attendance/export', [AttendanceController::class, 'export'])->name('attendance.export');
+        Route::get('attendance/export', [AttendanceController::class, 'export'])->middleware('plan.feature:export')->name('attendance.export');
         Route::post('attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clock-in');
         Route::post('attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clock-out');
         Route::post('attendance/set-clock-out', [AttendanceController::class, 'setClockOut'])->name('attendance.set-clock-out');
@@ -145,34 +147,36 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::get('my-documents', [\App\Http\Controllers\StaffDocumentController::class, 'index'])->name('my-documents');
         Route::post('my-documents', [\App\Http\Controllers\StaffDocumentController::class, 'store'])->middleware('throttle:20,1')->name('my-documents.store');
 
-        // ── Payroll (seller owner + HR can view; owner-only for settings/actions)
-        Route::get('payroll', [PayrollController::class, 'index'])->name('payroll');
-        Route::get('payroll/export', [PayrollController::class, 'export'])->name('payroll.export');
-        Route::post('payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
-        Route::patch('payroll/{payroll}/release', [PayrollController::class, 'markReleased'])->name('payroll.release');
-        Route::patch('payroll/{payroll}/paid', [PayrollController::class, 'markPaid'])->name('payroll.paid');
-        Route::get('payroll/settings', [PayrollController::class, 'settings'])->name('payroll.settings');
-        Route::post('payroll/settings', [PayrollController::class, 'updateSettings'])->name('payroll.settings.update');
-        Route::patch('payroll/staff/{user}/rate', [PayrollController::class, 'updateStaffRate'])->name('payroll.staff-rate');
+        // ── Payroll (seller owner + HR can view; owner-only for settings/actions) — Pro plan and up
+        Route::middleware('plan.feature:payroll')->group(function () {
+            Route::get('payroll', [PayrollController::class, 'index'])->name('payroll');
+            Route::get('payroll/export', [PayrollController::class, 'export'])->middleware('plan.feature:export')->name('payroll.export');
+            Route::post('payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate');
+            Route::patch('payroll/{payroll}/release', [PayrollController::class, 'markReleased'])->name('payroll.release');
+            Route::patch('payroll/{payroll}/paid', [PayrollController::class, 'markPaid'])->name('payroll.paid');
+            Route::get('payroll/settings', [PayrollController::class, 'settings'])->name('payroll.settings');
+            Route::post('payroll/settings', [PayrollController::class, 'updateSettings'])->name('payroll.settings.update');
+            Route::patch('payroll/staff/{user}/rate', [PayrollController::class, 'updateStaffRate'])->name('payroll.staff-rate');
+        });
 
-        // ── Revenue & commissions (seller owner only) ─────────────────────────
+        // ── Revenue (seller owner only) ────────────────────────────────────────
         Route::middleware('seller_owner')->group(function () {
+            // My Plan (subscription)
+            Route::get('plan', [SellerSubscriptionController::class, 'index'])->name('plan');
+            Route::post('plan/checkout', [SellerSubscriptionController::class, 'checkout'])->middleware('throttle:10,1')->name('plan.checkout');
+            Route::get('plan/receipts/{payment}/pdf', [SellerSubscriptionController::class, 'receipt'])->name('plan.receipt');
+
             Route::get('revenue', [RevenueController::class, 'index'])->name('revenue');
-            Route::get('revenue/export', [RevenueController::class, 'export'])->name('revenue.export');
+            Route::get('revenue/export', [RevenueController::class, 'export'])->middleware('plan.feature:export')->name('revenue.export');
 
-            // Platform commission invoices
-            Route::get('commission', [SellerCommissionController::class, 'index'])->name('commission');
-            Route::get('commission/{invoice}', [SellerCommissionController::class, 'show'])->name('commission.show');
-            Route::get('commission/{invoice}/pdf', [SellerCommissionController::class, 'pdf'])->name('commission.pdf');
-            Route::post('commission/{invoice}/pay', [SellerCommissionController::class, 'pay'])->name('commission.pay');
-
-            // Store coupons
-            Route::get('coupons', [SellerCouponController::class, 'index'])->name('coupons');
-            Route::post('coupons', [SellerCouponController::class, 'store'])->name('coupons.store');
-            Route::patch('coupons/platform/{coupon}/participation', [SellerCouponController::class, 'participation'])->name('coupons.participation');
-            Route::put('coupons/{coupon}', [SellerCouponController::class, 'update'])->name('coupons.update');
-            Route::patch('coupons/{coupon}/toggle', [SellerCouponController::class, 'toggle'])->name('coupons.toggle');
-            Route::delete('coupons/{coupon}', [SellerCouponController::class, 'destroy'])->name('coupons.destroy');
+            // Store coupons — Pro plan and up
+            Route::middleware('plan.feature:coupons')->group(function () {
+                Route::get('coupons', [SellerCouponController::class, 'index'])->name('coupons');
+                Route::post('coupons', [SellerCouponController::class, 'store'])->name('coupons.store');
+                Route::put('coupons/{coupon}', [SellerCouponController::class, 'update'])->name('coupons.update');
+                Route::patch('coupons/{coupon}/toggle', [SellerCouponController::class, 'toggle'])->name('coupons.toggle');
+                Route::delete('coupons/{coupon}', [SellerCouponController::class, 'destroy'])->name('coupons.destroy');
+            });
         });
 
         // ── Refund requests (handled by the seller) ──────────────────────────
@@ -190,7 +194,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         // ── Reports ──────────────────────────────────────────────────────────
         Route::middleware('permission:reports.view')->group(function () {
             Route::get('reports', [ReportsController::class, 'index'])->name('reports');
-            Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
+            Route::get('reports/export', [ReportsController::class, 'export'])->middleware('plan.feature:export')->name('reports.export');
         });
 
         // ── Customer Reports (customer / rider reports for this store + reports the store files) ──
@@ -216,17 +220,20 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── Loyalty program ──────────────────────────────────────────────────
         // Settings/toggle: store owner only. Customers: owner + HR (checked in controller).
-        Route::middleware('seller_owner')->group(function () {
-            Route::get('loyalty/settings', [LoyaltyController::class, 'getSettings'])->name('loyalty.settings');
-            Route::put('loyalty/settings', [LoyaltyController::class, 'updateSettings'])->name('loyalty.settings.update');
-            Route::post('loyalty/toggle', [LoyaltyController::class, 'toggleLoyalty'])->name('loyalty.toggle');
+        // Pro plan and up.
+        Route::middleware('plan.feature:loyalty')->group(function () {
+            Route::middleware('seller_owner')->group(function () {
+                Route::get('loyalty/settings', [LoyaltyController::class, 'getSettings'])->name('loyalty.settings');
+                Route::put('loyalty/settings', [LoyaltyController::class, 'updateSettings'])->name('loyalty.settings.update');
+                Route::post('loyalty/toggle', [LoyaltyController::class, 'toggleLoyalty'])->name('loyalty.toggle');
+            });
+            Route::get('loyalty/customers', [LoyaltyController::class, 'getCustomers'])->name('loyalty.customers');
+            Route::get('loyalty/customers/export', [LoyaltyController::class, 'exportCustomers'])->middleware('plan.feature:export')->name('loyalty.customers.export');
         });
-        Route::get('loyalty/customers', [LoyaltyController::class, 'getCustomers'])->name('loyalty.customers');
-        Route::get('loyalty/customers/export', [LoyaltyController::class, 'exportCustomers'])->name('loyalty.customers.export');
 
-        // ── DSS ──────────────────────────────────────────────────────────────
+        // ── DSS (Premium plan) ───────────────────────────────────────────────
         Route::get('dss', [DssController::class, 'index'])
-            ->middleware('permission:dss.view')
+            ->middleware(['permission:dss.view', 'plan.feature:dss'])
             ->name('dss');
 
         // ── Store Documents (permit renewals, extra documents) — owner only ──

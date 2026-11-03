@@ -23,6 +23,8 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { PlanCardButton, PlanCards } from '@/components/plan-cards';
+import type { PlanCatalog } from '@/types/plans';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -32,11 +34,13 @@ interface Product {
     brand: string | null;
     weight_kg: number | string;
     selling_price: number | string;
+    store_featured?: boolean;
 }
 
 interface Props {
     products: Product[];
     stats: { stores: number; products: number; deliveries: number; customers: number };
+    plans?: PlanCatalog;
 }
 
 // ── Animation Hooks ────────────────────────────────────────────────────────────
@@ -135,7 +139,7 @@ function Reveal({ children, delay = 0, className = '' }: {
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function Landing({ products, stats }: Props) {
+export default function Landing({ products, stats, plans }: Props) {
     const [scrolled, setScrolled]     = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -154,6 +158,7 @@ export default function Landing({ products, stats }: Props) {
         { label: 'How It Works', id: 'how-it-works' },
         { label: 'For Buyers',   id: 'for-buyers'   },
         { label: 'For Sellers',  id: 'for-sellers'  },
+        { label: 'Pricing',      id: 'pricing'      },
     ];
 
     // ── Stats section ──────────────────────────────────────────────────────────
@@ -536,6 +541,26 @@ export default function Landing({ products, stats }: Props) {
                     </div>
                 </section>
 
+                {/* ══════════════ PRICING ══════════════ */}
+                {plans && plans.plans.length > 0 && (
+                    <section id="pricing" className="bg-white py-24">
+                        <div className="mx-auto max-w-6xl px-6">
+                            <Reveal className="mb-12 text-center">
+                                <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Pricing for sellers</p>
+                                <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Start with a free {plans.trial_days}-day Premium trial</h2>
+                                <p className="mt-3 text-slate-600">No commission — sellers keep 100% of their sales. Pick a monthly plan when the trial ends.</p>
+                            </Reveal>
+                            <PlanCards
+                                catalog={plans}
+                                className="text-left text-slate-900"
+                                renderAction={(p) => (
+                                    <PlanCardButton href="/seller/register" variant={p.key === 'pro' ? 'default' : 'outline'}>Start free trial</PlanCardButton>
+                                )}
+                            />
+                        </div>
+                    </section>
+                )}
+
                 {/* ══════════════ PLATFORM FEATURES ══════════════ */}
                 <section className="bg-slate-50 py-24">
                     <div className="mx-auto max-w-6xl px-6">
@@ -554,7 +579,7 @@ export default function Landing({ products, stats }: Props) {
                                 { icon: Truck,    title: 'Delivery Tracking',     desc: 'Real-time status updates with photo proof at every delivery milestone.',      color: 'bg-orange-600' },
                                 { icon: Brain,    title: 'Decision Support',      desc: 'Smart analytics dashboard to help sellers make better inventory decisions.',  color: 'bg-purple-600' },
                                 { icon: UserCog,  title: 'Role Management',       desc: 'Granular staff permissions — cashiers, warehouse, riders, and more.',         color: 'bg-indigo-600' },
-                                { icon: BarChart3, title: 'Transparent Fees',     desc: 'Clear and fair commission model. No hidden charges for sellers.',             color: 'bg-cyan-600'   },
+                                { icon: BarChart3, title: 'Transparent Fees',     desc: 'Simple monthly plans with a free 30-day trial. Sellers keep 100% of their sales.', color: 'bg-cyan-600'   },
                             ].map(({ icon: Icon, title, desc, color }, i) => (
                                 <Reveal key={title} delay={i * 70}>
                                     <div className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">

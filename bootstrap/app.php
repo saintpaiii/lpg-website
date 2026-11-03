@@ -30,6 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->web(append: [
             HandleAppearance::class,
+            // Staff paused by the plan's staff limit can't use any page
+            \App\Http\Middleware\LogoutPausedStaff::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
             // Last visit per sidebar section (badges + "New"/"Updated" row highlights)
@@ -46,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission'       => RequirePermission::class,
             'password.changed' => EnsurePasswordChanged::class,
             'id.verified'      => \App\Http\Middleware\EnsureIdVerified::class,
+            'plan.feature'     => \App\Http\Middleware\RequirePlanFeature::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

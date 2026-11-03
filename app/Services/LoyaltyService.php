@@ -15,14 +15,28 @@ class LoyaltyService
 {
     public const TIER_LABELS = ['new' => 'New', 'regular' => 'Regular', 'loyal' => 'Loyal', 'vip' => 'VIP'];
 
-    /** Enabled settings for a store, or null when the store hasn't opted in. */
+    /**
+     * Enabled settings for a store, or null when the store hasn't opted in — or its plan doesn't include loyalty
+     * (settings are kept and work again after an upgrade).
+     */
     public static function enabledSettings(?int $storeId): ?StoreLoyaltySettings
     {
         if (! $storeId) {
             return null;
         }
 
-        return StoreLoyaltySettings::where('store_id', $storeId)->where('is_enabled', true)->first();
+        $settings = StoreLoyaltySettings::where('store_id', $storeId)->where('is_enabled', true)->with('store')->first();
+        if (! $settings || ! $settings->store || ! SubscriptionService::hasFeature($settings->store, 'loyalty')) {
+            return null;
+        }
+
+        return $settings;
+    }
+
+    /** Loyalty is switched on AND the store's plan includes it. */
+    public static function isOn(?int $storeId): bool
+    {
+        return static::enabledSettings($storeId) !== null;
     }
 
     /** The platform user behind an order (walk-in customers without an account are skipped). */
@@ -89,7 +103,7 @@ class LoyaltyService
         }
 
         $order->loadMissing(['items', 'store']);
-        // Product subtotal only — never the delivery fee (same basis as commission)
+        // Product subtotal only — never the delivery fee
         $productSubtotal = round((float) $order->items->sum('subtotal') - (float) $order->discount_amount, 2);
         if ($productSubtotal <= 0) {
             return; // e.g. ₱0 refund replacement orders don't earn loyalty
@@ -181,6 +195,10 @@ class LoyaltyService
         StoreLoyaltySettings::where('is_enabled', true)->with('store')->each(function (StoreLoyaltySettings $settings) use (&$demoted) {
             // Suspended stores are frozen: no tier changes while they can't take orders
             if (! $settings->store || ! $settings->store->isOpenToCustomers()) {
+                return;
+            }
+            // Plan without loyalty: frozen too (nothing changes until the store upgrades)
+            if (! SubscriptionService::hasFeature($settings->store, 'loyalty')) {
                 return;
             }
 

@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { ExportLink } from '@/components/export-link';
 import { Eye, FileDown, Printer, Receipt, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -96,8 +97,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                             Invoices
                         </h1>
                         <p className="text-muted-foreground text-sm mt-0.5">
-                            Sales invoices for your orders. The full amount is paid to your store — platform commission is billed separately via{' '}
-                            <Link href="/seller/commission" className="font-medium text-blue-600 hover:underline">Commission Invoices</Link>.
+                            Sales invoices for your orders. The full amount goes to your store.
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -109,14 +109,14 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                             </div>
                             <Button type="submit" variant="secondary" size="sm">Search</Button>
                         </form>
-                        <a href={`/seller/invoices/export?format=csv&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                        <ExportLink href={`/seller/invoices/export?format=csv&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> CSV
-                        </a>
-                        <a href={`/seller/invoices/export?format=pdf&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
+                            CSV
+                        </ExportLink>
+                        <ExportLink href={`/seller/invoices/export?format=pdf&tab=${tab}&search=${encodeURIComponent(searchVal)}&date_from=${dateFrom}&date_to=${dateTo}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> PDF
-                        </a>
+                            PDF
+                        </ExportLink>
                     </div>
                 </div>
 

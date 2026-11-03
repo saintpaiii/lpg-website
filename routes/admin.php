@@ -3,8 +3,6 @@
 use App\Http\Controllers\Admin\AuthLogController;
 use App\Http\Controllers\Admin\BannerController;
 use App\Http\Controllers\Admin\CustomerController;
-use App\Http\Controllers\Admin\CommissionController;
-use App\Http\Controllers\Admin\CouponController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\WelcomeController;
 use App\Http\Controllers\Admin\InvoiceController;
@@ -17,6 +15,7 @@ use App\Http\Controllers\Admin\StoreController;
 use App\Http\Controllers\Admin\UsersController;
 use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\RefundController;
+use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\UserReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -112,7 +111,6 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::delete('stores/{store}', [StoreController::class, 'destroy'])->name('stores.destroy');
     Route::post('stores/{store}/restore', [StoreController::class, 'restore'])->withTrashed()->name('stores.restore');
     Route::delete('stores/{store}/force', [StoreController::class, 'forceDestroy'])->withTrashed()->name('stores.force-delete');
-    Route::patch('stores/{store}/commission-rate', [StoreController::class, 'updateCommissionRate'])->name('stores.update-commission-rate');
 
     // ID Verifications
     Route::middleware('permission:verifications.view')->group(function () {
@@ -121,24 +119,13 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::patch('verifications/{verification}/reject', [VerificationController::class, 'reject'])->name('verifications.reject');
     });
 
-    // Platform commissions (platform admin only)
-    Route::get('commissions', [CommissionController::class, 'index'])->name('commissions');
-    Route::get('commissions/export', [CommissionController::class, 'export'])->name('commissions.export');
-    Route::get('commissions/preview', [CommissionController::class, 'preview'])->name('commissions.preview');
-    Route::post('commissions/generate', [CommissionController::class, 'generate'])->name('commissions.generate');
-    Route::get('commissions/{invoice}', [CommissionController::class, 'show'])->name('commissions.show');
-    Route::get('commissions/{invoice}/pdf', [CommissionController::class, 'pdf'])->name('commissions.pdf');
-    Route::patch('commissions/{invoice}/mark-paid', [CommissionController::class, 'markPaid'])->name('commissions.mark-paid');
-    Route::patch('commissions/{invoice}/waive', [CommissionController::class, 'waive'])->name('commissions.waive');
-    Route::post('commissions/{invoice}/remind', [CommissionController::class, 'remind'])->name('commissions.remind');
-
-    // Platform coupons
-    Route::get('coupons', [CouponController::class, 'index'])->name('coupons');
-    Route::post('coupons', [CouponController::class, 'store'])->name('coupons.store');
-    Route::get('coupons/{coupon}', [CouponController::class, 'show'])->name('coupons.show');
-    Route::put('coupons/{coupon}', [CouponController::class, 'update'])->name('coupons.update');
-    Route::patch('coupons/{coupon}/toggle', [CouponController::class, 'toggle'])->name('coupons.toggle');
-    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy'])->name('coupons.destroy');
+    // Store subscriptions (platform admin only — every action checks isAdmin())
+    Route::get('subscriptions', [SubscriptionController::class, 'index'])->name('subscriptions');
+    Route::get('subscriptions/export', [SubscriptionController::class, 'export'])->name('subscriptions.export');
+    Route::post('subscriptions/stores/{store}/give-days', [SubscriptionController::class, 'giveDays'])->name('subscriptions.give-days');
+    Route::post('subscriptions/stores/{store}/record-cash', [SubscriptionController::class, 'recordCash'])->name('subscriptions.record-cash');
+    Route::put('subscriptions/plans/{plan}', [SubscriptionController::class, 'updatePlan'])->name('subscriptions.plans.update');
+    Route::get('subscriptions/payments/{payment}/pdf', [SubscriptionController::class, 'receipt'])->name('subscriptions.receipt');
 
     // Refund disputes (escalated by customers)
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');

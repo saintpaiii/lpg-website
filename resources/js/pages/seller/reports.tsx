@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import { ExportLink } from '@/components/export-link';
 import { useState } from 'react';
 import {
     CartesianGrid,
@@ -10,7 +11,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { FileDown, Filter, LineChart as LineChartIcon, PhilippinePeso, TrendingDown, TrendingUp } from 'lucide-react';
+import { FileDown, Filter, LineChart as LineChartIcon, PhilippinePeso, ShoppingCart, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,16 +26,12 @@ type ChartRow = {
     date: string;
     orders: number;
     gross: number;
-    commission: number;
-    net: number;
 };
 
 type Summary = {
     gross_revenue: number;
-    platform_fees: number;
-    net_revenue: number;
     total_orders: number;
-    commission_rate: number;
+    average_order_value: number;
 };
 
 type Props = {
@@ -96,18 +93,18 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Revenue Reports</h1>
                         <p className="text-muted-foreground text-sm mt-0.5">
-                            Track your gross revenue, platform fees, and net earnings.
+                            Track your revenue and orders.
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <a href={`/seller/reports/export?format=csv&date_from=${from}&date_to=${to}`}
+                        <ExportLink href={`/seller/reports/export?format=csv&date_from=${from}&date_to=${to}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> CSV
-                        </a>
-                        <a href={`/seller/reports/export?format=pdf&date_from=${from}&date_to=${to}`}
+                            CSV
+                        </ExportLink>
+                        <ExportLink href={`/seller/reports/export?format=pdf&date_from=${from}&date_to=${to}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> PDF
-                        </a>
+                            PDF
+                        </ExportLink>
                     </div>
                 </div>
 
@@ -152,14 +149,14 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                 </Card>
 
                 {/* Summary cards */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Gross Revenue</p>
                                     <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(summary.gross_revenue)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{summary.total_orders} orders</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Orders that were not cancelled</p>
                                 </div>
                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0">
                                     <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -171,26 +168,12 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Platform Fees</p>
-                                    <p className="text-2xl font-bold mt-1 text-amber-600">{fmt(summary.platform_fees)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{summary.commission_rate}% commission rate</p>
-                                </div>
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/20 shrink-0">
-                                    <PhilippinePeso className="h-5 w-5 text-amber-600" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Net Revenue</p>
-                                    <p className="text-2xl font-bold mt-1 text-blue-600">{fmt(summary.net_revenue)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">After platform commission</p>
+                                    <p className="text-sm text-muted-foreground">Orders</p>
+                                    <p className="text-2xl font-bold mt-1 text-blue-600">{summary.total_orders}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">In this period</p>
                                 </div>
                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 shrink-0">
-                                    <TrendingDown className="h-5 w-5 text-blue-600" />
+                                    <ShoppingCart className="h-5 w-5 text-blue-600" />
                                 </div>
                             </div>
                         </CardContent>
@@ -199,28 +182,24 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Fee Percentage</p>
-                                    <p className="text-2xl font-bold mt-1 text-gray-700">
-                                        {summary.gross_revenue > 0
-                                            ? ((summary.platform_fees / summary.gross_revenue) * 100).toFixed(1)
-                                            : '0.0'}%
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-1">Actual fees paid</p>
+                                    <p className="text-sm text-muted-foreground">Average Order Value</p>
+                                    <p className="text-2xl font-bold mt-1 text-violet-600">{fmt(summary.average_order_value)}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Revenue ÷ orders</p>
                                 </div>
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800 shrink-0">
-                                    <LineChartIcon className="h-5 w-5 text-gray-600" />
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-900/20 shrink-0">
+                                    <PhilippinePeso className="h-5 w-5 text-violet-600" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Gross vs Net chart */}
+                {/* Revenue chart */}
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                             <LineChartIcon className="h-4 w-4 text-emerald-600" />
-                            Gross vs Net Revenue
+                            Revenue
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -248,9 +227,7 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                         contentStyle={{ fontSize: 12 }}
                                     />
                                     <Legend />
-                                    <Line dataKey="gross" name="Gross Revenue" stroke="#10b981" strokeWidth={2} dot={false} />
-                                    <Line dataKey="commission" name="Platform Fee" stroke="#f59e0b" strokeWidth={2} dot={false} strokeDasharray="4 2" />
-                                    <Line dataKey="net" name="Net Revenue" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                                    <Line dataKey="gross" name="Revenue" stroke="#10b981" strokeWidth={2} dot={false} />
                                 </LineChart>
                             </ResponsiveContainer>
                         )}
@@ -272,9 +249,7 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                         <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                                             <th className="px-4 py-3">Date</th>
                                             <th className="px-4 py-3 text-right">Orders</th>
-                                            <th className="px-4 py-3 text-right">Gross Revenue</th>
-                                            <th className="px-4 py-3 text-right">Platform Fee</th>
-                                            <th className="px-4 py-3 text-right">Net Revenue</th>
+                                            <th className="px-4 py-3 text-right">Revenue</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -282,9 +257,7 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                             <tr key={row.date} className="hover:bg-gray-50/60">
                                                 <td className="px-4 py-2.5 text-gray-700">{row.date}</td>
                                                 <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
-                                                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">{fmt(row.gross)}</td>
-                                                <td className="px-4 py-2.5 text-right tabular-nums text-amber-700">{fmt(row.commission)}</td>
-                                                <td className="px-4 py-2.5 text-right tabular-nums text-blue-700 font-medium">{fmt(row.net)}</td>
+                                                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 font-medium">{fmt(row.gross)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -293,8 +266,6 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                             <td className="px-4 py-2.5">Total</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums">{summary.total_orders}</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">{fmt(summary.gross_revenue)}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-amber-700">{fmt(summary.platform_fees)}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-blue-700">{fmt(summary.net_revenue)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

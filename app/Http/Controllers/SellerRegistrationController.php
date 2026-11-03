@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Rules\InServiceArea;
-use App\Models\Setting;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
@@ -121,8 +120,7 @@ class SellerRegistrationController extends Controller
                 'doe_lpg_license_expires_at' => $validated['doe_lpg_license_expires_at'],
                 'lto_permit_expires_at'      => $validated['lto_permit_expires_at'],
                 'status'           => 'pending',
-                'subscription_plan'=> 'free',
-                'commission_rate'  => (float) Setting::get('default_commission_rate', 5.00),   // the rate the seller agreed to
+                'subscription_plan'=> 'none',
                 'is_featured'      => false,
             ]);
 

@@ -33,6 +33,8 @@ type CartItem = {
 type StoreGroup = {
     store_id: number;
     store_name: string;
+    /** False when the store is hidden (plan ended, permit expired…) — left out of the order */
+    store_available?: boolean;
     delivery_fee: number;
     store_lat: number | null;
     store_lng: number | null;
@@ -128,7 +130,10 @@ async function fetchOsrmRoute(
     return r.ok ? { coords: r.coords, durationMin: r.durationMin ?? 0 } : null;
 }
 
-export default function CheckoutPage({ stores, customer, savedAddresses = [] }: Props) {
+export default function CheckoutPage({ stores: allStores, customer, savedAddresses = [] }: Props) {
+    // Stores that are not available right now are shown greyed and left out of totals and the order
+    const stores = allStores.filter((sg) => sg.store_available !== false);
+    const unavailableStores = allStores.filter((sg) => sg.store_available === false);
     const { auth } = usePage<SharedData>().props;
     const idStatus = auth.user.id_verification_status;
 
@@ -169,7 +174,7 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
         () => Object.fromEntries(stores.map((sg) => [sg.store_id, sg.min_down_payment_percent])),
     );
     const [notes, setNotes]             = useState('');
-    // Promo coupon (platform or store)
+    // Store promo coupon
     const [promo, setPromo]             = useState<CouponRules | null>(null);
     const [couponInput, setCouponInput] = useState('');
     const [couponError, setCouponError] = useState<string | null>(null);
@@ -550,6 +555,23 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                 )}
 
                 {/* Per-store order summaries */}
+                {unavailableStores.map((sg) => (
+                    <Card key={sg.store_id} className="opacity-60">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Store className="h-4 w-4 text-gray-400" />
+                                {sg.store_name}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
+                            <p className="font-medium">This store is not available right now</p>
+                            <p className="text-xs text-gray-500">
+                                {sg.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')} — not included in this order.
+                            </p>
+                        </CardContent>
+                    </Card>
+                ))}
+
                 {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance }) => {
                     return (
                         <Card key={sg.store_id}>
@@ -600,9 +622,6 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                                             <span>Store discount</span>
                                             <span>−{peso(discount)}</span>
                                         </div>
-                                    )}
-                                    {promo?.type === 'platform' && (promo.excluded_store_ids ?? []).includes(sg.store_id) && (
-                                        <p className="text-xs text-gray-400">This store isn't participating in {promo.code}.</p>
                                     )}
                                     {promo && promoCut.total > 0 && (
                                         <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
@@ -849,7 +868,7 @@ export default function CheckoutPage({ stores, customer, savedAddresses = [] }: 
                     </Link>
                     <Button
                         onClick={placeOrder}
-                        disabled={loading || !customer}
+                        disabled={loading || !customer || stores.length === 0}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
                     >
                         {loading ? (

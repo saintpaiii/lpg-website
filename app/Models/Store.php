@@ -30,8 +30,11 @@ class Store extends Model
         'lto_permit',
         'status',
         'subscription_plan',
+        'subscription_started_at',
         'subscription_expires_at',
-        'commission_rate',
+        'trial_used_at',
+        'plan_reminder_sent_on',
+        'plan_expired_notified_at',
         'delivery_fee',
         'is_featured',
         'approved_at',
@@ -50,8 +53,6 @@ class Store extends Model
         'allow_consignment',
         'min_down_payment_percent',
         'consignment_due_days',
-        'commission_suspended',
-        'commission_suspended_at',
         'business_permit_expires_at',
         'fsic_permit_expires_at',
         'doe_lpg_license_expires_at',
@@ -63,19 +64,20 @@ class Store extends Model
     protected function casts(): array
     {
         return [
-            'commission_rate'          => 'decimal:2',
             'delivery_fee'             => 'decimal:2',
             'is_featured'              => 'boolean',
             'approved_at'              => 'datetime',
+            'subscription_started_at'  => 'datetime',
             'subscription_expires_at'  => 'datetime',
+            'trial_used_at'            => 'datetime',
+            'plan_reminder_sent_on'    => 'date',
+            'plan_expired_notified_at' => 'datetime',
             'latitude'                 => 'decimal:7',
             'longitude'                => 'decimal:7',
             'attendance_radius'        => 'integer',
             'base_delivery_fee'        => 'decimal:2',
             'fee_per_km'               => 'decimal:2',
             'max_delivery_radius_km'   => 'integer',
-            'commission_suspended'     => 'boolean',
-            'commission_suspended_at'  => 'datetime',
             'business_permit_expires_at' => 'date',
             'fsic_permit_expires_at'     => 'date',
             'doe_lpg_license_expires_at' => 'date',
@@ -91,11 +93,16 @@ class Store extends Model
 
     // ── Relationships ─────────────────────────────────────────────────────────
 
-    /** The seller/owner of this store */
-    /** Approved, not suspended for unpaid commission, not hidden for an expired permit — safe to show to customers. */
+    /**
+     * Approved, not hidden for an expired permit, and on an active plan (trial or paid) — safe to show to customers.
+     * Keep in step with isOpenToCustomers().
+     */
     public function scopeVisibleToCustomers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
-        return $query->where('status', 'approved')->where('commission_suspended', false)->where('documents_suspended', false);
+        return $query->where('stores.status', 'approved')->where('stores.documents_suspended', false)
+            ->where('stores.subscription_plan', '!=', 'none')
+            ->whereNotNull('stores.subscription_expires_at')
+            ->where('stores.subscription_expires_at', '>', now());
     }
 
     public function loyaltySettings(): \Illuminate\Database\Eloquent\Relations\HasOne
@@ -106,11 +113,6 @@ class Store extends Model
     public function customerLoyalties(): HasMany
     {
         return $this->hasMany(CustomerLoyalty::class);
-    }
-
-    public function commissionInvoices(): HasMany
-    {
-        return $this->hasMany(CommissionInvoice::class);
     }
 
     public function owner(): BelongsTo
@@ -132,16 +134,20 @@ class Store extends Model
         });
     }
 
-    /** Customers can message the store (same rule as the storefront). */
+    /**
+     * Customers can message the store. No plan rule here: customers must still reach an expired store
+     * about orders that are in progress.
+     */
     public function canReceiveMessages(): bool
     {
-        return $this->isOpenToCustomers();
+        return $this->status === 'approved' && ! $this->documents_suspended;
     }
 
-    /** Approved, not suspended for unpaid commission, not hidden for an expired permit. */
+    /** Approved, not hidden for an expired permit, and on an active plan. */
     public function isOpenToCustomers(): bool
     {
-        return $this->status === 'approved' && ! $this->commission_suspended && ! $this->documents_suspended;
+        return $this->status === 'approved' && ! $this->documents_suspended
+            && \App\Services\SubscriptionService::isActive($this);
     }
 
     public function documentSubmissions(): HasMany
@@ -181,9 +187,9 @@ class Store extends Model
         return $this->hasMany(Invoice::class);
     }
 
-    public function subscriptions(): HasMany
+    public function subscriptionPayments(): HasMany
     {
-        return $this->hasMany(StoreSubscription::class);
+        return $this->hasMany(SubscriptionPayment::class);
     }
 
     public function verificationRequests(): HasMany
@@ -196,17 +202,6 @@ class Store extends Model
     public function isApproved(): bool
     {
         return $this->status === 'approved';
-    }
-
-    public function isPremium(): bool
-    {
-        return $this->subscription_plan === 'premium';
-    }
-
-    public function isPremiumActive(): bool
-    {
-        return $this->isPremium()
-            && ($this->subscription_expires_at === null || $this->subscription_expires_at->isFuture());
     }
 
     public function ratings(): \Illuminate\Database\Eloquent\Relations\HasMany

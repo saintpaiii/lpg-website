@@ -44,6 +44,8 @@ class CartController extends Controller
                     'store_name'   => $store->store_name,
                     'store_logo_url' => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
                     'delivery_fee' => (float) ($store->delivery_fee ?? 0),
+                    // False when the store is hidden (plan ended, permit expired…): its items can't be checked out
+                    'store_available' => $store->isOpenToCustomers(),
                     'items'        => [],
                 ];
             }

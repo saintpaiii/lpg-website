@@ -21,8 +21,6 @@ class InvoiceController extends Controller
         $total      = (float) $inv->total_amount;
         $paid       = (float) $inv->paid_amount;
         $balance    = max(0, $total - $paid);
-        $commission = (float) $inv->platform_commission;
-        $netAmount  = max(0, $total - $commission);
 
         return [
             'id'                  => $inv->id,
@@ -31,8 +29,6 @@ class InvoiceController extends Controller
             'total_amount'        => $total,
             'paid_amount'         => $paid,
             'balance'             => $balance,
-            'platform_commission' => $commission,
-            'net_amount'          => $netAmount,
             'payment_method' => $inv->payment_method,
             'paid_at'        => $inv->paid_at?->format('M d, Y g:i A'),
             'due_date'       => $inv->due_date?->format('M d, Y'),
@@ -165,7 +161,6 @@ class InvoiceController extends Controller
             ['key' => 'total_amount',   'label' => 'Total',         'align' => 'right'],
             ['key' => 'paid_amount',    'label' => 'Paid',          'align' => 'right'],
             ['key' => 'outstanding',    'label' => 'Outstanding',   'align' => 'right'],
-            ['key' => 'commission',     'label' => 'Commission',    'align' => 'right'],
             ['key' => 'status',         'label' => 'Status'],
             ['key' => 'method',         'label' => 'Method'],
         ];
@@ -179,17 +174,14 @@ class InvoiceController extends Controller
             'total_amount'   => $this->peso((float) $i->total_amount),
             'paid_amount'    => $this->peso((float) $i->paid_amount),
             'outstanding'    => $this->peso(max(0, (float) $i->total_amount - (float) $i->paid_amount)),
-            'commission'     => $this->peso((float) ($i->platform_commission ?? 0)),
             'status'         => $i->payment_status,
             'method'         => $i->payment_method ?? '—',
             '_total'         => (float) $i->total_amount,
             '_paid'          => (float) $i->paid_amount,
-            '_comm'          => (float) ($i->platform_commission ?? 0),
         ])->values()->all();
 
         $grandTotal = collect($rows)->sum('_total');
         $grandPaid  = collect($rows)->sum('_paid');
-        $grandComm  = collect($rows)->sum('_comm');
         $grandOut   = max(0, $grandTotal - $grandPaid);
 
         if ($format === 'pdf') {
@@ -203,17 +195,16 @@ class InvoiceController extends Controller
                     ['label' => 'Total Billed',    'value' => $this->peso($grandTotal)],
                     ['label' => 'Total Collected', 'value' => $this->peso($grandPaid)],
                     ['label' => 'Outstanding',     'value' => $this->peso($grandOut)],
-                    ['label' => 'Commission',      'value' => $this->peso($grandComm)],
                 ],
                 'columns'   => $columns,
                 'rows'      => $rows,
-                'totalsRow' => ['invoice_number' => 'TOTAL', 'order_number' => '', 'store_name' => '', 'customer' => '', 'created_at' => '', 'total_amount' => $this->peso($grandTotal), 'paid_amount' => $this->peso($grandPaid), 'outstanding' => $this->peso($grandOut), 'commission' => $this->peso($grandComm), 'status' => '', 'method' => ''],
+                'totalsRow' => ['invoice_number' => 'TOTAL', 'order_number' => '', 'store_name' => '', 'customer' => '', 'created_at' => '', 'total_amount' => $this->peso($grandTotal), 'paid_amount' => $this->peso($grandPaid), 'outstanding' => $this->peso($grandOut), 'status' => '', 'method' => ''],
             ]);
         }
 
-        $headings = ['Invoice #', 'Order #', 'Store', 'Customer', 'Date', 'Total', 'Paid', 'Outstanding', 'Commission', 'Status', 'Method'];
-        $csvRows  = array_map(fn ($r) => [$r['invoice_number'], $r['order_number'], $r['store_name'], $r['customer'], $r['created_at'], $r['total_amount'], $r['paid_amount'], $r['outstanding'], $r['commission'], $r['status'], $r['method']], $rows);
-        $csvRows[] = ['TOTAL', '', '', '', '', $this->peso($grandTotal), $this->peso($grandPaid), $this->peso($grandOut), $this->peso($grandComm), '', ''];
+        $headings = ['Invoice #', 'Order #', 'Store', 'Customer', 'Date', 'Total', 'Paid', 'Outstanding', 'Status', 'Method'];
+        $csvRows  = array_map(fn ($r) => [$r['invoice_number'], $r['order_number'], $r['store_name'], $r['customer'], $r['created_at'], $r['total_amount'], $r['paid_amount'], $r['outstanding'], $r['status'], $r['method']], $rows);
+        $csvRows[] = ['TOTAL', '', '', '', '', $this->peso($grandTotal), $this->peso($grandPaid), $this->peso($grandOut), '', ''];
         return $this->csvResponse($filename, $headings, $csvRows);
     }
 

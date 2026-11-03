@@ -90,6 +90,7 @@ class DeliveryController extends Controller
         // Available vehicles for this store
         $vehicles = Vehicle::where('store_id', $store->id)
             ->whereIn('status', ['available', 'in_use'])
+            ->where('paused_by_plan', false)
             ->whereNull('deleted_at')
             ->orderBy('vehicle_type')
             ->get()
@@ -164,6 +165,9 @@ class DeliveryController extends Controller
             $vehicle = Vehicle::where('id', $data['vehicle_id'])->where('store_id', $store->id)->first();
             if (! $vehicle) {
                 return back()->withErrors(['vehicle_id' => 'Invalid vehicle.']);
+            }
+            if ($vehicle->paused_by_plan) {
+                return back()->with('error', "Vehicle {$vehicle->plate_number} is inactive — over plan limit.");
             }
 
             // Capacity check: total kg of the order vs vehicle max

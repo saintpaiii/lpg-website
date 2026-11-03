@@ -52,7 +52,8 @@ class StoreController extends Controller
                 'city'           => $s->city,
                 'province'       => $s->province,
                 'status'         => $s->status,
-                'commission_rate'=> (float) $s->commission_rate,
+                'plan'           => $s->subscription_plan !== 'none' ? \App\Services\SubscriptionService::planName($s->subscription_plan) : 'No plan',
+                'plan_status'    => SubscriptionController::statusOf($s),
                 'created_at'     => $s->created_at->format('M d, Y'),
                 'deleted_at'     => $s->deleted_at?->format('M d, Y'),
                 'owner_name'     => $s->owner?->name ?? '—',
@@ -81,7 +82,7 @@ class StoreController extends Controller
             'total_revenue'   => (float) $store->orders()->where('payment_status', 'paid')->sum('total_amount'),
             'total_products'  => $store->products()->count(),
             'active_products' => $store->products()->where('is_active', true)->count(),
-            'commissions'     => (float) $store->invoices()->sum('platform_commission'),
+            'delivered_orders'=> $store->orders()->where('status', 'delivered')->count(),
         ];
 
         $history = AccountAction::where('target_type', 'store')
@@ -99,7 +100,29 @@ class StoreController extends Controller
                 'created_at'   => $a->created_at->format('M d, Y g:i A'),
             ]);
 
+        // Plan + the last 5 plan payments
+        $subscription = [
+            'plan'      => $store->subscription_plan !== 'none' ? \App\Services\SubscriptionService::planName($store->subscription_plan) : 'No plan',
+            'status'    => SubscriptionController::statusOf($store),
+            'expires'   => $store->subscription_expires_at?->format('M j, Y g:i A'),
+            'days_left' => \App\Services\SubscriptionService::daysLeft($store),
+            'usage'     => \App\Services\SubscriptionService::usage($store),
+            'limits'    => \App\Services\SubscriptionService::limits($store),
+            'paused'    => \App\Services\SubscriptionService::pausedCounts($store),
+            'payments'  => $store->subscriptionPayments()->where('status', 'paid')->latest('paid_at')->limit(5)->get()
+                ->map(fn ($p) => [
+                    'id'             => $p->id,
+                    'receipt_number' => $p->receipt_number,
+                    'plan'           => \App\Services\SubscriptionService::planName($p->plan_key),
+                    'amount'         => (float) $p->amount,
+                    'method'         => \App\Services\SubscriptionService::methodLabel($p->method),
+                    'period'         => \App\Services\SubscriptionService::periodLabel($p->period_start, $p->period_end),
+                    'paid_at'        => $p->paid_at?->format('M j, Y'),
+                ])->values(),
+        ];
+
         return Inertia::render('admin/store-show', [
+            'subscription' => $subscription,
             'store' => [
                 'id'                     => $store->id,
                 'store_name'             => $store->store_name,
@@ -111,7 +134,6 @@ class StoreController extends Controller
                 'phone'                  => $store->phone,
                 'email'                  => $store->email,
                 'status'                 => $store->status,
-                'commission_rate'        => (float) $store->commission_rate,
                 'approved_at'            => $store->approved_at?->format('M d, Y'),
                 'created_at'             => $store->created_at->format('M d, Y'),
                 'owner_name'             => $store->owner?->name,
@@ -178,6 +200,9 @@ class StoreController extends Controller
                 'reviewed_by' => $request->user()->id,
                 'reviewed_at' => now(),
             ]);
+
+        // The one-time 30-day Premium trial (never a second time)
+        \App\Services\SubscriptionService::startTrial($store->fresh());
 
         return back()->with('success', "{$store->store_name} has been approved.");
     }
@@ -266,16 +291,6 @@ class StoreController extends Controller
         return back()->with('success', "{$store->store_name} restored.");
     }
 
-    public function updateCommissionRate(Request $request, Store $store): RedirectResponse
-    {
-        $request->validate([
-            'commission_rate' => 'required|numeric|min:0|max:100',
-        ]);
-
-        $store->update(['commission_rate' => $request->commission_rate]);
-
-        return back()->with('success', "Commission rate for {$store->store_name} updated to {$request->commission_rate}%.");
-    }
 
     public function forceDestroy(Store $store): RedirectResponse
     {

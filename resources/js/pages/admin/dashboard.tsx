@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     BadgeCheck,
     CheckCircle2,
+    Crown,
     PhilippinePeso,
     ShieldAlert,
     ShoppingCart,
@@ -38,13 +39,14 @@ type Stats = {
     newUsersThisWeek: number;
     totalOrders: number;
     ordersToday: number;
-    totalCommissions: number;
-    commissionsThisMonth: number;
-    commissionsToday: number;
+    salesAllTime: number;
+    salesThisMonth: number;
+    subscriptionIncomeMonth: number;
+    subscriptionIncomeTotal: number;
     pendingVerifications: number;
 };
 
-type CommissionPoint  = { week: string; commission: number };
+type SalesPoint       = { week: string; sales: number };
 type RegistrationPoint = { week: string; users: number };
 type OrderPoint       = { date: string; orders: number };
 type ActivityItem     = { type: string; message: string; time: string };
@@ -53,7 +55,8 @@ type AuthStats = { successToday: number; failedToday: number; suspiciousCount: n
 
 type Props = {
     stats: Stats;
-    commissionsChart: CommissionPoint[];
+    salesChart: SalesPoint[];
+    storesByPlan: { trial: number; basic: number; pro: number; premium: number; expired: number };
     registrationsChart: RegistrationPoint[];
     ordersChart: OrderPoint[];
     recentActivity: ActivityItem[];
@@ -72,7 +75,8 @@ const ACTIVITY_CONFIG: Record<string, { icon: typeof Store; color: string; bg: s
 
 export default function Dashboard({
     stats,
-    commissionsChart,
+    salesChart,
+    storesByPlan,
     registrationsChart,
     ordersChart,
     recentActivity,
@@ -107,13 +111,22 @@ export default function Dashboard({
             href:  '/admin/orders',
         },
         {
-            label: 'Commission Earned',
-            value: fmt(stats.totalCommissions),
-            sub:   `${fmt(stats.commissionsThisMonth)} this month`,
+            label: 'Platform Sales (GMV)',
+            value: fmt(stats.salesAllTime),
+            sub:   `${fmt(stats.salesThisMonth)} this month`,
             icon:  PhilippinePeso,
             color: 'text-amber-600',
             bg:    'bg-amber-50 dark:bg-amber-900/20',
             href:  null as string | null,
+        },
+        {
+            label: 'Subscription Income',
+            value: fmt(stats.subscriptionIncomeMonth),
+            sub:   `This month · ${fmt(stats.subscriptionIncomeTotal)} all time`,
+            icon:  Crown,
+            color: 'text-emerald-600',
+            bg:    'bg-emerald-50 dark:bg-emerald-900/20',
+            href:  '/admin/subscriptions?tab=payments' as string | null,
         },
     ];
 
@@ -151,7 +164,7 @@ export default function Dashboard({
                 </div>
 
                 {/* Stat cards */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {statCards.map(({ label, value, sub, icon: Icon, color, bg, href }) => (
                         <Card key={label} className="relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                             <CardContent className="pt-6">
@@ -214,27 +227,53 @@ export default function Dashboard({
                     </Link>
                 </div>
 
+                {/* Stores by plan */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center justify-between text-base">
+                            <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Stores by plan</span>
+                            <Link href="/admin/subscriptions" className="text-xs font-medium text-blue-600 hover:underline">Manage</Link>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                            {([
+                                ['Trial', storesByPlan.trial, 'text-violet-600'],
+                                ['Basic', storesByPlan.basic, 'text-blue-600'],
+                                ['Pro', storesByPlan.pro, 'text-indigo-600'],
+                                ['Premium', storesByPlan.premium, 'text-amber-600'],
+                                ['Expired', storesByPlan.expired, 'text-red-600'],
+                            ] as const).map(([label, n, cls]) => (
+                                <div key={label} className="rounded-lg border px-3 py-2">
+                                    <p className="text-xs text-muted-foreground">{label}</p>
+                                    <p className={`text-xl font-bold ${cls}`}>{n}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Charts */}
                 <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Commissions per week */}
+                    {/* Platform sales per week */}
                     <Card className="hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <PhilippinePeso className="h-4 w-4 text-amber-600" />
-                                Commission Earned — Last 12 Weeks
+                                Platform Sales — Last 12 Weeks
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={200}>
-                                <BarChart data={commissionsChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                                <BarChart data={salesChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                     <XAxis dataKey="week" tick={{ fontSize: 10 }} interval={2} />
                                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                     <Tooltip
-                                        formatter={(v: number) => [fmt(v), 'Commission']}
+                                        formatter={(v: number | undefined) => [fmt(v ?? 0), 'Sales']}
                                         contentStyle={{ fontSize: 12 }}
                                     />
-                                    <Bar dataKey="commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="sales" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>

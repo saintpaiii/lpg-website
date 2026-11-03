@@ -9,7 +9,6 @@ use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\Customer;
-use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,7 +81,6 @@ class OrderController extends Controller
             'invoice_id'    => $o->invoice?->id,
             'store_name'       => $o->store?->store_name,
             'store_id'         => $o->store_id,
-            'commission_amount'=> $o->invoice ? (float) $o->invoice->platform_commission : null,
         ];
     }
 
@@ -350,16 +348,6 @@ class OrderController extends Controller
 
             if ($newStatus === 'delivered' && ! $order->delivered_at) {
                 $updates['delivered_at'] = now();
-
-                // Calculate and save platform commission to invoice
-                $order->loadMissing(['store', 'invoice']);
-                if ($order->invoice) {
-                    $rate       = $order->store
-                        ? (float) $order->store->commission_rate
-                        : (float) Setting::get('default_commission_rate', 5);
-                    $commission = round((float) $order->total_amount * $rate / 100, 2);
-                    $order->invoice->update(['platform_commission' => $commission]);
-                }
             }
 
             $order->update($updates);

@@ -1,8 +1,8 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BarChart3,
-    HandCoins,
+    Crown,
     Package,
     PhilippinePeso,
     ShoppingCart,
@@ -11,9 +11,8 @@ import {
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { PayCommissionButton } from '@/components/pay-commission-button';
 import { fmtDate } from '@/lib/utils';
-import type { BreadcrumbItem } from '@/types';
+import type { BreadcrumbItem, SharedData } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Dashboard', href: '/seller/dashboard' }];
 
@@ -24,12 +23,11 @@ type Stats = {
     pendingOrders: number;
     revenueThisMonth: number;
     revenueAllTime: number;
-    commissionRate: number;
-    commissionThisMonth: number;
-    netRevenueThisMonth: number;
+    deliveredThisMonth: number;
+    averageOrderValue: number;
 };
 
-type ChartPoint = { date: string; short: string; orders: number; revenue: number; net_revenue: number };
+type ChartPoint = { date: string; short: string; orders: number; revenue: number };
 type RecentOrder = {
     id: number;
     order_number: string;
@@ -51,14 +49,6 @@ type Props = {
     ordersChart: ChartPoint[];
     recentOrders: RecentOrder[];
     lowStock: LowStockItem[];
-    commissionDue: {
-        amount: number;
-        overdue_amount: number;
-        is_overdue: boolean;
-        due_date: string;
-        invoice_id: number;
-        suspended: boolean;
-    } | null;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -74,7 +64,8 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock, commissionDue }: Props) {
+export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock }: Props) {
+    const { auth, plan } = usePage<SharedData>().props;
     const statCards = [
         {
             label: 'Products',
@@ -119,58 +110,50 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
             <Head title="Dashboard" />
 
             <div className="p-6 space-y-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Store Dashboard</h1>
-                    <p className="text-muted-foreground text-sm mt-0.5">
-                        Overview of your store's performance.
-                    </p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Store Dashboard</h1>
+                        <p className="text-muted-foreground text-sm mt-0.5">
+                            Overview of your store's performance.
+                        </p>
+                    </div>
+                    {/* Store plan (owner) */}
+                    {plan && auth.user.role === 'seller' && (
+                        <Link href="/seller/plan"
+                            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-sm transition-colors hover:bg-muted/40 ${
+                                !plan.active ? 'border-red-300 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300'
+                                    : plan.days_left <= 3 ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200' : 'bg-card'
+                            }`}>
+                            <Crown className="h-4 w-4 text-amber-500" />
+                            <span className="font-medium">
+                                {plan.active ? `${plan.name} · ${plan.days_left} day${plan.days_left === 1 ? '' : 's'} left` : 'No active plan — store hidden'}
+                            </span>
+                            <span className="text-xs font-semibold text-blue-600">Manage</span>
+                        </Link>
+                    )}
                 </div>
 
-                {/* Unpaid commission */}
-                {commissionDue && (commissionDue.is_overdue ? (
-                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-300 bg-red-600 px-4 py-3 text-white">
-                        <AlertTriangle className="h-5 w-5 shrink-0" />
-                        <p className="flex-1 text-sm font-semibold">
-                            OVERDUE: {fmt(commissionDue.overdue_amount)} commission unpaid.{' '}
-                            {commissionDue.suspended
-                                ? 'Your store is suspended and hidden from customers until it is paid.'
-                                : 'Your store will be suspended if it is not paid.'}
-                        </p>
-                        <PayCommissionButton invoiceId={commissionDue.invoice_id} label="Pay Immediately"
-                            className="bg-white text-red-700 hover:bg-red-50" />
-                    </div>
-                ) : (
-                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                        <HandCoins className="h-5 w-5 shrink-0" />
-                        <p className="flex-1 text-sm">
-                            You have <strong>{fmt(commissionDue.amount)}</strong> in unpaid commission. Due by <strong>{commissionDue.due_date}</strong>.
-                        </p>
-                        <PayCommissionButton invoiceId={commissionDue.invoice_id} className="bg-amber-600 text-white hover:bg-amber-700" />
-                        <Link href="/seller/commission" className="text-xs font-medium underline">View invoices</Link>
-                    </div>
-                ))}
-
-                {/* Revenue breakdown cards */}
+                {/* Sales this month — the store keeps the full amount */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-emerald-500">
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Gross Revenue (This Month)</p>
+                            <p className="text-sm text-muted-foreground">Revenue (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(stats.revenueThisMonth)}</p>
                             <p className="text-xs text-muted-foreground mt-1">{fmt(stats.revenueAllTime)} all time</p>
                         </CardContent>
                     </Card>
-                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-amber-400">
-                        <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Platform Fee (This Month)</p>
-                            <p className="text-2xl font-bold mt-1 text-amber-600">{fmt(stats.commissionThisMonth)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{stats.commissionRate}% commission rate</p>
-                        </CardContent>
-                    </Card>
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-blue-500">
                         <CardContent className="pt-6">
-                            <p className="text-sm text-muted-foreground">Net Revenue (This Month)</p>
-                            <p className="text-2xl font-bold mt-1 text-blue-600">{fmt(stats.netRevenueThisMonth)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">After platform commission</p>
+                            <p className="text-sm text-muted-foreground">Delivered Orders (This Month)</p>
+                            <p className="text-2xl font-bold mt-1 text-blue-600">{stats.deliveredThisMonth.toLocaleString()}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Completed deliveries</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-violet-500">
+                        <CardContent className="pt-6">
+                            <p className="text-sm text-muted-foreground">Average Order Value (This Month)</p>
+                            <p className="text-2xl font-bold mt-1 text-violet-600">{fmt(stats.averageOrderValue)}</p>
+                            <p className="text-xs text-muted-foreground mt-1">Revenue ÷ delivered orders</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -226,26 +209,21 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <TrendingUp className="h-4 w-4 text-emerald-600" />
-                                Gross vs Net Revenue — Last 30 Days
+                                Revenue — Last 30 Days
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex items-center gap-4 mb-2 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-emerald-500 rounded" />Gross</span>
-                                <span className="flex items-center gap-1"><span className="inline-block w-3 h-0.5 bg-blue-500 rounded" />Net</span>
-                            </div>
                             <ResponsiveContainer width="100%" height={200}>
                                 <LineChart data={ordersChart} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
                                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                                     <XAxis dataKey="short" tick={{ fontSize: 11 }} interval={6} />
                                     <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                     <Tooltip
-                                        formatter={(v: number | undefined, name: string) => [fmt(v ?? 0), name === 'revenue' ? 'Gross' : 'Net']}
+                                        formatter={(v: number | undefined) => [fmt(v ?? 0), 'Revenue']}
                                         labelFormatter={(_, p) => p[0]?.payload?.date ?? ''}
                                         contentStyle={{ fontSize: 12 }}
                                     />
                                     <Line dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={false} />
-                                    <Line dataKey="net_revenue" stroke="#3b82f6" strokeWidth={2} dot={false} strokeDasharray="4 2" />
                                 </LineChart>
                             </ResponsiveContainer>
                         </CardContent>

@@ -53,10 +53,22 @@ class LandingController extends Controller
             if ($redirect) return $redirect;
         }
 
+        // Products of stores customers can see — Featured stores (Premium plan / trial) first
         $products = Product::where('is_active', true)
-            ->whereDoesntHave('store', fn ($q) => $q->where(fn ($w) => $w->where('commission_suspended', true)->orWhere('documents_suspended', true)))
+            ->whereHas('store', fn ($q) => $q->visibleToCustomers())
+            ->with('store:id,is_featured')
+            ->orderByDesc(Store::select('is_featured')->whereColumn('stores.id', 'products.store_id')->limit(1))
             ->orderBy('weight_kg')
-            ->get(['id', 'name', 'brand', 'weight_kg', 'selling_price']);
+            ->get(['id', 'name', 'brand', 'weight_kg', 'selling_price', 'store_id'])
+            ->map(fn (Product $p) => [
+                'id'             => $p->id,
+                'name'           => $p->name,
+                'brand'          => $p->brand,
+                'weight_kg'      => $p->weight_kg,
+                'selling_price'  => $p->selling_price,
+                'store_featured' => (bool) $p->store?->is_featured,
+            ])
+            ->values();
 
         $stats = [
             'stores'     => max(Store::count(), 2),
@@ -68,6 +80,8 @@ class LandingController extends Controller
         return Inertia::render('landing', [
             'products' => $products,
             'stats'    => $stats,
+            // Pricing section
+            'plans'    => \App\Services\SubscriptionService::publicPlans(),
         ]);
     }
 }

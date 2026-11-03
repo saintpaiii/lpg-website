@@ -26,6 +26,7 @@ class Product extends Model
         'description',
         'image',
         'is_active',
+        'paused_by_plan',
     ];
 
     protected function casts(): array
@@ -37,6 +38,7 @@ class Product extends Model
             'refill_price'   => 'decimal:2',
             'purchase_price' => 'decimal:2',
             'is_active'      => 'boolean',
+            'paused_by_plan' => 'boolean',
         ];
     }
 

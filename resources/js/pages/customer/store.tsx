@@ -1,4 +1,5 @@
 import MessageButton from '@/components/chat/message-button';
+import { FeaturedBadge } from '@/components/featured-badge';
 import { Head, router } from '@inertiajs/react';
 import { ArrowLeft, Award, BadgeCheck, MapPin, Phone, Search, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
@@ -23,6 +24,7 @@ import ProductCardImage from '@/components/product-card-image';
 type StoreInfo = {
     id: number;
     store_name: string;
+    is_featured?: boolean;
     logo_url: string | null;
     description: string | null;
     city: string | null;
@@ -96,7 +98,7 @@ function StarsDisplay({ value, size = 'sm' }: { value: number; size?: 'xs' | 'sm
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function StorePage({ store, products, recent_reviews, search: initialSearch, promos = [] }: Props & { promos?: { code: string; label: string }[] }) {
+export default function StorePage({ store, products, recent_reviews, search: initialSearch }: Props) {
     const [search, setSearch]       = useState(initialSearch);
     const [cartSubmitting, setCartSubmitting] = useState(false);
 
@@ -159,6 +161,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={48} />
                                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{store.store_name}</h1>
+                                    {store.is_featured && <FeaturedBadge />}
                                     <MessageButton portal="customer" params={{ store_id: store.id }} label="Message store" className="gap-1.5" />
                                     {store.is_top_rated && (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
@@ -173,18 +176,6 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         </span>
                                     )}
                                 </div>
-
-                                {promos.length > 0 && (
-                                    <div className="inline-flex flex-wrap items-center gap-1.5 rounded-lg bg-orange-50 px-3 py-1.5 text-sm font-medium text-orange-800 dark:bg-orange-900/20 dark:text-orange-300">
-                                        🔥 This store is participating in the{' '}
-                                        {promos.map((p, i) => (
-                                            <span key={p.code}>
-                                                <span className="font-mono font-bold">{p.code}</span> ({p.label}){i < promos.length - 1 ? ', ' : ''}
-                                            </span>
-                                        ))}{' '}
-                                        promotion{promos.length > 1 ? 's' : ''}!
-                                    </div>
-                                )}
 
                                 {store.description && (
                                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl">{store.description}</p>

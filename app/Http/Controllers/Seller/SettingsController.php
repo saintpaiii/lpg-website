@@ -28,7 +28,6 @@ class SettingsController extends Controller
                 'phone'             => $store->phone,
                 'email'             => $store->email,
                 'logo_url'          => $store->logo ? Storage::url($store->logo) : null,
-                'commission_rate'   => (float) $store->commission_rate,
                 'delivery_fee'             => (float) ($store->delivery_fee ?? 0),
                 'base_delivery_fee'        => (float) ($store->base_delivery_fee ?? 45),
                 'fee_per_km'               => (float) ($store->fee_per_km ?? 10),

@@ -233,6 +233,10 @@ class UsersController extends Controller
                 ->with('success', "{$user->name} has been deactivated.");
         }
 
+        if ($this->storeAtStaffLimit($user)) {
+            return back()->with('error', "This store is at its plan's staff limit.");
+        }
+
         $user->update([
             'is_active'           => true,
             'deactivation_reason' => null,
@@ -250,6 +254,17 @@ class UsersController extends Controller
 
         return redirect()->route('admin.users.show', $user->id)
             ->with('success', "{$user->name} has been activated.");
+    }
+
+    /** Re-activating a store's staff account counts against the store's plan (a paused one doesn't count yet). */
+    private function storeAtStaffLimit(User $user): bool
+    {
+        if ($user->role !== 'seller_staff' || ! $user->store_id || $user->paused_by_plan) {
+            return false;
+        }
+        $store = \App\Models\Store::find($user->store_id);
+
+        return $store && ! \App\Services\SubscriptionService::canAdd($store, 'staff');
     }
 
     // ── Soft Delete / Restore ─────────────────────────────────────────────────
@@ -284,6 +299,10 @@ class UsersController extends Controller
 
     public function restore(Request $request, User $user): RedirectResponse
     {
+        if ($this->storeAtStaffLimit($user)) {
+            return back()->with('error', "This store is at its plan's staff limit.");
+        }
+
         $user->restore();
         $user->update([
             'is_active'           => true,

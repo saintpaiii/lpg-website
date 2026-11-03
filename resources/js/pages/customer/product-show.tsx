@@ -1,4 +1,5 @@
 import MessageButton from '@/components/chat/message-button';
+import { FeaturedBadge } from '@/components/featured-badge';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, ShoppingCart, Star } from 'lucide-react';
 import { useState } from 'react';
@@ -30,13 +31,13 @@ type Product = {
     media: GalleryMedia[];
     store_id: number;
     store_name: string;
+    store_featured?: boolean;
     store_logo_url: string | null;
     store_city: string;
     store_barangay: string;
     delivery_fee: number;
     avg_rating: number;
     review_count: number;
-    promo_code?: string | null;
 };
 
 type Review = {
@@ -60,6 +61,7 @@ type RelatedProduct = {
     has_video?: boolean;
     stock: number;
     store_name: string;
+    store_featured?: boolean;
     store_id: number;
     avg_rating: number;
     review_count: number;
@@ -199,11 +201,6 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
                             <p className="text-gray-500 mt-0.5">{product.brand} · {product.weight}</p>
-                            {product.promo_code && (
-                                <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-semibold text-orange-700">
-                                    🔥 Promo — use code <span className="font-mono">{product.promo_code}</span> at checkout
-                                </span>
-                            )}
                         </div>
 
                         {/* Rating */}
@@ -246,6 +243,7 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 >
                                     {product.store_name}
                                 </button>
+                                {product.store_featured && <FeaturedBadge />}
                                 <MessageButton portal="customer" params={{ store_id: product.store_id }} label="Message store" className="ml-auto h-7 gap-1 px-2 text-xs" />
                             </div>
                             <p className="text-gray-500 pl-6">

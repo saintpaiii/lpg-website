@@ -105,7 +105,7 @@ export default function LegalSectionEditor({ value, onChange }: { value: EditorD
     return (
         <div className="space-y-4">
             <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-                You can use {'{company_name}'}, {'{company_email}'} and {'{commission_rate}'} — they are replaced automatically.
+                You can use {'{company_name}'} and {'{company_email}'} — they are replaced automatically.
             </p>
 
             <div className="grid gap-1.5">

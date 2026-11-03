@@ -12,7 +12,6 @@ use App\Models\Store;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use App\Services\CouponService;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -63,19 +62,15 @@ class ProductBrowseController extends Controller
             $query->where('refill_price', '<=', (float) $maxPrice);
         }
 
-        // Sort — during a featured platform promo, participating stores come first
-        $sort       = $request->get('sort', 'newest');
-        $promoCodes = CouponService::promoStoreCodes();
-
-        if ($promoCodes && ! in_array($sort, ['price_asc', 'price_desc'])) {
-            $ids = implode(',', array_map('intval', array_keys($promoCodes)));
-            $query->orderByRaw("CASE WHEN products.store_id IN ({$ids}) THEN 0 ELSE 1 END");
-        }
+        // Sort
+        $sort = $request->get('sort', 'newest');
 
         match ($sort) {
             'price_asc'  => $query->orderBy('refill_price', 'asc'),
             'price_desc' => $query->orderBy('refill_price', 'desc'),
-            default      => $query->orderByDesc('products.created_at'),
+            // Newest: Featured stores (Premium plan / trial) first
+            default      => $query->orderByDesc(Store::select('is_featured')->whereColumn('stores.id', 'products.store_id')->limit(1))
+                ->orderByDesc('products.created_at'),
         };
 
         $products = $query->paginate(20)->withQueryString()->through(fn ($p) => [
@@ -92,6 +87,7 @@ class ProductBrowseController extends Controller
             'stock'          => $p->inventory?->quantity ?? 0,
             'store_id'       => $p->store_id,
             'store_name'     => $p->store?->store_name ?? '',
+            'store_featured' => (bool) $p->store?->is_featured,
             'store_logo_url' => $p->store?->logo ? Storage::url($p->store->logo) : null,
             'store_city'     => $p->store?->city ?? '',
             'store_barangay' => $p->store?->barangay ?? '',
@@ -99,7 +95,6 @@ class ProductBrowseController extends Controller
             'delivery_fee'   => (float) ($p->store?->delivery_fee ?? 0),
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
-            'promo_code'     => $promoCodes[$p->store_id] ?? null,
         ]);
 
         // Filter option lists
@@ -247,8 +242,8 @@ class ProductBrowseController extends Controller
                 'stock'          => $product->inventory?->quantity ?? 0,
                 'store_id'       => $product->store_id,
                 'store_name'     => $product->store?->store_name ?? '',
+                'store_featured' => (bool) $product->store?->is_featured,
                 'store_logo_url' => $product->store?->logo ? Storage::url($product->store->logo) : null,
-                'promo_code'     => CouponService::promoStoreCodes()[$product->store_id] ?? null,
                 'store_city'     => $product->store?->city ?? '',
                 'store_barangay' => $product->store?->barangay ?? '',
                 'delivery_fee'   => (float) ($product->store?->delivery_fee ?? 0),
@@ -276,10 +271,10 @@ class ProductBrowseController extends Controller
             ...$p->cardMedia(),
             'stock'          => $p->inventory?->quantity ?? 0,
             'store_name'     => $p->store?->store_name ?? '',
+            'store_featured' => (bool) $p->store?->is_featured,
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
-            'promo_code'     => CouponService::promoStoreCodes()[$p->store_id] ?? null,
         ];
     }
 }

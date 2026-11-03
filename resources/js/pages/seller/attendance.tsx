@@ -1,4 +1,5 @@
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { ExportLink } from '@/components/export-link';
 import {
     AlertTriangle,
     CalendarDays,
@@ -290,14 +291,14 @@ export default function AttendancePage({ rows, date, summary, store_location }: 
                             onChange={handleDateChange}
                             className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                         />
-                        <a href={`/seller/attendance/export?format=csv&date=${date}`}
+                        <ExportLink href={`/seller/attendance/export?format=csv&date=${date}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> CSV
-                        </a>
-                        <a href={`/seller/attendance/export?format=pdf&date=${date}`}
+                            CSV
+                        </ExportLink>
+                        <ExportLink href={`/seller/attendance/export?format=pdf&date=${date}`}
                             className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent transition-colors">
-                            <FileDown className="h-4 w-4" /> PDF
-                        </a>
+                            PDF
+                        </ExportLink>
                     </div>
                 </div>
 

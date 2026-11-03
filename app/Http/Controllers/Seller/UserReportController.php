@@ -67,7 +67,7 @@ class UserReportController extends Controller
         $customer = $userReport->reportedCustomer ?? ($userReport->reporter_side === 'customer' ? $userReport->order?->customer : null);
 
         $loyalty = null;
-        if ($customer?->user_id && StoreLoyaltySettings::where('store_id', $userReport->reported_store_id)->value('is_enabled')) {
+        if ($customer?->user_id && \App\Services\LoyaltyService::isOn($userReport->reported_store_id)) {
             $l = CustomerLoyalty::where('user_id', $customer->user_id)->where('store_id', $userReport->reported_store_id)->first();
             $loyalty = $l ? ['tier' => $l->tier, 'trust_score' => (float) $l->trust_score] : null;
         }

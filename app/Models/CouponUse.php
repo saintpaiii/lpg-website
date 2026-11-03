@@ -14,9 +14,6 @@ class CouponUse extends Model
         'user_id',
         'order_id',
         'discount_applied',
-        'admin_absorbed',
-        'seller_absorbed',
-        'commission_rate',
         'checkout_ref',
     ];
 
@@ -24,9 +21,6 @@ class CouponUse extends Model
     {
         return [
             'discount_applied' => 'decimal:2',
-            'admin_absorbed'   => 'decimal:2',
-            'seller_absorbed'  => 'decimal:2',
-            'commission_rate'  => 'decimal:2',
         ];
     }
 

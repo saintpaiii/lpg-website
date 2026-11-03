@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Services\ProductMediaService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -26,6 +27,7 @@ class ProductController extends Controller
             'purchase_price'   => (float) ($p->purchase_price ?? 0),
             'selling_price'    => (float) ($p->selling_price ?? 0),
             'is_active'        => $p->is_active,
+            'paused_by_plan'   => (bool) $p->paused_by_plan,
             'image_url'        => $p->image ? Storage::url($p->image) : null,
             'media'            => $p->mediaPayload(),
             'stock'            => $p->inventory?->quantity ?? 0,
@@ -53,6 +55,8 @@ class ProductController extends Controller
             $query->onlyTrashed();
         } elseif ($tab === 'inactive') {
             $query->whereNull('deleted_at')->where('is_active', false);
+        } elseif ($tab === 'paused') {
+            $query->whereNull('deleted_at')->where('paused_by_plan', true);
         } else {
             $query->whereNull('deleted_at')->where('is_active', true);
         }
@@ -70,12 +74,20 @@ class ProductController extends Controller
         $counts = [
             'active'   => Product::where('store_id', $store->id)->where('is_active', true)->count(),
             'inactive' => Product::where('store_id', $store->id)->where('is_active', false)->count(),
+            'paused'   => Product::where('store_id', $store->id)->where('paused_by_plan', true)->count(),
             'archived' => Product::onlyTrashed()->where('store_id', $store->id)->count(),
         ];
 
         return Inertia::render('seller/products', [
             'products' => $products,
             'counts'   => $counts,
+            'planLimit' => [
+                'used'      => $counts['active'],
+                'limit'     => SubscriptionService::limits($store)['products'],
+                'plan'      => SubscriptionService::summary($store)['last_name'] ?? 'Basic',
+                'message'   => SubscriptionService::limitMessage($store, 'products'),
+                'can_add'   => SubscriptionService::canAdd($store, 'products'),
+            ],
             'tab'      => $tab,
             'search'   => $search ?? '',
             // Largest total upload the server accepts (post_max_size − 1 MB margin) — checked before sending
@@ -113,8 +125,11 @@ class ProductController extends Controller
             ...ProductMediaService::rules(),
         ], ProductMediaService::messages());
 
+        // Plan limit reached → still saved, but unpublished
+        $publish = SubscriptionService::canAdd($store, 'products');
+
         // Product, stock and photos/video together: a media problem leaves nothing half-saved
-        $product = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $data, $request) {
+        $product = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $data, $request, $publish) {
             $product = Product::create([
                 'store_id'       => $store->id,
                 'name'           => $data['name'],
@@ -125,7 +140,7 @@ class ProductController extends Controller
                 'purchase_price' => $data['purchase_price'],
                 'selling_price'  => $data['purchase_price'],
                 'cost_price'     => $data['purchase_price'],
-                'is_active'      => true,
+                'is_active'      => $publish,
                 'image'          => null,   // set from the first photo by the media sync
             ]);
 
@@ -139,6 +154,11 @@ class ProductController extends Controller
 
             return $product;
         });
+
+        if (! $publish) {
+            return redirect()->route('seller.products', ['tab' => 'inactive'])
+                ->with('warning', 'Saved as unpublished — ' . SubscriptionService::limitMessage($store, 'products'));
+        }
 
         return redirect()->route('seller.products')->with('success', "Product \"{$product->name}\" created.");
     }
@@ -188,7 +208,12 @@ class ProductController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($product->store_id !== $store->id) abort(403);
 
-        $product->update(['is_active' => ! $product->is_active]);
+        // Publishing counts against the plan; unpublishing always works
+        if (! $product->is_active && ! SubscriptionService::canAdd($store, 'products')) {
+            return back()->with('error', SubscriptionService::limitMessage($store, 'products'));
+        }
+
+        $product->update(['is_active' => ! $product->is_active, 'paused_by_plan' => false]);
         $state = $product->is_active ? 'activated' : 'deactivated';
 
         return back()->with('success', "Product \"{$product->name}\" {$state}.");
@@ -209,6 +234,17 @@ class ProductController extends Controller
         if ($product->store_id !== $store->id) abort(403);
 
         $product->restore();
+
+        // Restored as published but the store is over its plan limit → unpublished (kept)
+        if ($product->is_active) {
+            $limit = SubscriptionService::limits($store)['products'];
+            if ($limit !== null && SubscriptionService::usage($store)['products'] > $limit) {
+                $product->update(['is_active' => false, 'paused_by_plan' => true]);
+
+                return back()->with('warning', "Product \"{$product->name}\" restored as unpublished — " . SubscriptionService::limitMessage($store, 'products'));
+            }
+        }
+
         return back()->with('success', "Product \"{$product->name}\" restored.");
     }
 

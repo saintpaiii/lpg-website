@@ -21,6 +21,7 @@ class Vehicle extends Model
         'description',
         'status',
         'assigned_rider_id',
+        'paused_by_plan',
     ];
 
     protected function casts(): array
@@ -28,6 +29,7 @@ class Vehicle extends Model
         return [
             'max_capacity_kg' => 'decimal:2',
             'max_tanks'       => 'integer',
+            'paused_by_plan'  => 'boolean',
         ];
     }
 

@@ -1,4 +1,5 @@
 import MessageButton from '@/components/chat/message-button';
+import { ExportLink } from '@/components/export-link';
 import { usePermission } from '@/hooks/use-permission';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -108,10 +109,10 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                         <option value="loyal">Loyal</option>
                         <option value="vip">VIP</option>
                     </select>
-                    <a href={`/seller/loyalty/customers/export?${exportQs}`}
+                    <ExportLink href={`/seller/loyalty/customers/export?${exportQs}`}
                         className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
-                        <FileDown className="h-4 w-4" /> CSV
-                    </a>
+                        CSV
+                    </ExportLink>
                 </div>
 
                 <Card>

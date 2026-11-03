@@ -11,9 +11,6 @@ Artisan::command('inspire', function () {
 // Consignment: remind customers 2 days before the balance is due, flag overdue balances
 Schedule::command('consignment:balance-reminders')->dailyAt('08:00');
 
-// Commission billing: periodic invoices, reminders, overdue notices, auto-suspension
-Schedule::command('commissions:process-invoices')->dailyAt('07:00');
-
 // Coupons expiring within a day → remind customers who haven't used them
 Schedule::command('coupons:expiry-reminders')->dailyAt('09:00');
 
@@ -31,3 +28,6 @@ Schedule::command('stores:check-documents')->dailyAt('06:00')->withoutOverlappin
 
 // Riders: driver's license reminders (30/7/1 days before) and expired notices to the rider and the store owner
 Schedule::command('staff:check-documents')->dailyAt('06:05')->withoutOverlapping();
+
+// Store plans: reminders in the last 3 days, end-of-plan notices (stores are hidden the moment a plan ends), stale checkouts
+Schedule::command('subscriptions:process')->hourly()->withoutOverlapping();

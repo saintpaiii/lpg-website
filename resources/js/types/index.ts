@@ -36,6 +36,7 @@ export type SharedData = {
         success?: string | null;
         error?: string | null;
         info?: string | null;
+        warning?: string | null;
         cart_conflict?: CartConflict | null;
         deactivation_info?: { reason: string | null; notes: string | null } | null;
         store_suspension_info?: { reason: string | null; notes: string | null } | null;
@@ -50,6 +51,10 @@ export type SharedData = {
     reportBadges?: { store: number; admin: number };
     /** Per-menu-item "needs action" counts (-1 = "!") — SidebarBadgeService */
     sidebarBadges?: Record<string, number>;
+    /** Store plan (owner, staff and riders of a store) */
+    plan?: import('./plans').PlanSummary | null;
+    /** Plan comparison for the owner's "plan ends soon" popup */
+    planCatalog?: import('./plans').PlanCatalog | null;
     /** "Report a website problem" catalog */
     systemReportCategories?: Record<string, import('@/components/reports/types').SystemCategory>;
     systemReportAreas?: Record<string, string[]>;

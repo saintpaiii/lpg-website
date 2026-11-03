@@ -77,7 +77,7 @@ return [
     'system_areas' => [
         'customer' => ['Browse products', 'Cart & checkout', 'My orders', 'Messages', 'Loyalty', 'Invoices', 'Refunds', 'Profile & addresses', 'Notifications', 'Other'],
         'store'    => ['Dashboard', 'Products', 'Inventory', 'Orders', 'Deliveries', 'Messages', 'Customer reports', 'Staff', 'Attendance', 'Payroll',
-                       'Revenue & reports', 'DSS insights', 'Coupons', 'Commission & invoices', 'Settings', 'Other'],
+                       'Revenue & reports', 'DSS insights', 'Coupons', 'Subscription & billing', 'Settings', 'Other'],
         'rider'    => ['My deliveries & map', 'Delivery history', 'Messages', 'Attendance', 'Payslips', 'Other'],
     ],
 

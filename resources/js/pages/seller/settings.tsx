@@ -42,7 +42,6 @@ interface StoreData {
     phone: string | null;
     email: string | null;
     logo_url: string | null;
-    commission_rate: number;
     delivery_fee: number;
     base_delivery_fee: number;
     fee_per_km: number;
@@ -377,14 +376,6 @@ export default function SellerSettings({ store }: Props) {
                                 {allErrors.description && <p className="text-xs text-red-500">{allErrors.description}</p>}
                             </div>
 
-                            {/* Platform info (read-only) */}
-                            <div className="rounded-lg bg-muted/40 p-4 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground text-xs uppercase tracking-wide font-semibold">Commission Rate</p>
-                                    <p className="font-bold text-blue-700 mt-0.5">{store.commission_rate}%</p>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-2">Commission rate is managed by the platform administrator and deducted from each delivered order.</p>
-                            </div>
                         </CardContent>
                     </Card>
 

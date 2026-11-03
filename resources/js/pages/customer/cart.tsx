@@ -35,6 +35,8 @@ type StoreGroup = {
     store_name: string;
     store_logo_url?: string | null;
     delivery_fee: number;
+    /** False when the store is hidden (plan ended, permit expired…) */
+    store_available?: boolean;
     items: CartItem[];
 };
 
@@ -50,7 +52,9 @@ export default function CartPage({ cart }: Props) {
     const { auth } = usePage<SharedData>().props;
     const idStatus  = (auth.user as any)?.id_verification_status as string | undefined;
     const storeGroups: StoreGroup[] = cart?.stores ? Object.values(cart.stores) : [];
-    const allProductIds = storeGroups.flatMap(s => s.items.map(i => i.product_id));
+    // Items of stores that are not available right now can't be checked out
+    const isAvailable = (sg: StoreGroup) => sg.store_available !== false;
+    const allProductIds = storeGroups.filter(isAvailable).flatMap(s => s.items.map(i => i.product_id));
 
     const [selected, setSelected] = useState<Set<number>>(new Set(allProductIds));
     const [clearOpen, setClearOpen] = useState(false);
@@ -65,6 +69,7 @@ export default function CartPage({ cart }: Props) {
     }
 
     function toggleStore(storeGroup: StoreGroup) {
+        if (!isAvailable(storeGroup)) return;
         const ids = storeGroup.items.map(i => i.product_id);
         const allSelected = ids.every(id => selected.has(id));
         setSelected(prev => {
@@ -126,6 +131,7 @@ export default function CartPage({ cart }: Props) {
 
     // Compute totals for selected items only
     const selectedStores = storeGroups
+        .filter(isAvailable)
         .map(sg => ({ ...sg, items: sg.items.filter(i => selected.has(i.product_id)) }))
         .filter(sg => sg.items.length > 0);
 
@@ -201,14 +207,22 @@ export default function CartPage({ cart }: Props) {
                             const allStoreSelected = storeItemIds.every(id => selected.has(id));
                             const someStoreSelected = storeItemIds.some(id => selected.has(id));
 
+                            const available = isAvailable(sg);
+
                             return (
-                                <Card key={sg.store_id}>
+                                <Card key={sg.store_id} className={available ? '' : 'opacity-60'}>
                                     {/* Store header */}
                                     <CardHeader className="pb-3 border-b border-gray-100 dark:border-gray-800">
+                                        {!available && (
+                                            <p className="mb-2 rounded-md bg-gray-100 px-3 py-1.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                                This store is not available right now
+                                            </p>
+                                        )}
                                         <div className="flex items-center gap-3">
                                             <input
                                                 type="checkbox"
-                                                checked={allStoreSelected}
+                                                disabled={!available}
+                                                checked={available && allStoreSelected}
                                                 ref={el => { if (el) el.indeterminate = someStoreSelected && !allStoreSelected; }}
                                                 onChange={() => toggleStore(sg)}
                                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 cursor-pointer"
@@ -239,8 +253,9 @@ export default function CartPage({ cart }: Props) {
                                                         <div className="flex gap-3">
                                                             <input
                                                                 type="checkbox"
-                                                                checked={isChecked}
-                                                                onChange={() => toggleItem(item.product_id)}
+                                                                disabled={!available}
+                                                                checked={available && isChecked}
+                                                                onChange={() => available && toggleItem(item.product_id)}
                                                                 className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 cursor-pointer shrink-0"
                                                             />
                                                             {item.image_url ? (

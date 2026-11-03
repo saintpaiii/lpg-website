@@ -21,7 +21,6 @@ class Order extends Model
         'status',
         'total_amount',
         'shipping_fee',
-        'platform_fee',
         'payment_method',
         'payment_status',
         'notes',
@@ -56,7 +55,6 @@ class Order extends Model
         return [
             'total_amount' => 'decimal:2',
             'shipping_fee' => 'decimal:2',
-            'platform_fee' => 'decimal:2',
             'ordered_at'           => 'datetime',
             'delivered_at'         => 'datetime',
             'loyalty_recorded_at'  => 'datetime',
@@ -136,11 +134,6 @@ class Order extends Model
     public function coupon(): BelongsTo
     {
         return $this->belongsTo(Coupon::class)->withTrashed();
-    }
-
-    public function commission(): HasOne
-    {
-        return $this->hasOne(Commission::class);
     }
 
     public function refundRequests(): HasMany

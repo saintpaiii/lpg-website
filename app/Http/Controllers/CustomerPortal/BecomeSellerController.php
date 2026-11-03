@@ -4,7 +4,6 @@ namespace App\Http\Controllers\CustomerPortal;
 
 use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
-use App\Models\Setting;
 use App\Models\Store;
 use App\Models\VerificationRequest;
 use App\Services\LegalService;
@@ -183,7 +182,6 @@ class BecomeSellerController extends Controller
                 'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,
                 'lto_permit_expires_at'      => $request->lto_permit_expires_at,
                 'status'          => 'pending',
-                'commission_rate' => (float) Setting::get('default_commission_rate', 5.00),   // the rate the seller agreed to
             ]
         );
 

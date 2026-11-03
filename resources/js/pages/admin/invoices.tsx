@@ -40,8 +40,6 @@ type InvoiceRow = {
         order_number: string;
         status: string;
     } | null;
-    platform_commission: number | null;
-    net_amount: number | null;
 };
 
 type Summary = {
@@ -302,8 +300,6 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                             <th className="px-4 py-3 text-right">Total</th>
                                             <th className="px-4 py-3 text-right">Paid</th>
                                             <th className="px-4 py-3 text-right">Balance</th>
-                                            <th className="px-4 py-3 text-right hidden xl:table-cell">Commission</th>
-                                            <th className="px-4 py-3 text-right hidden xl:table-cell">Net</th>
                                             <th className="px-4 py-3">Status</th>
                                             <th className="px-4 py-3">Date</th>
                                         </tr>
@@ -339,12 +335,6 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                                 </td>
                                                 <td className={`px-4 py-3 text-right tabular-nums font-medium ${inv.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                                     {peso(inv.balance)}
-                                                </td>
-                                                <td className="px-4 py-3 text-right tabular-nums text-amber-700 text-xs hidden xl:table-cell">
-                                                    {inv.platform_commission != null ? peso(inv.platform_commission) : '—'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right tabular-nums text-blue-700 text-xs hidden xl:table-cell">
-                                                    {inv.net_amount != null ? peso(inv.net_amount) : '—'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge status={inv.payment_status} />

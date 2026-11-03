@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
-/** Shared create/update validation and listing for admin (platform) and seller (store) coupons. */
+/** Store coupons: create/update validation and the listing with per-coupon stats. */
 trait ManagesCoupons
 {
     protected function couponRules(Request $request, ?Coupon $coupon = null): array
@@ -29,10 +29,6 @@ trait ManagesCoupons
             'expires_at'          => array_filter(['nullable', 'date',
                 $request->filled('starts_at') ? 'after_or_equal:starts_at' : ($coupon ? null : 'after_or_equal:today')]),
             'is_active'           => 'boolean',
-            // Cost sharing — only used for platform coupons
-            'admin_share_percent'            => 'nullable|integer|min:0|max:100',
-            'seller_commission_during_promo' => 'nullable|numeric|min:0|max:100',
-            'featured_boost'                 => 'boolean',
         ];
     }
 
@@ -62,17 +58,6 @@ trait ManagesCoupons
         ];
     }
 
-    /** Cost-sharing attributes for platform coupons. */
-    protected function platformAttributes(array $data): array
-    {
-        return [
-            'admin_share_percent'            => (int) ($data['admin_share_percent'] ?? 50),
-            'seller_commission_during_promo' => isset($data['seller_commission_during_promo']) && $data['seller_commission_during_promo'] !== ''
-                ? $data['seller_commission_during_promo'] : null,
-            'featured_boost'                 => (bool) ($data['featured_boost'] ?? true),
-        ];
-    }
-
     /** Coupons with per-coupon stats (non-cancelled orders only). */
     protected function couponList(Builder $query, Request $request)
     {
@@ -88,20 +73,10 @@ trait ManagesCoupons
             ->withSum(['orders as revenue_items' => $active], 'total_amount')
             ->withSum(['orders as revenue_shipping' => $active], 'shipping_fee')
             ->withCount(['orders as orders_count' => $active])
-            ->withCount('exclusions')
-            ->withSum('uses as admin_absorbed_sum', 'admin_absorbed')
-            ->withSum('uses as seller_absorbed_sum', 'seller_absorbed')
             ->latest()
             ->paginate(20)
             ->withQueryString()
             ->through(fn (Coupon $c) => $this->formatCoupon($c));
-    }
-
-    private ?int $approvedStores = null;
-
-    protected function approvedStoreCount(): int
-    {
-        return $this->approvedStores ??= \App\Models\Store::where('status', 'approved')->count();
     }
 
     protected function formatCoupon(Coupon $c): array
@@ -122,20 +97,12 @@ trait ManagesCoupons
             'starts_at'           => $c->starts_at?->toDateString(),
             'expires_at'          => $c->expires_at?->toDateString(),
             'is_active'           => $c->is_active,
-            'admin_share_percent' => (int) $c->admin_share_percent,
-            'seller_commission_during_promo' => $c->seller_commission_during_promo !== null ? (float) $c->seller_commission_during_promo : null,
-            'featured_boost'      => (bool) $c->featured_boost,
-            'participating_stores' => $c->type === 'platform'
-                ? max(0, $this->approvedStoreCount() - (int) ($c->exclusions_count ?? 0))
-                : null,
             'state'               => $c->state(),
             'label'               => $c->label(),
             'stats'               => [
                 'orders'         => (int) ($c->orders_count ?? 0),
                 'discount_given' => round((float) ($c->discount_given ?? 0), 2),
                 'revenue'        => round((float) ($c->revenue_items ?? 0) + (float) ($c->revenue_shipping ?? 0), 2),
-                'admin_absorbed' => round((float) ($c->admin_absorbed_sum ?? 0), 2),
-                'seller_absorbed'=> round((float) ($c->seller_absorbed_sum ?? 0), 2),
             ],
             'created_at'          => $c->created_at->format('M d, Y'),
         ];

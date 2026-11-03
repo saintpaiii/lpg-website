@@ -28,6 +28,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_admin',
         'is_platform_staff',
         'is_active',
+        'paused_by_plan',
         'valid_id',
         'id_verified',
         'store_id',
@@ -63,12 +64,15 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_admin'                => 'boolean',
             'is_platform_staff'       => 'boolean',
             'is_active'               => 'boolean',
+            'paused_by_plan'          => 'boolean',
             'id_verified'             => 'boolean',
             'must_change_password'    => 'boolean',
             'daily_rate_override'     => 'decimal:2',
             'id_verified_at'          => 'datetime',
         ];
     }
+
+    public const PAUSED_BY_PLAN_MESSAGE = "Your account is paused because your store's current plan has reached its staff limit. Please contact your store owner.";
 
     public function isAdmin(): bool
     {

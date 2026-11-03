@@ -14,6 +14,7 @@ import {
 import { useState } from 'react';
 import {
     BarChart2,
+    Crown,
     FileDown,
     Filter,
     PhilippinePeso,
@@ -34,11 +35,11 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Reports', href: '/admin/reports
 
 type StoreBreakdown = {
     store_id: number; store_name: string; city: string;
-    commission_rate: number; orders: number; gmv: number; commission: number;
+    orders: number; gmv: number;
 };
-type CommissionData = {
-    total_commission: number; total_gmv: number;
-    monthly_chart: { month: string; commission: number }[];
+type SalesData = {
+    total_gmv: number; total_orders: number;
+    monthly_chart: { month: string; gmv: number }[];
     store_breakdown: StoreBreakdown[];
 };
 
@@ -70,6 +71,13 @@ type TopRatedStore = {
     id: number; store_name: string; city: string;
     avg_rating: number; review_count: number; rank: number;
 };
+type SubscriptionsData = {
+    income: number;
+    monthly_chart: { month: string; income: number }[];
+    plan_counts: { trial: number; basic: number; pro: number; premium: number; expired: number };
+    payments: { id: number; receipt_number: string | null; store_name: string; plan: string; method: string; period: string; paid_at: string | null; amount: number }[];
+};
+
 type RatingsData = {
     platform_avg: number;
     total_reviews: number;
@@ -82,7 +90,8 @@ type Props = {
     tab: string;
     date_from: string; date_from_raw: string;
     date_to: string;   date_to_raw: string;
-    commission?: CommissionData;
+    sales?: SalesData;
+    subscriptions?: SubscriptionsData;
     users?: UsersData;
     stores?: StoresData;
     orders?: OrdersData;
@@ -92,11 +101,12 @@ type Props = {
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const TABS = [
-    { key: 'commission', label: 'Commission', icon: PhilippinePeso },
+    { key: 'sales',      label: 'Store Sales', icon: PhilippinePeso },
     { key: 'users',      label: 'Users',      icon: Users          },
     { key: 'stores',     label: 'Stores',     icon: Store          },
     { key: 'orders',     label: 'Orders',     icon: ShoppingCart   },
     { key: 'ratings',    label: 'Ratings',    icon: Star           },
+    { key: 'subscriptions', label: 'Subscriptions', icon: Crown     },
 ] as const;
 
 function fmt(n: number) {
@@ -126,34 +136,34 @@ function EmptyChart({ message }: { message: string }) {
     );
 }
 
-// ── Tab 1: Commission ──────────────────────────────────────────────────────────
+// ── Tab 1: Store Sales ─────────────────────────────────────────────────────────
 
-function CommissionTab({ data }: { data: CommissionData }) {
+function SalesTab({ data }: { data: SalesData }) {
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
-                <StatCard label="Total Commission Earned" value={fmt(data.total_commission)} color="text-amber-600" />
                 <StatCard label="Total GMV (Gross Merchandise Value)" value={fmt(data.total_gmv)} color="text-emerald-600" />
+                <StatCard label="Delivered Orders" value={data.total_orders.toLocaleString()} color="text-blue-600" />
             </div>
 
             <Card>
                 <CardHeader className="pb-2">
                     <CardTitle className="text-base flex items-center gap-2">
-                        <PhilippinePeso className="h-4 w-4 text-amber-600" />
-                        Commission by Month — Last 12 Months
+                        <PhilippinePeso className="h-4 w-4 text-emerald-600" />
+                        GMV by Month — Last 12 Months
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {data.monthly_chart.every(r => r.commission === 0) ? (
-                        <EmptyChart message="No commission data yet." />
+                    {data.monthly_chart.every(r => r.gmv === 0) ? (
+                        <EmptyChart message="No sales yet." />
                     ) : (
                         <ResponsiveContainer width="100%" height={260}>
                             <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                                 <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
                                 <YAxis tick={{ fontSize: 11 }} />
-                                <Tooltip formatter={(v: number) => [fmt(v), 'Commission']} contentStyle={{ fontSize: 12 }} />
-                                <Bar dataKey="commission" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                <Tooltip formatter={(v: number | undefined) => [fmt(v ?? 0), 'GMV']} contentStyle={{ fontSize: 12 }} />
+                                <Bar dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     )}
@@ -162,7 +172,7 @@ function CommissionTab({ data }: { data: CommissionData }) {
 
             <Card>
                 <CardHeader className="pb-2">
-                    <CardTitle className="text-base">Store Commission Breakdown</CardTitle>
+                    <CardTitle className="text-base">Sales per Store</CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
                     {data.store_breakdown.length === 0 ? (
@@ -173,23 +183,18 @@ function CommissionTab({ data }: { data: CommissionData }) {
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3">City</th>
                                         <th className="px-4 py-3 text-right">Orders</th>
                                         <th className="px-4 py-3 text-right">GMV</th>
-                                        <th className="px-4 py-3 text-right">Rate</th>
-                                        <th className="px-4 py-3 text-right">Commission</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
                                     {data.store_breakdown.map((row) => (
                                         <tr key={row.store_id} className="hover:bg-muted/20">
-                                            <td className="px-4 py-2.5">
-                                                <p className="font-medium">{row.store_name}</p>
-                                                {row.city && <p className="text-xs text-muted-foreground">{row.city}</p>}
-                                            </td>
+                                            <td className="px-4 py-2.5 font-medium">{row.store_name}</td>
+                                            <td className="px-4 py-2.5 text-muted-foreground">{row.city || '—'}</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.gmv)}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">{row.commission_rate}%</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-amber-600">{fmt(row.commission)}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-700">{fmt(row.gmv)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -202,7 +207,89 @@ function CommissionTab({ data }: { data: CommissionData }) {
     );
 }
 
-// ── Tab 2: Users ───────────────────────────────────────────────────────────────
+// ── Tab: Subscriptions ─────────────────────────────────────────────────────────
+
+function SubscriptionsTab({ data }: { data: SubscriptionsData }) {
+    const c = data.plan_counts;
+    return (
+        <div className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                <StatCard label="Plan income (this period)" value={fmt(data.income)} color="text-emerald-600" />
+                <StatCard label="On trial" value={c.trial} color="text-violet-600" />
+                <StatCard label="Basic" value={c.basic} color="text-blue-600" />
+                <StatCard label="Pro" value={c.pro} color="text-indigo-600" />
+                <StatCard label="Premium" value={c.premium} color="text-amber-600" />
+                <StatCard label="Expired" value={c.expired} color="text-red-600" />
+            </div>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Crown className="h-4 w-4 text-amber-500" />
+                        Subscription Income — Last 12 Months
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {data.monthly_chart.every((r) => r.income === 0) ? (
+                        <EmptyChart message="No plan payments yet." />
+                    ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                            <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <YAxis tick={{ fontSize: 11 }} />
+                                <Tooltip formatter={(v: number | undefined) => [fmt(v ?? 0), 'Income']} contentStyle={{ fontSize: 12 }} />
+                                <Bar dataKey="income" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Plan payments in this period</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {data.payments.length === 0 ? (
+                        <p className="px-4 py-8 text-center text-sm text-muted-foreground">No plan payments in this period.</p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-3">Receipt #</th>
+                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3">Plan</th>
+                                        <th className="px-4 py-3">Method</th>
+                                        <th className="px-4 py-3">Period</th>
+                                        <th className="px-4 py-3">Paid on</th>
+                                        <th className="px-4 py-3 text-right">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {data.payments.map((p) => (
+                                        <tr key={p.id} className="hover:bg-muted/20">
+                                            <td className="px-4 py-2.5 font-mono text-xs">{p.receipt_number ?? '—'}</td>
+                                            <td className="px-4 py-2.5">{p.store_name}</td>
+                                            <td className="px-4 py-2.5">{p.plan}</td>
+                                            <td className="px-4 py-2.5">{p.method}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{p.period}</td>
+                                            <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{p.paid_at}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums">{fmt(p.amount)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+// ── Tab 2: Users───────────────────────────────────────────────────────────────
 
 function UsersTab({ data }: { data: UsersData }) {
     return (
@@ -577,11 +664,12 @@ export default function ReportsPage({
     tab,
     date_from_raw,
     date_to_raw,
-    commission,
+    sales,
     users,
     stores,
     orders,
     ratings,
+    subscriptions,
 }: Props) {
     const [fromVal, setFromVal] = useState(date_from_raw);
     const [toVal,   setToVal]   = useState(date_to_raw);
@@ -655,11 +743,12 @@ export default function ReportsPage({
                 </div>
 
                 {/* Tab content */}
-                {tab === 'commission' && commission && <CommissionTab data={commission} />}
+                {tab === 'sales'      && sales      && <SalesTab      data={sales}      />}
                 {tab === 'users'      && users      && <UsersTab      data={users}      />}
                 {tab === 'stores'     && stores     && <StoresTab     data={stores}     />}
                 {tab === 'orders'     && orders     && <OrdersTab     data={orders}     />}
                 {tab === 'ratings'    && ratings    && <RatingsTab    data={ratings}    />}
+                {tab === 'subscriptions' && subscriptions && <SubscriptionsTab data={subscriptions} />}
             </div>
         </AppLayout>
     );

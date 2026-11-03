@@ -80,7 +80,6 @@ type Order = {
     invoice_id: number | null;
     store_name: string | null;
     store_id: number | null;
-    commission_amount: number | null;
 };
 
 type Paginated<T> = {
@@ -528,7 +527,6 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                             <th className="px-4 py-3">Type</th>
                                             <th className="px-4 py-3">Items</th>
                                             <th className="px-4 py-3 text-right">Total</th>
-                                            <th className="px-4 py-3 text-right hidden lg:table-cell">Commission</th>
                                             <th className="px-4 py-3">Payment</th>
                                             <th className="px-4 py-3">Status</th>
                                             <th className="px-4 py-3">Date</th>
@@ -580,11 +578,6 @@ export default function OrdersPage({ orders, tab, archivedCount, filters, userRo
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums">
                                                     ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                                </td>
-                                                <td className="px-4 py-3 text-right text-xs text-amber-700 tabular-nums hidden lg:table-cell">
-                                                    {order.commission_amount != null
-                                                        ? '₱' + order.commission_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })
-                                                        : '—'}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex flex-col gap-0.5">

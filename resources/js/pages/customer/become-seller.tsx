@@ -1,4 +1,6 @@
 import { Head, useForm } from '@inertiajs/react';
+import { PlansDialogLink } from '@/components/plans-dialog-link';
+import type { PlanCatalog } from '@/types/plans';
 import {
     AlertCircle, CheckCircle2, CheckSquare, Clock, ExternalLink, FileText,
     ScrollText, Shield, ShieldCheck, Store, Upload, XCircle,
@@ -54,7 +56,7 @@ type Props = {
     previous_store: PreviousStore;
     previous_docs: PreviousDocs;
     seller_terms: SellerTerms;
-    commission_rate: number;
+    plan_catalog?: PlanCatalog | null;
     /** Set when 5 applications were rejected within 30 days */
     limit_message: string | null;
     attempt: number;
@@ -102,13 +104,13 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, commission_rate, limit_message, attempt, max_attempts }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
     const [agreeAuthentic, setAgreeAuthentic] = useState(false);
-    const [agreeCommission, setAgreeCommission] = useState(false);
-    const allAgreed = agreeTerms && agreeAuthentic && agreeCommission;
+    const [agreePlan, setAgreePlan] = useState(false);
+    const allAgreed = agreeTerms && agreeAuthentic && agreePlan;
     const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
 
     const { data, setData, post, processing, errors, progress, transform } = useForm<{
@@ -528,13 +530,13 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                 I confirm that all uploaded documents are authentic and valid
                                             </AgreementCheckbox>
                                             <AgreementCheckbox
-                                                checked={agreeCommission}
-                                                onChange={setAgreeCommission}
-                                                id="agree_commission"
+                                                checked={agreePlan}
+                                                onChange={setAgreePlan}
+                                                id="agree_plan"
                                             >
-                                                I understand and agree to the platform commission of{' '}
-                                                <strong>{commission_rate}% per completed order</strong>
+                                                I understand that my store gets a free 30-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
                                             </AgreementCheckbox>
+                                            <PlansDialogLink catalog={plan_catalog} />
                                         </div>
 
                                         {errors.terms_agreed && (

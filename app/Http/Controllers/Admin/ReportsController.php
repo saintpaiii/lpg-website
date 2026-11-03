@@ -4,10 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\GeneratesExport;
-use App\Models\Invoice;
 use App\Models\Order;
 use App\Models\Rating;
 use App\Models\Store;
+use App\Support\PlatformSales;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -33,16 +33,17 @@ class ReportsController extends Controller
 
     public function index(Request $request): Response
     {
-        $tab = $request->input('tab', 'commission');
+        $tab = $request->input('tab', 'sales');
         [$from, $to] = $this->parseDateRange($request);
 
         $data = match ($tab) {
-            'commission' => $this->commissionData($from, $to),
+            'sales'      => $this->salesData($from, $to),
             'users'      => $this->usersData($from, $to),
             'stores'     => $this->storesData($from, $to),
             'orders'     => $this->ordersData($from, $to),
             'ratings'    => $this->ratingsData($from, $to),
-            default      => $this->commissionData($from, $to),
+            'subscriptions' => $this->subscriptionsData($from, $to),
+            default      => $this->salesData($from, $to),
         };
 
         return Inertia::render('admin/reports', array_merge($data, [
@@ -54,66 +55,83 @@ class ReportsController extends Controller
         ]));
     }
 
-    // ── Tab 1: Commission ─────────────────────────────────────────────────────
+    // ── Tab 1: Store Sales ────────────────────────────────────────────────────
 
-    private function commissionData(Carbon $from, Carbon $to): array
+    /** Platform sales (GMV = items + delivery fee of delivered orders) overall and per store. */
+    private function salesData(Carbon $from, Carbon $to): array
     {
-        $totalCommission = (float) Invoice::whereBetween('created_at', [$from, $to])
-            ->sum('platform_commission');
+        $inRange = PlatformSales::query($from, $to);
 
-        $totalGmv = (float) Order::whereNull('deleted_at')
-            ->whereNotIn('status', ['cancelled'])
-            ->whereBetween('created_at', [$from, $to])
-            ->sum('total_amount');
-
-        // Commission by month (last 12 months, regardless of date range)
+        // GMV by month (last 12 months, regardless of date range)
         $monthlyChart = collect(range(11, 0))->map(function (int $monthsAgo) {
             $date = Carbon::now()->subMonths($monthsAgo)->startOfMonth();
             return [
-                'month'      => $date->format('M Y'),
-                'commission' => (float) Invoice::whereYear('created_at', $date->year)
-                    ->whereMonth('created_at', $date->month)
-                    ->sum('platform_commission'),
+                'month' => $date->format('M Y'),
+                'gmv'   => PlatformSales::between($date, $date->copy()->endOfMonth()),
             ];
         })->values();
 
-        // Per-store commission breakdown within date range
-        $storeBreakdown = Store::where('status', 'approved')->get()
-            ->map(function ($store) use ($from, $to) {
-                $orders = (int) $store->orders()
-                    ->whereNotIn('status', ['cancelled'])
-                    ->whereBetween('created_at', [$from, $to])
-                    ->count();
-                $gmv = (float) $store->orders()
-                    ->whereNotIn('status', ['cancelled'])
-                    ->whereBetween('created_at', [$from, $to])
-                    ->sum('total_amount');
-                $commission = (float) Invoice::whereHas('order', fn ($q) =>
-                    $q->where('store_id', $store->id)
-                      ->whereNotIn('status', ['cancelled'])
-                      ->whereBetween('created_at', [$from, $to])
-                )->sum('platform_commission');
-                return [
-                    'store_id'       => $store->id,
-                    'store_name'     => $store->store_name,
-                    'city'           => $store->city ?? '',
-                    'commission_rate'=> (float) $store->commission_rate,
-                    'orders'         => $orders,
-                    'gmv'            => $gmv,
-                    'commission'     => $commission,
-                ];
-            })
-            ->filter(fn ($s) => $s['orders'] > 0)
-            ->sortByDesc('commission')
+        // Per-store sales within the date range (one grouped query)
+        $byStore = (clone $inRange)
+            ->select('orders.store_id')
+            ->selectRaw('COUNT(*) as orders_count')
+            ->selectRaw('SUM(orders.total_amount + COALESCE(orders.shipping_fee, 0)) as gmv')
+            ->whereNotNull('orders.store_id')
+            ->groupBy('orders.store_id')
+            ->get()
+            ->keyBy('store_id');
+        $stores = Store::whereIn('id', $byStore->keys())->get(['id', 'store_name', 'city']);
+
+        $storeBreakdown = $stores->map(fn ($store) => [
+                'store_id'   => $store->id,
+                'store_name' => $store->store_name,
+                'city'       => $store->city ?? '',
+                'orders'     => (int) $byStore[$store->id]->orders_count,
+                'gmv'        => round((float) $byStore[$store->id]->gmv, 2),
+            ])
+            ->sortByDesc('gmv')
             ->values()
             ->all();
 
         return [
-            'commission' => [
-                'total_commission' => $totalCommission,
-                'total_gmv'        => $totalGmv,
-                'monthly_chart'    => $monthlyChart,
-                'store_breakdown'  => $storeBreakdown,
+            'sales' => [
+                'total_gmv'       => PlatformSales::gmv($inRange),
+                'total_orders'    => (clone $inRange)->count(),
+                'monthly_chart'   => $monthlyChart,
+                'store_breakdown' => $storeBreakdown,
+            ],
+        ];
+    }
+
+    // ── Tab: Subscriptions ────────────────────────────────────────────────────
+
+    /** Plan income (PayMongo + cash) by month, stores per plan, and the plan payments in the range. */
+    private function subscriptionsData(Carbon $from, Carbon $to): array
+    {
+        $monthly = collect(range(11, 0))->map(function (int $monthsAgo) {
+            $date = Carbon::now()->subMonths($monthsAgo)->startOfMonth();
+            return ['month' => $date->format('M Y'), 'income' => \App\Services\SubscriptionService::income($date, $date->copy()->endOfMonth())];
+        })->values();
+
+        $payments = \App\Models\SubscriptionPayment::with('store:id,store_name')->paid()
+            ->whereBetween('paid_at', [$from, $to])->latest('paid_at')->get()
+            ->map(fn ($p) => [
+                'id'             => $p->id,
+                'receipt_number' => $p->receipt_number,
+                'store_name'     => $p->store?->store_name ?? '—',
+                'plan'           => \App\Services\SubscriptionService::planName($p->plan_key),
+                'method'         => \App\Services\SubscriptionService::methodLabel($p->method),
+                'period'         => \App\Services\SubscriptionService::periodLabel($p->period_start, $p->period_end),
+                'paid_at'        => $p->paid_at?->format('M d, Y'),
+                'amount'         => (float) $p->amount,
+            ])->values()->all();
+
+        return [
+            'subscriptions' => [
+                'income'        => \App\Services\SubscriptionService::income($from, $to),
+                'monthly_chart' => $monthly,
+                'plan_counts'   => \App\Services\SubscriptionService::storesByPlan(),
+                'payments'      => $payments,
             ],
         ];
     }
@@ -337,39 +355,61 @@ class ReportsController extends Controller
 
     public function export(Request $request)
     {
-        $tab    = $request->input('tab', 'commission');
+        $tab    = $request->input('tab', 'sales');
         $format = $request->get('format', 'csv');
         [$from, $to] = $this->parseDateRange($request);
         $dateLabel = $from->format('M d, Y') . ' – ' . $to->format('M d, Y');
         $filename  = $this->exportFilename("platform_report_{$tab}", 'LPG_Portal', $from->toDateString(), $to->toDateString(), $format);
 
         switch ($tab) {
-            case 'commission':
-                $data   = $this->commissionData($from, $to);
-                $rows   = collect($data['commission']['store_breakdown'])->map(fn ($s) => [
-                    'store_name'      => $s['store_name'],
-                    'city'            => $s['city'],
-                    'commission_rate' => $s['commission_rate'] . '%',
-                    'orders'          => $s['orders'],
-                    'gmv'             => $this->peso($s['gmv']),
-                    'commission'      => $this->peso($s['commission']),
+            case 'sales':
+                $data   = $this->salesData($from, $to);
+                $rows   = collect($data['sales']['store_breakdown'])->map(fn ($s) => [
+                    'store_name' => $s['store_name'],
+                    'city'       => $s['city'],
+                    'orders'     => $s['orders'],
+                    'gmv'        => $this->peso($s['gmv']),
                 ])->values()->all();
                 $columns = [
-                    ['key' => 'store_name',      'label' => 'Store'],
-                    ['key' => 'city',            'label' => 'City'],
-                    ['key' => 'commission_rate', 'label' => 'Rate', 'align' => 'right'],
-                    ['key' => 'orders',          'label' => 'Orders', 'align' => 'right'],
-                    ['key' => 'gmv',             'label' => 'GMV',    'align' => 'right'],
-                    ['key' => 'commission',      'label' => 'Commission', 'align' => 'right'],
+                    ['key' => 'store_name', 'label' => 'Store'],
+                    ['key' => 'city',       'label' => 'City'],
+                    ['key' => 'orders',     'label' => 'Orders', 'align' => 'right'],
+                    ['key' => 'gmv',        'label' => 'GMV',    'align' => 'right'],
                 ];
-                $totalComm = collect($data['commission']['store_breakdown'])->sum('commission');
-                $totalGmv  = collect($data['commission']['store_breakdown'])->sum('gmv');
-                $totalsRow = ['store_name' => 'TOTAL', 'city' => '', 'commission_rate' => '', 'orders' => collect($data['commission']['store_breakdown'])->sum('orders'), 'gmv' => $this->peso($totalGmv), 'commission' => $this->peso($totalComm)];
+                $totalsRow = ['store_name' => 'TOTAL', 'city' => '', 'orders' => $data['sales']['total_orders'], 'gmv' => $this->peso($data['sales']['total_gmv'])];
                 $summaryItems = [
-                    ['label' => 'Total GMV',        'value' => $this->peso($data['commission']['total_gmv'])],
-                    ['label' => 'Total Commission', 'value' => $this->peso($data['commission']['total_commission'])],
+                    ['label' => 'Total GMV',        'value' => $this->peso($data['sales']['total_gmv'])],
+                    ['label' => 'Delivered Orders', 'value' => $data['sales']['total_orders']],
                 ];
-                $title = 'Platform Commission Report';
+                $title = 'Store Sales Report';
+                break;
+
+            case 'subscriptions':
+                $data   = $this->subscriptionsData($from, $to);
+                $rows   = collect($data['subscriptions']['payments'])->map(fn ($p) => [
+                    'receipt' => $p['receipt_number'] ?? '—',
+                    'store'   => $p['store_name'],
+                    'plan'    => $p['plan'],
+                    'method'  => $p['method'],
+                    'period'  => $p['period'],
+                    'paid_at' => $p['paid_at'],
+                    'amount'  => $this->peso($p['amount']),
+                ])->values()->all();
+                $columns = [
+                    ['key' => 'receipt', 'label' => 'Receipt #', 'class' => 'mono'],
+                    ['key' => 'store',   'label' => 'Store'],
+                    ['key' => 'plan',    'label' => 'Plan'],
+                    ['key' => 'method',  'label' => 'Method'],
+                    ['key' => 'period',  'label' => 'Period'],
+                    ['key' => 'paid_at', 'label' => 'Paid on'],
+                    ['key' => 'amount',  'label' => 'Amount', 'align' => 'right'],
+                ];
+                $totalsRow = ['receipt' => 'TOTAL', 'amount' => $this->peso($data['subscriptions']['income'])];
+                $summaryItems = [
+                    ['label' => 'Plan income (PayMongo + cash)', 'value' => $this->peso($data['subscriptions']['income'])],
+                    ['label' => 'Payments', 'value' => count($rows)],
+                ];
+                $title = 'Subscription Income Report';
                 break;
 
             case 'stores':

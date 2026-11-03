@@ -222,6 +222,7 @@ class FindStoreController extends Controller
             'store' => [
                 'id'                   => $store->id,
                 'name'                 => $store->store_name,
+                'featured'             => (bool) $store->is_featured,
                 'logo_url'             => $store->logo ? Storage::url($store->logo) : null,
                 'area'                 => collect([$store->barangay, $store->city])->filter()->implode(', '),
                 'approximate_location' => (bool) $r['loc']['approximate'],

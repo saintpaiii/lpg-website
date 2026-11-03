@@ -17,7 +17,6 @@ class Invoice extends Model
         'order_id',
         'customer_id',
         'total_amount',
-        'platform_commission',
         'payment_status',
         'paid_amount',
         'payment_method',
@@ -29,7 +28,6 @@ class Invoice extends Model
     {
         return [
             'total_amount'        => 'decimal:2',
-            'platform_commission' => 'decimal:2',
             'paid_amount'         => 'decimal:2',
             'paid_at'             => 'datetime',
             'due_date'            => 'date',

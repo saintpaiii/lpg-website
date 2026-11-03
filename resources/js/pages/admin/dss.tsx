@@ -98,7 +98,8 @@ type PlatformInsights = {
     this_month_revenue: number;
     last_month_revenue: number;
     revenue_change_pct: number | null;
-    commission_this_month: number;
+    sales_this_month: number;
+    subscription_income_this_month: number;
     new_sellers_this_month: number;
     pending_verifications: number;
     new_customers_this_month: number;
@@ -828,11 +829,16 @@ function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
                 />
 
                 {/* Summary stats row */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <div className="rounded-xl border bg-white p-4 space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Commission Earned</p>
-                        <p className="text-2xl font-black text-emerald-700 tabular-nums">{pesoFull(data.commission_this_month)}</p>
-                        <p className="text-xs text-gray-400">Platform revenue this month</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Platform Sales (This Month)</p>
+                        <p className="text-2xl font-black text-emerald-700 tabular-nums">{pesoFull(data.sales_this_month)}</p>
+                        <p className="text-xs text-gray-400">GMV of delivered orders</p>
+                    </div>
+                    <div className="rounded-xl border bg-white p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subscription Income (This Month)</p>
+                        <p className="text-2xl font-black text-violet-700 tabular-nums">{pesoFull(data.subscription_income_this_month)}</p>
+                        <p className="text-xs text-gray-400">Store plans paid (PayMongo + cash)</p>
                     </div>
                     <div className="rounded-xl border bg-white p-4 space-y-1">
                         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Revenue vs Last Month</p>

@@ -123,8 +123,9 @@ class DemoSeeder extends Seeder
             'delivery_fee'            => 50.00,
             'status'                  => 'approved',
             'subscription_plan'       => 'premium',
-            'subscription_expires_at' => $this->now->copy()->addYear(),
-            'commission_rate'         => 5.00,
+            'subscription_started_at' => $this->now->copy()->subDays(20),
+            'subscription_expires_at' => $this->now->copy()->addDays(10),
+            'trial_used_at'           => $this->now->copy()->subDays(50),
             'is_featured'             => true,
             'approved_at'             => $this->now->copy()->subDays(88),
             'approved_by'             => $adminId,
@@ -147,10 +148,11 @@ class DemoSeeder extends Seeder
             'business_permit'         => 'permits/store2-business.pdf',
             'delivery_fee'            => 45.00,
             'status'                  => 'approved',
-            'subscription_plan'       => 'free',
-            'subscription_expires_at' => null,
-            'commission_rate'         => 5.00,
-            'is_featured'             => false,
+            'subscription_plan'       => 'trial',
+            'subscription_started_at' => $this->now,
+            'subscription_expires_at' => $this->now->copy()->addDays(30),
+            'trial_used_at'           => $this->now,
+            'is_featured'             => true,
             'approved_at'             => $this->now->copy()->subDays(58),
             'approved_by'             => $adminId,
             'created_at'              => $this->now->copy()->subDays(60),
@@ -568,14 +570,14 @@ class DemoSeeder extends Seeder
             $store1Specs, $store1Id, $seller1Id,
             $s1ProductIds, $s1SellPrices,
             $customerIds, $customerUserIds,
-            0.05, $consumed
+            $consumed
         );
 
         $this->seedOrders(
             $store2Specs, $store2Id, $seller2Id,
             $s2ProductIds, $s2SellPrices,
             $customerIds, $customerUserIds,
-            0.05, $consumed
+            $consumed
         );
 
         // ══════════════════════════════════════════════════════════════════════
@@ -640,7 +642,6 @@ class DemoSeeder extends Seeder
             ['platform_email',        'info@lpgmarketplace.com'],
             ['default_reorder_level', '10'],
             ['lead_time_days',        '3'],
-            ['default_commission',    '5.00'],
         ];
         foreach ($settings as [$key, $value]) {
             DB::table('settings')->insert([
@@ -652,18 +653,43 @@ class DemoSeeder extends Seeder
         }
 
         // ══════════════════════════════════════════════════════════════════════
-        // 12. STORE SUBSCRIPTIONS
+        // 12. STORE PLANS
         // ══════════════════════════════════════════════════════════════════════
-        DB::table('store_subscriptions')->insert([
-            'store_id'       => $store1Id,
-            'plan'           => 'premium',
-            'amount'         => 999.00,
-            'payment_method' => 'gcash',
-            'starts_at'      => $this->now->copy()->subDays(88),
-            'expires_at'     => $this->now->copy()->addYear(),
-            'status'         => 'active',
-            'created_at'     => $this->now->copy()->subDays(88),
-            'updated_at'     => $this->now->copy()->subDays(88),
+        // Plans (the migration inserts them already — keep the defaults if it didn't)
+        foreach ([
+            ['key' => 'basic',   'name' => 'Basic',   'price' => 499,  'max_products' => 15,   'max_staff' => 3,    'max_vehicles' => 2,    'sort_order' => 1],
+            ['key' => 'pro',     'name' => 'Pro',     'price' => 999,  'max_products' => 50,   'max_staff' => 10,   'max_vehicles' => 5,    'sort_order' => 2],
+            ['key' => 'premium', 'name' => 'Premium', 'price' => 1799, 'max_products' => null, 'max_staff' => null, 'max_vehicles' => null, 'sort_order' => 3],
+        ] as $plan) {
+            if (! DB::table('subscription_plans')->where('key', $plan['key'])->exists()) {
+                DB::table('subscription_plans')->insert($plan + ['created_at' => $this->now, 'updated_at' => $this->now]);
+            }
+        }
+
+        // Store 1: trial used 50 days ago, then Premium bought 20 days ago (10 days left). Store 2: trial started today.
+        $month = $this->now->format('Y-m');
+        DB::table('subscription_payments')->insert([
+            [
+                'store_id' => $store1Id, 'plan_key' => 'trial', 'amount' => 0, 'status' => 'paid', 'method' => 'trial',
+                'paymongo_checkout_id' => null, 'reference' => null, 'receipt_number' => "SUB-{$month}-001",
+                'period_start' => $this->now->copy()->subDays(50), 'period_end' => $this->now->copy()->subDays(20), 'days' => 30,
+                'paid_at' => $this->now->copy()->subDays(50), 'notes' => 'Free 30-day Premium trial',
+                'created_at' => $this->now->copy()->subDays(50), 'updated_at' => $this->now->copy()->subDays(50),
+            ],
+            [
+                'store_id' => $store1Id, 'plan_key' => 'premium', 'amount' => 1799, 'status' => 'paid', 'method' => 'paymongo',
+                'paymongo_checkout_id' => null, 'reference' => 'DEMO-PAY-1', 'receipt_number' => "SUB-{$month}-002",
+                'period_start' => $this->now->copy()->subDays(20), 'period_end' => $this->now->copy()->addDays(10), 'days' => 30,
+                'paid_at' => $this->now->copy()->subDays(20), 'notes' => null,
+                'created_at' => $this->now->copy()->subDays(20), 'updated_at' => $this->now->copy()->subDays(20),
+            ],
+            [
+                'store_id' => $store2Id, 'plan_key' => 'trial', 'amount' => 0, 'status' => 'paid', 'method' => 'trial',
+                'paymongo_checkout_id' => null, 'reference' => null, 'receipt_number' => "SUB-{$month}-003",
+                'period_start' => $this->now, 'period_end' => $this->now->copy()->addDays(30), 'days' => 30,
+                'paid_at' => $this->now, 'notes' => 'Free 30-day Premium trial',
+                'created_at' => $this->now, 'updated_at' => $this->now,
+            ],
         ]);
 
         // ══════════════════════════════════════════════════════════════════════
@@ -741,7 +767,6 @@ class DemoSeeder extends Seeder
      * @param  float[] $sellPrices    Parallel selling prices
      * @param  int[]  $customerIds    Customer record IDs (customers table)
      * @param  int[]  $customerUserIds Customer user IDs (users table)
-     * @param  float  $commissionRate 0.05 = 5%
      * @param  array  &$consumed      Running consumed-units per product_id
      */
     private function seedOrders(
@@ -752,7 +777,6 @@ class DemoSeeder extends Seeder
         array  $sellPrices,
         array  $customerIds,
         array  $customerUserIds,
-        float  $commissionRate,
         array  &$consumed
     ): void {
         foreach ($specs as $spec) {
@@ -771,8 +795,6 @@ class DemoSeeder extends Seeder
             foreach ($items as [$pIdx, $qty]) {
                 $total += $sellPrices[$pIdx] * $qty;
             }
-
-            $platformFee = round($total * $commissionRate, 2);
 
             $paidAmount = 0.0;
             $paidAt     = null;
@@ -797,7 +819,6 @@ class DemoSeeder extends Seeder
                 'status'           => $status,
                 'total_amount'     => $total,
                 'shipping_fee'     => 0.00,
-                'platform_fee'     => $platformFee,
                 'payment_method'   => $payMethod,
                 'payment_status'   => $payStatus,
                 'notes'            => null,
@@ -833,7 +854,6 @@ class DemoSeeder extends Seeder
                     'order_id'            => $orderId,
                     'customer_id'         => $customerIds[$custIdx],
                     'total_amount'        => $total,
-                    'platform_commission' => $platformFee,
                     'payment_status'      => $payStatus,
                     'paid_amount'         => $paidAmount,
                     'payment_method'      => $payMethod,

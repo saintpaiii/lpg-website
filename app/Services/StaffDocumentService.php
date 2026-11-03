@@ -77,9 +77,22 @@ class StaffDocumentService
         return ['status' => 'missing', 'license' => null];
     }
 
-    /** Only riders are checked; everyone else can deliver. */
+    public const PAUSED_NOTE = 'Paused — over plan limit';
+
+    /** Paused because the store's plan is over its staff limit (works even when the column wasn't selected). */
+    public static function isPausedByPlan(User $user): bool
+    {
+        return array_key_exists('paused_by_plan', $user->getAttributes())
+            ? (bool) $user->paused_by_plan
+            : (bool) User::whereKey($user->id)->value('paused_by_plan');
+    }
+
+    /** Paused accounts can't deliver; otherwise only riders are checked (license). */
     public static function canDeliver(User $user, ?Collection $licenses = null): bool
     {
+        if (self::isPausedByPlan($user)) {
+            return false;
+        }
         if (! $user->isRider()) {
             return true;
         }
@@ -124,11 +137,14 @@ class StaffDocumentService
     {
         $riders = collect($riders);
         $byUser = StaffDocument::whereIn('user_id', $riders->pluck('id'))->where('doc_type', 'drivers_license')->get()->groupBy('user_id');
+        $paused = User::whereIn('id', $riders->pluck('id'))->where('paused_by_plan', true)->pluck('id')->all();
         $out = [];
         foreach ($riders as $r) {
             $docs = $byUser->get($r->id, collect());
             $status = $r->isRider() ? self::riderLicenseStatus($r, $docs) : 'valid';
-            $out[$r->id] = ['can_deliver' => in_array($status, ['valid', 'expiring'], true), 'license_note' => self::pickerNote($status), 'license_status' => $status];
+            $out[$r->id] = in_array($r->id, $paused)
+                ? ['can_deliver' => false, 'license_note' => self::PAUSED_NOTE, 'license_status' => $status]
+                : ['can_deliver' => in_array($status, ['valid', 'expiring'], true), 'license_note' => self::pickerNote($status), 'license_status' => $status];
         }
 
         return $out;
@@ -137,6 +153,10 @@ class StaffDocumentService
     /** "{name} can't deliver yet: {message}", or null when the rider may be assigned. */
     public static function assignmentError(User $rider): ?string
     {
+        if (self::isPausedByPlan($rider)) {
+            return "{$rider->name} can't deliver: " . self::PAUSED_NOTE . '.';
+        }
+
         return self::canDeliver($rider) ? null : "{$rider->name} can't deliver yet: " . self::message($rider);
     }
 }
