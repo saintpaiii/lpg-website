@@ -108,7 +108,7 @@ export default function Dashboard({
             icon:  ShoppingCart,
             color: 'text-violet-600',
             bg:    'bg-violet-50 dark:bg-violet-900/20',
-            href:  '/admin/orders',
+            href:  '/admin/reports?tab=sales',
         },
         {
             label: 'Platform Sales (GMV)',
