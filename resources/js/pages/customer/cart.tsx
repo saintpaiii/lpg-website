@@ -1,3 +1,4 @@
+import { maxPerOrderLabel, maxQty } from '@/lib/order-limits';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -28,6 +29,9 @@ type CartItem = {
     transaction_type: 'refill' | 'new_purchase';
     quantity: number;
     stock: number;
+    max_per_order?: number | null;
+    /** Over the seller's max per order (lowered after it was added) — blocks checkout */
+    over_max?: boolean;
 };
 
 type StoreGroup = {
@@ -144,6 +148,8 @@ export default function CartPage({ cart }: Props) {
     const selectedDelivery = selectedStores.reduce((sum, sg) => sum + sg.delivery_fee, 0);
     const selectedTotal    = selectedSubtotal + selectedDelivery;
     const selectedCount    = selected.size;
+    // A selected line over the seller's max per order blocks checkout until it's reduced
+    const overMaxSelected  = storeGroups.some((sg) => sg.items.some((i) => i.over_max && selected.has(i.product_id)));
 
     return (
         <CustomerLayout>
@@ -311,17 +317,22 @@ export default function CartPage({ cart }: Props) {
                                                                         <span className="w-8 text-center text-sm font-semibold text-gray-900 dark:text-white">{item.quantity}</span>
                                                                         <button
                                                                             onClick={() => updateItem(item.product_id, item.quantity + 1)}
-                                                                            disabled={item.quantity >= item.stock}
+                                                                            disabled={item.quantity >= maxQty(item)}
                                                                             className="h-7 w-7 rounded border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
                                                                         >
                                                                             <Plus className="h-3 w-3" />
                                                                         </button>
-                                                                        <span className="text-xs text-gray-400 ml-1">{item.stock} avail.</span>
+                                                                        <span className="text-xs text-gray-400 ml-1">{item.stock} avail.{maxPerOrderLabel(item) && ` · ${maxPerOrderLabel(item)}`}</span>
                                                                     </div>
                                                                     <span className={`font-bold text-sm ${isChecked ? 'text-gray-900 dark:text-white' : 'text-gray-400 line-through'}`}>
                                                                         ₱{subtotalItem.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                                     </span>
                                                                 </div>
+                                                                {item.over_max && (
+                                                                    <p className="mt-1.5 text-xs font-medium text-red-600">
+                                                                        Max {item.max_per_order} per order — reduce the quantity to continue
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -372,7 +383,7 @@ export default function CartPage({ cart }: Props) {
                                 </div>
                                 <Button
                                     onClick={proceedToCheckout}
-                                    disabled={selectedCount === 0}
+                                    disabled={selectedCount === 0 || overMaxSelected}
                                     className={`w-full font-semibold py-2.5 disabled:opacity-50 text-white ${
                                         idStatus !== 'verified'
                                             ? 'bg-orange-500 hover:bg-orange-600'

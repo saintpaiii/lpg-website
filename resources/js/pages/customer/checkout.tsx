@@ -28,6 +28,8 @@ type CartItem = {
     transaction_type: 'refill' | 'new_purchase';
     quantity: number;
     stock: number;
+    max_per_order?: number | null;
+    over_max?: boolean;
 };
 
 type StoreGroup = {
@@ -134,6 +136,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     // Stores that are not available right now are shown greyed and left out of totals and the order
     const stores = allStores.filter((sg) => sg.store_available !== false);
     const unavailableStores = allStores.filter((sg) => sg.store_available === false);
+    // Over the seller's max per order → can't place the order (the server refuses too)
+    const overMax = stores.some((sg) => sg.items.some((i) => i.over_max));
     const { auth } = usePage<SharedData>().props;
     const idStatus = auth.user.id_verification_status;
 
@@ -597,6 +601,9 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.name}</p>
                                                     <p className="text-xs text-gray-500">{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</p>
+                                                    {item.over_max && (
+                                                        <p className="text-xs font-medium text-red-600">Max {item.max_per_order} per order — reduce the quantity in your cart to continue</p>
+                                                    )}
                                                 </div>
                                                 <div className="text-right shrink-0">
                                                     <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -868,7 +875,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Link>
                     <Button
                         onClick={placeOrder}
-                        disabled={loading || !customer || stores.length === 0}
+                        disabled={loading || !customer || stores.length === 0 || overMax}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
                     >
                         {loading ? (

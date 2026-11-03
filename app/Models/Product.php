@@ -23,6 +23,7 @@ class Product extends Model
         'cost_price',
         'refill_price',
         'purchase_price',
+        'max_per_order',
         'description',
         'image',
         'is_active',
@@ -33,6 +34,7 @@ class Product extends Model
     {
         return [
             'weight_kg'      => 'decimal:2',
+            'max_per_order'  => 'integer',
             'selling_price'  => 'decimal:2',
             'cost_price'     => 'decimal:2',
             'refill_price'   => 'decimal:2',

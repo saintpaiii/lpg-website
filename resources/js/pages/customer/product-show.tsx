@@ -28,6 +28,8 @@ type Product = {
     image_url: string | null;
     stock: number;
     in_cart: number;
+    /** Seller's limit per customer order (null = no limit) */
+    max_per_order?: number | null;
     media: GalleryMedia[];
     store_id: number;
     store_name: string;
@@ -138,7 +140,9 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
 export default function ProductShowPage({ product, reviews, canRate, ratingOrderId, fromStore, similar }: Props) {
     const [qty, setQty]     = useState(1);
     // What can still be added on top of what is already in the cart
-    const maxAdd = Math.max(0, product.stock - (product.in_cart ?? 0));
+    // Capped by the seller's max per order (one cart line per product = the quantity in the order)
+    const maxAdd = Math.max(0, Math.min(product.stock, product.max_per_order ?? Infinity) - (product.in_cart ?? 0));
+    const atOrderMax = product.max_per_order != null && (product.in_cart ?? 0) >= product.max_per_order;
     const [txType, setTxType] = useState<'refill' | 'new_purchase'>('refill');
     const [adding, setAdding] = useState(false);
 
@@ -228,6 +232,9 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 ? <span className="text-green-600 font-medium">{product.stock} available</span>
                                 : <span className="text-red-500 font-medium">Out of stock</span>
                             }
+                            {product.max_per_order != null && product.stock > 0 && (
+                                <span className="text-gray-500"> · Max {product.max_per_order} per order</span>
+                            )}
                         </p>
                         {product.in_cart > 0 && (
                             <p className="-mt-2 text-sm text-blue-700 dark:text-blue-400">{product.in_cart} already in your cart</p>
@@ -312,7 +319,11 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                     Add to Cart
                                 </Button>
                                 {maxAdd === 0 && (
-                                    <p className="text-center text-sm text-gray-500">All available stock is already in your cart</p>
+                                    <p className="text-center text-sm text-gray-500">
+                                        {atOrderMax
+                                            ? `You already have the maximum (${product.max_per_order}) per order in your cart`
+                                            : 'All available stock is already in your cart'}
+                                    </p>
                                 )}
                             </div>
                         )}

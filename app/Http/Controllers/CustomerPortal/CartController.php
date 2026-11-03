@@ -62,6 +62,9 @@ class CartController extends Controller
                 'transaction_type' => $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $stock,
+                // Seller's limit per customer order (null = no limit); over it when the seller lowered it later
+                'max_per_order'    => $product->max_per_order,
+                'over_max'         => $product->max_per_order !== null && $ci->quantity > $product->max_per_order,
             ];
         }
 
@@ -110,6 +113,14 @@ class CartController extends Controller
         $existing = CartItem::where('user_id', $userId)
             ->where('product_id', $product->id)
             ->first();
+
+        // Seller's limit per customer order (one cart line per product = the quantity in the order)
+        $max    = $product->max_per_order;
+        $inCart = (int) ($existing?->quantity ?? 0);
+        if ($max !== null && $inCart + (int) $request->quantity > $max) {
+            return back()->with('error', "You can buy at most {$max} of {$product->name} per order."
+                . ($inCart > 0 && $max - $inCart > 0 ? " You already have {$inCart}; you can add " . ($max - $inCart) . ' more.' : ''));
+        }
 
         if ($existing) {
             $newQty = $existing->quantity + (int) $request->quantity;
@@ -163,11 +174,17 @@ class CartController extends Controller
             $product = Product::with('inventory')->find($request->product_id);
             $stock   = $product?->inventory?->quantity ?? PHP_INT_MAX;
 
-            $updates = ['quantity' => min((int) $request->quantity, $stock)];
+            $max     = $product?->max_per_order ?? PHP_INT_MAX;
+
+            $updates = ['quantity' => min((int) $request->quantity, $stock, $max)];
             if ($request->transaction_type) {
                 $updates['transaction_type'] = $request->transaction_type;
             }
             $cartItem->update($updates);
+
+            if ((int) $request->quantity > $max && $max <= $stock) {
+                return back()->with('error', "You can buy at most {$max} of {$product->name} per order.");
+            }
         }
 
         return back();

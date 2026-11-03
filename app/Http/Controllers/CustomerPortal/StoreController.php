@@ -42,6 +42,7 @@ class StoreController extends Controller
             'brand'          => $p->brand,
             'weight'         => $p->weight,
             'weight_kg'      => (float) ($p->weight_kg ?? 0),
+            'max_per_order'  => $p->max_per_order,
             'description'    => $p->description,
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),

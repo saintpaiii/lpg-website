@@ -438,11 +438,11 @@ class DemoSeeder extends Seeder
         // ══════════════════════════════════════════════════════════════════════
         // [name, brand, weight_kg, weight, sell, cost, refill, purchase, desc]
         $store1ProductDefs = [
-            ['11kg Petron Gasul',   'Petron',  11.0, '11kg',   850.00,  700.00,  750.00,  950.00,  'Standard 11 kg refillable LPG tank — Petron Gasul brand.'],
-            ['22kg Petron Gasul',   'Petron',  22.0, '22kg',  1600.00, 1350.00, 1400.00, 1800.00,  'Large 22 kg refillable LPG tank — ideal for commercial kitchens.'],
-            ['11kg Solane',         'Solane',  11.0, '11kg',   830.00,  680.00,  730.00,  930.00,  'Standard 11 kg refillable LPG tank — Solane brand.'],
-            ['2.7kg Handy Gas',     'Total',    2.7, '2.7kg',  380.00,  300.00,  320.00,  450.00,  'Portable 2.7 kg mini LPG canister for camping and small appliances.'],
-            ['50kg Industrial LPG', 'Shell',   50.0, '50kg',  3500.00, 3000.00, 3200.00, 4200.00,  '50 kg industrial LPG cylinder for factories and large establishments.'],
+            ['11kg Petron Gasul',   'Petron',  11.0, '11 kg',   850.00,  700.00,  750.00,  950.00,  'Standard 11 kg refillable LPG tank — Petron Gasul brand.'],
+            ['22kg Petron Gasul',   'Petron',  22.0, '22 kg',  1600.00, 1350.00, 1400.00, 1800.00,  'Large 22 kg refillable LPG tank — ideal for commercial kitchens.'],
+            ['11kg Solane',         'Solane',  11.0, '11 kg',   830.00,  680.00,  730.00,  930.00,  'Standard 11 kg refillable LPG tank — Solane brand.'],
+            ['2.7kg Handy Gas',     'Total',    2.7, '2.7 kg',  380.00,  300.00,  320.00,  450.00,  'Portable 2.7 kg mini LPG canister for camping and small appliances.'],
+            ['50kg Industrial LPG', 'Shell',   50.0, '50 kg',  3500.00, 3000.00, 3200.00, 4200.00,  '50 kg industrial LPG cylinder for factories and large establishments.'],
         ];
 
         $s1ProductIds  = [];
@@ -476,13 +476,16 @@ class DemoSeeder extends Seeder
             ]);
         }
 
+        // Max per customer order = 2 on the 22 kg and the 50 kg tank (their seeded orders are all ≤ 2)
+        DB::table('products')->whereIn('id', [$s1ProductIds[1], $s1ProductIds[4]])->update(['max_per_order' => 2]);
+
         // ══════════════════════════════════════════════════════════════════════
         // 8. STORE 2 PRODUCTS (3 products — Solane Direct Bacoor)
         // ══════════════════════════════════════════════════════════════════════
         $store2ProductDefs = [
-            ['11kg Solane',       'Solane', 11.0, '11kg',   820.00, 670.00,  720.00,  920.00,  'Standard 11 kg Solane LPG cylinder. Fast delivery within Bacoor.'],
-            ['22kg Solane',       'Solane', 22.0, '22kg',  1550.00,1280.00, 1350.00, 1750.00,  '22 kg Solane LPG tank — great for commercial kitchens.'],
-            ['2.7kg Solane Handy','Solane',  2.7, '2.7kg',  370.00, 290.00,  310.00,  440.00,  'Portable 2.7 kg Solane mini LPG for camping and small stoves.'],
+            ['11kg Solane',       'Solane', 11.0, '11 kg',   820.00, 670.00,  720.00,  920.00,  'Standard 11 kg Solane LPG cylinder. Fast delivery within Bacoor.'],
+            ['22kg Solane',       'Solane', 22.0, '22 kg',  1550.00,1280.00, 1350.00, 1750.00,  '22 kg Solane LPG tank — great for commercial kitchens.'],
+            ['2.7kg Solane Handy','Solane',  2.7, '2.7 kg',  370.00, 290.00,  310.00,  440.00,  'Portable 2.7 kg Solane mini LPG for camping and small stoves.'],
         ];
 
         $s2ProductIds  = [];

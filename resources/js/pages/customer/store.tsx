@@ -1,6 +1,7 @@
 import MessageButton from '@/components/chat/message-button';
 import { FeaturedBadge } from '@/components/featured-badge';
 import { Head, router } from '@inertiajs/react';
+import { maxPerOrderLabel, maxQty } from '@/lib/order-limits';
 import { ArrowLeft, Award, BadgeCheck, MapPin, Phone, Search, ShoppingCart } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -54,6 +55,7 @@ type Product = {
     photo_count?: number;
     has_video?: boolean;
     stock: number;
+    max_per_order?: number | null;
     store_id: number;
     avg_rating: number;
     review_count: number;
@@ -389,9 +391,9 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1}
                                         className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40">−</button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
-                                    <button onClick={() => setQty((q) => Math.min(cartDialog.product!.stock, q + 1))} disabled={qty >= cartDialog.product.stock}
+                                    <button onClick={() => setQty((q) => Math.min(maxQty(cartDialog.product!), q + 1))} disabled={qty >= maxQty(cartDialog.product)}
                                         className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40">+</button>
-                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock</span>
+                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{maxPerOrderLabel(cartDialog.product) && ` · ${maxPerOrderLabel(cartDialog.product)}`}</span>
                                 </div>
                             </div>
                             <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-4 py-3">

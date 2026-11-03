@@ -5,6 +5,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
+import { maxPerOrderLabel, maxQty } from '@/lib/order-limits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -33,6 +34,7 @@ type Product = {
     photo_count?: number;
     has_video?: boolean;
     stock: number;
+    max_per_order?: number | null;
     store_id: number;
     store_name: string;
     store_featured?: boolean;
@@ -585,13 +587,13 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     </button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button
-                                        onClick={() => setQty(q => Math.min(cartDialog.product!.stock, q + 1))}
+                                        onClick={() => setQty(q => Math.min(maxQty(cartDialog.product!), q + 1))}
                                         className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-                                        disabled={qty >= cartDialog.product.stock}
+                                        disabled={qty >= maxQty(cartDialog.product)}
                                     >
                                         +
                                     </button>
-                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock</span>
+                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{maxPerOrderLabel(cartDialog.product) && ` · ${maxPerOrderLabel(cartDialog.product)}`}</span>
                                 </div>
                             </div>
 

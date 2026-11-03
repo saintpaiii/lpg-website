@@ -50,8 +50,11 @@ class ProductBrowseController extends Controller
             $query->where('brand', $brand);
         }
 
+        // Size filter by number (old "?weight=11kg" links still work)
         if ($weight = $request->get('weight')) {
-            $query->where('weight', $weight);
+            if ($kg = \App\Support\LpgSize::parseKg($weight)) {
+                $query->where('weight_kg', $kg);
+            }
         }
 
         if ($minPrice = $request->get('min_price')) {
@@ -79,6 +82,7 @@ class ProductBrowseController extends Controller
             'brand'          => $p->brand,
             'weight'         => $p->weight,
             'weight_kg'      => (float) ($p->weight_kg ?? 0),
+            'max_per_order'  => $p->max_per_order,
             'description'    => $p->description,
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
@@ -104,7 +108,8 @@ class ProductBrowseController extends Controller
             ->distinct()->orderBy('brand')->whereNotNull('brand')->pluck('brand');
         $weights = Product::where('is_active', true)
             ->whereHas('store', fn ($q) => $q->visibleToCustomers())
-            ->distinct()->orderBy('weight')->whereNotNull('weight')->pluck('weight');
+            ->distinct()->whereNotNull('weight')->pluck('weight')
+            ->sortBy(fn ($w) => \App\Support\LpgSize::parseKg($w) ?? PHP_INT_MAX)->values();
 
         $isAdminPreview = $request->user() &&
             in_array($request->user()->role, ['platform_admin', 'admin']);
@@ -214,7 +219,9 @@ class ProductBrowseController extends Controller
         $similar = Product::with(['store', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
-            ->where('weight', $product->weight)
+            ->when((float) $product->weight_kg > 0,
+                fn ($q) => $q->where('weight_kg', $product->weight_kg),
+                fn ($q) => $q->where('weight', $product->weight))
             ->where('store_id', '!=', $product->store_id)
             ->where('id', '!=', $product->id)
             ->where('is_active', true)
@@ -234,6 +241,7 @@ class ProductBrowseController extends Controller
                 'brand'          => $product->brand,
                 'weight'         => $product->weight,
                 'weight_kg'      => (float) ($product->weight_kg ?? 0),
+                'max_per_order'  => $product->max_per_order,
                 'description'    => $product->description,
                 'refill_price'   => (float) $product->refill_price,
                 'purchase_price' => (float) ($product->purchase_price ?? $product->refill_price),

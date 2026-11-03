@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\CustomerPortal;
 
 use App\Rules\InServiceArea;
+use App\Exceptions\CheckoutRuleException;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Customer;
@@ -145,10 +146,23 @@ class CheckoutController extends Controller
                 'transaction_type' => $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $product->inventory?->quantity ?? 0,
+                // Over the seller's max per order (lowered after it was added) → this line blocks checkout
+                'max_per_order'    => $product->max_per_order,
+                'over_max'         => $product->max_per_order !== null && $ci->quantity > $product->max_per_order,
             ];
         }
 
         return array_values($stores);
+    }
+
+    /** "Max 2 of X per order…" when the quantity is over the seller's limit, otherwise null. */
+    private static function maxPerOrderError(?Product $product, int $quantity): ?string
+    {
+        $max = $product?->max_per_order;
+
+        return $max !== null && $quantity > $max
+            ? "You can buy at most {$max} of {$product->name} per order. Reduce the quantity in your cart to continue."
+            : null;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -363,6 +377,12 @@ class CheckoutController extends Controller
             if (empty($checkoutStores)) {
                 return $error('The selected stores are not available right now.');
             }
+            // Seller's max per customer order — checked before anything is created
+            foreach ($cartItems as $ci) {
+                if (($why = static::maxPerOrderError($ci->product, (int) $ci->quantity)) !== null) {
+                    return $error($why);
+                }
+            }
 
             // Block checkout if any selected items are from the user's own store
             $ownStoreId = Store::where('user_id', auth()->id())->value('id');
@@ -432,7 +452,10 @@ class CheckoutController extends Controller
 
                         $stock = $product->inventory?->quantity ?? 0;
                         if ($stock < $cartItem['quantity']) {
-                            throw new \RuntimeException("Insufficient stock for {$product->name}. Only {$stock} unit(s) left.");
+                            throw new CheckoutRuleException("Insufficient stock for {$product->name}. Only {$stock} unit(s) left.");
+                        }
+                        if (($why = static::maxPerOrderError($product, (int) $cartItem['quantity'])) !== null) {
+                            throw new CheckoutRuleException($why);
                         }
 
                         $txType = $cartItem['transaction_type'] ?? 'refill';
@@ -740,6 +763,9 @@ class CheckoutController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             throw $e;
         } catch (CouponException $e) {
+            return $error($e->getMessage());
+        } catch (CheckoutRuleException $e) {
+            // Stock / max per order: the customer sees the real reason (the transaction rolled back)
             return $error($e->getMessage());
         } catch (\App\Exceptions\PaymentServiceUnavailable $e) {
             // No connection to PayMongo — the transaction rolled back, nothing was saved

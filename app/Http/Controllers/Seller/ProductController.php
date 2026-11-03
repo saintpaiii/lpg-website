@@ -7,6 +7,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Services\ProductMediaService;
 use App\Services\SubscriptionService;
+use App\Support\LpgSize;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,9 @@ class ProductController extends Controller
             'name'             => $p->name,
             'brand'            => $p->brand ?? '',
             'weight'           => $p->weight ?? '',
+            // Number for the form: weight_kg, or parsed from the old free text
+            'weight_kg'        => $p->weight_kg !== null && (float) $p->weight_kg > 0 ? (float) $p->weight_kg : LpgSize::parseKg($p->weight),
+            'max_per_order'    => $p->max_per_order,
             'description'      => $p->description,
             'refill_price'     => (float) ($p->refill_price ?? 0),
             'purchase_price'   => (float) ($p->purchase_price ?? 0),
@@ -109,21 +113,52 @@ class ProductController extends Controller
         };
     }
 
+    /** Fields shared by create + edit. Tank size is a number in kg; refill can't cost more than a new tank. */
+    private static function productRules(): array
+    {
+        return [
+            'name'           => 'required|string|max:255',
+            'brand'          => 'nullable|string|max:100',
+            'weight_kg'      => 'required|numeric|min:0.5|max:100',
+            'description'    => 'nullable|string|max:1000',
+            'refill_price'   => 'required|numeric|min:0|lte:purchase_price',
+            'purchase_price' => 'required|numeric|min:1',
+            'max_per_order'  => 'nullable|integer|min:1|max:999',
+            'reorder_level'  => 'required|integer|min:0',
+        ];
+    }
+
+    private static function productMessages(): array
+    {
+        $size = 'Enter the tank size in kg, e.g. 11.';
+
+        return [
+            ...ProductMediaService::messages(),
+            'weight_kg.required' => $size,
+            'weight_kg.numeric'  => $size,
+            'weight_kg.min'      => $size,
+            'weight_kg.max'      => $size,
+            'refill_price.lte'   => "Refill price can't be higher than the new tank price.",
+        ];
+    }
+
+    /** weight_kg (1 decimal) + the "11 kg" text that older pages still read. */
+    private static function sizeAttributes(array $data): array
+    {
+        $kg = round((float) $data['weight_kg'], 1);
+
+        return ['weight_kg' => $kg, 'weight' => LpgSize::label($kg)];
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $store = request()->attributes->get('seller_store');
 
         $data = $request->validate([
-            'name'           => 'required|string|max:255',
-            'brand'          => 'nullable|string|max:100',
-            'weight'         => 'nullable|string|max:50',
-            'description'    => 'nullable|string|max:1000',
-            'refill_price'   => 'required|numeric|min:0',
-            'purchase_price' => 'required|numeric|min:0',
+            ...self::productRules(),
             'stock'          => 'required|integer|min:0',
-            'reorder_level'  => 'required|integer|min:0',
             ...ProductMediaService::rules(),
-        ], ProductMediaService::messages());
+        ], self::productMessages());
 
         // Plan limit reached → still saved, but unpublished
         $publish = SubscriptionService::canAdd($store, 'products');
@@ -134,7 +169,8 @@ class ProductController extends Controller
                 'store_id'       => $store->id,
                 'name'           => $data['name'],
                 'brand'          => $data['brand'] ?? null,
-                'weight'         => $data['weight'] ?? null,
+                ...self::sizeAttributes($data),
+                'max_per_order'  => $data['max_per_order'] ?? null,
                 'description'    => $data['description'] ?? null,
                 'refill_price'   => $data['refill_price'],
                 'purchase_price' => $data['purchase_price'],
@@ -172,15 +208,9 @@ class ProductController extends Controller
         }
 
         $data = $request->validate([
-            'name'           => 'required|string|max:255',
-            'brand'          => 'nullable|string|max:100',
-            'weight'         => 'nullable|string|max:50',
-            'description'    => 'nullable|string|max:1000',
-            'refill_price'   => 'required|numeric|min:0',
-            'purchase_price' => 'required|numeric|min:0',
-            'reorder_level'  => 'required|integer|min:0',
+            ...self::productRules(),
             ...ProductMediaService::rules(),
-        ], ProductMediaService::messages());
+        ], self::productMessages());
 
         // Photos + video first (validated cross-field; files are cleaned up if anything fails)
         ProductMediaService::sync($product, $request);
@@ -188,7 +218,8 @@ class ProductController extends Controller
         $updates = [
             'name'           => $data['name'],
             'brand'          => $data['brand'] ?? null,
-            'weight'         => $data['weight'] ?? null,
+            ...self::sizeAttributes($data),
+            'max_per_order'  => $data['max_per_order'] ?? null,
             'description'    => $data['description'] ?? null,
             'refill_price'   => $data['refill_price'],
             'purchase_price' => $data['purchase_price'],

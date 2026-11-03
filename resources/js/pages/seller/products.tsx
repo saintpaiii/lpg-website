@@ -28,7 +28,10 @@ type Product = {
     id: number;
     name: string;
     brand: string;
+    /** "11 kg" (built by the server from weight_kg) */
     weight: string;
+    weight_kg: number | null;
+    max_per_order: number | null;
     description: string | null;
     refill_price: number;
     purchase_price: number;
@@ -69,7 +72,8 @@ const TABS = [
 type ProductForm = {
     name: string;
     brand: string;
-    weight: string;
+    weight_kg: string;
+    max_per_order: string;
     description: string;
     refill_price: string;
     purchase_price: string;
@@ -78,9 +82,12 @@ type ProductForm = {
 };
 
 const EMPTY_FORM: ProductForm = {
-    name: '', brand: '', weight: '', description: '',
+    name: '', brand: '', weight_kg: '', max_per_order: '', description: '',
     refill_price: '', purchase_price: '', stock: '', reorder_level: '10',
 };
+
+const SIZE_CHIPS = [2.7, 5, 7, 11, 22, 50];
+const REFILL_MSG = "Refill price can't be higher than the new tank price.";
 
 export default function SellerProducts({ products, counts, tab, search, max_upload_bytes, planLimit }: Props) {
     const [searchVal, setSearchVal] = useState(search);
@@ -94,6 +101,8 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
     const mediaBusy = mediaItems.some((m) => m.preparing);
 
     const { data, setData, post, processing, errors, reset, transform, progress } = useForm<ProductForm>(EMPTY_FORM);
+    // Live price rule (the server checks too)
+    const refillTooHigh = data.refill_price !== '' && data.purchase_price !== '' && Number(data.refill_price) > Number(data.purchase_price);
     const mediaErrors = Object.entries(errors as Record<string, string>)
         .filter(([k]) => /^(media_order|new_files|new_posters|new_meta)/.test(k)).map(([, v]) => v);
 
@@ -133,7 +142,9 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
     function openEdit(p: Product) {
         setEditing(p);
         setData({
-            name: p.name, brand: p.brand, weight: p.weight,
+            name: p.name, brand: p.brand,
+            weight_kg: p.weight_kg != null ? String(p.weight_kg) : '',
+            max_per_order: p.max_per_order != null ? String(p.max_per_order) : '',
             description: p.description ?? '', refill_price: String(p.refill_price),
             purchase_price: String(p.purchase_price), stock: String(p.stock),
             reorder_level: String(p.reorder_level),
@@ -307,6 +318,17 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">{p.name}</p>
                                                 <p className="text-xs text-muted-foreground">{p.brand} {p.weight && `· ${p.weight}`}</p>
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {p.max_per_order != null && (
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Max {p.max_per_order} / order</span>
+                                                    )}
+                                                    {p.refill_price > p.purchase_price && (
+                                                        <span title="Refill price is higher than the new tank price — edit to fix."
+                                                            className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                                                            Check prices
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {p.paused_by_plan && <span className={`mt-1 inline-block ${PAUSED_BADGE}`}>Unpublished — over plan limit</span>}
                                             </td>
                                             <td className="px-4 py-3 text-right font-medium">
@@ -404,12 +426,23 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                             </div>
                         </div>
 
-                        {/* Weight + Description */}
+                        {/* Tank size (kg) + Description */}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-1.5">
-                                <Label htmlFor="weight">Size/Weight</Label>
-                                <Input id="weight" value={data.weight} onChange={(e) => setData('weight', e.target.value)}
-                                    placeholder="e.g. 11kg" />
+                                <Label htmlFor="weight_kg">Tank size (kg) <span className="text-red-500">*</span></Label>
+                                <Input id="weight_kg" type="number" step="0.1" min="0.5" max="100" inputMode="decimal"
+                                    value={data.weight_kg} onChange={(e) => setData('weight_kg', e.target.value)} placeholder="e.g. 11" />
+                                <div className="flex flex-wrap gap-1.5">
+                                    {SIZE_CHIPS.map((kg) => (
+                                        <button key={kg} type="button" onClick={() => setData('weight_kg', String(kg))}
+                                            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                                                Number(data.weight_kg) === kg ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-muted'
+                                            }`}>
+                                            {kg}
+                                        </button>
+                                    ))}
+                                </div>
+                                {errors.weight_kg && <p className="text-xs text-red-500">{errors.weight_kg}</p>}
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="description">Description</Label>
@@ -424,7 +457,9 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                 <Label htmlFor="refill_price">Refill Price (₱) <span className="text-red-500">*</span></Label>
                                 <Input id="refill_price" type="number" min="0" step="0.01" value={data.refill_price}
                                     onChange={(e) => setData('refill_price', e.target.value)} placeholder="0.00" />
-                                {errors.refill_price && <p className="text-xs text-red-500">{errors.refill_price}</p>}
+                                {refillTooHigh
+                                    ? <p className="text-xs text-red-500">{REFILL_MSG}</p>
+                                    : errors.refill_price && <p className="text-xs text-red-500">{errors.refill_price}</p>}
                             </div>
                             <div className="grid gap-1.5">
                                 <Label htmlFor="purchase_price">New Purchase Price (₱) <span className="text-red-500">*</span></Label>
@@ -432,6 +467,15 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                     onChange={(e) => setData('purchase_price', e.target.value)} placeholder="0.00" />
                                 {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
                             </div>
+                        </div>
+
+                        {/* Max per customer order (optional) */}
+                        <div className="grid gap-1.5 sm:max-w-[50%] sm:pr-2">
+                            <Label htmlFor="max_per_order">Max per customer order</Label>
+                            <Input id="max_per_order" type="number" min="1" max="999" step="1" inputMode="numeric"
+                                value={data.max_per_order} onChange={(e) => setData('max_per_order', e.target.value)} placeholder="No limit" />
+                            <p className="text-xs text-muted-foreground">Limits how many of this product one customer can buy in one order.</p>
+                            {errors.max_per_order && <p className="text-xs text-red-500">{errors.max_per_order}</p>}
                         </div>
 
                         {/* Stock + Reorder (only on create) */}
@@ -464,7 +508,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
 
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => { setShowForm(false); reset(); }}>Cancel</Button>
-                            <Button type="submit" disabled={processing || mediaBusy}>
+                            <Button type="submit" disabled={processing || mediaBusy || refillTooHigh}>
                                 {processing && <Spinner className="mr-1.5" />}
                                 {mediaBusy ? 'Preparing files…' : editing ? 'Save Changes' : 'Add Product'}
                             </Button>

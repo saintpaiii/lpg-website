@@ -13,6 +13,9 @@ class ProductSeeder extends Seeder
         $products = [
             [
                 'name'          => '11kg Petron Gasul',
+                'weight'        => '11 kg',
+                'refill_price'  => 750.00,
+                'purchase_price'=> 950.00,
                 'brand'         => 'Petron Gasul',
                 'weight_kg'     => 11,
                 'selling_price' => 850.00,
@@ -22,6 +25,9 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name'          => '11kg Solane',
+                'weight'        => '11 kg',
+                'refill_price'  => 730.00,
+                'purchase_price'=> 930.00,
                 'brand'         => 'Solane',
                 'weight_kg'     => 11,
                 'selling_price' => 830.00,
@@ -31,6 +37,9 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name'          => '22kg Petron Gasul',
+                'weight'        => '22 kg',
+                'refill_price'  => 1400.00,
+                'purchase_price'=> 1800.00,
                 'brand'         => 'Petron Gasul',
                 'weight_kg'     => 22,
                 'selling_price' => 1600.00,
@@ -40,6 +49,9 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name'          => '50kg Industrial',
+                'weight'        => '50 kg',
+                'refill_price'  => 3200.00,
+                'purchase_price'=> 4200.00,
                 'brand'         => 'Industrial',
                 'weight_kg'     => 50,
                 'selling_price' => 3500.00,
@@ -49,6 +61,9 @@ class ProductSeeder extends Seeder
             ],
             [
                 'name'          => '2.7kg Handy Gas',
+                'weight'        => '2.7 kg',
+                'refill_price'  => 320.00,
+                'purchase_price'=> 450.00,
                 'brand'         => 'Handy Gas',
                 'weight_kg'     => 2.7,
                 'selling_price' => 380.00,
