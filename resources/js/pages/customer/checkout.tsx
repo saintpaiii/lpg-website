@@ -2,6 +2,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
 import StoreLocationMap from '@/components/store-location-map';
+import { orderLoad, quoteFee, whyNoVehicle, type DeliveryOption } from '@/lib/delivery-fee';
 import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
@@ -23,6 +24,8 @@ type CartItem = {
     name: string;
     brand: string;
     weight: string;
+    /** Tank size in kg (0 = not a tank) — the load decides the vehicle */
+    weight_kg?: number;
     image_url: string | null;
     refill_price: number;
     purchase_price: number;
@@ -38,11 +41,12 @@ type StoreGroup = {
     store_name: string;
     /** False when the store is hidden (plan ended, permit expired…) — left out of the order */
     store_available?: boolean;
-    delivery_fee: number;
+    /** Delivery fee per vehicle type (lib/delivery-fee.ts quoteFee picks the vehicle) */
+    delivery_options: DeliveryOption[];
+    can_deliver: boolean;
+    no_delivery_reason: string | null;
     store_lat: number | null;
     store_lng: number | null;
-    base_delivery_fee: number | null;
-    fee_per_km: number | null;
     max_delivery_radius_km: number | null;
     allow_cod: boolean;
     allow_consignment: boolean;
@@ -124,12 +128,6 @@ function peso(n: number) {
 const PIN_WARN_KM = 3;
 
 
-function calcFee(sg: StoreGroup, distKm: number): number {
-    const base  = sg.base_delivery_fee ?? 0;
-    const perKm = sg.fee_per_km ?? 0;
-    if (base <= 0 && perKm <= 0) return sg.delivery_fee;
-    return Math.ceil((base + distKm * perKm) / 5) * 5;
-}
 
 /** Store → customer road route via the cached /api/route proxy (null when routing is unavailable). */
 async function fetchOsrmRoute(
@@ -279,16 +277,16 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const osrmAbortRef = useRef<AbortController | null>(null);
 
     // Per-store dynamic distances/fees (keyed by store_id)
-    const [distFees, setDistFees] = useState<Record<number, { distKm: number; fee: number }>>({});
+    // Straight-line distance store → pin per store (the fee itself comes from quoteFee below)
+    const [distFees, setDistFees] = useState<Record<number, { distKm: number }>>({});
 
     useEffect(() => {
         if (!pin) { setDistFees({}); setOsrmRoute(null); return; }
 
-        const newDistFees: Record<number, { distKm: number; fee: number }> = {};
+        const newDistFees: Record<number, { distKm: number }> = {};
         stores.forEach((sg) => {
             if (sg.store_lat && sg.store_lng) {
-                const distKm = haversineKm(sg.store_lat, sg.store_lng, pin.lat, pin.lng);
-                newDistFees[sg.store_id] = { distKm, fee: calcFee(sg, distKm) };
+                newDistFees[sg.store_id] = { distKm: haversineKm(sg.store_lat, sg.store_lng, pin.lat, pin.lng) };
             }
         });
         setDistFees(newDistFees);
@@ -340,18 +338,30 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     // Down payment %: tier minimum from the backend, the customer may choose to pay more (max 90%)
     const dpOf = (sg: StoreGroup) => Math.min(90, Math.max(sg.min_down_payment_percent, dpPercents[sg.store_id] ?? sg.min_down_payment_percent));
 
+    // Delivery quote per store: load (kg + tanks) of its lines, distance from the store pin (none → base fee)
+    const quoteOf = (sg: StoreGroup) => {
+        const load = orderLoad(sg.items);
+        return quoteFee(sg.delivery_options, distFees[sg.store_id]?.distKm ?? null, load.kg, load.tanks);
+    };
+
     // Per-store totals (mirrors CheckoutController@store)
     const baseTotals = stores.map((sg) => {
         const subtotal = sg.items.reduce((s, item) => {
             const price = item.transaction_type === 'refill' ? item.refill_price : item.purchase_price;
             return s + price * item.quantity;
         }, 0);
-        const dynamic  = distFees[sg.store_id];
-        // Pick-up: no delivery fee (a shipping-only coupon gives nothing here)
-        const fee      = fulfillmentOf(sg) === 'pickup' ? 0 : dynamic ? dynamic.fee : sg.delivery_fee;
+        // Delivery: the cheapest vehicle that carries this load (same rule as the server); pick-up: ₱0, no vehicle
+        const isDelivery = fulfillmentOf(sg) === 'delivery';
+        const quote    = isDelivery ? quoteOf(sg) : null;
+        const distKm   = distFees[sg.store_id]?.distKm ?? null;
+        const tooFar   = isDelivery && distKm != null && !!sg.max_delivery_radius_km && distKm > sg.max_delivery_radius_km;
+        // Can't deliver: no vehicle fits / no vehicle, or beyond the store's radius
+        const blocked  = isDelivery ? (!quote ? whyNoVehicle(sg.delivery_options, sg.no_delivery_reason)
+            : tooFar ? `${sg.store_name} doesn't deliver that far (${distKm!.toFixed(1)} km, limit ${sg.max_delivery_radius_km} km).` : null) : null;
+        const fee      = quote?.fee ?? 0;
         const coupon   = sg.coupons.find((c) => c.id === selectedCoupons[sg.store_id]) ?? null;
         const discount = coupon ? Math.min(coupon.amount, subtotal) : 0;
-        return { store: sg, subtotal, fee, coupon, discount };
+        return { store: sg, subtotal, fee, coupon, discount, quote, blocked };
     });
 
     // Promo coupon spread across the orders (recomputed live as delivery fees change)
@@ -375,6 +385,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const grandDelivery = storeTotals.reduce((s, t) => s + t.fee, 0);
     const grandDiscount = storeTotals.reduce((s, t) => s + t.discount, 0);
     const grandTotal    = round2(storeTotals.reduce((s, t) => s + t.total, 0));
+    // A store set to delivery that can't deliver this order (no vehicle fits / too far) blocks Place Order
+    const deliveryBlocked = storeTotals.some((t) => !!t.blocked);
     const payNowTotal   = round2(storeTotals.reduce((s, t) => s + t.payNow, 0));
     const codTotal      = round2(storeTotals.filter((t) => t.mode === 'cod').reduce((s, t) => s + t.total, 0));
     const balanceTotal  = round2(storeTotals.filter((t) => t.mode === 'consignment').reduce((s, t) => s + t.balance, 0));
@@ -577,7 +589,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                     </span>
                                                 </span>
                                                 <span className="font-semibold text-blue-700 dark:text-blue-400">
-                                                    {df.fee > 0 ? peso(df.fee) : 'Free'}
+                                                    {(() => { const q = quoteOf(sg); return q ? (q.fee > 0 ? peso(q.fee) : 'Free') : '—'; })()}
                                                 </span>
                                             </div>
                                         );
@@ -586,7 +598,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                             )}
                             {!pin && (
                                 <div className="mt-3 px-4 py-3 text-xs text-gray-400 text-center border-t border-gray-100">
-                                    No pin set — flat delivery fee will apply. Your order will still be placed at your barangay for the rider's map.
+                                    No pin set — the base delivery fee applies. Your order will still be placed at your barangay for the rider's map.
                                 </div>
                             )}
                             <div className="h-3" />
@@ -614,7 +626,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Card>
                 ))}
 
-                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance }) => {
+                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance, quote, blocked }) => {
                     const pickup = fulfillmentOf(sg) === 'pickup';
                     const refillSummary = refillSummaryOf(sg);
                     return (
@@ -638,6 +650,20 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                 <Icon className="h-4 w-4" /> {label}
                                             </button>
                                         ))}
+                                    </div>
+                                )}
+                                {/* Delivery not possible for this store (no vehicle fits / no vehicle / too far) */}
+                                {blocked && (
+                                    <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
+                                        <p className="font-medium">Delivery isn't possible for this order.</p>
+                                        <p className="mt-0.5">{blocked}</p>
+                                        <p className="mt-1 text-xs">{sg.allow_pickup ? 'Choose pick-up, or reduce the quantity.' : 'Reduce the quantity or remove some items.'}</p>
+                                        {sg.allow_pickup && (
+                                            <Button type="button" size="sm" variant="outline" className="mt-2 border-red-300 bg-white text-red-700 hover:bg-red-50 dark:bg-transparent"
+                                                onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: 'pickup' }))}>
+                                                <Store className="mr-1 h-3.5 w-3.5" /> Switch to pick-up
+                                            </Button>
+                                        )}
                                     </div>
                                 )}
                                 {/* Only pick-up groups mount a map */}
@@ -701,8 +727,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                         <span>{peso(storeSubtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                        <span>Delivery fee</span>
-                                        <span>{pickup ? '₱0 (pick-up)' : fee > 0 ? peso(fee) : 'Free'}</span>
+                                        <span>Delivery fee{!pickup && quote ? ` (${quote.label})` : ''}</span>
+                                        <span>{pickup ? '₱0 (pick-up)' : !quote ? '—' : fee > 0 ? peso(fee) : 'Free'}</span>
                                     </div>
                                     {discount > 0 && (
                                         <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
@@ -964,7 +990,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Link>
                     <Button
                         onClick={placeOrder}
-                        disabled={loading || !customer || stores.length === 0 || overMax || (hasRefill && !emptyConfirmed)}
+                        disabled={loading || !customer || stores.length === 0 || overMax || (hasRefill && !emptyConfirmed) || deliveryBlocked}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
                     >
                         {loading ? (

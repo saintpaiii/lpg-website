@@ -21,7 +21,6 @@ class SettingsController extends Controller
         'default_reorder_level',
         'lead_time_days',
         // Platform / marketplace
-        'default_delivery_fee',
     ];
 
     private array $defaults = [
@@ -31,7 +30,6 @@ class SettingsController extends Controller
         'company_email'           => '',
         'default_reorder_level'   => '10',
         'lead_time_days'          => '3',
-        'default_delivery_fee'    => '0.00',
     ];
 
     public function index(): Response
@@ -55,7 +53,6 @@ class SettingsController extends Controller
             'company_email'           => 'nullable|email|max:255',
             'default_reorder_level'   => 'required|integer|min:1|max:9999',
             'lead_time_days'          => 'required|integer|min:1|max:365',
-            'default_delivery_fee'    => 'required|numeric|min:0',
         ]);
 
         foreach ($data as $key => $value) {

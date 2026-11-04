@@ -89,6 +89,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         // ── Vehicles ─────────────────────────────────────────────────────────
         Route::get('vehicles', [VehicleController::class, 'index'])->name('vehicles');
         Route::post('vehicles', [VehicleController::class, 'store'])->name('vehicles.store');
+        // Before vehicles/{vehicle}, otherwise {vehicle} would capture "rates"
+        Route::put('vehicles/rates', [VehicleController::class, 'updateRates'])->name('vehicles.rates');
         Route::put('vehicles/{vehicle}', [VehicleController::class, 'update'])->name('vehicles.update');
         Route::delete('vehicles/{vehicle}', [VehicleController::class, 'destroy'])->name('vehicles.destroy');
         Route::patch('vehicles/{vehicle}/plan-pause', [VehicleController::class, 'togglePlanPause'])->name('vehicles.plan-pause');

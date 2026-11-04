@@ -29,7 +29,6 @@ type FeaturedProduct = {
     store_name: string;
     store_city: string;
     store_id: number;
-    delivery_fee: number;
 };
 
 type Props = {

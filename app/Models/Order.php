@@ -49,6 +49,7 @@ class Order extends Model
         'delivery_distance_km',
         'estimated_delivery_minutes',
         'fulfillment',
+        'delivery_vehicle_type',
         'empty_tanks_required',
         'empty_tanks_collected_at',
         'empty_tanks_collected_by',

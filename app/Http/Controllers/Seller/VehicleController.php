@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\Vehicle;
+use App\Models\StoreDeliveryRate;
+use App\Services\DeliveryFeeService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,6 +59,9 @@ class VehicleController extends Controller
         return Inertia::render('seller/vehicles', [
             'vehicles' => $vehicles,
             'riders'   => $riders,
+            // Delivery fee per vehicle type the store currently has (non-retired, not deleted)
+            'rates'    => $this->rateRows($store),
+            'can_deliver' => DeliveryFeeService::clientOptions($store) !== [],
             'planLimit' => [
                 'used'    => SubscriptionService::usage($store)['vehicles'],
                 'limit'   => SubscriptionService::limits($store)['vehicles'],
@@ -65,6 +70,58 @@ class VehicleController extends Controller
                 'can_add' => SubscriptionService::canAdd($store, 'vehicles'),
             ],
         ]);
+    }
+
+    /** One row per vehicle type the store has now (non-retired, not deleted), with its fee (null = not set). */
+    private function rateRows($store): array
+    {
+        $rates = StoreDeliveryRate::where('store_id', $store->id)->get()->keyBy('vehicle_type');
+        $types = Vehicle::where('store_id', $store->id)->where('status', '!=', 'retired')->distinct()->pluck('vehicle_type');
+        $order = array_flip(array_keys(DeliveryFeeService::types()));
+
+        return $types->sortBy(fn ($t) => $order[$t] ?? 99)->map(fn ($t) => [
+            'vehicle_type' => $t,
+            'label'        => DeliveryFeeService::label($t),
+            'base_fee'     => $rates->has($t) ? (float) $rates[$t]->base_fee : null,
+            'fee_per_km'   => $rates->has($t) ? (float) $rates[$t]->fee_per_km : null,
+        ])->values()->all();
+    }
+
+    /** First vehicle of a type → its delivery fee gets the suggested default. Returns the flash suffix. */
+    private function ensureRate($store, string $type): string
+    {
+        if (StoreDeliveryRate::where('store_id', $store->id)->where('vehicle_type', $type)->exists()) {
+            return '';
+        }
+        $d = DeliveryFeeService::types()[$type] ?? ['default_base' => 50, 'default_per_km' => 10];
+        StoreDeliveryRate::create(['store_id' => $store->id, 'vehicle_type' => $type, 'base_fee' => $d['default_base'], 'fee_per_km' => $d['default_per_km']]);
+
+        return ' Delivery fee for ' . DeliveryFeeService::label($type) . " set to ₱{$d['default_base']} + ₱{$d['default_per_km']}/km — you can change it below.";
+    }
+
+    /** Save the delivery fee of each vehicle type (owner only). */
+    public function updateRates(Request $request): RedirectResponse
+    {
+        $this->ownerOnly();
+        $store = $request->attributes->get('seller_store');
+        $data = $request->validate([
+            'rates'                => 'required|array|min:1',
+            'rates.*.vehicle_type' => 'required|in:' . implode(',', array_keys(DeliveryFeeService::types())),
+            'rates.*.base_fee'     => 'required|numeric|min:0|max:9999.99',
+            'rates.*.fee_per_km'   => 'required|numeric|min:0|max:999.99',
+        ], [
+            'rates.*.base_fee.required'   => 'Enter a base fee.',
+            'rates.*.fee_per_km.required' => 'Enter a fee per km (0 for a flat fee).',
+        ]);
+
+        foreach ($data['rates'] as $r) {
+            StoreDeliveryRate::updateOrCreate(
+                ['store_id' => $store->id, 'vehicle_type' => $r['vehicle_type']],
+                ['base_fee' => $r['base_fee'], 'fee_per_km' => $r['fee_per_km']],
+            );
+        }
+
+        return back()->with('success', 'Delivery fees saved.');
     }
 
     public function store(Request $request): RedirectResponse
@@ -104,7 +161,7 @@ class VehicleController extends Controller
             'assigned_rider_id' => $data['assigned_rider_id'] ?? null,
         ]);
 
-        return back()->with('success', 'Vehicle added successfully.');
+        return back()->with('success', 'Vehicle added successfully.' . $this->ensureRate($store, $data['vehicle_type']));
     }
 
     public function update(Request $request, Vehicle $vehicle): RedirectResponse
@@ -149,7 +206,7 @@ class VehicleController extends Controller
             'assigned_rider_id' => $data['assigned_rider_id'] ?? null,
         ]);
 
-        return back()->with('success', 'Vehicle updated.');
+        return back()->with('success', 'Vehicle updated.' . ($data['status'] !== 'retired' ? $this->ensureRate($store, $data['vehicle_type']) : ''));
     }
 
     public function destroy(Vehicle $vehicle): RedirectResponse
@@ -173,7 +230,7 @@ class VehicleController extends Controller
         }
 
         $vehicle->restore();
-        return back()->with('success', 'Vehicle restored.');
+        return back()->with('success', 'Vehicle restored.' . ($vehicle->status !== 'retired' ? $this->ensureRate($store, $vehicle->vehicle_type) : ''));
     }
 
     /** Pause (plan limit) / Activate — the owner chooses which vehicles stay usable. */

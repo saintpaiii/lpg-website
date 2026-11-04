@@ -38,7 +38,9 @@ type StoreGroup = {
     store_id: number;
     store_name: string;
     store_logo_url?: string | null;
-    delivery_fee: number;
+    /** Cheapest delivery option ("Delivery from ₱40"); null = no delivery. Final fee at checkout. */
+    delivery_from: number | null;
+    allow_pickup?: boolean;
     /** False when the store is hidden (plan ended, permit expired…) */
     store_available?: boolean;
     items: CartItem[];
@@ -145,8 +147,8 @@ export default function CartPage({ cart }: Props) {
             return s + price * item.quantity;
         }, 0), 0);
 
-    const selectedDelivery = selectedStores.reduce((sum, sg) => sum + sg.delivery_fee, 0);
-    const selectedTotal    = selectedSubtotal + selectedDelivery;
+    // The delivery fee depends on the vehicle and distance — it's added at checkout, not here
+    const selectedTotal    = selectedSubtotal;
     const selectedCount    = selected.size;
     // A selected line over the seller's max per order blocks checkout until it's reduced
     const overMaxSelected  = storeGroups.some((sg) => sg.items.some((i) => i.over_max && selected.has(i.product_id)));
@@ -237,13 +239,13 @@ export default function CartPage({ cart }: Props) {
                                                 <StoreAvatar name={sg.store_name} logoUrl={sg.store_logo_url} size={24} />
                                                 {sg.store_name}
                                             </CardTitle>
-                                            {sg.delivery_fee > 0 ? (
+                                            {sg.delivery_from != null ? (
                                                 <span className="ml-auto text-xs text-gray-500">
-                                                    Delivery: ₱{sg.delivery_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    Delivery from ₱{sg.delivery_from.toLocaleString('en-PH')} <span className="text-gray-400">(final fee at checkout)</span>
                                                 </span>
-                                            ) : (
-                                                <span className="ml-auto text-xs text-emerald-600 font-medium">Free delivery</span>
-                                            )}
+                                            ) : sg.allow_pickup ? (
+                                                <span className="ml-auto text-xs text-gray-500">Pick-up only</span>
+                                            ) : null}
                                         </div>
                                     </CardHeader>
 
@@ -359,10 +361,10 @@ export default function CartPage({ cart }: Props) {
                                 {selectedStores.map(sg => (
                                     <div key={sg.store_id} className="text-xs text-gray-500 space-y-1 border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
                                         <p className="font-medium text-gray-700 dark:text-gray-300">{sg.store_name}</p>
-                                        {sg.delivery_fee > 0 && (
+                                        {sg.delivery_from != null && (
                                             <div className="flex justify-between">
-                                                <span>Delivery fee</span>
-                                                <span>₱{sg.delivery_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                                                <span>Delivery</span>
+                                                <span>from ₱{sg.delivery_from.toLocaleString('en-PH')} (at checkout)</span>
                                             </div>
                                         )}
                                     </div>
@@ -371,14 +373,9 @@ export default function CartPage({ cart }: Props) {
                                     <span>Subtotal</span>
                                     <span>₱{selectedSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                {selectedDelivery > 0 && (
-                                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                        <span>Total delivery</span>
-                                        <span>₱{selectedDelivery.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
-                                    </div>
-                                )}
+                                <p className="text-xs text-gray-400">Delivery fee is added at checkout (it depends on your address and the vehicle).</p>
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between font-bold text-gray-900 dark:text-white">
-                                    <span>Total</span>
+                                    <span>Total (before delivery)</span>
                                     <span>₱{selectedTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                 </div>
                                 <Button

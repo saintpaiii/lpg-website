@@ -9,6 +9,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Rating;
 use App\Models\Store;
+use App\Services\DeliveryFeeService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +25,7 @@ class ProductBrowseController extends Controller
             ? Store::where('user_id', $request->user()->id)->value('id')
             : null;
 
-        $query = Product::with(['store', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
+        $query = Product::with(['store.vehicles', 'store.deliveryRates', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('is_active', true)
@@ -96,7 +97,9 @@ class ProductBrowseController extends Controller
             'store_city'     => $p->store?->city ?? '',
             'store_barangay' => $p->store?->barangay ?? '',
             'store_province' => $p->store?->province ?? '',
-            'delivery_fee'   => (float) ($p->store?->delivery_fee ?? 0),
+            // "Delivery from ₱40" (cheapest vehicle base fee; null = no delivery)
+            'delivery_from'  => $p->store ? DeliveryFeeService::fromFee($p->store) : null,
+            'allow_pickup'   => (bool) $p->store?->allow_pickup,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
         ]);
@@ -155,7 +158,7 @@ class ProductBrowseController extends Controller
 
     public function show(Request $request, int $id): Response|RedirectResponse
     {
-        $product = Product::with(['store', 'inventory', 'media'])
+        $product = Product::with(['store.vehicles', 'store.deliveryRates', 'inventory', 'media'])
             ->withAvg('ratings', 'rating')
             ->withCount('ratings')
             ->where('id', $id)
@@ -254,7 +257,8 @@ class ProductBrowseController extends Controller
                 'store_logo_url' => $product->store?->logo ? Storage::url($product->store->logo) : null,
                 'store_city'     => $product->store?->city ?? '',
                 'store_barangay' => $product->store?->barangay ?? '',
-                'delivery_fee'   => (float) ($product->store?->delivery_fee ?? 0),
+                'delivery_from'  => $product->store ? DeliveryFeeService::fromFee($product->store) : null,
+                'allow_pickup'   => (bool) $product->store?->allow_pickup,
                 'avg_rating'     => round((float) ($product->ratings_avg_rating ?? 0), 1),
                 'review_count'   => (int) ($product->ratings_count ?? 0),
             ],

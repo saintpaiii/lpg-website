@@ -1,6 +1,8 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { toast } from 'sonner';
 import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
+import { DeliveryRatesCard, type RateRow } from '@/components/delivery-rates-card';
+import { NoVehicleBanner } from '@/components/no-vehicle-banner';
 import {
     AlertTriangle,
     Car,
@@ -67,6 +69,9 @@ type Props = {
     vehicles: Vehicle[];
     riders: Rider[];
     planLimit?: PlanLimit;
+    rates?: RateRow[];
+    /** Has a usable vehicle with a delivery fee */
+    can_deliver?: boolean;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -126,7 +131,7 @@ function blankForm() {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function VehiclesPage({ vehicles, riders, planLimit }: Props) {
+export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], can_deliver = true }: Props) {
     // ?filter=paused (from My Plan) shows only the vehicles paused by the plan limit
     const { url } = usePage();
     const [onlyPaused, setOnlyPaused] = useState(url.includes('filter=paused'));
@@ -242,6 +247,10 @@ export default function VehiclesPage({ vehicles, riders, planLimit }: Props) {
                 </div>
 
                 <PlanLimitBar label="Vehicles" planLimit={planLimit} />
+
+                {!can_deliver && <NoVehicleBanner showLink={false} />}
+
+                <DeliveryRatesCard rates={rates} canEdit />
 
                 {/* Vehicle table */}
                 <Card>

@@ -21,7 +21,7 @@ class CartController extends Controller
      */
     private function buildCartResponse(int $userId): ?array
     {
-        $items = CartItem::with(['product.inventory', 'store'])
+        $items = CartItem::with(['product.inventory', 'store.vehicles', 'store.deliveryRates'])
             ->where('user_id', $userId)
             ->get();
 
@@ -43,7 +43,9 @@ class CartController extends Controller
                     'store_id'     => $storeId,
                     'store_name'   => $store->store_name,
                     'store_logo_url' => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
-                    'delivery_fee' => (float) ($store->delivery_fee ?? 0),
+                    // Cheapest delivery option ("Delivery from ₱40") — the final fee is computed at checkout
+                    'delivery_from' => \App\Services\DeliveryFeeService::fromFee($store),
+                    'allow_pickup'  => (bool) $store->allow_pickup,
                     // False when the store is hidden (plan ended, permit expired…): its items can't be checked out
                     'store_available' => $store->isOpenToCustomers(),
                     'items'        => [],

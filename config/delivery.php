@@ -30,4 +30,18 @@ return [
     'redeliver_max_start_days' => 14,
     'redeliver_max_range_days' => 7,
 
+    /*
+    | Vehicle types: label + suggested delivery fee (base ₱ + ₱ per km) when a store adds its first vehicle of a type.
+    | The order here is also the last tie-break when two types quote the same fee.
+    */
+    'vehicle_types' => [
+        'motorcycle'   => ['label' => 'Motorcycle',   'default_base' => 40,  'default_per_km' => 8],
+        'tricycle'     => ['label' => 'Tricycle',     'default_base' => 50,  'default_per_km' => 10],
+        'multicab'     => ['label' => 'Multicab',     'default_base' => 80,  'default_per_km' => 12],
+        'van'          => ['label' => 'Van',          'default_base' => 100, 'default_per_km' => 15],
+        'pickup_truck' => ['label' => 'Pickup Truck', 'default_base' => 120, 'default_per_km' => 15],
+        'small_truck'  => ['label' => 'Small Truck',  'default_base' => 150, 'default_per_km' => 18],
+        'large_truck'  => ['label' => 'Large Truck',  'default_base' => 200, 'default_per_km' => 20],
+    ],
+
 ];

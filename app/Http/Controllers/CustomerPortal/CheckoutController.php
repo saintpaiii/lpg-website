@@ -84,7 +84,7 @@ class CheckoutController extends Controller
      */
     private function buildCheckoutStores(int $userId, array $selectedProductIds, ?Customer $customer): array
     {
-        $cartItems = CartItem::with(['product.inventory', 'store'])
+        $cartItems = CartItem::with(['product.inventory', 'store.vehicles', 'store.deliveryRates'])
             ->where('user_id', $userId)
             ->whereIn('product_id', $selectedProductIds)
             ->get();
@@ -104,11 +104,12 @@ class CheckoutController extends Controller
                     'store_name'             => $store->store_name,
                     // False when the store is hidden (plan ended, permit expired…) — the order can't be placed
                     'store_available'        => $store->isOpenToCustomers(),
-                    'delivery_fee'           => (float) ($store->delivery_fee ?? 0),
+                    // Delivery fee per vehicle type — the page picks the vehicle with lib/delivery-fee.ts quoteFee()
+                    'delivery_options'       => $options = DeliveryFeeService::clientOptions($store),
+                    'can_deliver'            => $options !== [],
+                    'no_delivery_reason'     => $options === [] ? DeliveryFeeService::whyNoVehicle($store, 0, 0) : null,
                     'store_lat'            => $store->latitude  ? (float) $store->latitude  : null,
                     'store_lng'              => $store->longitude ? (float) $store->longitude : null,
-                    'base_delivery_fee'      => $store->base_delivery_fee ? (float) $store->base_delivery_fee : null,
-                    'fee_per_km'             => $store->fee_per_km        ? (float) $store->fee_per_km        : null,
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
                     'allow_cod'              => (bool) ($store->allow_cod ?? true),
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
@@ -144,6 +145,7 @@ class CheckoutController extends Controller
                 'name'             => $product->name,
                 'brand'            => $product->brand ?? '',
                 'weight'           => $product->weight ?? (($product->weight_kg ?? '') . 'kg'),
+                'weight_kg'        => (float) ($product->weight_kg ?? 0),   // load for the vehicle choice
                 'image_url'        => $product->image ? Storage::url($product->image) : null,
                 'refill_price'     => (float) $product->refill_price,
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),
@@ -367,7 +369,6 @@ class CheckoutController extends Controller
                     $checkoutStores[$storeId] = [
                         'store_id'     => $storeId,
                         'store_name'   => $ci->store?->store_name ?? 'Unknown Store',
-                        'delivery_fee' => (float) ($ci->store?->delivery_fee ?? 0),
                         'store_ref'    => $ci->store,
                         'items'        => [],
                     ];
@@ -501,15 +502,30 @@ class CheckoutController extends Controller
                     $txTypeFinal = (array_count_values($transTypes)['refill'] ?? 0) >= (array_count_values($transTypes)['new_purchase'] ?? 0)
                         ? 'refill' : 'new_purchase';
 
-                    // Calculate delivery fee (dynamic if store has lat/lng + fee settings + customer dropped a pin)
+                    // Delivery fee: the cheapest of the store's vehicles that can carry this order (distance from the
+                    // store pin to the customer pin; no distance → the base fee). Pick-up: ₱0, no vehicle.
                     $isPickup    = ($fulfillments[$store->id] ?? 'delivery') === 'pickup';
                     $distKm      = null;
-                    // Pick-up: no delivery fee
-                    $finalFee    = $isPickup ? 0.0 : (float) ($storeData['delivery_fee'] ?? 0);
-                    if (! $isPickup && $deliveryLat !== null && $deliveryLng !== null
-                        && $store->latitude && $store->longitude) {
-                        $distKm   = DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $deliveryLat, $deliveryLng);
-                        $finalFee = DeliveryFeeService::fee($store, $distKm);
+                    $finalFee    = 0.0;
+                    $vehicleType = null;
+                    if (! $isPickup) {
+                        if ($deliveryLat !== null && $deliveryLng !== null && (float) $store->latitude != 0.0 && (float) $store->longitude != 0.0) {
+                            $distKm = DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $deliveryLat, $deliveryLng);
+                            $radius = (int) ($store->max_delivery_radius_km ?? 0);
+                            if ($radius > 0 && $distKm > $radius) {
+                                throw new CheckoutRuleException("{$store->store_name} doesn't deliver that far (" . number_format($distKm, 1)
+                                    . " km, limit {$radius} km). Choose pick-up or another address.");
+                            }
+                        }
+                        $load  = DeliveryFeeService::orderLoad($orderedItems);
+                        $store->loadMissing(['vehicles', 'deliveryRates']);
+                        $quote = DeliveryFeeService::quote($store, $distKm, $load['kg'], $load['tanks']);
+                        if (! $quote) {
+                            throw new CheckoutRuleException("{$store->store_name}: " . DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks'])
+                                . ' Choose pick-up or reduce the quantity.');
+                        }
+                        $finalFee    = $quote['fee'];
+                        $vehicleType = $quote['vehicle_type'];
                     }
 
                     // Store discount coupon (issued by this store as a refund resolution)
@@ -530,7 +546,7 @@ class CheckoutController extends Controller
                     // Refill tanks (products with a size) = empty tanks to hand over
                     $emptyTanks = collect($orderedItems)->filter(fn ($i) => $i['transaction_type'] === 'refill' && (float) $i['product']->weight_kg > 0)->sum('quantity');
 
-                    $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount', 'isPickup', 'emptyTanks');
+                    $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount', 'isPickup', 'emptyTanks', 'vehicleType');
                 }
 
                 // ── Promo coupon (platform or store) — validated under a row lock ──
@@ -601,6 +617,7 @@ class CheckoutController extends Controller
                         'delivery_distance_km'       => $p['distKm'] !== null ? round($p['distKm'], 2) : null,
                         'estimated_delivery_minutes' => $p['isPickup'] ? null : $estimatedMin,
                         'fulfillment'                => $p['isPickup'] ? 'pickup' : 'delivery',
+                        'delivery_vehicle_type'      => $p['vehicleType'],
                         'empty_tanks_required'       => $p['emptyTanks'],
                     ]);
 

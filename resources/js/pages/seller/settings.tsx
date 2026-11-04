@@ -4,6 +4,7 @@ import { usePlan } from '@/hooks/use-plan';
 import { openUpgrade } from '@/lib/plans';
 import type { SharedData } from '@/types';
 import { AddressFields } from '@/components/address-fields';
+import { NoVehicleBanner } from '@/components/no-vehicle-banner';
 import {
     Building2,
     Camera,
@@ -46,10 +47,9 @@ interface StoreData {
     phone: string | null;
     email: string | null;
     logo_url: string | null;
-    delivery_fee: number;
-    base_delivery_fee: number;
-    fee_per_km: number;
     max_delivery_radius_km: number;
+    /** Has a usable vehicle with a delivery fee */
+    can_deliver: boolean;
     latitude: number | null;
     longitude: number | null;
     attendance_radius: number;
@@ -193,9 +193,6 @@ export default function SellerSettings({ store }: Props) {
         province: string;
         phone: string;
         email: string;
-        delivery_fee: string;
-        base_delivery_fee: string;
-        fee_per_km: string;
         max_delivery_radius_km: string;
         allow_cod: boolean;
         allow_pickup: boolean;
@@ -210,9 +207,6 @@ export default function SellerSettings({ store }: Props) {
         province:     store.province,
         phone:        store.phone ?? '',
         email:        store.email ?? '',
-        delivery_fee:           store.delivery_fee > 0 ? String(store.delivery_fee) : '',
-        base_delivery_fee:      String(store.base_delivery_fee ?? 45),
-        fee_per_km:             String(store.fee_per_km ?? 10),
         max_delivery_radius_km: String(store.max_delivery_radius_km ?? 20),
         allow_cod:                store.allow_cod,
         allow_pickup:             !!store.allow_pickup,
@@ -249,9 +243,6 @@ export default function SellerSettings({ store }: Props) {
         fd.append('province',    data.province || 'Cavite');
         fd.append('phone',       data.phone);
         fd.append('email',       data.email);
-        fd.append('delivery_fee',           data.delivery_fee);
-        fd.append('base_delivery_fee',      data.base_delivery_fee || '45');
-        fd.append('fee_per_km',             data.fee_per_km || '10');
         fd.append('max_delivery_radius_km', data.max_delivery_radius_km || '20');
         fd.append('allow_cod',                data.allow_cod ? '1' : '0');
         fd.append('allow_pickup',             data.allow_pickup ? '1' : '0');
@@ -387,41 +378,16 @@ export default function SellerSettings({ store }: Props) {
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Truck className="h-4 w-4 text-blue-600" />
-                                Delivery Fee Settings
+                                Delivery
                             </CardTitle>
                             <CardDescription>
-                                Customers are charged a base fee plus a per-km rate based on their distance from your store.
+                                Delivery fees are set per vehicle type on the{' '}
+                                <Link href="/seller/vehicles" className="font-medium text-blue-600 hover:underline">Vehicles page</Link>.
+                                At checkout the cheapest vehicle that can carry the order is chosen automatically.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="base_delivery_fee">Base Delivery Fee (₱)</Label>
-                                    <Input
-                                        id="base_delivery_fee"
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={data.base_delivery_fee}
-                                        onChange={(e) => setData('base_delivery_fee', e.target.value)}
-                                        placeholder="45"
-                                    />
-                                    {allErrors.base_delivery_fee && <p className="text-xs text-red-500">{allErrors.base_delivery_fee}</p>}
-                                </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="fee_per_km">Fee per km (₱)</Label>
-                                    <Input
-                                        id="fee_per_km"
-                                        type="number"
-                                        min="0"
-                                        step="0.5"
-                                        value={data.fee_per_km}
-                                        onChange={(e) => setData('fee_per_km', e.target.value)}
-                                        placeholder="10"
-                                    />
-                                    {allErrors.fee_per_km && <p className="text-xs text-red-500">{allErrors.fee_per_km}</p>}
-                                </div>
-                            </div>
+                            {!store.can_deliver && <NoVehicleBanner />}
                             <div className="grid gap-1.5">
                                 <Label htmlFor="max_delivery_radius_km">Max Delivery Radius (km)</Label>
                                 <Input
@@ -437,21 +403,6 @@ export default function SellerSettings({ store }: Props) {
                                 <p className="text-xs text-muted-foreground">Orders outside this radius will be rejected.</p>
                                 {allErrors.max_delivery_radius_km && <p className="text-xs text-red-500">{allErrors.max_delivery_radius_km}</p>}
                             </div>
-                            {/* Sample calculation */}
-                            {(() => {
-                                const base  = parseFloat(data.base_delivery_fee)  || 45;
-                                const perKm = parseFloat(data.fee_per_km)         || 10;
-                                const ex5km = Math.ceil((base + 5 * perKm) / 5) * 5;
-                                const ex10km = Math.ceil((base + 10 * perKm) / 5) * 5;
-                                return (
-                                    <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3 text-xs text-blue-800 dark:text-blue-300 space-y-1">
-                                        <p className="font-semibold">Example calculations:</p>
-                                        <p>5 km away → ₱{base} + (5 × ₱{perKm}) = <strong>₱{ex5km}</strong></p>
-                                        <p>10 km away → ₱{base} + (10 × ₱{perKm}) = <strong>₱{ex10km}</strong></p>
-                                        <p className="text-blue-600/70">Rounded up to nearest ₱5.</p>
-                                    </div>
-                                );
-                            })()}
                         </CardContent>
                     </Card>
 

@@ -120,7 +120,6 @@ class DemoSeeder extends Seeder
             'logo'                    => null,
             'bir_permit'              => 'permits/store1-bir.pdf',
             'business_permit'         => 'permits/store1-business.pdf',
-            'delivery_fee'            => 50.00,
             'status'                  => 'approved',
             'subscription_plan'       => 'premium',
             'subscription_started_at' => $this->now->copy()->subDays(20),
@@ -146,7 +145,6 @@ class DemoSeeder extends Seeder
             'logo'                    => null,
             'bir_permit'              => 'permits/store2-bir.pdf',
             'business_permit'         => 'permits/store2-business.pdf',
-            'delivery_fee'            => 45.00,
             'status'                  => 'approved',
             'subscription_plan'       => 'trial',
             'subscription_started_at' => $this->now,
@@ -517,6 +515,27 @@ class DemoSeeder extends Seeder
                 'created_at'    => $this->now->copy()->subDays(58),
                 'updated_at'    => $this->now,
             ]);
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 8b. DELIVERY VEHICLES + FEES PER VEHICLE TYPE (config defaults)
+        // ══════════════════════════════════════════════════════════════════════
+        // Store 1: a motorcycle for small orders, a multicab for big ones. Store 2: a tricycle.
+        foreach ([
+            [$store1Id, 'motorcycle', 'PGC-101', 40, 2],
+            [$store1Id, 'multicab', 'PGC-202', 300, 10],
+            [$store2Id, 'tricycle', 'SDB-301', 100, 4],
+        ] as [$sid, $type, $plate, $kg, $tanks]) {
+            DB::table('vehicles')->insert([
+                'store_id' => $sid, 'vehicle_type' => $type, 'plate_number' => $plate,
+                'max_capacity_kg' => $kg, 'max_tanks' => $tanks, 'status' => 'available',
+                'created_at' => $this->now->copy()->subDays(80), 'updated_at' => $this->now,
+            ]);
+            $d = config("delivery.vehicle_types.{$type}");
+            DB::table('store_delivery_rates')->updateOrInsert(
+                ['store_id' => $sid, 'vehicle_type' => $type],
+                ['base_fee' => $d['default_base'], 'fee_per_km' => $d['default_per_km'], 'created_at' => $this->now, 'updated_at' => $this->now],
+            );
         }
 
         // ══════════════════════════════════════════════════════════════════════

@@ -35,7 +35,6 @@ class Store extends Model
         'trial_used_at',
         'plan_reminder_sent_on',
         'plan_expired_notified_at',
-        'delivery_fee',
         'is_featured',
         'approved_at',
         'approved_by',
@@ -46,8 +45,6 @@ class Store extends Model
         'latitude',
         'longitude',
         'attendance_radius',
-        'base_delivery_fee',
-        'fee_per_km',
         'max_delivery_radius_km',
         'allow_cod',
         'allow_consignment',
@@ -66,7 +63,6 @@ class Store extends Model
     protected function casts(): array
     {
         return [
-            'delivery_fee'             => 'decimal:2',
             'is_featured'              => 'boolean',
             'approved_at'              => 'datetime',
             'subscription_started_at'  => 'datetime',
@@ -77,8 +73,6 @@ class Store extends Model
             'latitude'                 => 'decimal:7',
             'longitude'                => 'decimal:7',
             'attendance_radius'        => 'integer',
-            'base_delivery_fee'        => 'decimal:2',
-            'fee_per_km'               => 'decimal:2',
             'max_delivery_radius_km'   => 'integer',
             'business_permit_expires_at' => 'date',
             'fsic_permit_expires_at'     => 'date',
@@ -188,6 +182,17 @@ class Store extends Model
     public function invoices(): HasMany
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    /** Delivery fee per vehicle type (DeliveryFeeService). */
+    public function deliveryRates(): HasMany
+    {
+        return $this->hasMany(StoreDeliveryRate::class);
+    }
+
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
     }
 
     public function subscriptionPayments(): HasMany

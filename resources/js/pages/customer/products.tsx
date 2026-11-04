@@ -42,7 +42,9 @@ type Product = {
     store_city: string;
     store_barangay: string;
     store_province: string;
-    delivery_fee: number;
+    /** Cheapest delivery option; null = no delivery */
+    delivery_from: number | null;
+    allow_pickup?: boolean;
     avg_rating: number;
     review_count: number;
 };
@@ -479,11 +481,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                                 </p>
                                             </div>
                                         </div>
-                                        {p.delivery_fee > 0 && (
-                                            <p className="text-[10px] text-gray-400 mb-2">
-                                                + ₱{p.delivery_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })} delivery fee
-                                            </p>
-                                        )}
+                                        {p.delivery_from != null ? (
+                                            <p className="text-[10px] text-gray-400 mb-2">Delivery from ₱{p.delivery_from.toLocaleString('en-PH')}</p>
+                                        ) : p.allow_pickup ? (
+                                            <p className="text-[10px] text-gray-400 mb-2">Pick-up only</p>
+                                        ) : null}
                                         {isAdminPreview ? (
                                             <div className="w-full rounded-lg bg-gray-100 text-gray-400 text-xs font-medium h-9 flex items-center justify-center gap-1.5 border border-dashed border-gray-300">
                                                 <ShoppingCart className="h-3.5 w-3.5" />

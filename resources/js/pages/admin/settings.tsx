@@ -19,7 +19,6 @@ interface Settings {
     company_email: string;
     default_reorder_level: string;
     lead_time_days: string;
-    default_delivery_fee: string;
 }
 
 interface Props {
@@ -36,7 +35,6 @@ export default function AdminSettings({ settings }: Props) {
         company_email:            settings.company_email,
         default_reorder_level:    settings.default_reorder_level,
         lead_time_days:           settings.lead_time_days,
-        default_delivery_fee:     settings.default_delivery_fee,
     });
 
     const submit = (e: React.SyntheticEvent<HTMLFormElement>) => {

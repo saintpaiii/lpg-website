@@ -37,7 +37,8 @@ type Product = {
     store_logo_url: string | null;
     store_city: string;
     store_barangay: string;
-    delivery_fee: number;
+    delivery_from: number | null;
+    allow_pickup?: boolean;
     avg_rating: number;
     review_count: number;
 };
@@ -256,12 +257,13 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                             <p className="text-gray-500 pl-6">
                                 {[product.store_barangay, product.store_city].filter(Boolean).join(', ')}
                             </p>
-                            <p className="text-gray-500 pl-6">
-                                Delivery fee: {product.delivery_fee > 0
-                                    ? `₱${product.delivery_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`
-                                    : 'Free'
-                                }
-                            </p>
+                            {(product.delivery_from != null || product.allow_pickup) && (
+                                <p className="text-gray-500 pl-6">
+                                    {product.delivery_from != null
+                                        ? `Delivery from ₱${product.delivery_from.toLocaleString('en-PH')} (final fee at checkout)`
+                                        : 'Pick-up only'}
+                                </p>
+                            )}
                         </div>
 
                         {product.description && (

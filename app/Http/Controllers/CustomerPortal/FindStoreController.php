@@ -129,7 +129,7 @@ class FindStoreController extends Controller
         $ownStoreId = Store::where('user_id', $request->user()->id)->value('id');
 
         // 1. Candidate products (one query, store + inventory eager-loaded)
-        $products = Product::with(['store', 'inventory'])
+        $products = Product::with(['store.vehicles', 'store.deliveryRates', 'inventory'])
             ->where('is_active', true)
             ->whereIn('products.weight', $rawWeights ?: ['__none__'])
             ->when($data['brand'] ?? null, fn ($q, $brand) => $q->where('brand', $brand))
@@ -160,10 +160,20 @@ class FindStoreController extends Controller
                 continue;
             }
 
-            // Delivery fee exactly as checkout: distance-based only from the store's own pin, else flat
-            $fee = ($store->latitude && $store->longitude)
-                ? DeliveryFeeService::fee($store, DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $lat, $lng))
-                : (float) ($store->delivery_fee ?? 0);
+            // Delivery fee exactly as checkout: the cheapest vehicle that carries this quantity; distance only from
+            // the store's own pin (else the base fee). No vehicle fits → this store can't deliver it.
+            $quote = DeliveryFeeService::quote(
+                $store,
+                ((float) $store->latitude != 0.0 && (float) $store->longitude != 0.0)
+                    ? DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $lat, $lng)
+                    : null,
+                (float) $p->weight_kg * $qty,
+                (float) $p->weight_kg > 0 ? $qty : 0,
+            );
+            if (! $quote) {
+                continue;
+            }
+            $fee = $quote['fee'];
 
             $subtotal = $unit * $qty;
             $total    = round($subtotal + $fee, 2);
