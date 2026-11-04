@@ -93,6 +93,7 @@ class OrderController extends Controller
                     'order_number'      => $o->order_number,
                     'store_name'        => $o->store?->store_name ?? '—',
                     'status'            => $o->status,
+                    'fulfillment'       => $o->fulfillment ?? 'delivery',
                     'total_amount'      => (float) $o->total_amount,
                     'payment_method'    => $o->payment_method,
                     'payment_status'    => $o->payment_status,
@@ -414,6 +415,25 @@ class OrderController extends Controller
         $order->load(['delivery.rider', 'store']);
         $delivery = $order->delivery;
 
+        // Pick-up: no rider, no route — just the store
+        if ($order->isPickup()) {
+            $store = \App\Services\DeliveryRouteService::storeLocation($order->store);
+
+            return response()->json([
+                'status'           => match ($order->status) {
+                    'delivered'        => 'picked_up',
+                    'out_for_delivery' => 'ready_for_pickup',
+                    default            => 'not_dispatched',
+                },
+                'fulfillment'      => 'pickup',
+                'rider_name'       => null,
+                'rider_area'       => null,
+                'delivery_address' => null,
+                'store_location'   => $store ? ['lat' => $store['lat'], 'lng' => $store['lng'], 'name' => $order->store?->store_name] : null,
+                'stops_before'     => 0,
+            ]);
+        }
+
         $status = match (true) {
             $order->status === 'delivered'                          => 'delivered',
             $order->status !== 'out_for_delivery' || ! $delivery    => 'not_dispatched',
@@ -515,6 +535,19 @@ class OrderController extends Controller
                     'name' => $order->store->store_name,
                 ] : null,
                 'status'           => $order->status,
+                // Pick-up at the store: address, Maps pin and instructions instead of rider tracking
+                'fulfillment'      => $order->fulfillment ?? 'delivery',
+                'pickup'           => $order->isPickup() ? [
+                    'address'      => $order->store?->address,
+                    'barangay'     => $order->store?->barangay,
+                    'city'         => $order->store?->city,
+                    'lat'          => $order->store?->latitude ? (float) $order->store->latitude : null,
+                    'lng'          => $order->store?->longitude ? (float) $order->store->longitude : null,
+                    'instructions' => $order->store?->pickup_instructions,
+                ] : null,
+                // Refill: empty tanks to hand over
+                'empty_tanks_needed'  => $order->needsEmptyTanks() && ! in_array($order->status, ['delivered', 'cancelled'], true),
+                'empty_tank_summary'  => (int) $order->empty_tanks_required > 0 ? $order->emptyTankSummary() : null,
                 'transaction_type' => $order->transaction_type,
                 'total_amount'     => (float) $order->total_amount,
                 'shipping_fee'     => $order->shipping_fee ? (float) $order->shipping_fee : null,

@@ -15,6 +15,7 @@ return [
         'vehicle_problem'      => 'Vehicle problem',
         'bad_weather'          => 'Bad weather / flooding',
         'road_closed'          => 'Road closed / no access',
+        'no_empty_tank'        => 'No empty tank to exchange',
         'other'                => 'Other',
     ],
 

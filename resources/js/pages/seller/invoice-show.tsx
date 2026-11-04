@@ -33,7 +33,7 @@ type Invoice = {
     is_online: boolean;
     pay_ref: string | null;
     paid_via: string | null;
-    customer: { name: string; phone: string | null; address: string; city: string } | null;
+    customer: { name: string; phone: string | null; address: string; city: string | null } | null;
     order: { id: number; order_number: string; transaction_type: string; items: InvoiceItem[] } | null;
 };
 
@@ -183,7 +183,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
                                 <CardContent className="text-sm space-y-1">
                                     <p className="font-semibold">{invoice.customer.name}</p>
                                     {invoice.customer.phone && <p className="text-muted-foreground">{invoice.customer.phone}</p>}
-                                    <p className="text-xs text-muted-foreground">{invoice.customer.address}, {invoice.customer.city}</p>
+                                    <p className="text-xs text-muted-foreground">{[invoice.customer.address, invoice.customer.city].filter(Boolean).join(', ')}</p>
                                 </CardContent>
                             </Card>
                         )}

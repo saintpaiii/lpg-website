@@ -100,10 +100,11 @@ export const REASON_CATALOG: Record<ReasonContext, ReasonOption[]> = {
         { value: 'wrong_address',        label: 'Wrong or incomplete address',  details: ['House number not found', 'Pin is in the wrong place', 'Street name is wrong', 'No landmark given'] },
         { value: 'customer_refused',     label: 'Customer refused the order',   details: ['Changed their mind', 'Ordered by mistake', 'Wants a different brand or size', 'Says they already have gas'] },
         { value: 'no_payment',           label: "Customer couldn't pay (COD)",  details: ['No cash on hand', 'Needs change for a big bill', 'Asked to pay next time'] },
-        { value: 'wrong_item',           label: 'Wrong item or size',           details: ['Wrong tank size loaded', 'Wrong brand loaded', "Empty tank size doesn't match"] },
+        { value: 'wrong_item',           label: 'Wrong item or size',           details: ['Wrong tank size loaded', 'Wrong brand loaded'] },
         { value: 'vehicle_problem',      label: 'Vehicle problem',              details: ['Flat tire', 'Engine trouble', 'Ran out of fuel'] },
         { value: 'bad_weather',          label: 'Bad weather / flooding',       details: ['Heavy rain', 'Street is flooded', 'Typhoon signal'] },
         { value: 'road_closed',          label: 'Road closed / no access',      details: ['Road under repair', 'Gated area — not allowed in', 'Accident on the road'] },
+        { value: 'no_empty_tank',        label: 'No empty tank to exchange',    details: ['Customer has no empty tank', 'Empty tank is a different size', 'Empty tank is damaged or unsafe'] },
         { value: 'other',                label: 'Other',                        details: [] },
     ],
 

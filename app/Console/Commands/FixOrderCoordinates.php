@@ -32,7 +32,7 @@ class FixOrderCoordinates extends Command
         $fixed = 0; $kept = 0; $missed = [];
         $rows  = [];
 
-        Order::withTrashed()->with('customer')->chunkById(200, function ($orders) use ($keepKm, $dry, $all, &$fixed, &$kept, &$missed, &$rows) {
+        Order::withTrashed()->with('customer')->where('fulfillment', 'delivery')->chunkById(200, function ($orders) use ($keepKm, $dry, $all, &$fixed, &$kept, &$missed, &$rows) {
             foreach ($orders as $order) {
                 if ($order->delivery_address && ! $all) {
                     $kept++;

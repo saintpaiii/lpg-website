@@ -39,11 +39,18 @@ class OrderObserver
                 'confirmed'        => $this->say($order, 'order_confirmed', fn () => "Your order {$n} is confirmed. We're getting it ready."),
                 'preparing'        => $this->say($order, 'order_preparing', fn () => "We're preparing your order {$n} now."),
                 // With a rider assigned, the rider's own updates cover these two
-                'out_for_delivery' => $this->hasDelivery($order) ? null
-                    : $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is on its way."),
-                'delivered'        => $this->hasDelivery($order) ? null
-                    : $this->say($order, 'order_delivered', fn () => "Your order {$n} has been delivered. Thank you for buying from "
-                        . ($order->store?->store_name ?? 'us') . '!' . static::balanceNote($order)),
+                // Pick-up orders: "ready for pick-up" / "picked up" (no rider)
+                'out_for_delivery' => $order->isPickup()
+                    ? $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is ready for pick-up at "
+                        . ($order->store?->store_name ?? 'the store') . '.')
+                    : ($this->hasDelivery($order) ? null
+                        : $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is on its way.")),
+                'delivered'        => $order->isPickup()
+                    ? $this->say($order, 'order_delivered', fn () => "Your order {$n} was picked up. Thank you for buying from "
+                        . ($order->store?->store_name ?? 'us') . '!' . static::balanceNote($order))
+                    : ($this->hasDelivery($order) ? null
+                        : $this->say($order, 'order_delivered', fn () => "Your order {$n} has been delivered. Thank you for buying from "
+                            . ($order->store?->store_name ?? 'us') . '!' . static::balanceNote($order))),
                 'cancelled'        => $this->say($order, 'order_cancelled', fn () => "Your order {$n} was cancelled."
                     . ($order->cancellation_reason ? " Reason: {$order->cancellation_reason}" : '')),
                 default            => null,
@@ -94,6 +101,7 @@ class OrderObserver
                 'order_id'          => $order->id,
                 'order_number'      => $order->order_number,
                 'status'            => $order->status,
+                'fulfillment'       => $order->fulfillment ?? 'delivery',
                 'payment_status'    => $order->payment_status,
                 'remaining_balance' => (float) $order->remaining_balance,
                 'is_new'            => $isNew,

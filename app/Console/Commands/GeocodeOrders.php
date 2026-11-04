@@ -21,6 +21,7 @@ class GeocodeOrders extends Command
         $missed = [];
 
         Order::withTrashed()->with('customer')
+            ->where('fulfillment', 'delivery')   // pick-up orders have no delivery address
             ->where(fn ($q) => $q->whereNull('delivery_latitude')->orWhereNull('delivery_longitude'))
             ->chunkById(200, function ($orders) use (&$filled, &$approx, &$missed) {
                 foreach ($orders as $order) {

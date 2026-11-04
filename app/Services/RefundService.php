@@ -126,7 +126,21 @@ class RefundService
             'delivery_latitude'  => $original->delivery_latitude,
             'delivery_longitude' => $original->delivery_longitude,
             'delivery_distance_km' => $original->delivery_distance_km,
+            'delivery_address'   => $original->delivery_address,
+            'delivery_barangay'  => $original->delivery_barangay,
+            'delivery_city'      => $original->delivery_city,
+            // A replacement always goes out with a rider (even when the original was picked up), no empty tanks
+            'fulfillment'          => 'delivery',
+            'empty_tanks_required' => 0,
         ]);
+
+        // Original was a pick-up (no address/pin): place it at the customer's profile address
+        if ($replacement->delivery_latitude === null || $replacement->delivery_longitude === null) {
+            \App\Services\DeliveryRouteService::geocodeOrder($replacement);
+            if ($replacement->fresh()->delivery_latitude === null) {
+                throw new \RuntimeException("Add the customer's address first — the replacement needs a delivery address.");
+            }
+        }
 
         foreach ($original->items as $item) {
             OrderItem::create([
@@ -135,6 +149,7 @@ class RefundService
                 'quantity'   => $item->quantity,
                 'unit_price' => 0,
                 'subtotal'   => 0,
+                'transaction_type' => $item->transaction_type ?? $original->transaction_type,
             ]);
 
             Inventory::where('product_id', $item->product_id)->decrement('quantity', $item->quantity);

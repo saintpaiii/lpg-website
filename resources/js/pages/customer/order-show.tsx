@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
 import TrackingCard from '@/components/tracking-card';
+import { mapsUrl, orderStatusLabel } from '@/lib/order-status';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
 
@@ -40,6 +41,12 @@ type Order = {
     store_id: number | null;
     store_name: string;
     status: string;
+    fulfillment?: 'delivery' | 'pickup';
+    /** Pick-up at the store: where + instructions */
+    pickup?: { address: string | null; barangay: string | null; city: string | null; lat: number | null; lng: number | null; instructions: string | null } | null;
+    /** Refill: empty tanks still to hand over */
+    empty_tanks_needed?: boolean;
+    empty_tank_summary?: string | null;
     store_location: StoreLocation | null;
     delivery_latitude: number | null;
     delivery_longitude: number | null;
@@ -258,7 +265,7 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
                             <span className={`mt-1.5 text-xs font-medium text-center whitespace-nowrap ${
                                 done || current ? 'text-gray-900 dark:text-white' : 'text-gray-400'
                             }`}>
-                                {step.label}
+                                {order.fulfillment === 'pickup' ? (step.key === 'pending' ? 'Placed' : orderStatusLabel(step.key, 'pickup')) : step.label}
                             </span>
                         </div>
                         {idx < ORDER_STEPS.length - 1 && (
@@ -303,7 +310,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
     // Live: this order's status / delivery changes reload the page data
     const meId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${meId}`, ['order', 'breakdown'], (e) => e.order_id === order.id,
-        (e) => toast.info(`Order updated: ${statusLabel(e.status)}`));
+        (e) => toast.info(`Order updated: ${statusLabel(e.status, (e as { fulfillment?: string }).fulfillment)}`));
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
     const hasActiveRefund = !!order.refund_request && ['pending', 'approved', 'processed'].includes(order.refund_request.status);
     const canRefund = order.status === 'delivered' && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund;
@@ -593,12 +600,33 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                 {/* Status tracker */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="text-base">Delivery Status</CardTitle>
+                        <CardTitle className="text-base">{order.fulfillment === 'pickup' ? 'Pick-up Status' : 'Delivery Status'}</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <StatusStepper status={order.status} order={order} />
-                        {order.status === 'out_for_delivery' && (
+                        {order.fulfillment !== 'pickup' && order.status === 'out_for_delivery' && (
                             <TrackingCard orderId={order.id} />
+                        )}
+                        {/* Pick-up at the store: where to go (no rider tracking) */}
+                        {order.fulfillment === 'pickup' && order.pickup && (
+                            <div className="mt-4 space-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+                                <p className="font-semibold">
+                                    {order.status === 'out_for_delivery' ? 'Ready for pick-up at ' : 'Pick up at '}{order.store_name}
+                                </p>
+                                <p>{[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}</p>
+                                {mapsUrl(order.pickup.lat, order.pickup.lng, [order.pickup.address, order.pickup.city].filter(Boolean).join(', ')) && (
+                                    <a href={mapsUrl(order.pickup.lat, order.pickup.lng, [order.pickup.address, order.pickup.city].filter(Boolean).join(', '))!}
+                                        target="_blank" rel="noreferrer" className="text-xs font-medium underline">
+                                        Open in Google Maps
+                                    </a>
+                                )}
+                                {order.pickup.instructions && <p className="text-xs">{order.pickup.instructions}</p>}
+                            </div>
+                        )}
+                        {order.empty_tanks_needed && order.empty_tank_summary && (
+                            <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                ♻ {order.fulfillment === 'pickup' ? 'Bring' : 'Have'} {order.empty_tank_summary} empty tank(s){order.fulfillment === 'pickup' ? ' to the store.' : ' ready for the rider.'}
+                            </p>
                         )}
                         {order.delivery?.fail_info && (
                             <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
@@ -822,7 +850,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                 {/* COD note */}
                                 {order.payment_mode === 'cod' && order.payment_status === 'unpaid' && order.status !== 'cancelled' && (
                                     <div className="rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-300">
-                                        Pay <strong>{peso(grandTotal)}</strong> in cash to the rider upon delivery.
+                                        Pay <strong>{peso(grandTotal)}</strong> in cash {order.fulfillment === 'pickup' ? 'at the store when you pick up your order.' : 'to the rider upon delivery.'}
                                     </div>
                                 )}
 

@@ -116,6 +116,7 @@ class MessageController extends BaseMessageController
                 'id'                => $o->id,
                 'order_number'      => $o->order_number,
                 'status'            => $o->status,
+                'fulfillment'       => $o->fulfillment ?? 'delivery',
                 'total'             => $o->grandTotal(),
                 'payment_mode'      => $o->payment_mode,
                 'remaining_balance' => (float) $o->remaining_balance,

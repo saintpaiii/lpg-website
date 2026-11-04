@@ -1,6 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, ShieldCheck, ShoppingCart, Store, TicketPercent } from 'lucide-react';
+import { Banknote, CreditCard, Crosshair, ExternalLink, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
+import { mapsUrl } from '@/lib/order-status';
 import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
@@ -45,6 +46,10 @@ type StoreGroup = {
     max_delivery_radius_km: number | null;
     allow_cod: boolean;
     allow_consignment: boolean;
+    /** Store offers "Pick up at the store" (₱0 delivery fee, no rider) */
+    allow_pickup?: boolean;
+    pickup_instructions?: string | null;
+    store_address?: { address: string | null; barangay: string | null; city: string | null };
     min_down_payment_percent: number;
     consignment_due_days: number;
     coupons: StoreCouponOption[];
@@ -95,6 +100,17 @@ const PAYMENT_MODE_META: Record<PaymentMode, { label: string; icon: React.Elemen
     consignment: { label: 'Consignment',      icon: Handshake  },
     cod:         { label: 'Cash on Delivery', icon: Banknote   },
 };
+
+/** Refill lines grouped by size: "2 × 11 kg, 1 × 2.7 kg" (each needs an empty tank of the same size). */
+function refillSummaryOf(sg: { items: { transaction_type: string; quantity: number; weight: string }[] }): string {
+    const bySize: Record<string, number> = {};
+    for (const i of sg.items) {
+        if (i.transaction_type !== 'refill') continue;
+        const size = i.weight || 'tank';
+        bySize[size] = (bySize[size] ?? 0) + i.quantity;
+    }
+    return Object.entries(bySize).map(([size, n]) => `${n} × ${size}`).join(', ');
+}
 
 function round2(n: number) {
     return Math.round(n * 100) / 100;
@@ -201,6 +217,13 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     }
     // One optional store coupon per store (keyed by store_id)
     const [selectedCoupons, setSelectedCoupons] = useState<Record<number, number | null>>({});
+    // Deliver to me / pick up at the store, per store
+    const [fulfillments, setFulfillments] = useState<Record<number, 'delivery' | 'pickup'>>({});
+    const fulfillmentOf = (sg: StoreGroup): 'delivery' | 'pickup' => (sg.allow_pickup && fulfillments[sg.store_id] === 'pickup' ? 'pickup' : 'delivery');
+    const allPickup = stores.length > 0 && stores.every((sg) => fulfillmentOf(sg) === 'pickup');
+    // Refill = hand over an empty tank of the same size — the customer confirms once for the whole checkout
+    const [emptyConfirmed, setEmptyConfirmed] = useState(false);
+    const hasRefill = stores.some((sg) => sg.items.some((i) => i.transaction_type === 'refill'));
     const [loading, setLoading]         = useState(false);
 
     // Delivery location: the default saved address (or the profile address, pinned at its barangay).
@@ -329,7 +352,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
             return s + price * item.quantity;
         }, 0);
         const dynamic  = distFees[sg.store_id];
-        const fee      = dynamic ? dynamic.fee : sg.delivery_fee;
+        // Pick-up: no delivery fee (a shipping-only coupon gives nothing here)
+        const fee      = fulfillmentOf(sg) === 'pickup' ? 0 : dynamic ? dynamic.fee : sg.delivery_fee;
         const coupon   = sg.coupons.find((c) => c.id === selectedCoupons[sg.store_id]) ?? null;
         const discount = coupon ? Math.min(coupon.amount, subtotal) : 0;
         return { store: sg, subtotal, fee, coupon, discount };
@@ -370,12 +394,17 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const estimatedMins = osrmRoute?.durationMin ?? null;
 
     async function placeOrder() {
-        if (delivery.addressId === null && !delivery.line.trim() && !(delivery.barangay && delivery.city)) {
+        // Everything picked up at the store → no address or pin needed
+        if (!allPickup && delivery.addressId === null && !delivery.line.trim() && !(delivery.barangay && delivery.city)) {
             toast.error('Please complete your delivery address (house no. / street, barangay and city).');
             return;
         }
-        if (gpsRoughM !== null) {
+        if (!allPickup && gpsRoughM !== null) {
             toast.error('Please drag the pin to your exact spot, or click "Use this spot" first.');
+            return;
+        }
+        if (hasRefill && !emptyConfirmed) {
+            toast.error('Please confirm you have the empty tank(s) ready for exchange.');
             return;
         }
         setLoading(true);
@@ -388,12 +417,14 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     coupon_ids:                 Object.values(selectedCoupons).filter((id): id is number => !!id),
                     coupon_code:                promo?.code ?? null,
                     notes,
-                    delivery_latitude:          pin?.lat ?? null,
-                    delivery_longitude:         pin?.lng ?? null,
-                    delivery_address:           delivery.line.trim() || null,
-                    delivery_barangay:          delivery.barangay || null,
-                    delivery_city:              delivery.city || null,
-                    estimated_delivery_minutes: estimatedMins,
+                    delivery_latitude:          allPickup ? null : pin?.lat ?? null,
+                    delivery_longitude:         allPickup ? null : pin?.lng ?? null,
+                    delivery_address:           allPickup ? null : delivery.line.trim() || null,
+                    delivery_barangay:          allPickup ? null : delivery.barangay || null,
+                    delivery_city:              allPickup ? null : delivery.city || null,
+                    estimated_delivery_minutes: allPickup ? null : estimatedMins,
+                    fulfillments:               Object.fromEntries(stores.map((sg) => [sg.store_id, fulfillmentOf(sg)])),
+                    empty_tanks_confirmed:      hasRefill ? emptyConfirmed : null,
                 },
             );
             if (res.data.redirect_url) {
@@ -424,6 +455,16 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
             <div className="max-w-3xl mx-auto space-y-6">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Checkout</h1>
 
+                {allPickup && (
+                    <Card>
+                        <CardContent className="flex items-start gap-2 pt-6 text-sm text-gray-700 dark:text-gray-300">
+                            <Store className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                            <p>You're picking up {stores.length > 1 ? 'every order' : 'your order'} at the store — no delivery address needed.</p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {!allPickup && (<>
                 {/* Delivery address */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -528,7 +569,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                             {/* Distance & fee info per store */}
                             {pin && Object.keys(distFees).length > 0 && (
                                 <div className="mt-3 px-4 py-3 space-y-1.5 border-t border-gray-100 bg-blue-50/60 dark:bg-blue-900/10">
-                                    {stores.filter((sg) => distFees[sg.store_id]).map((sg) => {
+                                    {stores.filter((sg) => distFees[sg.store_id] && fulfillmentOf(sg) === 'delivery').map((sg) => {
                                         const df = distFees[sg.store_id];
                                         return (
                                             <div key={sg.store_id} className="flex items-center justify-between text-sm">
@@ -558,6 +599,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Card>
                 )}
 
+                </>)}
+
                 {/* Per-store order summaries */}
                 {unavailableStores.map((sg) => (
                     <Card key={sg.store_id} className="opacity-60">
@@ -577,6 +620,9 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                 ))}
 
                 {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance }) => {
+                    const pickup = fulfillmentOf(sg) === 'pickup';
+                    const storeMaps = mapsUrl(sg.store_lat, sg.store_lng, formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? ''));
+                    const refillSummary = refillSummaryOf(sg);
                     return (
                         <Card key={sg.store_id}>
                             <CardHeader className="pb-3">
@@ -586,6 +632,43 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
+                                {/* Deliver to me / Pick up at the store */}
+                                {sg.allow_pickup && (
+                                    <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+                                        {([['delivery', 'Deliver to me', Truck], ['pickup', 'Pick up at the store', Store]] as const).map(([value, label, Icon]) => (
+                                            <button key={value} type="button"
+                                                onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: value }))}
+                                                className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                                                    fulfillmentOf(sg) === value ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'
+                                                }`}>
+                                                <Icon className="h-4 w-4" /> {label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {pickup && (
+                                    <div className="mb-3 space-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
+                                        <p className="font-semibold">Pick up at {sg.store_name}</p>
+                                        <p>{formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? '')}</p>
+                                        {storeMaps && (
+                                            <a href={storeMaps} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium underline">
+                                                <ExternalLink className="h-3 w-3" /> Open in Google Maps
+                                            </a>
+                                        )}
+                                        {sg.pickup_instructions && <p className="text-xs">{sg.pickup_instructions}</p>}
+                                    </div>
+                                )}
+                                {refillSummary && (
+                                    <p className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                        <Recycle className="mt-0.5 h-4 w-4 shrink-0" />
+                                        <span>
+                                            <strong>Refill exchange:</strong>{' '}
+                                            {pickup
+                                                ? `Bring ${refillSummary} empty tank(s) to the store.`
+                                                : `have ${refillSummary} empty tank(s) ready — our rider will collect them.`}
+                                        </span>
+                                    </p>
+                                )}
                                 <div className="divide-y divide-gray-100 dark:divide-gray-800">
                                     {sg.items.map(item => {
                                         const unitPrice = item.transaction_type === 'refill' ? item.refill_price : item.purchase_price;
@@ -622,7 +705,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                                         <span>Delivery fee</span>
-                                        <span>{fee > 0 ? peso(fee) : 'Free'}</span>
+                                        <span>{pickup ? '₱0 (pick-up)' : fee > 0 ? peso(fee) : 'Free'}</span>
                                     </div>
                                     {discount > 0 && (
                                         <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
@@ -675,7 +758,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     </p>
                                     <div className={`grid gap-2 ${modesFor(sg).length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                                         {modesFor(sg).map((m) => {
-                                            const { label, icon: Icon } = PAYMENT_MODE_META[m];
+                                            const { icon: Icon } = PAYMENT_MODE_META[m];
+                                            const label = m === 'cod' && pickup ? 'Pay at the store (cash)' : PAYMENT_MODE_META[m].label;
                                             const active = mode === m;
                                             return (
                                                 <button
@@ -690,7 +774,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                         <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
                                                         <span className={`text-sm font-semibold ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{label}</span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500">{modeDescription(sg, m)}</p>
+                                                    <p className="text-xs text-gray-500">{m === 'cod' && pickup ? 'Pay in cash when you pick up your order' : modeDescription(sg, m)}</p>
                                                     {m === 'consignment' && sg.loyalty.tier && (
                                                         <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                                                             <TierBadge tier={sg.loyalty.tier} size="sm" />
@@ -739,7 +823,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
 
                                     {mode === 'cod' && (
                                         <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                                            Prepare <strong>{peso(total)}</strong> in cash for the rider.
+                                            Prepare <strong>{peso(total)}</strong> in cash {pickup ? 'to pay at the store' : 'for the rider'}.
                                         </p>
                                     )}
                                 </div>
@@ -866,6 +950,14 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </CardContent>
                 </Card>
 
+                {hasRefill && (
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <input type="checkbox" checked={emptyConfirmed} onChange={(e) => setEmptyConfirmed(e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500" />
+                        I have the empty tank(s) ready for exchange.
+                    </label>
+                )}
+
                 {/* Actions */}
                 <div className="flex flex-col sm:flex-row gap-3">
                     <Link href="/customer/cart" className="sm:flex-none">
@@ -875,7 +967,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Link>
                     <Button
                         onClick={placeOrder}
-                        disabled={loading || !customer || stores.length === 0 || overMax}
+                        disabled={loading || !customer || stores.length === 0 || overMax || (hasRefill && !emptyConfirmed)}
                         className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
                     >
                         {loading ? (

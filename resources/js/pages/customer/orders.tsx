@@ -19,6 +19,7 @@ import {
 import { fmtDate } from '@/lib/utils';
 import CustomerLayout from '@/layouts/customer-layout';
 import { ReasonPicker } from '@/components/reason-picker';
+import { orderStatusLabel } from '@/lib/order-status';
 
 type Order = {
     id: number;
@@ -26,6 +27,7 @@ type Order = {
     order_number: string;
     store_name: string;
     status: string;
+    fulfillment?: string;
     total_amount: number;
     payment_method: string;
     payment_status: string;
@@ -86,7 +88,7 @@ const STATUS_TABS = [
     { value: 'pending',          label: 'Pending' },
     { value: 'confirmed',        label: 'Confirmed' },
     { value: 'preparing',        label: 'Preparing' },
-    { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'out_for_delivery', label: 'Out for Delivery / Ready' },
     { value: 'delivered',        label: 'Delivered' },
     { value: 'cancelled',        label: 'Cancelled' },
 ] as const;
@@ -97,7 +99,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
     // Live: any of my orders changing refreshes the list
     const meId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${meId}`, ['orders'], () => true, (e, kind) => {
-        if (kind === 'order' && 'order_number' in e && e.order_number) toast.info(`Order ${e.order_number}: ${statusLabel(e.status)}`);
+        if (kind === 'order' && 'order_number' in e && e.order_number) toast.info(`Order ${e.order_number}: ${statusLabel(e.status, (e as { fulfillment?: string }).fulfillment)}`);
     });
     const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
     const [cancelReason, setCancelReason] = useState('');
@@ -305,7 +307,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                                        {order.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                                                        {orderStatusLabel(order.status, order.fulfillment)}
                                                     </span>
                                                     {order.status === 'cancelled' && order.cancelled_by && (
                                                         <p className="text-[10px] text-gray-400 mt-0.5">

@@ -91,6 +91,10 @@ type OrderRef = {
     payment_status: string;
     payment_mode: 'full' | 'consignment' | 'cod';
     amount_to_collect: number;
+    /** Refill: empty tanks to collect */
+    empty_tanks_required?: number;
+    empty_tank_summary?: string | null;
+    empty_tanks_collected?: boolean;
     remaining_balance: number | null;
     delivery_latitude: number | null;
     delivery_longitude: number | null;
@@ -272,6 +276,10 @@ function UpdateStatusDialog({
     });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Refill: "Collected {summary} empty tank(s)" before Delivered
+    const [tanksCollected, setTanksCollected] = useState(false);
+    useEffect(() => { setTanksCollected(false); }, [delivery?.id, targetStatus]);
+    const needsTanks = targetStatus === 'delivered' && !!delivery?.order?.empty_tanks_required && !delivery.order.empty_tanks_collected;
     const [preview, setPreview]       = useState<string | null>(null);
     const [gpsState, setGpsState]     = useState<GpsState>('idle');
     const [geocodeAddr, setGeocodeAddr] = useState<string | null>(null);
@@ -347,7 +355,7 @@ function UpdateStatusDialog({
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
         if (!delivery) return;
-        transform((d) => ({ ...d, _method: 'PATCH' }));
+        transform((d) => ({ ...d, _method: 'PATCH', ...(needsTanks ? { empty_tanks_collected: tanksCollected ? '1' : '0' } : {}) }));
         post(`/rider/deliveries/${delivery.id}/status`, {
             forceFormData: true,
             onSuccess: () => {
@@ -502,11 +510,21 @@ function UpdateStatusDialog({
                         </div>
                     )}
 
+                    {needsTanks && (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900">
+                            <input type="checkbox" checked={tanksCollected} onChange={(e) => setTanksCollected(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                            ♻ Collected {delivery?.order?.empty_tank_summary} empty tank(s)
+                        </label>
+                    )}
+                    {(errors as Record<string, string>).empty_tanks_collected && (
+                        <p className="text-xs text-red-500">{(errors as Record<string, string>).empty_tanks_collected}</p>
+                    )}
+
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
                             type="submit"
-                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data)) || (needsPhoto && !data.photo)}
+                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data)) || (needsPhoto && !data.photo) || (needsTanks && !tanksCollected)}
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >
@@ -1039,7 +1057,12 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                             if (!STATUS_NEXT[stop.status]?.includes(next) || (next === 'picked_up' && cannotDeliver)) return;
                             // Same dialog as the List view (photo proof, location, Reason ▸ Details, redelivery range);
                             // on success the page reloads `route`, so the pin changes colour
-                            openStatusDialog({ id: stop.id, status: stop.status, order: { order_number: stop.order_number } } as unknown as DeliveryRow, next);
+                            openStatusDialog({ id: stop.id, status: stop.status, order: {
+                                order_number: stop.order_number,
+                                empty_tanks_required: stop.empty_tanks_required ?? 0,
+                                empty_tank_summary: stop.empty_tank_summary ?? null,
+                                empty_tanks_collected: stop.empty_tanks_collected ?? false,
+                            } } as unknown as DeliveryRow, next);
                         }}
                     />
                 ) : (
@@ -1162,6 +1185,13 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                         <span className="font-semibold tabular-nums text-gray-900">
                                             ₱{(d.order?.total_amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </span>
+
+                                        {/* Refill: empty tanks to collect */}
+                                        {d.order && !!d.order.empty_tanks_required && !d.order.empty_tanks_collected && d.status !== 'delivered' && (
+                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                ♻ Collect {d.order.empty_tank_summary} empty
+                                            </span>
+                                        )}
 
                                         {/* COD: amount to collect + Payment Collected */}
                                         {d.order && d.order.amount_to_collect > 0 && (

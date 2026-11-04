@@ -112,6 +112,10 @@ class CheckoutController extends Controller
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
                     'allow_cod'              => (bool) ($store->allow_cod ?? true),
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
+                    // Pick up at the store (₱0 delivery fee, no rider)
+                    'allow_pickup'           => (bool) $store->allow_pickup,
+                    'pickup_instructions'    => $store->pickup_instructions,
+                    'store_address'          => ['address' => $store->address, 'barangay' => $store->barangay, 'city' => $store->city],
                     // Consignment is a loyalty benefit: store must allow it, run a loyalty
                     // program, and the customer's trust score must meet the store minimum
                     'consignment_available'  => $this->consignmentAvailable($store, $userId),
@@ -317,6 +321,10 @@ class CheckoutController extends Controller
                 'delivery_barangay'          => 'nullable|string|max:100',
                 'delivery_city'              => 'nullable|string|max:100',
                 'estimated_delivery_minutes' => 'nullable|integer|min:0|max:9999',
+                // Per store: deliver to me / pick up at the store
+                'fulfillments'               => 'nullable|array',
+                'fulfillments.*'             => 'in:delivery,pickup',
+                'empty_tanks_confirmed'      => 'nullable|boolean',
             ]);
 
             $deliveryLat  = isset($data['delivery_latitude'])  ? (float) $data['delivery_latitude']  : null;
@@ -422,8 +430,23 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Deliver to me / pick up at the store (per store), and the refill empty-tank exchange
+            $fulfillments = []; // store_id => delivery|pickup
+            foreach ($checkoutStores as $storeData) {
+                $sid  = (int) $storeData['store_id'];
+                $kind = $data['fulfillments'][$sid] ?? 'delivery';
+                if ($kind === 'pickup' && ! $storeData['store_ref']?->allow_pickup) {
+                    throw new CheckoutRuleException("{$storeData['store_name']} doesn't offer pick-up.");
+                }
+                $fulfillments[$sid] = $kind;
+            }
+            $hasRefill = collect($checkoutStores)->flatMap(fn ($s) => $s['items'])->contains(fn ($i) => ($i['transaction_type'] ?? 'refill') === 'refill');
+            if ($hasRefill && ! $request->boolean('empty_tanks_confirmed')) {
+                throw new CheckoutRuleException('Please confirm you have the empty tank(s) ready for exchange.');
+            }
+
             // Create one order per store in a single DB transaction
-            $result = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin) {
+            $result = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin, $fulfillments) {
                 // ── Pass 1: price every store's items and delivery fee ─────────
                 $prepared = [];
 
@@ -467,10 +490,11 @@ class CheckoutController extends Controller
                         $subtotal      += $sub;
                         $transTypes[]   = $txType;
                         $orderedItems[] = [
-                            'product'    => $product,
-                            'quantity'   => $cartItem['quantity'],
-                            'unit_price' => $price,
-                            'subtotal'   => $sub,
+                            'product'          => $product,
+                            'quantity'         => $cartItem['quantity'],
+                            'unit_price'       => $price,
+                            'subtotal'         => $sub,
+                            'transaction_type' => $txType,
                         ];
                     }
 
@@ -478,9 +502,11 @@ class CheckoutController extends Controller
                         ? 'refill' : 'new_purchase';
 
                     // Calculate delivery fee (dynamic if store has lat/lng + fee settings + customer dropped a pin)
+                    $isPickup    = ($fulfillments[$store->id] ?? 'delivery') === 'pickup';
                     $distKm      = null;
-                    $finalFee    = (float) ($storeData['delivery_fee'] ?? 0);
-                    if ($deliveryLat !== null && $deliveryLng !== null
+                    // Pick-up: no delivery fee
+                    $finalFee    = $isPickup ? 0.0 : (float) ($storeData['delivery_fee'] ?? 0);
+                    if (! $isPickup && $deliveryLat !== null && $deliveryLng !== null
                         && $store->latitude && $store->longitude) {
                         $distKm   = DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $deliveryLat, $deliveryLng);
                         $finalFee = DeliveryFeeService::fee($store, $distKm);
@@ -501,7 +527,10 @@ class CheckoutController extends Controller
                         }
                     }
 
-                    $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount');
+                    // Refill tanks (products with a size) = empty tanks to hand over
+                    $emptyTanks = collect($orderedItems)->filter(fn ($i) => $i['transaction_type'] === 'refill' && (float) $i['product']->weight_kg > 0)->sum('quantity');
+
+                    $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount', 'isPickup', 'emptyTanks');
                 }
 
                 // ── Promo coupon (platform or store) — validated under a row lock ──
@@ -563,13 +592,16 @@ class CheckoutController extends Controller
                         'notes'                      => $data['notes'] ?? null,
                         'ordered_at'                 => now(),
                         'created_by'                 => $request->user()->id,
-                        'delivery_latitude'          => $deliveryLat ?? $geoFallback[0] ?? null,
-                        'delivery_longitude'         => $deliveryLng ?? $geoFallback[1] ?? null,
-                        'delivery_address'           => $delivery['address'] ?: null,
-                        'delivery_barangay'          => $delivery['barangay'] ?: null,
-                        'delivery_city'              => $delivery['city'] ?: null,
+                        // Pick-up orders keep no delivery address / pin (not even the barangay fallback)
+                        'delivery_latitude'          => $p['isPickup'] ? null : ($deliveryLat ?? $geoFallback[0] ?? null),
+                        'delivery_longitude'         => $p['isPickup'] ? null : ($deliveryLng ?? $geoFallback[1] ?? null),
+                        'delivery_address'           => $p['isPickup'] ? null : ($delivery['address'] ?: null),
+                        'delivery_barangay'          => $p['isPickup'] ? null : ($delivery['barangay'] ?: null),
+                        'delivery_city'              => $p['isPickup'] ? null : ($delivery['city'] ?: null),
                         'delivery_distance_km'       => $p['distKm'] !== null ? round($p['distKm'], 2) : null,
-                        'estimated_delivery_minutes' => $estimatedMin,
+                        'estimated_delivery_minutes' => $p['isPickup'] ? null : $estimatedMin,
+                        'fulfillment'                => $p['isPickup'] ? 'pickup' : 'delivery',
+                        'empty_tanks_required'       => $p['emptyTanks'],
                     ]);
 
                     foreach ($p['orderedItems'] as $item) {
@@ -579,6 +611,7 @@ class CheckoutController extends Controller
                             'quantity'   => $item['quantity'],
                             'unit_price' => $item['unit_price'],
                             'subtotal'   => $item['subtotal'],
+                            'transaction_type' => $item['transaction_type'],
                         ]);
                     }
 

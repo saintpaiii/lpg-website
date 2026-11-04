@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { orderStatusLabel } from '@/lib/order-status';
 import axios from 'axios';
 import { Loader2, Mail, Phone, Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,7 +15,7 @@ type CustomerCrm = {
         loyalty_enabled: boolean;
         loyalty: { tier: Tier; trust_score: number; total_orders: number; total_spent: number } | null;
         total_orders: number; total_spent: number; open_balance: number;
-        recent_orders: { id: number; order_number: string; status: string; total: number; payment_mode: string; remaining_balance: number; ordered_at: string | null; url: string }[];
+        recent_orders: { id: number; order_number: string; status: string; fulfillment?: string; total: number; payment_mode: string; remaining_balance: number; ordered_at: string | null; url: string }[];
     };
 };
 type RiderCrm = { kind: 'rider'; rider: { name: string; phone: string | null; active_deliveries: number; delivered_today: number } };
@@ -23,7 +24,6 @@ const STATUS_STYLE: Record<string, string> = {
     pending: 'bg-gray-100 text-gray-700', confirmed: 'bg-blue-100 text-blue-700', preparing: 'bg-indigo-100 text-indigo-700',
     out_for_delivery: 'bg-amber-100 text-amber-800', delivered: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-700',
 };
-const statusLabel = (s: string) => s.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
 /** Who this customer (or rider) is to the store — shown beside the chat. */
 export default function SellerCrmPanel({ header }: { header: ConversationHeader }) {
@@ -104,7 +104,7 @@ export default function SellerCrmPanel({ header }: { header: ConversationHeader 
                                 <Link href={o.url} className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800">
                                     <span className="min-w-0">
                                         <span className="block font-mono text-xs">{o.order_number}</span>
-                                        <span className={`mt-0.5 inline-block rounded px-1.5 py-px text-[10px] font-medium ${STATUS_STYLE[o.status] ?? 'bg-gray-100 text-gray-700'}`}>{statusLabel(o.status)}</span>
+                                        <span className={`mt-0.5 inline-block rounded px-1.5 py-px text-[10px] font-medium ${STATUS_STYLE[o.status] ?? 'bg-gray-100 text-gray-700'}`}>{orderStatusLabel(o.status, o.fulfillment)}</span>
                                     </span>
                                     <span className="shrink-0 text-right text-xs font-semibold">
                                         {peso(o.total)}

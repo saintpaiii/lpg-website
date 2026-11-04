@@ -96,7 +96,7 @@ export function useEchoPrivate<T = unknown>(channel: string | null, event: strin
 
 // ── order / delivery pages ───────────────────────────────────────────────────
 
-export type OrderEvent = { order_id: number; order_number?: string; status: string; payment_status?: string; is_new?: boolean };
+export type OrderEvent = { order_id: number; order_number?: string; status: string; payment_status?: string; is_new?: boolean; fulfillment?: string };
 export type DeliveryEvent = { delivery_id: number; order_id: number; status: string; rider_id: number | null };
 
 const ORDER_STATUS_LABELS: Record<string, string> = {
@@ -104,7 +104,11 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
     delivered: 'Delivered', cancelled: 'Cancelled',
     assigned: 'Rider assigned', picked_up: 'Picked up', in_transit: 'On the way', failed: 'Delivery failed',
 };
-export const statusLabel = (s: string) => ORDER_STATUS_LABELS[s] ?? s.replace(/_/g, ' ');
+/** Pick-up orders: out_for_delivery = "Ready for pick-up", delivered = "Picked up". */
+export const statusLabel = (s: string, fulfillment?: string | null) =>
+    fulfillment === 'pickup' && s === 'out_for_delivery' ? 'Ready for pick-up'
+        : fulfillment === 'pickup' && s === 'delivered' ? 'Picked up'
+        : ORDER_STATUS_LABELS[s] ?? s.replace(/_/g, ' ');
 
 /**
  * Reload some page props when an order / delivery changes (OrderUpdated / DeliveryUpdated on a

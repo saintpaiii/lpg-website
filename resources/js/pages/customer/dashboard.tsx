@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { orderStatusLabel } from '@/lib/order-status';
 import { CheckCircle2, Circle, Clock, MapPin, Navigation, Package, Search, ShoppingBag, ShoppingCart, Star, Truck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { fmtDate } from '@/lib/utils';
@@ -10,6 +11,7 @@ type ActiveOrder = {
     id: number;
     order_number: string;
     status: string;
+    fulfillment?: string;
     total_amount: number;
     created_at: string;
     rider_name: string | null;
@@ -288,7 +290,7 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                                     {activeOrder.order_number}
                                 </span>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[activeOrder.status] ?? 'bg-gray-100 text-gray-800'}`}>
-                                    {activeOrder.status.replace('_', ' ')}
+                                    {orderStatusLabel(activeOrder.status, activeOrder.fulfillment)}
                                 </span>
                                 <span className="text-sm text-gray-500">
                                     ₱{activeOrder.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}

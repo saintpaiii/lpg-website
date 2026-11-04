@@ -62,6 +62,9 @@ class DeliveryController extends Controller
                 'order_number'       => $d->order->order_number,
                 'status'             => $d->order->status,
                 'total_amount'       => (float) $d->order->total_amount,
+                'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
+                'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,
+                'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,
                 'shipping_fee'       => $d->order->shipping_fee ? (float) $d->order->shipping_fee : null,
                 'transaction_type'   => $d->order->transaction_type,
                 'payment_method'     => $d->order->payment_method,
@@ -196,6 +199,10 @@ class DeliveryController extends Controller
                     'amount'            => $o ? $o->grandTotal() : 0,
                     'payment_label'     => $modeLabels[$o?->payment_mode ?? 'full'] ?? 'Full Payment',
                     'amount_to_collect' => $o && $o->payment_mode === 'cod' && $o->payment_status === 'unpaid' ? $o->grandTotal() : 0,
+                    // Refill: empty tanks to collect before "Delivered"
+                    'empty_tanks_required'  => (int) ($o?->empty_tanks_required ?? 0),
+                    'empty_tank_summary'    => $o && (int) $o->empty_tanks_required > 0 ? $o->emptyTankSummary() : null,
+                    'empty_tanks_collected' => $o?->empty_tanks_collected_at !== null,
                 ];
             })->all(),
         ];
@@ -284,6 +291,7 @@ class DeliveryController extends Controller
             'rider_latitude'    => 'nullable|numeric|between:-90,90',
             'rider_longitude'   => 'nullable|numeric|between:-180,180',
             'rider_accuracy'    => 'nullable|numeric|min:0',
+            'empty_tanks_collected' => 'nullable|boolean',
         ], Delivery::failureMessages());
 
         $newStatus = $data['status'];
@@ -301,6 +309,11 @@ class DeliveryController extends Controller
 
         if (! in_array($newStatus, $allowed[$delivery->status] ?? [])) {
             return back()->with('error', "Cannot move from {$delivery->status} to {$newStatus}.");
+        }
+
+        // Refill: the rider confirms the empty tanks were collected
+        if ($newStatus === 'delivered' && $delivery->order) {
+            $delivery->order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, auth()->id());
         }
 
         $riderLocSaved = false;

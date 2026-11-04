@@ -42,7 +42,11 @@ type Delivery = {
     delivered_at: string | null;
     notes: string | null;
     fail_info: FailInfo | null;
-    order: { id: number; order_number: string; customer: string; address: string; total_amount: number } | null;
+    order: {
+        id: number; order_number: string; customer: string; address: string; total_amount: number;
+        /** Refill: empty tanks the rider must collect */
+        empty_tanks_required?: number; empty_tanks_collected?: boolean; empty_tank_summary?: string | null;
+    } | null;
     rider: { id: number; name: string; phone: string | null } | null;
     vehicle: { id: number; vehicle_type: string; plate_number: string } | null;
     proofs: DeliveryProof[];
@@ -186,6 +190,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     const [showAssign, setShowAssign]         = useState(false);
     const [statusTarget, setStatusTarget]     = useState<Delivery | null>(null);
     const [newStatus, setNewStatus]           = useState('');
+    const [tanksCollected, setTanksCollected] = useState(false);
     const [failValues, setFailValues]         = useState<FailValues>(emptyFailValues);
     const [statusErrors, setStatusErrors]     = useState<Record<string, string>>({});
     const [statusNotes, setStatusNotes]       = useState('');
@@ -227,16 +232,20 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     function openStatus(d: Delivery) {
         setStatusTarget(d);
         setNewStatus(d.status);
+        setTanksCollected(false);
         setFailValues(emptyFailValues);
         setStatusNotes('');
         setStatusErrors({});
     }
 
+    // Refill delivered: confirm the empty tanks were collected
+    const needsTanks = newStatus === 'delivered' && !!statusTarget?.order?.empty_tanks_required && !statusTarget.order.empty_tanks_collected;
+
     function submitStatusUpdate() {
         if (!statusTarget || !newStatus) return;
         const payload = newStatus === 'failed'
             ? { status: newStatus, ...failValues }
-            : { status: newStatus, ...(statusNotes.trim() ? { notes: statusNotes.trim() } : {}) };
+            : { status: newStatus, ...(statusNotes.trim() ? { notes: statusNotes.trim() } : {}), ...(needsTanks ? { empty_tanks_collected: tanksCollected } : {}) };
         setStatusSaving(true);
         router.patch(`/seller/deliveries/${statusTarget.id}/status`, payload, {
             preserveScroll: true,
@@ -538,6 +547,13 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                             />
                         </div>
                     )}
+                    {needsTanks && (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                            <input type="checkbox" checked={tanksCollected} onChange={(e) => setTanksCollected(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                            ♻ Collected {statusTarget?.order?.empty_tank_summary} empty tank(s)
+                        </label>
+                    )}
+                    {statusErrors.empty_tanks_collected && <p className="text-xs text-red-500">{statusErrors.empty_tanks_collected}</p>}
                     {newStatus === 'failed' && (
                         <DeliveryFailFields
                             options={fail_options}
@@ -551,7 +567,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                         {/* Plain button: the dialog stays open to show validation errors */}
                         <Button
                             onClick={submitStatusUpdate}
-                            disabled={statusSaving || (newStatus === 'failed' && !failValuesComplete(fail_options, failValues))}
+                            disabled={statusSaving || (newStatus === 'failed' && !failValuesComplete(fail_options, failValues)) || (needsTanks && !tanksCollected)}
                             className="bg-blue-600 hover:bg-blue-700"
                         >
                             Update

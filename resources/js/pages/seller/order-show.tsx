@@ -27,6 +27,8 @@ import type { BreadcrumbItem, SharedData } from '@/types';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 import type { FailInfo } from '@/components/delivery-fail-fields';
 import { ReasonPicker } from '@/components/reason-picker';
+import { CompletePickupDialog, FulfillmentBadge } from '@/components/complete-pickup-dialog';
+import { orderStatusLabel } from '@/lib/order-status';
 
 type OrderItem = {
     id: number;
@@ -56,6 +58,11 @@ type Order = {
     id: number;
     order_number: string;
     status: string;
+    fulfillment: 'delivery' | 'pickup';
+    empty_tanks_required: number;
+    empty_tanks_collected: boolean;
+    empty_tank_summary: string | null;
+    grand_total: number;
     transaction_type: string;
     total_amount: number;
     payment_method: string | null;
@@ -121,7 +128,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
     // Live: this order's status / delivery changes reload the page data
     const liveStoreId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
     useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
-        (e) => toast.info(`Order updated: ${statusLabel(e.status)}`));
+        (e) => toast.info(`Order updated: ${statusLabel(e.status, (e as { fulfillment?: string }).fulfillment)}`));
     const { can } = usePermission();
     const canMessage = (usePage<SharedData>().props.auth.user.role === 'seller') || can('messages.view');
     const canFileReport = usePage<SharedData>().props.auth.user.role === 'seller' || can('customer_reports.manage');
@@ -134,6 +141,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
 
     const [showCancel,    setShowCancel]    = useState(false);
     const [showAssign,    setShowAssign]    = useState(false);
+    const [showPickedUp,  setShowPickedUp]  = useState(false);
     // "Report customer" (sends only order_id — the backend takes the customer from the order)
     const [showReport, setShowReport] = useState(false);
     const [selectedRider, setSelectedRider] = useState('');
@@ -182,7 +190,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
     const canDispatch   = order.payment_status === 'paid'
         || order.payment_mode === 'cod'
         || (isConsignment && order.payment_status === 'partial');
-    const canAssign     = ['confirmed', 'preparing'].includes(order.status) && canDispatch;
+    const isPickup      = order.fulfillment === 'pickup';
+    // Pick-up orders never get a rider
+    const canAssign     = !isPickup && ['confirmed', 'preparing'].includes(order.status) && canDispatch;
     const grandTotal    = order.total_amount + (order.shipping_fee ?? 0);
     const canCancel     = !isFinal;
 
@@ -203,8 +213,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl font-bold font-mono">{order.order_number}</h1>
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[order.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                    {order.status.replace('_', ' ')}
+                                    {orderStatusLabel(order.status, order.fulfillment)}
                                 </span>
+                                <FulfillmentBadge fulfillment={order.fulfillment} />
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 Created {fmtDateTime(order.created_at)}
@@ -236,7 +247,17 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 <Package className="h-3.5 w-3.5 mr-1" /> Mark Preparing
                             </Button>
                         )}
-                        {['confirmed', 'preparing'].includes(order.status) && (
+                        {isPickup && ['confirmed', 'preparing'].includes(order.status) && (
+                            <Button onClick={() => moveStatus('out_for_delivery')} size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+                                <Package className="h-3.5 w-3.5 mr-1" /> Ready for pick-up
+                            </Button>
+                        )}
+                        {isPickup && order.status === 'out_for_delivery' && (
+                            <Button onClick={() => setShowPickedUp(true)} size="sm" className="bg-green-600 hover:bg-green-700 text-white">
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark as picked up
+                            </Button>
+                        )}
+                        {!isPickup && ['confirmed', 'preparing'].includes(order.status) && (
                             <Button
                                 onClick={() => canAssign ? setShowAssign(true) : undefined}
                                 size="sm"
@@ -265,6 +286,17 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                     </div>
                 </div>
 
+                {/* Refill: empty tanks to receive */}
+                {order.empty_tanks_required > 0 && order.status !== 'cancelled' && (
+                    <p className={`rounded-lg border px-3 py-2 text-sm ${order.empty_tanks_collected
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300'
+                        : 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200'}`}>
+                        ♻ {order.empty_tanks_collected
+                            ? `Collected ${order.empty_tank_summary} empty tank(s).`
+                            : `Refill exchange: ${isPickup ? 'the customer brings' : 'the rider collects'} ${order.empty_tank_summary} empty tank(s).`}
+                    </p>
+                )}
+
                 {/* Progress stepper */}
                 {order.status !== 'cancelled' && (
                     <div className="flex items-center gap-0">
@@ -275,7 +307,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 </div>
                                 <div className="mx-1 hidden sm:block">
                                     <p className={`text-xs font-medium capitalize ${idx <= stepIndex ? 'text-blue-600' : 'text-muted-foreground'}`}>
-                                        {step.replace('_', ' ')}
+                                        {orderStatusLabel(step, order.fulfillment)}
                                     </p>
                                 </div>
                                 {idx < STATUS_STEPS.length - 1 && (
@@ -334,7 +366,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                         {loyalty?.tier && <TierBadge tier={loyalty.tier} size="sm" />}
                                     </div>
                                     {order.customer.phone && <p className="text-muted-foreground">{order.customer.phone}</p>}
-                                    <p className="text-muted-foreground text-xs">{order.customer.address}, {order.customer.city}</p>
+                                    {isPickup
+                                        ? <p className="text-xs font-medium text-teal-700 dark:text-teal-400">Pick-up at the store</p>
+                                        : <p className="text-muted-foreground text-xs">{[order.customer.address, order.customer.city].filter(Boolean).join(', ')}</p>}
                                     {canMessage && order.customer.user_id && (
                                         <MessageButton portal="seller" params={{ customer_id: order.customer.id }} label="Message customer" className="mt-1.5 gap-1.5" />
                                     )}
@@ -576,6 +610,8 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {showPickedUp && <CompletePickupDialog order={order} onClose={() => setShowPickedUp(false)} />}
 
             {/* Assign rider dialog */}
             <AlertDialog open={showAssign} onOpenChange={setShowAssign}>

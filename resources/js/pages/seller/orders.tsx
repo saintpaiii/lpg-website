@@ -21,6 +21,8 @@ import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 import { ReasonPicker } from '@/components/reason-picker';
+import { CompletePickupDialog, FulfillmentBadge, type PickupOrder } from '@/components/complete-pickup-dialog';
+import { orderStatusLabel } from '@/lib/order-status';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/seller/dashboard' },
@@ -47,11 +49,16 @@ type Order = {
     created_at: string;
     cancelled_by: 'customer' | 'seller' | null;
     has_coordinates: boolean;
+    fulfillment: 'delivery' | 'pickup';
+    empty_tanks_required: number;
+    empty_tanks_collected: boolean;
+    empty_tank_summary: string | null;
+    grand_total: number;
 };
 
 /** Confirmed/preparing orders whose payment allows dispatch (same rule as single assignment). */
 const isDispatchable = (o: Order) =>
-    ['confirmed', 'preparing'].includes(o.status)
+    o.fulfillment !== 'pickup' && ['confirmed', 'preparing'].includes(o.status)
     && (o.payment_status === 'paid' || o.payment_mode === 'cod' || (o.payment_mode === 'consignment' && o.payment_status === 'partial'));
 
 type Rider  = { id: number; name: string } & RiderLicenseFields;
@@ -62,7 +69,7 @@ type Props = {
     orders:  Paginated;
     counts:  Counts;
     tab:     string;
-    filters: { status?: string; search?: string; date_from?: string; date_to?: string; balance?: string };
+    filters: { status?: string; search?: string; date_from?: string; date_to?: string; balance?: string; fulfillment?: string };
     riders:  Rider[];
     since?:  string | null;
 };
@@ -92,6 +99,8 @@ type ActionDialog =
     | null;
 
 export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
+    // "Mark as picked up" dialog (empty tanks + cash at the store)
+    const [pickupOrder, setPickupOrder] = useState<PickupOrder | null>(null);
     // New / updated since the last visit (until the user leaves the page)
     const seen = useSeenRows(orders.data);
     // Live: new orders and status changes for this store
@@ -128,7 +137,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
     }
 
     function navigate(overrides: Record<string, string> = {}) {
-        router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, balance: filters.balance ?? '', ...overrides }, { preserveState: true, replace: true });
+        router.get('/seller/orders', { tab, search: searchVal, date_from: dateFrom, date_to: dateTo, balance: filters.balance ?? '', fulfillment: filters.fulfillment ?? '', ...overrides }, { preserveState: true, replace: true });
     }
 
     function goTab(t: string) {
@@ -213,7 +222,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
         { label: 'Pending',          value: counts.pending,          color: `text-yellow-700 bg-yellow-50 border-yellow-200 ${actionGlow(counts.pending)}` },
         { label: 'Confirmed',        value: counts.confirmed,        color: 'text-blue-700 bg-blue-50 border-blue-200'       },
         { label: 'Preparing',        value: counts.preparing,        color: 'text-purple-700 bg-purple-50 border-purple-200' },
-        { label: 'Out for Delivery', value: counts.out_for_delivery, color: 'text-orange-700 bg-orange-50 border-orange-200' },
+        { label: 'Out for delivery / Ready', value: counts.out_for_delivery, color: 'text-orange-700 bg-orange-50 border-orange-200' },
     ];
 
     return (
@@ -274,6 +283,17 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
                 {/* Date + consignment balance filter */}
                 <div className="flex flex-wrap items-end gap-3">
+                    {/* Delivery / pick-up */}
+                    <div className="flex items-center gap-1.5 mr-2">
+                        {([['', 'All'], ['delivery', 'Delivery'], ['pickup', 'Pick-up']] as const).map(([key, label]) => (
+                            <button key={key || 'all-f'} type="button" onClick={() => navigate({ fulfillment: key })}
+                                className={`h-8 rounded-full border px-3 text-xs font-medium transition-colors ${
+                                    (filters.fulfillment ?? '') === key ? 'border-blue-600 bg-blue-600 text-white' : 'border-input bg-background hover:bg-muted'
+                                }`}>
+                                {label}
+                            </button>
+                        ))}
+                    </div>
                     {(counts.outstanding_balance > 0 || filters.balance) && (
                         <div className="flex items-center gap-1.5 mr-2">
                             {([
@@ -351,6 +371,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             <td className="px-4 py-3">
                                                 <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-blue-600 font-medium">{o.order_number}<SeenPill flags={seen.get(o.id)} className="font-sans" /></p>
                                                 <p className="text-xs text-muted-foreground capitalize">{o.transaction_type.replace('_', ' ')}</p>
+                                                <div className="mt-0.5"><FulfillmentBadge fulfillment={o.fulfillment} /></div>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{o.customer?.name ?? '—'}</td>
                                             <td className="px-4 py-3 text-right font-medium">
@@ -358,7 +379,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                                    {o.status.replace('_', ' ')}
+                                                    {orderStatusLabel(o.status, o.fulfillment)}
                                                 </span>
                                                 {o.redelivery && (
                                                     <p className="mt-0.5">
@@ -402,7 +423,8 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                 {fmtDate(o.created_at)}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <OrderActions order={o} riders={riders} tab={tab} onOpen={openDialog} />
+                                                <OrderActions order={o} riders={riders} tab={tab} onOpen={openDialog}
+                                                    onReady={(ord) => patchStatus(ord.id, 'out_for_delivery')} onPickedUp={setPickupOrder} />
                                             </td>
                                         </tr>
                                     ))}
@@ -501,6 +523,8 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                 </AlertDialogContent>
             </AlertDialog>
 
+            <CompletePickupDialog order={pickupOrder} onClose={() => setPickupOrder(null)} />
+
             {/* ── Assign Rider Dialog ── */}
             <AlertDialog open={dialog?.type === 'assign_rider'} onOpenChange={(open) => !open && setDialog(null)}>
                 <AlertDialogContent>
@@ -552,13 +576,16 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 }
 
 function OrderActions({
-    order, riders, tab, onOpen,
+    order, riders, tab, onOpen, onReady, onPickedUp,
 }: {
     order:  Order;
     riders: Rider[];
     tab:    string;
     onOpen: (d: ActionDialog) => void;
+    onReady: (o: Order) => void;
+    onPickedUp: (o: Order) => void;
 }) {
+    const isPickup = order.fulfillment === 'pickup';
     const isFinal = ['delivered', 'cancelled'].includes(order.status);
     const awaitingDownPayment = order.payment_mode === 'consignment' && order.payment_status === 'unpaid';
 
@@ -597,7 +624,7 @@ function OrderActions({
                             Prepare
                         </Button>
                     )}
-                    {order.status === 'preparing' && (
+                    {!isPickup && order.status === 'preparing' && (
                         <Button size="sm"
                             className="h-7 px-2.5 text-xs bg-purple-600 hover:bg-purple-700 text-white gap-1"
                             onClick={() => onOpen({ type: 'assign_rider', order })}>
@@ -605,7 +632,25 @@ function OrderActions({
                             Assign
                         </Button>
                     )}
-                    {order.status !== 'out_for_delivery' && (
+                    {/* Pick-up: Ready for pick-up → Mark picked up (no rider) */}
+                    {isPickup && ['confirmed', 'preparing'].includes(order.status) && (
+                        <Button size="sm"
+                            className="h-7 px-2.5 text-xs bg-orange-500 hover:bg-orange-600 text-white gap-1"
+                            onClick={() => onReady(order)}>
+                            <Package className="h-3 w-3" />
+                            Ready for pick-up
+                        </Button>
+                    )}
+                    {isPickup && order.status === 'out_for_delivery' && (
+                        <Button size="sm"
+                            className="h-7 px-2.5 text-xs bg-green-600 hover:bg-green-700 text-white gap-1"
+                            onClick={() => onPickedUp(order)}>
+                            <CheckCircle className="h-3 w-3" />
+                            Mark picked up
+                        </Button>
+                    )}
+                    {/* Pick-up orders can still be cancelled when ready (no-show) */}
+                    {(order.status !== 'out_for_delivery' || isPickup) && (
                         <Button size="sm" variant="outline"
                             className="h-7 px-2.5 text-xs text-red-600 border-red-300 hover:bg-red-50 gap-1"
                             onClick={() => onOpen({ type: 'cancel', order })}>

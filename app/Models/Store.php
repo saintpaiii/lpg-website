@@ -51,6 +51,8 @@ class Store extends Model
         'max_delivery_radius_km',
         'allow_cod',
         'allow_consignment',
+        'allow_pickup',
+        'pickup_instructions',
         'min_down_payment_percent',
         'consignment_due_days',
         'business_permit_expires_at',
@@ -86,6 +88,7 @@ class Store extends Model
             'documents_suspended_at'     => 'datetime',
             'allow_cod'                => 'boolean',
             'allow_consignment'        => 'boolean',
+            'allow_pickup'             => 'boolean',
             'min_down_payment_percent' => 'integer',
             'consignment_due_days'     => 'integer',
         ];

@@ -30,6 +30,10 @@ class DeliveryController extends Controller
                 'order_number'     => $d->order->order_number,
                 'status'           => $d->order->status,
                 'total_amount'     => (float) $d->order->total_amount,
+                // Refill: send empty_tanks_collected=true with status=delivered
+                'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
+                'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,
+                'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,
                 'transaction_type' => $d->order->transaction_type,
                 'payment_method'   => $d->order->payment_method,
                 'payment_status'   => $d->order->payment_status,
@@ -152,8 +156,10 @@ class DeliveryController extends Controller
 
         $data = $request->validate([
             'status' => 'required|in:picked_up,in_transit,delivered,failed',
-            'notes'  => 'nullable|string|max:500',
-        ]);
+            'empty_tanks_collected' => 'nullable|boolean',
+            // fail_reason (incl. no_empty_tank), redelivery range, notes (required for "other")
+            ...Delivery::failureRules($request),
+        ], Delivery::failureMessages());
 
         $newStatus = $data['status'];
 
@@ -166,8 +172,9 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'Cannot change status of a completed delivery.'], 422);
         }
 
-        if ($newStatus === 'failed' && empty($data['notes'])) {
-            return response()->json(['message' => 'Notes are required when marking a delivery as failed.'], 422);
+        // Refill: the empty tanks must be collected (JSON 422 "Confirm the empty tank(s) were collected.")
+        if ($newStatus === 'delivered' && $delivery->order) {
+            $delivery->order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, $user->id);
         }
 
         // Riders follow strict progression; admins can jump
@@ -202,6 +209,7 @@ class DeliveryController extends Controller
             }
 
             if ($newStatus === 'failed') {
+                $updates += Delivery::failureUpdates($data);
                 $delivery->order?->update(['status' => 'preparing']);
             }
 
@@ -230,6 +238,9 @@ class DeliveryController extends Controller
         ]);
 
         $order = Order::findOrFail($data['order_id']);
+        if ($order->isPickup()) {
+            return response()->json(['message' => "Pick-up orders don't need a rider."], 422);
+        }
 
         // Riders need an approved, unexpired driver's license
         if (($rider = \App\Models\User::find($data['rider_id'])) && ($why = \App\Services\StaffDocumentService::assignmentError($rider))) {

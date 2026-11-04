@@ -48,6 +48,10 @@ class Order extends Model
         'delivery_city',
         'delivery_distance_km',
         'estimated_delivery_minutes',
+        'fulfillment',
+        'empty_tanks_required',
+        'empty_tanks_collected_at',
+        'empty_tanks_collected_by',
     ];
 
     protected function casts(): array
@@ -70,6 +74,8 @@ class Order extends Model
             'delivery_longitude'          => 'decimal:7',
             'delivery_distance_km'        => 'decimal:2',
             'estimated_delivery_minutes'  => 'integer',
+            'empty_tanks_required'        => 'integer',
+            'empty_tanks_collected_at'    => 'datetime',
         ];
     }
 
@@ -91,11 +97,75 @@ class Order extends Model
      */
     public function deliveryAddressParts(): array
     {
+        // Picked up at the store: there is no delivery address (never fall back to the profile address)
+        if ($this->isPickup()) {
+            return ['address' => null, 'barangay' => null, 'city' => null];
+        }
         if ($this->delivery_address) {
             return ['address' => $this->delivery_address, 'barangay' => $this->delivery_barangay, 'city' => $this->delivery_city];
         }
 
         return ['address' => $this->customer?->address, 'barangay' => $this->customer?->barangay, 'city' => $this->customer?->city];
+    }
+
+    // ── Pick-up & empty-tank exchange ─────────────────────────────────────────
+
+    public function isPickup(): bool
+    {
+        return $this->fulfillment === 'pickup';
+    }
+
+    /** Status shown to people: pick-up orders say "Ready for pick-up" / "Picked up". */
+    public function statusLabel(): string
+    {
+        if ($this->isPickup() && $this->status === 'out_for_delivery') {
+            return 'Ready for pick-up';
+        }
+        if ($this->isPickup() && $this->status === 'delivered') {
+            return 'Picked up';
+        }
+
+        return ucwords(str_replace('_', ' ', (string) $this->status));
+    }
+
+    /** Refill items grouped by tank size: "2 × 11 kg, 1 × 2.7 kg" (tanks only). */
+    public function emptyTankSummary(): string
+    {
+        $items = $this->relationLoaded('items') ? $this->items : $this->items()->with('product')->get();
+        $bySize = [];
+        foreach ($items as $item) {
+            $type = $item->transaction_type ?? $this->transaction_type;
+            if ($type !== 'refill' || ! $item->product || (float) $item->product->weight_kg <= 0) {
+                continue;
+            }
+            $size = $item->product->weight ?: \App\Support\LpgSize::label((float) $item->product->weight_kg);
+            $bySize[$size] = ($bySize[$size] ?? 0) + (int) $item->quantity;
+        }
+
+        return collect($bySize)->map(fn ($n, $size) => "{$n} × {$size}")->implode(', ');
+    }
+
+    public function needsEmptyTanks(): bool
+    {
+        return (int) $this->empty_tanks_required > 0 && $this->empty_tanks_collected_at === null;
+    }
+
+    /**
+     * Every "delivered / picked up" path calls this: the empty tanks of a refill must be confirmed as collected.
+     *
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    public function assertEmptyTanksCollected(?bool $flag, int $userId): void
+    {
+        if (! $this->needsEmptyTanks()) {
+            return;
+        }
+        if ($flag !== true) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'empty_tanks_collected' => 'Confirm the empty tank(s) were collected.',
+            ]);
+        }
+        $this->forceFill(['empty_tanks_collected_at' => now(), 'empty_tanks_collected_by' => $userId])->save();
     }
 
     /** "Street, Barangay, City" for the delivery address. */

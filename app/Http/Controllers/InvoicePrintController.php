@@ -47,13 +47,15 @@ class InvoicePrintController extends Controller
                 'customer'       => $invoice->customer ? [
                     'name'     => $invoice->customer->name,
                     'phone'    => $invoice->customer->phone,
-                    'address'  => $invoice->customer->address,
-                    'city'     => $invoice->customer->city,
-                    'barangay' => $invoice->customer->barangay,
+                    // Pick-up orders have no delivery address
+                    'address'  => $invoice->order?->isPickup() ? 'Pick-up at the store' : $invoice->customer->address,
+                    'city'     => $invoice->order?->isPickup() ? null : $invoice->customer->city,
+                    'barangay' => $invoice->order?->isPickup() ? null : $invoice->customer->barangay,
                 ] : null,
                 'order' => $invoice->order ? [
                     'order_number'     => $invoice->order->order_number,
                     'status'           => $invoice->order->status,
+                    'fulfillment'      => $invoice->order->fulfillment ?? 'delivery',
                     'transaction_type' => $invoice->order->transaction_type,
                     'ordered_at'       => $invoice->order->ordered_at?->format('M d, Y g:i A'),
                     'delivered_at'     => $invoice->order->delivered_at?->format('M d, Y g:i A'),

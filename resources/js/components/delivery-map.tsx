@@ -23,6 +23,10 @@ export type RouteStop = {
     amount: number;
     payment_label: string;
     amount_to_collect: number;
+    /** Refill: empty tanks to collect before Delivered */
+    empty_tanks_required?: number;
+    empty_tank_summary?: string | null;
+    empty_tanks_collected?: boolean;
 };
 
 export type RouteData = {
@@ -195,6 +199,9 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
                                             {peso(s.amount)} ({s.payment_label})
                                             {s.amount_to_collect > 0 && <span className="font-semibold text-amber-700"> · collect {peso(s.amount_to_collect)}</span>}
                                         </p>
+                                        {!!s.empty_tanks_required && !s.empty_tanks_collected && (
+                                            <p className="text-xs font-semibold text-amber-700">♻ Collect {s.empty_tank_summary} empty</p>
+                                        )}
                                         <p className="text-xs">
                                             Status: <span className="font-semibold" style={{ color: st.color }}>{s.status === 'delivered' ? '✓ ' : s.status === 'failed' ? '✕ ' : ''}{st.label}</span>
                                         </p>

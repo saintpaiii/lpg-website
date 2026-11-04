@@ -45,6 +45,12 @@ class OrderController extends Controller
             'id'               => $o->id,
             'order_number'     => $o->order_number,
             'status'           => $o->status,
+            'status_label'     => $o->statusLabel(),
+            'fulfillment'      => $o->fulfillment ?? 'delivery',
+            'empty_tanks_required'  => (int) $o->empty_tanks_required,
+            'empty_tanks_collected' => $o->empty_tanks_collected_at !== null,
+            'empty_tank_summary'    => (int) $o->empty_tanks_required > 0 ? $o->emptyTankSummary() : null,
+            'grand_total'      => $o->grandTotal(),
             'transaction_type' => $o->transaction_type,
             'total_amount'     => (float) $o->total_amount,
             'payment_method'      => $o->payment_method,
@@ -110,6 +116,10 @@ class OrderController extends Controller
         if ($status = $request->input('status')) {
             $query->where('status', $status);
         }
+        // Delivery / pick-up
+        if (in_array($fulfillment = $request->input('fulfillment'), ['delivery', 'pickup'], true)) {
+            $query->where('fulfillment', $fulfillment);
+        }
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
@@ -163,7 +173,7 @@ class OrderController extends Controller
             'orders'  => $orders,
             'tab'     => $tab,
             'counts'  => $counts,
-            'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to', 'balance'),
+            'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to', 'balance', 'fulfillment'),
             'riders'  => $riders,
             'since'   => \App\Services\SectionVisitService::sinceIso($request),
         ]);
@@ -214,7 +224,7 @@ class OrderController extends Controller
             'order_number'     => $o->order_number,
             'customer_name'    => $o->customer?->name ?? '—',
             'created_at'       => $o->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
-            'status'           => str_replace('_', ' ', $o->status),
+            'status'           => $o->statusLabel() . ($o->isPickup() ? ' (pick-up)' : ''),
             'transaction_type' => $o->transaction_type ?? '—',
             'payment_method'   => $o->payment_method ?? '—',
             'payment_status'   => $o->payment_status,
@@ -279,6 +289,7 @@ class OrderController extends Controller
         $data = $request->validate([
             'customer_id'        => 'required|exists:customers,id',
             'transaction_type'   => 'required|in:refill,new_purchase',
+            'fulfillment'        => 'nullable|in:delivery,pickup',
             'payment_method'     => 'required|in:cash,gcash,bank_transfer,maya',
             'payment_status'     => 'required|in:unpaid,paid,partial',
             'notes'              => 'nullable|string|max:1000',
@@ -326,14 +337,18 @@ class OrderController extends Controller
                 'notes'            => $data['notes'] ?? null,
                 'ordered_at'       => now(),
                 'created_by'       => auth()->id(),
+                // Delivery, or pick-up / walk-in at the counter
+                'fulfillment'          => $data['fulfillment'] ?? 'delivery',
+                'empty_tanks_required' => $data['transaction_type'] === 'refill' ? (int) collect($lineItems)->sum('quantity') : 0,
             ]);
 
             foreach ($lineItems as $line) {
                 $order->items()->create([
-                    'product_id' => $line['product']->id,
-                    'quantity'   => $line['quantity'],
-                    'unit_price' => $line['unit_price'],
-                    'subtotal'   => $line['subtotal'],
+                    'product_id'       => $line['product']->id,
+                    'quantity'         => $line['quantity'],
+                    'unit_price'       => $line['unit_price'],
+                    'subtotal'         => $line['subtotal'],
+                    'transaction_type' => $data['transaction_type'],
                 ]);
             }
 
@@ -411,6 +426,9 @@ class OrderController extends Controller
             'status'              => 'required|in:pending,confirmed,preparing,out_for_delivery,delivered,cancelled',
             'cancellation_reason' => 'required_if:status,cancelled|nullable|string|max:255',
             'cancellation_notes'  => 'nullable|string|max:1000',
+            // "Mark as delivered / picked up": empty tanks received, cash received at the store
+            'empty_tanks_collected' => 'nullable|boolean',
+            'cash_paid'             => 'nullable|boolean',
         ]);
 
         $newStatus = $data['status'];
@@ -420,6 +438,28 @@ class OrderController extends Controller
             return back()->with('error', "Cannot change status of a {$oldStatus} order.");
         }
 
+        // Pick-up orders: Confirm → Preparing → Ready (out_for_delivery) → Picked up (delivered), no skipping
+        // (pending → confirmed deducts the stock and creates the invoice)
+        $cashAtStore = false;
+        if ($order->isPickup()) {
+            if ($newStatus === 'out_for_delivery' && ! in_array($oldStatus, ['confirmed', 'preparing'], true)) {
+                return back()->with('error', 'Confirm the order before marking it ready for pick-up.');
+            }
+            if ($newStatus === 'delivered') {
+                if ($oldStatus !== 'out_for_delivery') {
+                    return back()->with('error', 'Mark the order "Ready for pick-up" before marking it picked up.');
+                }
+                $paidEnough = $order->payment_status === 'paid'
+                    || ($order->payment_mode === 'consignment' && $order->payment_status === 'partial');
+                if (! $paidEnough) {
+                    if ($order->payment_mode === 'consignment' || ! $request->boolean('cash_paid')) {
+                        return back()->with('error', "Record the customer's payment first.");
+                    }
+                    $cashAtStore = true;
+                }
+            }
+        }
+
         // Consignment orders may proceed once the down payment is in (partial),
         // but not before the customer has paid anything.
         if ($newStatus === 'confirmed' && $oldStatus === 'pending'
@@ -427,7 +467,12 @@ class OrderController extends Controller
             return back()->with('error', 'Cannot confirm this consignment order until the customer pays the down payment.');
         }
 
-        DB::transaction(function () use ($order, $newStatus, $oldStatus, $store) {
+        DB::transaction(function () use ($order, $newStatus, $oldStatus, $store, $request, $cashAtStore) {
+            // Refill: the empty tanks must be received before delivered / picked up
+            if ($newStatus === 'delivered') {
+                $order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, auth()->id());
+            }
+
             if ($newStatus === 'confirmed' && $oldStatus === 'pending') {
                 $order->load('items.product.inventory');
 
@@ -514,8 +559,22 @@ class OrderController extends Controller
 
             if ($newStatus === 'delivered') {
                 OrderPaymentService::handleDelivered($order->fresh());
+                // Paid in cash at the store (same as the rider's collectPayment)
+                if ($cashAtStore) {
+                    OrderPaymentService::markPaid($order->fresh(), 'cash');
+                }
             }
         });
+
+        if ($cashAtStore) {
+            NotificationService::sendToStore(
+                $order->store_id,
+                'payment',
+                'Cash Payment Recorded',
+                auth()->user()->name . ' recorded ₱' . number_format($order->fresh()->grandTotal(), 2) . " cash for pick-up order {$order->order_number}.",
+                ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
+            );
+        }
 
         // Notify customer on meaningful status changes
         $order->loadMissing('customer');
@@ -528,14 +587,20 @@ class OrderController extends Controller
                 'delivered'        => ['Your order has been delivered!',     "Order {$order->order_number} has been successfully delivered."],
                 'cancelled'        => ['Your order has been cancelled',      "Order {$order->order_number} was cancelled by the store."],
             ];
+            if ($order->isPickup()) {
+                $bring = $order->needsEmptyTanks() ? ' Please bring ' . $order->emptyTankSummary() . ' empty tank(s).' : '';
+                $statusNotifs['out_for_delivery'] = ['Your order is ready for pick-up!',
+                    trim("Order {$order->order_number} is ready at {$store->store_name}. " . ($store->pickup_instructions ?? '')) . $bring];
+                $statusNotifs['delivered'] = ['Order picked up', "Order {$order->order_number} was picked up. Thank you!"];
+            }
             if (isset($statusNotifs[$newStatus])) {
                 [$title, $message] = $statusNotifs[$newStatus];
                 NotificationService::send($customerUserId, 'order_update', $title, $message, ['order_id' => $order->id, 'order_number' => $order->order_number]);
             }
         }
 
-        $label = str_replace('_', ' ', $newStatus);
-        return back()->with('success', "Order {$order->order_number} marked as " . ucfirst($label) . '.');
+        $label = $order->fresh()->statusLabel();
+        return back()->with('success', "Order {$order->order_number} marked as {$label}" . ($cashAtStore ? ' — cash payment recorded.' : '.'));
     }
 
     public function markRefunded(Order $order): RedirectResponse
@@ -592,6 +657,11 @@ class OrderController extends Controller
             'rider_id'    => 'required|integer|exists:users,id',
         ]);
 
+        // Pick-up orders never get a rider (checked before anything about the rider)
+        if ($bad = Order::whereIn('id', $data['order_ids'])->where('store_id', $store->id)->where('fulfillment', 'pickup')->first()) {
+            return back()->with('error', "Order {$bad->order_number}: Pick-up orders don't need a rider.");
+        }
+
         $rider = User::where('id', $data['rider_id'])
             ->where('store_id', $store->id)
             ->where('sub_role', 'rider')
@@ -609,6 +679,9 @@ class OrderController extends Controller
 
         if ($orders->count() !== count($data['order_ids'])) {
             return back()->with('error', 'Some selected orders do not belong to your store.');
+        }
+        if ($bad = $orders->first(fn ($o) => $o->isPickup())) {
+            return back()->with('error', "Order {$bad->order_number}: Pick-up orders don't need a rider.");
         }
         if ($bad = $orders->first(fn ($o) => ! in_array($o->status, ['confirmed', 'preparing']))) {
             return back()->with('error', "Order {$bad->order_number} is " . str_replace('_', ' ', $bad->status) . ' — only confirmed or preparing orders can be batched.');
@@ -665,6 +738,10 @@ class OrderController extends Controller
     {
         $store = request()->attributes->get('seller_store');
         if ($order->store_id !== $store->id) abort(403);
+
+        if ($order->isPickup()) {
+            return back()->with('error', "Pick-up orders don't need a rider.");
+        }
 
         $data = $request->validate([
             'rider_id' => 'required|exists:users,id',

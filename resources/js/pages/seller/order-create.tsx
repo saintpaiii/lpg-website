@@ -146,6 +146,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
     const { data, setData, post, processing, errors } = useForm<{
         customer_id:      string;
         transaction_type: 'refill' | 'new_purchase';
+        fulfillment:      'delivery' | 'pickup';
         payment_method:   string;
         payment_status:   'unpaid' | 'paid' | 'partial';
         notes:            string;
@@ -153,6 +154,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
     }>({
         customer_id:      '',
         transaction_type: 'refill',
+        fulfillment:      'delivery',
         payment_method:   'cash',
         payment_status:   'unpaid',
         notes:            '',
@@ -240,6 +242,18 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                     <Card>
                         <CardHeader className="pb-3"><CardTitle className="text-base">Order Details</CardTitle></CardHeader>
                         <CardContent className="grid gap-4">
+                            {/* Delivery, or pick-up / walk-in at the counter (no rider) */}
+                            <div className="grid gap-1.5">
+                                <Label>Fulfillment</Label>
+                                <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:max-w-md">
+                                    {([['delivery', 'Delivery'], ['pickup', 'Pick-up / walk-in']] as const).map(([value, label]) => (
+                                        <button key={value} type="button" onClick={() => setData('fulfillment', value)}
+                                            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${data.fulfillment === value ? 'bg-background text-blue-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="grid gap-1.5">
                                     <Label>Transaction Type <span className="text-red-500">*</span></Label>

@@ -58,6 +58,10 @@ class DeliveryController extends Controller
                     'customer'     => $d->order->customer?->name ?? '—',
                     'address'      => $d->order->deliveryAddressText() ?: '—',
                     'total_amount' => (float) $d->order->total_amount,
+                    // Refill: empty tanks the rider must collect
+                    'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
+                    'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,
+                    'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,
                 ] : null,
                 'rider'   => $d->rider ? ['id' => $d->rider->id, 'name' => $d->rider->name, 'phone' => $d->rider->phone] : null,
                 'vehicle' => $d->vehicle ? [
@@ -107,6 +111,7 @@ class DeliveryController extends Controller
         // Orders needing assignment (confirmed/preparing, no delivery yet or the last attempt failed)
         $unassigned = Order::where('store_id', $store->id)
             ->whereIn('status', ['confirmed', 'preparing'])
+            ->where('fulfillment', 'delivery')   // pick-up orders don't need a rider
             ->where(fn ($q) => $q->whereDoesntHave('delivery')
                 ->orWhereHas('delivery', fn ($d) => $d->where('status', 'failed')))
             ->with(['customer', 'delivery'])
@@ -154,6 +159,9 @@ class DeliveryController extends Controller
 
         $order = Order::where('id', $data['order_id'])->where('store_id', $store->id)
             ->with('items.product')->firstOrFail();
+        if ($order->isPickup()) {
+            return back()->with('error', "Pick-up orders don't need a rider.");
+        }
         $rider = User::where('id', $data['rider_id'])->where('store_id', $store->id)->where('sub_role', 'rider')->firstOrFail();
         // Riders need an approved, unexpired driver's license
         if ($why = \App\Services\StaffDocumentService::assignmentError($rider)) {
@@ -235,8 +243,14 @@ class DeliveryController extends Controller
         $data = $request->validate([
             'status' => 'required|in:assigned,picked_up,in_transit,delivered,failed',
             'notes'  => 'nullable|string|max:500',
+            'empty_tanks_collected' => 'nullable|boolean',
             ...Delivery::failureRules($request),
         ], Delivery::failureMessages());
+
+        // Refill: the empty tanks must be collected before Delivered
+        if ($data['status'] === 'delivered' && $delivery->order) {
+            $delivery->order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, $delivery->rider_id ?? auth()->id());
+        }
 
         // Moving a delivery out of 'assigned' (picked up / on the way / delivered) needs a rider who can deliver
         if ($delivery->status === 'assigned' && in_array($data['status'], ['picked_up', 'in_transit', 'delivered'], true)

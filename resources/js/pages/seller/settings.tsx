@@ -53,6 +53,8 @@ interface StoreData {
     allow_consignment: boolean;
     min_down_payment_percent: number;
     consignment_due_days: number;
+    allow_pickup: boolean;
+    pickup_instructions: string;
 }
 
 interface Props {
@@ -195,6 +197,8 @@ export default function SellerSettings({ store }: Props) {
         allow_consignment: boolean;
         min_down_payment_percent: string;
         consignment_due_days: string;
+        allow_pickup: boolean;
+        pickup_instructions: string;
         logo: File | null;
     }>({
         store_name:   store.store_name,
@@ -213,6 +217,8 @@ export default function SellerSettings({ store }: Props) {
         allow_consignment:        store.allow_consignment,
         min_down_payment_percent: String(store.min_down_payment_percent ?? 50),
         consignment_due_days:     String(store.consignment_due_days ?? 7),
+        allow_pickup:             !!store.allow_pickup,
+        pickup_instructions:      store.pickup_instructions ?? '',
         logo:                   null,
     });
 
@@ -253,6 +259,8 @@ export default function SellerSettings({ store }: Props) {
         fd.append('allow_consignment',        data.allow_consignment ? '1' : '0');
         fd.append('min_down_payment_percent', data.min_down_payment_percent || '50');
         fd.append('consignment_due_days',     data.consignment_due_days || '7');
+        fd.append('allow_pickup',             data.allow_pickup ? '1' : '0');
+        fd.append('pickup_instructions',      data.pickup_instructions);
         // Location fields — sent as numeric strings or empty (→ null on backend)
         fd.append('latitude',          pin ? String(pin.lat) : '');
         fd.append('longitude',         pin ? String(pin.lng) : '');
@@ -505,6 +513,43 @@ export default function SellerSettings({ store }: Props) {
                                         <p className="text-xs text-muted-foreground">Customers get a reminder 2 days before.</p>
                                         {allErrors.consignment_due_days && <p className="text-xs text-red-500">{allErrors.consignment_due_days}</p>}
                                     </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Pick-up */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Store className="h-4 w-4 text-blue-600" />
+                                Pick-up
+                            </CardTitle>
+                            <CardDescription>
+                                Customers can choose to pick up their order at your store — no delivery fee and no rider.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <ToggleRow
+                                label="Allow customers to pick up orders at the store"
+                                hint="Shown at checkout as “Pick up at the store”. Cash on Delivery becomes “Pay at the store”."
+                                checked={data.allow_pickup}
+                                onChange={(v) => setData('allow_pickup', v)}
+                            />
+                            {data.allow_pickup && (
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="pickup_instructions">Pick-up instructions</Label>
+                                    <textarea
+                                        id="pickup_instructions"
+                                        rows={2}
+                                        maxLength={255}
+                                        value={data.pickup_instructions}
+                                        onChange={(e) => setData('pickup_instructions', e.target.value)}
+                                        placeholder="e.g. Open 8 AM – 6 PM. Please bring your empty tank."
+                                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+                                    />
+                                    <p className="text-xs text-muted-foreground">{data.pickup_instructions.length}/255 · Shown to the customer at checkout and when the order is ready.</p>
+                                    {allErrors.pickup_instructions && <p className="text-xs text-red-500">{allErrors.pickup_instructions}</p>}
                                 </div>
                             )}
                         </CardContent>
