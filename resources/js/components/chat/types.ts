@@ -56,6 +56,8 @@ export type ChatMessage = {
     body: string | null;
     attachment_url: string | null;
     order: { id: number; order_number: string | null } | null;
+    /** Store's pick-up message: location card that opens our map & route on the order page */
+    pickup_card?: { store_name: string; address: string; lat: number | null; lng: number | null; google_url: string; active: boolean } | null;
     created_at: string | null;
     /** Client-only: optimistic send state */
     status?: 'sending' | 'failed';

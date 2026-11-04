@@ -452,7 +452,42 @@ class ChatService
             'body'            => $m->body,
             'attachment_url'  => $m->attachment_url,
             'order'           => $m->order_id ? ['id' => $m->order_id, 'order_number' => $m->order?->order_number] : null,
+            'pickup_card'     => static::pickupCard($m),
             'created_at'      => $m->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Location card for the store's pick-up messages ("Pick-up location" on the thank-you of a customer's checkout order,
+     * and "ready for pick-up"): opens our map & route on the order page. Null for every other message.
+     */
+    private static function pickupCard(ConversationMessage $m): ?array
+    {
+        $order = $m->order;
+        if (! $m->is_automatic || ! $order || $order->fulfillment !== 'pickup') {
+            return null;
+        }
+        $isLocationMessage = $m->auto_kind === 'order_out_for_delivery'
+            || ($m->auto_kind === 'order_created' && str_contains((string) $m->body, 'Pick-up location'));   // walk-in orders have none
+        if (! $isLocationMessage) {
+            return null;
+        }
+
+        $store   = $order->store;
+        $address = collect([$store?->address, $store?->barangay, $store?->city])->filter()->implode(', ');
+        $lat = (float) ($store?->latitude ?? 0);
+        $lng = (float) ($store?->longitude ?? 0);   // decimal casts are strings like "0.0000000"
+        $hasPin = $lat != 0.0 && $lng != 0.0;
+
+        return [
+            'store_name' => $store?->store_name ?? 'Store',
+            'address'    => $address,
+            'lat'        => $hasPin ? $lat : null,
+            'lng'        => $hasPin ? $lng : null,
+            'google_url' => $hasPin
+                ? "https://www.google.com/maps/dir/?api=1&destination={$lat},{$lng}&travelmode=driving"
+                : 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address),
+            'active'     => ! in_array($order->status, ['delivered', 'cancelled'], true),
         ];
     }
 
@@ -593,7 +628,7 @@ class ChatService
             return;
         }
         try {
-            $m->loadMissing(['sender:id,name,first_name,last_name', 'order:id,order_number']);
+            $m->loadMissing(['sender:id,name,first_name,last_name', 'order:id,order_number,fulfillment,store_id,status', 'order.store:id,store_name,address,barangay,city,latitude,longitude']);
             $payload  = static::formatMessage($m, $c->store?->store_name);
             $channels = ["conversation.{$c->id}"];
             $participants = static::participants($c);

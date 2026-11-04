@@ -116,20 +116,15 @@ class Order extends Model
     }
 
     /**
-     * Pick-up location block for chat messages: store + address, a Google Maps link (directions when the store
-     * has a pin, else a search by address), the store's instructions and the empty tanks to bring.
+     * Pick-up location block for chat messages: store + address, the store's instructions and the empty tanks to
+     * bring. The chat adds a location card (ChatService::pickupCard) that opens the map & route on the order page.
      */
     public function pickupLocationText(): string
     {
         $store   = $this->store;
         $address = collect([$store?->address, $store?->barangay, $store?->city])->filter()->implode(', ');
-        $lat = (float) ($store?->latitude ?? 0);
-        $lng = (float) ($store?->longitude ?? 0);   // decimal casts are strings like "0.0000000"
-        $link = $lat != 0.0 && $lng != 0.0
-            ? "https://www.google.com/maps/dir/?api=1&destination={$lat},{$lng}"
-            : 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address);
-
-        $text = "📍 " . ($store?->store_name ?? 'Store') . ($address !== '' ? ", {$address}" : '') . "\nDirections: {$link}";
+        // The chat shows a location card that opens our map & route (no raw Google link in the text)
+        $text = "📍 " . ($store?->store_name ?? 'Store') . ($address !== '' ? ", {$address}" : '');
         if ($store?->pickup_instructions) {
             $text .= "\n{$store->pickup_instructions}";
         }

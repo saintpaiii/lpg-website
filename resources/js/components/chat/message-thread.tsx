@@ -10,6 +10,7 @@ import type { SharedData } from '@/types';
 import { Avatar } from './conversation-list';
 import { dayKey, dayLabel, timeOf } from './format';
 import type { ChatMessage, ChatPortal, ConversationHeader } from './types';
+import PickupLocationCard from './pickup-location-card';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const NEAR_BOTTOM_PX = 120;
@@ -408,6 +409,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                                                     </button>
                                                 )}
                                                 {m.body && <p className="whitespace-pre-wrap break-words"><Linkified text={m.body} /></p>}
+                                                {m.pickup_card && m.order && <PickupLocationCard card={m.pickup_card} orderId={m.order.id} portal={portal} />}
                                                 {orderChip}
                                             </div>
                                             <span className="mt-0.5 px-1 text-[10px] text-gray-400">

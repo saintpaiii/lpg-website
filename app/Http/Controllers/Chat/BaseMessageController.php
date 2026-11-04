@@ -141,7 +141,7 @@ abstract class BaseMessageController extends Controller
     protected function messageQuery(Request $request, Conversation $conversation)
     {
         return ChatService::visibleMessages(
-            $conversation->messages()->getQuery()->with(['sender:id,name,first_name,last_name', 'order:id,order_number']),
+            $conversation->messages()->getQuery()->with(['sender:id,name,first_name,last_name', 'order:id,order_number,fulfillment,store_id,status', 'order.store:id,store_name,address,barangay,city,latitude,longitude']),
             $conversation, $request->user(),
         );
     }
@@ -153,7 +153,7 @@ abstract class BaseMessageController extends Controller
 
     protected function format(ConversationMessage $m, Conversation $c): array
     {
-        return ChatService::formatMessage($m->loadMissing(['sender:id,name,first_name,last_name', 'order:id,order_number']), $c->store?->store_name);
+        return ChatService::formatMessage($m->loadMissing(['sender:id,name,first_name,last_name', 'order:id,order_number,fulfillment,store_id,status', 'order.store:id,store_name,address,barangay,city,latitude,longitude']), $c->store?->store_name);
     }
 
     protected function header(Request $request, Conversation $c): array

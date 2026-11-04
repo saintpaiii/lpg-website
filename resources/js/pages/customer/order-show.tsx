@@ -313,6 +313,13 @@ function peso(n: number) {
 }
 
 export default function OrderShow({ order, breakdown }: Props & { breakdown: PriceBreakdown }) {
+    // From the chat's "View map & route" (#pickup-map): scroll to the pick-up map once, on mount
+    useEffect(() => {
+        if (typeof window === 'undefined' || window.location.hash !== '#pickup-map') return;
+        const t = window.setTimeout(() => document.getElementById('pickup-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+        return () => window.clearTimeout(t);
+    }, []);
+
     // Live: this order's status / delivery changes reload the page data
     const meId = usePage<SharedData>().props.auth.user.id as number;
     useLiveReload(`user.${meId}`, ['order', 'breakdown'], (e) => e.order_id === order.id,
@@ -615,7 +622,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         )}
                         {/* Pick-up at the store: where to go (no rider tracking) */}
                         {order.fulfillment === 'pickup' && order.pickup && !['delivered', 'cancelled'].includes(order.status) && (
-                            <div className="mt-4 space-y-2">
+                            <div id="pickup-map" className="mt-4 scroll-mt-20 space-y-2">
                                 {order.status === 'out_for_delivery' && (
                                     <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">Your order is ready for pick-up.</p>
                                 )}
@@ -632,7 +639,7 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                         )}
                         {/* Picked up: just where it was */}
                         {order.fulfillment === 'pickup' && order.pickup && order.status === 'delivered' && (
-                            <p className="mt-4 text-sm text-muted-foreground">
+                            <p id="pickup-map" className="mt-4 scroll-mt-20 text-sm text-muted-foreground">
                                 Picked up at {order.store_name} — {[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}
                             </p>
                         )}
