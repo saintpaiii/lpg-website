@@ -91,8 +91,30 @@ export async function routeSegment(from: LatLng, to: LatLng, signal?: AbortSigna
     return (await fetchRoute([from, to], signal)).coords;
 }
 
-export const googleMapsDirections = (lat: number, lng: number) =>
-    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+/**
+ * Google Maps directions to a point. Without an origin Google starts from the device location.
+ * (Optional: our own map shows the route first — Google may miss local shortcuts.)
+ */
+export const googleMapsDirections = (lat: number, lng: number, origin?: LatLng | null, mode: 'driving' | 'walking' = 'driving') =>
+    `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=${mode}`
+    + (origin ? `&origin=${origin[0]},${origin[1]}` : '');
+
+/**
+ * Straight-line distance in km. Delivery fees use it — must stay identical to App\Services\DeliveryFeeService
+ * (the fee rounds up to the next ₱5, so even tiny differences could change a fee).
+ */
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** "350 m" under 1 km (nearest 10 m), else "1.2 km". */
+export function formatDistance(km: number): string {
+    return km < 1 ? `${Math.max(10, Math.round((km * 1000) / 10) * 10)} m` : `${km.toFixed(1)} km`;
+}
 
 // ── Service area: map pan limit (a rectangle around Cavite) — the real rule is isInServiceArea() below ──
 export const SERVICE_AREA = { south: 14.0, north: 14.6, west: 120.5, east: 121.15 } as const;

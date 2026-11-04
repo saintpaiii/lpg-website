@@ -44,7 +44,12 @@ type Order = {
     status: string;
     fulfillment?: 'delivery' | 'pickup';
     /** Pick-up at the store: where + instructions */
-    pickup?: { address: string | null; barangay: string | null; city: string | null; lat: number | null; lng: number | null; instructions: string | null } | null;
+    pickup?: {
+        address: string | null; barangay: string | null; city: string | null; lat: number | null; lng: number | null; instructions: string | null;
+        /** The customer's default address — the route starts here */
+        from?: [number, number] | null;
+        from_approximate?: boolean;
+    } | null;
     /** Refill: empty tanks still to hand over */
     empty_tanks_needed?: boolean;
     empty_tank_summary?: string | null;
@@ -620,6 +625,8 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                     lng={order.pickup.lng}
                                     address={[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}
                                     instructions={order.pickup.instructions}
+                                    from={order.pickup.from ?? null}
+                                    fromApproximate={order.pickup.from_approximate ?? false}
                                 />
                             </div>
                         )}

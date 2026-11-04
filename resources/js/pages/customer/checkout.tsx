@@ -6,7 +6,7 @@ import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
 import AddressSearchMap, { locationFromSaved, type ChangeReason, type DeliveryLocation, type SavedAddress } from '@/components/address-search-map';
-import { ACCURATE_ENOUGH_M, fetchRoute, getDeviceLocation, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon, type FilledAddress } from '@/lib/map';
+import { ACCURATE_ENOUGH_M, fetchRoute, getDeviceLocation, haversineKm, isInServiceArea, OUTSIDE_SERVICE_AREA_DEVICE, PIN_COLORS, pinIcon, type FilledAddress } from '@/lib/map';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import LocationAccuracyNotice from '@/components/location-accuracy-notice';
 import { toast } from 'sonner';
@@ -123,13 +123,6 @@ function peso(n: number) {
 /** Pins further than this from the chosen address get a non-blocking "check your pin" note. */
 const PIN_WARN_KM = 3;
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function calcFee(sg: StoreGroup, distKm: number): number {
     const base  = sg.base_delivery_fee ?? 0;
@@ -300,8 +293,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
         });
         setDistFees(newDistFees);
 
-        // OSRM route for single store only
-        if (stores.length === 1 && stores[0].store_lat && stores[0].store_lng) {
+        // OSRM route for single store only — and only for delivery (a pick-up store draws its own route on its map)
+        if (stores.length === 1 && stores[0].store_lat && stores[0].store_lng && fulfillmentOf(stores[0]) === 'delivery') {
             osrmAbortRef.current?.abort();
             const ctrl = new AbortController();
             osrmAbortRef.current = ctrl;
@@ -310,9 +303,11 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                 if (r) setOsrmRoute(r);
             });
         } else {
+            osrmAbortRef.current?.abort();
             setOsrmRoute(null);
         }
-    }, [pin?.lat, pin?.lng]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pin?.lat, pin?.lng, stores.length === 1 ? fulfillmentOf(stores[0]) : 'multi']);
 
     // A rough device reading (computer without GPS) is placed but must be confirmed before ordering
     const [gpsRoughM, setGpsRoughM] = useState<number | null>(null);
@@ -655,7 +650,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                             lng={sg.store_lng}
                                             address={formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? '')}
                                             instructions={sg.pickup_instructions}
-                                            youAreHere={pin ? [pin.lat, pin.lng] : null}
+                                            from={pin ? [pin.lat, pin.lng] : null}
+                                            fromApproximate={pinIsAuto}
                                         />
                                     </div>
                                 )}

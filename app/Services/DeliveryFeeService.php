@@ -6,7 +6,7 @@ use App\Models\Store;
 
 /**
  * Delivery fee rules used at checkout (and shown in advance by Find a Store).
- * Must stay identical to calcFee / haversineKm in resources/js/pages/customer/checkout.tsx.
+ * Must stay identical to calcFee in resources/js/pages/customer/checkout.tsx and haversineKm in resources/js/lib/map.ts.
  */
 class DeliveryFeeService
 {

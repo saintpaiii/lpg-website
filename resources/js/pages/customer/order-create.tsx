@@ -1,5 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { fetchRoute } from '@/lib/map';
+import { fetchRoute, haversineKm } from '@/lib/map';
 import { CreditCard, MapPin, Minus, Plus, ShoppingCart, Trash2, Truck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Circle, MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet';
@@ -48,14 +48,6 @@ type Props = {
 
 // ── Haversine (client-side mirror of PHP version) ──────────────────────────────
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-    const R    = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a    = Math.sin(dLat / 2) ** 2
-               + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function calcDeliveryFee(distKm: number, base: number, perKm: number): number {
     return Math.ceil((base + distKm * perKm) / 5) * 5;

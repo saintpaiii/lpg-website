@@ -503,6 +503,29 @@ class OrderController extends Controller
 
     // ── Show ──────────────────────────────────────────────────────────────────
 
+    /**
+     * Where the pick-up route starts: the customer's default saved address with coordinates, else the first saved
+     * address with coordinates (same choice as checkout). Never customers.latitude/longitude (registration pins are
+     * unreliable). 'from_approximate' = the address still sits on its barangay centre (auto-created from the profile).
+     *
+     * @return array{from: ?array{0: float, 1: float}, from_approximate: bool}
+     */
+    private function pickupStart(int $userId): array
+    {
+        $address = \App\Models\CustomerAddress::where('user_id', $userId)
+            ->orderByDesc('is_default')->orderBy('id')->get()
+            ->first(fn ($a) => (float) $a->latitude != 0.0 && (float) $a->longitude != 0.0);
+        if (! $address) {
+            return ['from' => null, 'from_approximate' => false];
+        }
+        $centre = \App\Http\Controllers\BarangayCoordinateController::addressPoint($address->city, $address->barangay);
+        $approximate = $centre !== null
+            && abs((float) $centre[0] - (float) $address->latitude) < 0.00001
+            && abs((float) $centre[1] - (float) $address->longitude) < 0.00001;
+
+        return ['from' => [(float) $address->latitude, (float) $address->longitude], 'from_approximate' => $approximate];
+    }
+
     public function show(Request $request, Order $order): Response
     {
         $customer = $this->getCustomer($request);
@@ -544,7 +567,7 @@ class OrderController extends Controller
                     'lat'          => $order->store?->latitude ? (float) $order->store->latitude : null,
                     'lng'          => $order->store?->longitude ? (float) $order->store->longitude : null,
                     'instructions' => $order->store?->pickup_instructions,
-                ] : null,
+                ] + $this->pickupStart($request->user()->id) : null,
                 // Refill: empty tanks to hand over
                 'empty_tanks_needed'  => $order->needsEmptyTanks() && ! in_array($order->status, ['delivered', 'cancelled'], true),
                 'empty_tank_summary'  => (int) $order->empty_tanks_required > 0 ? $order->emptyTankSummary() : null,
