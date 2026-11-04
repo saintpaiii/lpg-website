@@ -115,6 +115,31 @@ class Order extends Model
         return $this->fulfillment === 'pickup';
     }
 
+    /**
+     * Pick-up location block for chat messages: store + address, a Google Maps link (directions when the store
+     * has a pin, else a search by address), the store's instructions and the empty tanks to bring.
+     */
+    public function pickupLocationText(): string
+    {
+        $store   = $this->store;
+        $address = collect([$store?->address, $store?->barangay, $store?->city])->filter()->implode(', ');
+        $lat = (float) ($store?->latitude ?? 0);
+        $lng = (float) ($store?->longitude ?? 0);   // decimal casts are strings like "0.0000000"
+        $link = $lat != 0.0 && $lng != 0.0
+            ? "https://www.google.com/maps/dir/?api=1&destination={$lat},{$lng}"
+            : 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address);
+
+        $text = "📍 " . ($store?->store_name ?? 'Store') . ($address !== '' ? ", {$address}" : '') . "\nDirections: {$link}";
+        if ($store?->pickup_instructions) {
+            $text .= "\n{$store->pickup_instructions}";
+        }
+        if ($this->needsEmptyTanks() && ($sum = $this->emptyTankSummary()) !== '') {
+            $text .= "\nPlease bring {$sum} empty tank(s) for the refill.";
+        }
+
+        return $text;
+    }
+
     /** Status shown to people: pick-up orders say "Ready for pick-up" / "Picked up". */
     public function statusLabel(): string
     {

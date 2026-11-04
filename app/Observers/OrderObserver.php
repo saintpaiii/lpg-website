@@ -23,9 +23,13 @@ class OrderObserver
             $this->say($order, 'order_created', function () use ($order) {
                 $order->load(['items.product', 'customer.user']);
 
+                // Pick-up placed by the customer at checkout (not a walk-in order the store typed in): where to go
+                $placedByCustomer = $order->created_by && $order->created_by === $order->customer?->user_id;
+                $location = $order->isPickup() && $placedByCustomer ? "\n\nPick-up location:\n" . $order->pickupLocationText() : '';
+
                 return 'Thank you for your order, ' . $this->customerFirstName($order) . "! We received order {$order->order_number}"
                     . (($items = $this->itemSummary($order)) ? " — {$items}" : '')
-                    . ' — total ₱' . number_format($order->grandTotal(), 2) . ". We'll confirm it shortly.";
+                    . ' — total ₱' . number_format($order->grandTotal(), 2) . ". We'll confirm it shortly." . $location;
             });
             $this->broadcast($order, true);
         });
@@ -41,8 +45,8 @@ class OrderObserver
                 // With a rider assigned, the rider's own updates cover these two
                 // Pick-up orders: "ready for pick-up" / "picked up" (no rider)
                 'out_for_delivery' => $order->isPickup()
-                    ? $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is ready for pick-up at "
-                        . ($order->store?->store_name ?? 'the store') . '.')
+                    ? $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is ready for pick-up! 🎉\n"
+                        . $order->loadMissing(['store', 'items.product'])->pickupLocationText())
                     : ($this->hasDelivery($order) ? null
                         : $this->say($order, 'order_out_for_delivery', fn () => "Your order {$n} is on its way.")),
                 'delivered'        => $order->isPickup()

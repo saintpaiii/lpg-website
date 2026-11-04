@@ -595,7 +595,7 @@ class OrderController extends Controller
             }
             if (isset($statusNotifs[$newStatus])) {
                 [$title, $message] = $statusNotifs[$newStatus];
-                NotificationService::send($customerUserId, 'order_update', $title, $message, ['order_id' => $order->id, 'order_number' => $order->order_number]);
+                NotificationService::send($customerUserId, 'order_update', $title, $message, ['order_id' => $order->id, 'order_number' => $order->order_number, 'link' => '/customer/orders/' . $order->id]);
             }
         }
 

@@ -226,6 +226,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
                 Route::get('loyalty/settings', [LoyaltyController::class, 'getSettings'])->name('loyalty.settings');
                 Route::put('loyalty/settings', [LoyaltyController::class, 'updateSettings'])->name('loyalty.settings.update');
                 Route::post('loyalty/toggle', [LoyaltyController::class, 'toggleLoyalty'])->name('loyalty.toggle');
+                Route::put('loyalty/consignment', [LoyaltyController::class, 'updateConsignment'])->name('loyalty.consignment');
             });
             Route::get('loyalty/customers', [LoyaltyController::class, 'getCustomers'])->name('loyalty.customers');
             Route::get('loyalty/customers/export', [LoyaltyController::class, 'exportCustomers'])->middleware('plan.feature:export')->name('loyalty.customers.export');

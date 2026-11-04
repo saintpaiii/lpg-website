@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
 import TrackingCard from '@/components/tracking-card';
-import { mapsUrl, orderStatusLabel } from '@/lib/order-status';
+import { orderStatusLabel } from '@/lib/order-status';
+import StoreLocationMap from '@/components/store-location-map';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
 
@@ -608,20 +609,25 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                             <TrackingCard orderId={order.id} />
                         )}
                         {/* Pick-up at the store: where to go (no rider tracking) */}
-                        {order.fulfillment === 'pickup' && order.pickup && (
-                            <div className="mt-4 space-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-                                <p className="font-semibold">
-                                    {order.status === 'out_for_delivery' ? 'Ready for pick-up at ' : 'Pick up at '}{order.store_name}
-                                </p>
-                                <p>{[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}</p>
-                                {mapsUrl(order.pickup.lat, order.pickup.lng, [order.pickup.address, order.pickup.city].filter(Boolean).join(', ')) && (
-                                    <a href={mapsUrl(order.pickup.lat, order.pickup.lng, [order.pickup.address, order.pickup.city].filter(Boolean).join(', '))!}
-                                        target="_blank" rel="noreferrer" className="text-xs font-medium underline">
-                                        Open in Google Maps
-                                    </a>
+                        {order.fulfillment === 'pickup' && order.pickup && !['delivered', 'cancelled'].includes(order.status) && (
+                            <div className="mt-4 space-y-2">
+                                {order.status === 'out_for_delivery' && (
+                                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">Your order is ready for pick-up.</p>
                                 )}
-                                {order.pickup.instructions && <p className="text-xs">{order.pickup.instructions}</p>}
+                                <StoreLocationMap
+                                    storeName={order.store_name}
+                                    lat={order.pickup.lat}
+                                    lng={order.pickup.lng}
+                                    address={[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}
+                                    instructions={order.pickup.instructions}
+                                />
                             </div>
+                        )}
+                        {/* Picked up: just where it was */}
+                        {order.fulfillment === 'pickup' && order.pickup && order.status === 'delivered' && (
+                            <p className="mt-4 text-sm text-muted-foreground">
+                                Picked up at {order.store_name} — {[order.pickup.address, order.pickup.barangay, order.pickup.city].filter(Boolean).join(', ')}
+                            </p>
                         )}
                         {order.empty_tanks_needed && order.empty_tank_summary && (
                             <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">

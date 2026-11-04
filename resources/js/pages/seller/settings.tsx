@@ -1,10 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { usePlan } from '@/hooks/use-plan';
+import { openUpgrade } from '@/lib/plans';
+import type { SharedData } from '@/types';
 import { AddressFields } from '@/components/address-fields';
 import {
     Building2,
     Camera,
     CreditCard,
+    Lock,
     Crosshair,
     Mail,
     MapPin,
@@ -50,9 +54,6 @@ interface StoreData {
     longitude: number | null;
     attendance_radius: number;
     allow_cod: boolean;
-    allow_consignment: boolean;
-    min_down_payment_percent: number;
-    consignment_due_days: number;
     allow_pickup: boolean;
     pickup_instructions: string;
 }
@@ -97,6 +98,9 @@ function MapClickHandler({ onPickRef }: { onPickRef: React.RefObject<((lat: numb
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SellerSettings({ store }: Props) {
+    // The Loyalty Program page is owner-only; staff with settings.view see plain text
+    const isOwner = usePage<SharedData>().props.auth.user?.role === 'seller';
+    const { has } = usePlan();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Settings', href: '/seller/settings' },
@@ -194,9 +198,6 @@ export default function SellerSettings({ store }: Props) {
         fee_per_km: string;
         max_delivery_radius_km: string;
         allow_cod: boolean;
-        allow_consignment: boolean;
-        min_down_payment_percent: string;
-        consignment_due_days: string;
         allow_pickup: boolean;
         pickup_instructions: string;
         logo: File | null;
@@ -214,9 +215,6 @@ export default function SellerSettings({ store }: Props) {
         fee_per_km:             String(store.fee_per_km ?? 10),
         max_delivery_radius_km: String(store.max_delivery_radius_km ?? 20),
         allow_cod:                store.allow_cod,
-        allow_consignment:        store.allow_consignment,
-        min_down_payment_percent: String(store.min_down_payment_percent ?? 50),
-        consignment_due_days:     String(store.consignment_due_days ?? 7),
         allow_pickup:             !!store.allow_pickup,
         pickup_instructions:      store.pickup_instructions ?? '',
         logo:                   null,
@@ -256,9 +254,6 @@ export default function SellerSettings({ store }: Props) {
         fd.append('fee_per_km',             data.fee_per_km || '10');
         fd.append('max_delivery_radius_km', data.max_delivery_radius_km || '20');
         fd.append('allow_cod',                data.allow_cod ? '1' : '0');
-        fd.append('allow_consignment',        data.allow_consignment ? '1' : '0');
-        fd.append('min_down_payment_percent', data.min_down_payment_percent || '50');
-        fd.append('consignment_due_days',     data.consignment_due_days || '7');
         fd.append('allow_pickup',             data.allow_pickup ? '1' : '0');
         fd.append('pickup_instructions',      data.pickup_instructions);
         // Location fields — sent as numeric strings or empty (→ null on backend)
@@ -478,43 +473,24 @@ export default function SellerSettings({ store }: Props) {
                                 checked={data.allow_cod}
                                 onChange={(v) => setData('allow_cod', v)}
                             />
-                            <ToggleRow
-                                label="Consignment"
-                                hint="Customer pays a down payment online; the balance is due after delivery. Only offered while your Loyalty Program is on — the down payment is set by the customer's loyalty tier."
-                                checked={data.allow_consignment}
-                                onChange={(v) => setData('allow_consignment', v)}
-                            />
-
-                            {data.allow_consignment && (
-                                <div className="grid grid-cols-2 gap-4 rounded-lg border bg-muted/30 p-3">
-                                    <div className="grid gap-1.5">
-                                        <Label htmlFor="min_down_payment_percent">Min Down Payment (%)</Label>
-                                        <Input
-                                            id="min_down_payment_percent"
-                                            type="number"
-                                            min={20}
-                                            max={80}
-                                            value={data.min_down_payment_percent}
-                                            onChange={(e) => setData('min_down_payment_percent', e.target.value)}
-                                        />
-                                        <p className="text-xs text-muted-foreground">Between 20% and 80%.</p>
-                                        {allErrors.min_down_payment_percent && <p className="text-xs text-red-500">{allErrors.min_down_payment_percent}</p>}
-                                    </div>
-                                    <div className="grid gap-1.5">
-                                        <Label htmlFor="consignment_due_days">Payment Deadline (days after delivery)</Label>
-                                        <Input
-                                            id="consignment_due_days"
-                                            type="number"
-                                            min={1}
-                                            max={90}
-                                            value={data.consignment_due_days}
-                                            onChange={(e) => setData('consignment_due_days', e.target.value)}
-                                        />
-                                        <p className="text-xs text-muted-foreground">Customers get a reminder 2 days before.</p>
-                                        {allErrors.consignment_due_days && <p className="text-xs text-red-500">{allErrors.consignment_due_days}</p>}
-                                    </div>
-                                </div>
-                            )}
+                            {/* Consignment lives in the Loyalty Program (owner only; Pro plan) */}
+                            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
+                                Consignment (pay later) is part of the Loyalty Program.
+                                {isOwner && (
+                                    <Link
+                                        href="/seller/loyalty/settings"
+                                        onClick={(e) => { if (!has('loyalty')) { e.preventDefault(); openUpgrade('loyalty'); } }}
+                                        className="font-medium text-blue-600 hover:underline"
+                                    >
+                                        Open Loyalty Program
+                                    </Link>
+                                )}
+                                {!has('loyalty') && (
+                                    <span className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                                        <Lock className="h-2.5 w-2.5" /> Pro
+                                    </span>
+                                )}
+                            </p>
                         </CardContent>
                     </Card>
 

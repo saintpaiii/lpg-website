@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import { Banknote, CreditCard, Crosshair, ExternalLink, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
-import { mapsUrl } from '@/lib/order-status';
+import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
+import StoreLocationMap from '@/components/store-location-map';
 import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Marker, Polyline } from 'react-leaflet';
@@ -621,7 +621,6 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
 
                 {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance }) => {
                     const pickup = fulfillmentOf(sg) === 'pickup';
-                    const storeMaps = mapsUrl(sg.store_lat, sg.store_lng, formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? ''));
                     const refillSummary = refillSummaryOf(sg);
                     return (
                         <Card key={sg.store_id}>
@@ -646,16 +645,18 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                         ))}
                                     </div>
                                 )}
+                                {/* Only pick-up groups mount a map */}
                                 {pickup && (
-                                    <div className="mb-3 space-y-1 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200">
-                                        <p className="font-semibold">Pick up at {sg.store_name}</p>
-                                        <p>{formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? '')}</p>
-                                        {storeMaps && (
-                                            <a href={storeMaps} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium underline">
-                                                <ExternalLink className="h-3 w-3" /> Open in Google Maps
-                                            </a>
-                                        )}
-                                        {sg.pickup_instructions && <p className="text-xs">{sg.pickup_instructions}</p>}
+                                    <div className="mb-3">
+                                        <StoreLocationMap
+                                            key={sg.store_id}
+                                            storeName={sg.store_name}
+                                            lat={sg.store_lat}
+                                            lng={sg.store_lng}
+                                            address={formatAddress(sg.store_address?.address ?? '', sg.store_address?.barangay ?? '', sg.store_address?.city ?? '')}
+                                            instructions={sg.pickup_instructions}
+                                            youAreHere={pin ? [pin.lat, pin.lng] : null}
+                                        />
                                     </div>
                                 )}
                                 {refillSummary && (

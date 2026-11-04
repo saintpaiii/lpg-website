@@ -26,6 +26,8 @@ type Props = {
     settings: Settings;
     store_default_dp: number;
     consignment_on: boolean;
+    allow_consignment: boolean;
+    consignment_due_days: number;
     enrolled_customers: number;
 };
 
@@ -33,7 +35,13 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Loyalty Program', href: '/selle
 
 type FormFields = Omit<Settings, 'is_enabled'>;
 
-export default function LoyaltySettings({ settings, consignment_on, enrolled_customers }: Props) {
+export default function LoyaltySettings({ settings, consignment_on, allow_consignment, consignment_due_days, enrolled_customers }: Props) {
+    // Consignment card: its own form (outside the tier form — no nested forms)
+    const consignment = useForm({ allow_consignment, consignment_due_days });
+    function saveConsignment(e: FormEvent) {
+        e.preventDefault();
+        consignment.put('/seller/loyalty/consignment', { preserveScroll: true });
+    }
     const { is_enabled, ...initial } = settings;
     const { data, setData, put, processing, errors } = useForm<FormFields>(initial);
 
@@ -90,7 +98,7 @@ export default function LoyaltySettings({ settings, consignment_on, enrolled_cus
                             </p>
                             {is_enabled && !consignment_on && (
                                 <p className="mt-2 flex items-center gap-1.5 text-sm text-amber-700">
-                                    <Info className="h-4 w-4" /> Consignment is turned off in your store settings, so tier down payment rates won't apply until you enable it.
+                                    <Info className="h-4 w-4" /> Consignment is turned off — switch it on in the card above.
                                 </p>
                             )}
                         </div>
@@ -98,6 +106,42 @@ export default function LoyaltySettings({ settings, consignment_on, enrolled_cus
                             className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${is_enabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
                             <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${is_enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                         </button>
+                    </CardContent>
+                </Card>
+
+                {/* Consignment (pay later) — moved here from Seller Settings */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Consignment (pay later)</CardTitle>
+                        <CardDescription>
+                            Customers in your loyalty tiers can pay a down payment online and the rest after delivery. Their tier decides the down
+                            payment and whether they qualify.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={saveConsignment} className="space-y-4">
+                            <label className="flex cursor-pointer items-center justify-between gap-4">
+                                <span className="text-sm font-medium">Offer consignment to loyal customers</span>
+                                <button type="button" role="switch" aria-checked={consignment.data.allow_consignment}
+                                    aria-label="Offer consignment to loyal customers"
+                                    onClick={() => consignment.setData('allow_consignment', !consignment.data.allow_consignment)}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${consignment.data.allow_consignment ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${consignment.data.allow_consignment ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                </button>
+                            </label>
+                            <div className="grid gap-1.5 sm:max-w-xs">
+                                <Label htmlFor="consignment_due_days">Payment deadline (days after delivery)</Label>
+                                <Input id="consignment_due_days" type="number" min={1} max={90}
+                                    value={consignment.data.consignment_due_days}
+                                    onChange={(e) => consignment.setData('consignment_due_days', e.target.value === '' ? ('' as unknown as number) : Number(e.target.value))} />
+                                <p className="text-xs text-muted-foreground">Customers get a reminder 2 days before.</p>
+                                {consignment.errors.consignment_due_days && <p className="text-xs text-red-500">{consignment.errors.consignment_due_days}</p>}
+                            </div>
+                            {!is_enabled && (
+                                <p className="text-sm text-amber-700 dark:text-amber-400">Turn on the Loyalty Program to offer consignment.</p>
+                            )}
+                            <Button type="submit" size="sm" disabled={consignment.processing}>Save consignment settings</Button>
+                        </form>
                     </CardContent>
                 </Card>
 

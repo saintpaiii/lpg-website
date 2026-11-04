@@ -64,6 +64,9 @@ class LoyaltyController extends Controller
             'settings'           => $this->formatSettings($settings),
             'store_default_dp'   => (int) ($store->min_down_payment_percent ?: 50),
             'consignment_on'     => (bool) $store->allow_consignment,
+            // Consignment (pay later) card — moved here from Seller Settings
+            'allow_consignment'    => (bool) $store->allow_consignment,
+            'consignment_due_days' => (int) ($store->consignment_due_days ?: 7),
             'enrolled_customers' => CustomerLoyalty::where('store_id', $store->id)->count(),
         ]);
     }
@@ -96,6 +99,23 @@ class LoyaltyController extends Controller
         StoreLoyaltySettings::forStore($store->id)->update($data);
 
         return back()->with('success', 'Loyalty settings saved.');
+    }
+
+    /** Consignment (pay later) for loyal customers: on/off + payment deadline. The tier sets the down payment. */
+    public function updateConsignment(Request $request): RedirectResponse
+    {
+        $store = $this->sellerStore($request);
+        $data  = $request->validate([
+            'allow_consignment'    => 'required|boolean',
+            'consignment_due_days' => 'required|integer|min:1|max:90',
+        ]);
+
+        $store->update([
+            'allow_consignment'    => $request->boolean('allow_consignment'),
+            'consignment_due_days' => (int) $data['consignment_due_days'],
+        ]);
+
+        return back()->with('success', 'Consignment settings saved.');
     }
 
     public function toggleLoyalty(Request $request): RedirectResponse
