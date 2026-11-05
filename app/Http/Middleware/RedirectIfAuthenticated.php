@@ -41,7 +41,7 @@ class RedirectIfAuthenticated
         return match ($user->role) {
             'platform_admin', 'admin', 'manager' => '/admin/dashboard',
             'cashier'                             => '/admin/invoices',
-            'warehouse'                           => '/admin/inventory',
+            'warehouse'                           => '/admin/dashboard',
             'rider'                               => '/rider/deliveries',
             'seller'                              => '/seller/dashboard',
             default                               => '/customer/dashboard',

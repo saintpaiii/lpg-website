@@ -358,13 +358,7 @@ export default function InvoiceShowPage({ invoice, company, breakdown }: Props &
                                         <div className="flex flex-wrap gap-4 text-sm">
                                             <div>
                                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Order</p>
-                                                <a
-                                                    href={`/admin/orders/${invoice.order.id}`}
-                                                    className="font-mono font-semibold text-blue-600 hover:underline"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    {invoice.order.order_number}
-                                                </a>
+                                                <p className="font-mono font-semibold text-gray-900 dark:text-white">{invoice.order.order_number}</p>
                                             </div>
                                             <div>
                                                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Type</p>

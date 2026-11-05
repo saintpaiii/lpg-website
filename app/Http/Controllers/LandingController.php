@@ -40,7 +40,7 @@ class LandingController extends Controller
                     => redirect()->route('admin.invoices'),
 
                 $user->role === 'warehouse'
-                    => redirect()->route('admin.inventory'),
+                    => redirect()->route('admin.dashboard'),
 
                 $user->role === 'rider'
                     => redirect()->route('rider.deliveries'),

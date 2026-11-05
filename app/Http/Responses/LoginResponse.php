@@ -43,7 +43,7 @@ class LoginResponse implements LoginResponseContract
                 => route('admin.invoices'),
 
             $user->role === 'warehouse'
-                => route('admin.inventory'),
+                => route('admin.dashboard'),
 
             $user->role === 'rider'
                 => route('rider.deliveries'),

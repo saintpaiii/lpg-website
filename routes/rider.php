@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Rider\CustomerController as RiderCustomerController;
 use App\Http\Controllers\Rider\DeliveryController as RiderDeliveryController;
 use App\Http\Controllers\Rider\LocationController as RiderLocationController;
 use App\Http\Controllers\Rider\MessageController as RiderMessageController;
