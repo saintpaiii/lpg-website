@@ -1,4 +1,4 @@
-import { maxPerOrderLabel, maxQty } from '@/lib/order-limits';
+import { limitLabel, maxQty, overLimitText, type LimitPeriod } from '@/lib/order-limits';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -30,7 +30,9 @@ type CartItem = {
     quantity: number;
     stock: number;
     max_per_order?: number | null;
-    /** Over the seller's max per order (lowered after it was added) — blocks checkout */
+    limit_period?: LimitPeriod;
+    bought_in_period?: number;
+    /** Over the seller's max per customer (per order / day / week, earlier orders count) — blocks checkout */
     over_max?: boolean;
 };
 
@@ -324,7 +326,7 @@ export default function CartPage({ cart }: Props) {
                                                                         >
                                                                             <Plus className="h-3 w-3" />
                                                                         </button>
-                                                                        <span className="text-xs text-gray-400 ml-1">{item.stock} avail.{maxPerOrderLabel(item) && ` · ${maxPerOrderLabel(item)}`}</span>
+                                                                        <span className="text-xs text-gray-400 ml-1">{item.stock} avail.{limitLabel(item) && ` · ${limitLabel(item)}`}</span>
                                                                     </div>
                                                                     <span className={`font-bold text-sm ${isChecked ? 'text-gray-900 dark:text-white' : 'text-gray-400 line-through'}`}>
                                                                         ₱{subtotalItem.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -332,7 +334,7 @@ export default function CartPage({ cart }: Props) {
                                                                 </div>
                                                                 {item.over_max && (
                                                                     <p className="mt-1.5 text-xs font-medium text-red-600">
-                                                                        Max {item.max_per_order} per order — reduce the quantity to continue
+                                                                        {overLimitText(item)}
                                                                     </p>
                                                                 )}
                                                             </div>

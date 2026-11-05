@@ -6,6 +6,7 @@ use App\Mail\OtpMail;
 use App\Models\OtpCode;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -134,7 +135,14 @@ class OtpController extends Controller
         RateLimiter::hit($throttleKey, 60); // 3 per 60 seconds
 
         $otp = OtpCode::generateFor($user);
-        Mail::to($user->email)->send(new OtpMail($user, $otp->code));
+        try {
+            Mail::to($user->email)->send(new OtpMail($user, $otp->code));
+        } catch (\Throwable $e) {
+            Log::warning('OTP email failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            $otp->delete();                       // don't start the "code sent" countdown for a code nobody got
+            RateLimiter::clear($throttleKey);     // and don't use up a resend attempt
+            return back()->withErrors(['resend' => "We couldn't send the code right now, please try again."]);
+        }
 
         return back()->with('success', 'A new verification code has been sent to your email.');
     }

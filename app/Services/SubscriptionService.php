@@ -329,7 +329,18 @@ class SubscriptionService
             if ($busyItems->count() > $limit) {
                 $out['busy_over'][$type] = $busyItems->count();
             }
-            $out[$type] = $busyItems->concat($idle)->slice(max($limit, $busyItems->count()))->values();
+            $keep = max($limit, $busyItems->count());
+            // Staff: keep ONE rider who can deliver first — without one the store is hidden from customers
+            if ($type === 'staff') {
+                $eligible = $store->eligibleRiders()->pluck('users.id')->all();
+                if ($eligible && ! $busyItems->contains(fn ($m) => in_array($m->id, $eligible))
+                    && ($rider = $idle->first(fn ($m) => in_array($m->id, $eligible)))) {
+                    $idle = $idle->reject(fn ($m) => $m->id === $rider->id)->values();
+                    $busyItems = collect([$rider])->concat($busyItems);
+                    $keep = max($limit, $busyItems->count() > $limit ? $busyItems->count() : 0);
+                }
+            }
+            $out[$type] = $busyItems->concat($idle)->slice($keep)->values();
         }
 
         return $out;
@@ -365,12 +376,15 @@ class SubscriptionService
             'locked_features' => $locked,
             'usage'           => static::usage($store),
             'limits'          => static::planLimits($planKey),
+            // Would no rider who can deliver remain? (the store would be hidden from customers)
+            'hides_store'     => ($eligible = $store->eligibleRiders()->pluck('users.id')->all()) !== []
+                && array_diff($eligible, $over['staff']->pluck('id')->all()) === [],
         ];
     }
 
     public static function previewHasChanges(array $preview): bool
     {
-        return $preview['products'] + $preview['staff'] + $preview['vehicles'] > 0 || $preview['locked_features'] !== [];
+        return $preview['products'] + $preview['staff'] + $preview['vehicles'] > 0 || $preview['locked_features'] !== [] || ! empty($preview['hides_store']);
     }
 
     /**
@@ -429,6 +443,7 @@ class SubscriptionService
 
         static::forgetSummary($store->id);
         SidebarBadgeService::forgetStore($store->id);
+        Store::forgetVisibilityCache($store->id);   // pausing / restoring riders can hide or show the store
 
         // One summary notification for the owner
         $planName = static::planName($store->subscription_plan);

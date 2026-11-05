@@ -20,6 +20,7 @@ use App\Services\DeliveryFeeService;
 use App\Services\LoyaltyService;
 use App\Services\NotificationService;
 use App\Services\PayMongoService;
+use App\Services\PurchaseLimitService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -89,6 +90,9 @@ class CheckoutController extends Controller
             ->whereIn('product_id', $selectedProductIds)
             ->get();
 
+        // Bought earlier today / this week, for products limited per day / per week (one query)
+        $bought = PurchaseLimitService::boughtForMany($userId, $cartItems->pluck('product')->filter());
+
         $stores = [];
         foreach ($cartItems as $ci) {
             $product = $ci->product;
@@ -152,23 +156,34 @@ class CheckoutController extends Controller
                 'transaction_type' => $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $product->inventory?->quantity ?? 0,
-                // Over the seller's max per order (lowered after it was added) → this line blocks checkout
+                // Over the seller's max per customer (per order / day / week) → this line blocks checkout
                 'max_per_order'    => $product->max_per_order,
-                'over_max'         => $product->max_per_order !== null && $ci->quantity > $product->max_per_order,
+                'limit_period'     => PurchaseLimitService::period($product),
+                'limit_label'      => PurchaseLimitService::label($product),
+                'bought_in_period' => $b = $bought[$product->id] ?? 0,
+                'over_max'         => PurchaseLimitService::isOver($product, (int) $ci->quantity, $b),
+                'limit_message'    => PurchaseLimitService::isOver($product, (int) $ci->quantity, $b)
+                    ? PurchaseLimitService::message($product, $b, 0) : null,
             ];
         }
 
         return array_values($stores);
     }
 
-    /** "Max 2 of X per order…" when the quantity is over the seller's limit, otherwise null. */
-    private static function maxPerOrderError(?Product $product, int $quantity): ?string
+    /**
+     * "You can buy at most 5 of X per day. You already bought 3 today. …" when the quantity (+ what the customer
+     * bought earlier in the period for per day / per week) is over the seller's limit, otherwise null.
+     */
+    private static function maxPerOrderError(?Product $product, int $quantity, int $bought = 0): ?string
     {
-        $max = $product?->max_per_order;
+        if (! $product || ! PurchaseLimitService::isOver($product, $quantity, $bought)) {
+            return null;
+        }
+        $left = max(0, $product->max_per_order - $bought);
 
-        return $max !== null && $quantity > $max
-            ? "You can buy at most {$max} of {$product->name} per order. Reduce the quantity in your cart to continue."
-            : null;
+        return "You can buy at most {$product->max_per_order} of {$product->name} per " . PurchaseLimitService::period($product) . '.'
+            . ($bought > 0 ? " You already bought {$bought} " . (PurchaseLimitService::period($product) === 'day' ? 'today' : 'this week') . '.' : '')
+            . ($left > 0 ? " Reduce the quantity in your cart to {$left} to continue." : ' Remove it from your cart to continue.');
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -386,9 +401,10 @@ class CheckoutController extends Controller
             if (empty($checkoutStores)) {
                 return $error('The selected stores are not available right now.');
             }
-            // Seller's max per customer order — checked before anything is created
+            // Seller's max per customer (per order / day / week) — checked before anything is created
+            $boughtBefore = PurchaseLimitService::boughtForMany(auth()->id(), $cartItems->pluck('product')->filter());
             foreach ($cartItems as $ci) {
-                if (($why = static::maxPerOrderError($ci->product, (int) $ci->quantity)) !== null) {
+                if (($why = static::maxPerOrderError($ci->product, (int) $ci->quantity, $boughtBefore[$ci->product_id] ?? 0)) !== null) {
                     return $error($why);
                 }
             }
@@ -448,6 +464,13 @@ class CheckoutController extends Controller
 
             // Create one order per store in a single DB transaction
             $result = DB::transaction(function () use ($geoFallback, $delivery, $checkoutStores, $customer, $request, $data, $modes, $dpPercents, $couponIds, $couponCode, $deliveryLat, $deliveryLng, $estimatedMin, $fulfillments) {
+                // Per day / per week limits: lock the customer row FIRST so two checkouts at the same time (two tabs)
+                // run one after the other — the second one then counts the first one's order.
+                PurchaseLimitService::lockCustomer($customer->id);
+                $boughtNow = PurchaseLimitService::boughtForMany($request->user()->id, Product::whereIn(
+                    'id', collect($checkoutStores)->flatMap(fn ($s) => array_column($s['items'], 'product_id'))->all()
+                )->get(['id', 'name', 'max_per_order', 'limit_period']));
+
                 // ── Pass 1: price every store's items and delivery fee ─────────
                 $prepared = [];
 
@@ -478,7 +501,7 @@ class CheckoutController extends Controller
                         if ($stock < $cartItem['quantity']) {
                             throw new CheckoutRuleException("Insufficient stock for {$product->name}. Only {$stock} unit(s) left.");
                         }
-                        if (($why = static::maxPerOrderError($product, (int) $cartItem['quantity'])) !== null) {
+                        if (($why = static::maxPerOrderError($product, (int) $cartItem['quantity'], $boughtNow[$product->id] ?? 0)) !== null) {
                             throw new CheckoutRuleException($why);
                         }
 

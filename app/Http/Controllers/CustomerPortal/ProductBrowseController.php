@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\Rating;
 use App\Models\Store;
 use App\Services\DeliveryFeeService;
+use App\Services\PurchaseLimitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -77,7 +78,10 @@ class ProductBrowseController extends Controller
                 ->orderByDesc('products.created_at'),
         };
 
-        $products = $query->paginate(20)->withQueryString()->through(fn ($p) => [
+        $products = $query->paginate(20)->withQueryString();
+        // Max per customer: period, what is left for this customer and what is in their cart (2 queries for the page)
+        $limits   = PurchaseLimitService::payloadForMany($request->user()?->id, $products->getCollection());
+        $products = $products->through(fn ($p) => [
             'id'             => $p->id,
             'name'           => $p->name,
             'brand'          => $p->brand,
@@ -102,6 +106,7 @@ class ProductBrowseController extends Controller
             'allow_pickup'   => (bool) $p->store?->allow_pickup,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
+            ...$limits[$p->id],
         ]);
 
         // Filter option lists
@@ -261,6 +266,8 @@ class ProductBrowseController extends Controller
                 'allow_pickup'   => (bool) $product->store?->allow_pickup,
                 'avg_rating'     => round((float) ($product->ratings_avg_rating ?? 0), 1),
                 'review_count'   => (int) ($product->ratings_count ?? 0),
+                // Max per customer (per order / day / week): what is left for this customer
+                ...PurchaseLimitService::payload($request->user()?->id, $product),
             ],
             'reviews'        => $reviews,
             'canRate'        => $canRate,

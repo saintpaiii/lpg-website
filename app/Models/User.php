@@ -72,6 +72,22 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    protected static function booted(): void
+    {
+        // Adding / changing / deactivating / archiving a store's staff (riders) can show or hide the store
+        $forget = function (User $u) {
+            if ($u->role === 'seller_staff' || $u->getOriginal('role') === 'seller_staff') {
+                Store::forgetVisibilityCache($u->store_id);
+                if ($u->getOriginal('store_id') && $u->getOriginal('store_id') !== $u->store_id) {
+                    Store::forgetVisibilityCache((int) $u->getOriginal('store_id'));
+                }
+            }
+        };
+        static::saved($forget);
+        static::deleted($forget);
+        static::restored($forget);
+    }
+
     public const PAUSED_BY_PLAN_MESSAGE = "Your account is paused because your store's current plan has reached its staff limit. Please contact your store owner.";
 
     public function isAdmin(): bool
@@ -90,6 +106,22 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function sendEmailVerificationNotification(): void
     {
+    }
+
+    /**
+     * "Forgot password" email (Fortify). A mail problem shows a friendly message on the form
+     * instead of a 500 (the reset token is simply unused).
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        try {
+            $this->notify(new \Illuminate\Auth\Notifications\ResetPassword($token));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Password reset email failed', ['user_id' => $this->id, 'error' => $e->getMessage()]);
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'email' => "We couldn't send the reset link right now, please try again.",
+            ]);
+        }
     }
 
     /**

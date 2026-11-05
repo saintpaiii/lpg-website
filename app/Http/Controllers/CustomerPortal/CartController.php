@@ -5,6 +5,7 @@ namespace App\Http\Controllers\CustomerPortal;
 use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Product;
+use App\Services\PurchaseLimitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,9 @@ class CartController extends Controller
         if ($items->isEmpty()) {
             return null;
         }
+
+        // Bought earlier today / this week, for products limited per day / per week (one query)
+        $bought = PurchaseLimitService::boughtForMany($userId, $items->pluck('product')->filter());
 
         $stores = [];
         foreach ($items as $ci) {
@@ -64,9 +68,15 @@ class CartController extends Controller
                 'transaction_type' => $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $stock,
-                // Seller's limit per customer order (null = no limit); over it when the seller lowered it later
+                // Seller's limit per customer (null = no limit) per order / day / week; over it when the seller
+                // lowered it later or when earlier orders of the period already used part of it
                 'max_per_order'    => $product->max_per_order,
-                'over_max'         => $product->max_per_order !== null && $ci->quantity > $product->max_per_order,
+                'limit_period'     => PurchaseLimitService::period($product),
+                'limit_label'      => PurchaseLimitService::label($product),
+                'bought_in_period' => $b = $bought[$product->id] ?? 0,
+                'over_max'         => PurchaseLimitService::isOver($product, (int) $ci->quantity, $b),
+                'limit_message'    => PurchaseLimitService::isOver($product, (int) $ci->quantity, $b)
+                    ? PurchaseLimitService::message($product, $b, 0) : null,
             ];
         }
 
@@ -116,12 +126,14 @@ class CartController extends Controller
             ->where('product_id', $product->id)
             ->first();
 
-        // Seller's limit per customer order (one cart line per product = the quantity in the order)
-        $max    = $product->max_per_order;
+        // Seller's limit per customer: per order (one cart line per product = the quantity in the order),
+        // per day / per week (+ what the customer already bought in that period)
         $inCart = (int) ($existing?->quantity ?? 0);
-        if ($max !== null && $inCart + (int) $request->quantity > $max) {
-            return back()->with('error', "You can buy at most {$max} of {$product->name} per order."
-                . ($inCart > 0 && $max - $inCart > 0 ? " You already have {$inCart}; you can add " . ($max - $inCart) . ' more.' : ''));
+        if ($product->max_per_order !== null) {
+            $bought = PurchaseLimitService::boughtInPeriod($userId, $product, PurchaseLimitService::period($product));
+            if (PurchaseLimitService::isOver($product, $inCart + (int) $request->quantity, $bought)) {
+                return back()->with('error', PurchaseLimitService::message($product, $bought, $inCart));
+            }
         }
 
         if ($existing) {
@@ -176,7 +188,10 @@ class CartController extends Controller
             $product = Product::with('inventory')->find($request->product_id);
             $stock   = $product?->inventory?->quantity ?? PHP_INT_MAX;
 
-            $max     = $product?->max_per_order ?? PHP_INT_MAX;
+            // Max the cart line may hold: the seller's limit minus what was bought earlier today / this week
+            $bought  = $product && $product->max_per_order !== null
+                ? PurchaseLimitService::boughtInPeriod(auth()->id(), $product, PurchaseLimitService::period($product)) : 0;
+            $max     = $product?->max_per_order !== null ? max(1, $product->max_per_order - $bought) : PHP_INT_MAX;
 
             $updates = ['quantity' => min((int) $request->quantity, $stock, $max)];
             if ($request->transaction_type) {
@@ -185,7 +200,7 @@ class CartController extends Controller
             $cartItem->update($updates);
 
             if ((int) $request->quantity > $max && $max <= $stock) {
-                return back()->with('error', "You can buy at most {$max} of {$product->name} per order.");
+                return back()->with('error', PurchaseLimitService::message($product, $bought, 0));
             }
         }
 

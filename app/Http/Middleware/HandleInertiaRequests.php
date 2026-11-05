@@ -98,6 +98,21 @@ class HandleInertiaRequests extends Middleware
                 ? \Illuminate\Support\Facades\Cache::remember(\App\Services\SubscriptionService::summaryCacheKey($store->id), 30,
                     fn () => \App\Services\SubscriptionService::summary($store))
                 : null,
+            // Is the store visible to customers, and why not (owner + non-rider staff banner). Re-queried on the full
+            // store row (the shared $store row has only a few columns); cached 30 s, forgotten on rider / license changes.
+            'storeVisibility' => fn () => $store && ($user->role === 'seller' || ($user->role === 'seller_staff' && $user->sub_role !== 'rider'))
+                ? \Illuminate\Support\Facades\Cache::remember(Store::visibilityCacheKey($store->id), 30, function () use ($store) {
+                    $full = Store::find($store->id);
+                    if (! $full || $full->status !== 'approved') {
+                        return null;
+                    }
+
+                    return $full->visibility() + [
+                        // "Add a rider" can't work while the plan's staff limit is full
+                        'staff_full' => ! \App\Services\SubscriptionService::canAdd($full, 'staff'),
+                    ];
+                })
+                : null,
             // Plan comparison for the owner's "plan ends soon / ended" popup and the upgrade dialog (staff see it too)
             'planCatalog' => fn () => $store && in_array($user->role, ['seller', 'seller_staff'], true) ? \App\Services\SubscriptionService::publicPlans() : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

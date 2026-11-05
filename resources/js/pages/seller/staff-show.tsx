@@ -27,6 +27,8 @@ interface StaffMember {
     phone: string | null;
     sub_role: string;
     is_active: boolean;
+    /** The store's only rider who can deliver */
+    is_last_eligible_rider?: boolean;
     paused_by_plan?: boolean;
     /** Rider with an active delivery (can't be paused) */
     busy?: boolean;
@@ -228,6 +230,10 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
     function togglePlanPause() {
         if (staff.paused_by_plan && staff.is_active && planLimit && !planLimit.can_add) {
             toast.error(planLimit.message);
+            return;
+        }
+        if (!staff.paused_by_plan && staff.is_last_eligible_rider
+            && !window.confirm('This is your only rider who can deliver — your products will be hidden from customers. Pause anyway?')) {
             return;
         }
         router.patch(`/seller/staff/${staff.id}/plan-pause`, {}, { preserveScroll: true });

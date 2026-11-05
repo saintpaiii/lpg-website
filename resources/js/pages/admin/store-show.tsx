@@ -123,6 +123,7 @@ type Props = {
     store: StoreDetail;
     stats: StoreStats;
     subscription?: StoreSubscription;
+    visibility?: { visible: boolean; reasons: { code: string; text: string }[] } | null;
     history: ActionHistory[];
     documentHistory: DocumentHistoryRow[];
 };
@@ -156,7 +157,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function StoreShow({ store, stats, subscription, history, documentHistory }: Props) {
+export default function StoreShow({ store, stats, subscription, visibility, history, documentHistory }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/admin/dashboard' },
         { title: 'Stores',    href: '/admin/stores' },
@@ -383,6 +384,14 @@ export default function StoreShow({ store, stats, subscription, history, documen
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Hidden from customers? */}
+                {visibility && !visibility.visible && (
+                    <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                        <strong>Hidden from customers:</strong>{' '}
+                        {visibility.reasons.map((r) => (r.code.startsWith('license') || r.code.includes('rider') ? `no eligible rider (${r.text.toLowerCase()})` : r.text.toLowerCase())).join(' · ')}
+                    </div>
+                )}
 
                 {/* Plan */}
                 {subscription && (

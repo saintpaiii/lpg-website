@@ -542,6 +542,17 @@ class DemoSeeder extends Seeder
 
         // Riders are on shift today with a vehicle, so the demo can assign deliveries right away
         // (store 1's rider already carries 2 × 11 kg + 1 × 22 kg = 95 kg full tanks → the multicab)
+        // Each demo rider has an approved driver's license (valid 1 year) — a store needs a rider who can deliver to
+        // be visible to customers. Placeholder file like the seeded permits (the viewer shows 404 until replaced).
+        foreach ([[$rider1Id, $store1Id, $seller1Id], [$rider2Id, $store2Id, $seller2Id]] as [$riderId, $sid, $ownerId]) {
+            DB::table('staff_documents')->insert([
+                'user_id' => $riderId, 'store_id' => $sid, 'doc_type' => 'drivers_license', 'document_number' => 'N01-' . str_pad((string) $riderId, 2, '0', STR_PAD_LEFT) . '-123456',
+                'file_path' => "staff_documents/demo-license-{$riderId}.jpg", 'expires_at' => $this->now->copy()->addYear()->toDateString(),
+                'status' => 'approved', 'reviewed_by' => $ownerId, 'reviewed_at' => $this->now,
+                'created_at' => $this->now, 'updated_at' => $this->now,
+            ]);
+        }
+
         foreach ([[$rider1Id, $store1Id, 'PGC-202'], [$rider2Id, $store2Id, 'SDB-301']] as [$riderId, $sid, $plate]) {
             DB::table('attendances')->insert([
                 'user_id' => $riderId, 'store_id' => $sid, 'date' => $this->now->toDateString(),

@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ImageIcon, MessageSquare, Package, Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +32,7 @@ type Product = {
     weight: string;
     weight_kg: number | null;
     max_per_order: number | null;
+    limit_period?: 'order' | 'day' | 'week';
     description: string | null;
     refill_price: number;
     purchase_price: number;
@@ -74,6 +75,7 @@ type ProductForm = {
     brand: string;
     weight_kg: string;
     max_per_order: string;
+    limit_period: 'order' | 'day' | 'week';
     description: string;
     refill_price: string;
     purchase_price: string;
@@ -82,7 +84,7 @@ type ProductForm = {
 };
 
 const EMPTY_FORM: ProductForm = {
-    name: '', brand: '', weight_kg: '', max_per_order: '', description: '',
+    name: '', brand: '', weight_kg: '', max_per_order: '', limit_period: 'order', description: '',
     refill_price: '', purchase_price: '', stock: '', reorder_level: '10',
 };
 
@@ -90,6 +92,8 @@ const SIZE_CHIPS = [2.7, 5, 7, 11, 22, 50];
 const REFILL_MSG = "Refill price can't be higher than the new tank price.";
 
 export default function SellerProducts({ products, counts, tab, search, max_upload_bytes, planLimit }: Props) {
+    // Hidden from customers (no rider who can deliver, plan ended, document expired) — shared by the seller layout
+    const storeHidden = (usePage().props as { storeVisibility?: { visible: boolean } | null }).storeVisibility?.visible === false;
     const [searchVal, setSearchVal] = useState(search);
     const [showForm, setShowForm]   = useState(false);
     const [editing, setEditing]     = useState<Product | null>(null);
@@ -145,6 +149,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
             name: p.name, brand: p.brand,
             weight_kg: p.weight_kg != null ? String(p.weight_kg) : '',
             max_per_order: p.max_per_order != null ? String(p.max_per_order) : '',
+            limit_period: p.limit_period ?? 'order',
             description: p.description ?? '', refill_price: String(p.refill_price),
             purchase_price: String(p.purchase_price), stock: String(p.stock),
             reorder_level: String(p.reorder_level),
@@ -257,6 +262,11 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                 </div>
 
                 <PlanLimitBar label="Published" planLimit={planLimit} />
+                {storeHidden && (
+                    <p className="inline-flex w-fit items-center gap-1.5 rounded-full border border-red-300 bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                        Hidden from customers
+                    </p>
+                )}
 
                 {/* Tabs */}
                 <div className="flex gap-1 overflow-x-auto border-b">
@@ -320,7 +330,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                                 <p className="text-xs text-muted-foreground">{p.brand} {p.weight && `· ${p.weight}`}</p>
                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                     {p.max_per_order != null && (
-                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Max {p.max_per_order} / order</span>
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Max {p.max_per_order} / {p.limit_period ?? 'order'}</span>
                                                     )}
                                                     {p.refill_price > p.purchase_price && (
                                                         <span title="Refill price is higher than the new tank price — edit to fix."
@@ -469,13 +479,24 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                             </div>
                         </div>
 
-                        {/* Max per customer order (optional) */}
-                        <div className="grid gap-1.5 sm:max-w-[50%] sm:pr-2">
-                            <Label htmlFor="max_per_order">Max per customer order</Label>
-                            <Input id="max_per_order" type="number" min="1" max="999" step="1" inputMode="numeric"
-                                value={data.max_per_order} onChange={(e) => setData('max_per_order', e.target.value)} placeholder="No limit" />
-                            <p className="text-xs text-muted-foreground">Limits how many of this product one customer can buy in one order.</p>
+                        {/* Max per customer (optional) — per order / per day / per week */}
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="max_per_order">Max per customer</Label>
+                            <div className="grid grid-cols-2 gap-2 sm:max-w-[50%] sm:pr-2">
+                                <Input id="max_per_order" type="number" min="1" max="999" step="1" inputMode="numeric"
+                                    value={data.max_per_order} onChange={(e) => setData('max_per_order', e.target.value)} placeholder="No limit" />
+                                <select id="limit_period" aria-label="Limit period"
+                                    value={data.limit_period} disabled={data.max_per_order === ''}
+                                    onChange={(e) => setData('limit_period', e.target.value as ProductForm['limit_period'])}
+                                    className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30">
+                                    <option value="order">per order</option>
+                                    <option value="day">per day</option>
+                                    <option value="week">per week</option>
+                                </select>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Limits how many one customer can buy. 'Per day' and 'per week' also count their earlier orders.</p>
                             {errors.max_per_order && <p className="text-xs text-red-500">{errors.max_per_order}</p>}
+                            {errors.limit_period && <p className="text-xs text-red-500">{errors.limit_period}</p>}
                         </div>
 
                         {/* Stock + Reorder (only on create) */}

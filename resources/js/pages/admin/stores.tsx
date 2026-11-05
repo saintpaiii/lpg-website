@@ -51,6 +51,7 @@ type StoreRow = {
     status: string;
     plan?: string;
     plan_status?: 'trial' | 'active' | 'ending' | 'expired' | 'none';
+    has_eligible_rider?: boolean;
     created_at: string;
     deleted_at: string | null;
     owner_name: string;
@@ -257,6 +258,9 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                                     <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ADMIN_PLAN_STATUS[store.plan_status]?.cls}`}>
                                                         {ADMIN_PLAN_STATUS[store.plan_status]?.label}
                                                     </span>
+                                                )}
+                                                {store.status === 'approved' && store.has_eligible_rider === false && (
+                                                    <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Hidden: no eligible rider</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-center">

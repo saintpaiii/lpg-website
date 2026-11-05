@@ -44,16 +44,22 @@ class CheckStaffDocuments extends Command
                 NotificationService::send($rider->id, 'system', "Driver's license expires soon",
                     "Your driver's license expires on {$date} ({$days} {$n}). Upload the renewed license in My Documents.", ['link' => '/rider/documents']);
                 if ($owner) {
+                    // The store's only rider who can deliver → the store will be hidden when it expires
+                    $last = $doc->store && $doc->store->eligibleRiders()->pluck('users.id')->all() === [$rider->id];
                     NotificationService::send($owner, 'system', "Rider's license expires soon",
-                        "{$rider->name}'s driver's license expires on {$date} ({$days} {$n}).", ['link' => "/seller/staff/{$rider->id}"]);
+                        "{$rider->name}'s driver's license expires on {$date} ({$days} {$n})."
+                        . ($last ? ' When it expires your products will be hidden from customers.' : ''), ['link' => "/seller/staff/{$rider->id}"]);
                 }
                 $sent++;
             } elseif ($days === -1) {
                 NotificationService::send($rider->id, 'system', "Driver's license expired",
                     "Your driver's license expired. You can't make deliveries until a renewed license is approved.", ['link' => '/rider/documents']);
                 if ($owner) {
+                    $hidden = $doc->store && ! $doc->store->eligibleRiders()->exists();
+                    \App\Models\Store::forgetVisibilityCache($doc->store_id);
                     NotificationService::send($owner, 'system', "Rider's license expired",
-                        "{$rider->name}'s driver's license expired. They can't make deliveries until a renewed license is approved.", ['link' => "/seller/staff/{$rider->id}"]);
+                        "{$rider->name}'s driver's license expired. They can't make deliveries until a renewed license is approved."
+                        . ($hidden ? ' Your products are now hidden from customers.' : ''), ['link' => "/seller/staff/{$rider->id}"]);
                 }
                 $sent++;
             }

@@ -23,6 +23,7 @@ class StoreController extends Controller
 
         $query = Store::withTrashed()
             ->with('owner')
+            ->withExists('eligibleRiders')   // hidden from customers without a rider who can deliver
             ->when($search, fn ($q) => $q->where('store_name', 'like', "%{$search}%")
                 ->orWhere('city', 'like', "%{$search}%"))
             ->latest();
@@ -54,6 +55,7 @@ class StoreController extends Controller
                 'status'         => $s->status,
                 'plan'           => $s->subscription_plan !== 'none' ? \App\Services\SubscriptionService::planName($s->subscription_plan) : 'No plan',
                 'plan_status'    => SubscriptionController::statusOf($s),
+                'has_eligible_rider' => (bool) $s->eligible_riders_exists,
                 'created_at'     => $s->created_at->format('M d, Y'),
                 'deleted_at'     => $s->deleted_at?->format('M d, Y'),
                 'owner_name'     => $s->owner?->name ?? '—',
@@ -123,6 +125,8 @@ class StoreController extends Controller
 
         return Inertia::render('admin/store-show', [
             'subscription' => $subscription,
+            // Visible to customers? (rider / plan / documents reasons)
+            'visibility'   => $store->status === 'approved' ? $store->visibility() : null,
             'store' => [
                 'id'                     => $store->id,
                 'store_name'             => $store->store_name,

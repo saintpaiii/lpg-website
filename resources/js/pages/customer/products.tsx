@@ -5,7 +5,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
-import { maxPerOrderLabel, maxQty } from '@/lib/order-limits';
+import { limitLabel, limitReachedText, limitStatus, maxAdd, type LimitPeriod } from '@/lib/order-limits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -35,6 +35,12 @@ type Product = {
     has_video?: boolean;
     stock: number;
     max_per_order?: number | null;
+    // Max per customer per order / day / week — what is left for this customer (see lib/order-limits)
+    limit_period?: LimitPeriod;
+    in_cart?: number;
+    bought_in_period?: number;
+    limit_remaining?: number | null;
+    limit_resets_at?: string | null;
     store_id: number;
     store_name: string;
     store_featured?: boolean;
@@ -589,14 +595,22 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     </button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button
-                                        onClick={() => setQty(q => Math.min(maxQty(cartDialog.product!), q + 1))}
+                                        onClick={() => setQty(q => Math.min(maxAdd(cartDialog.product!), q + 1))}
                                         className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-                                        disabled={qty >= maxQty(cartDialog.product)}
+                                        disabled={qty >= maxAdd(cartDialog.product)}
                                     >
                                         +
                                     </button>
-                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{maxPerOrderLabel(cartDialog.product) && ` · ${maxPerOrderLabel(cartDialog.product)}`}</span>
+                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{limitLabel(cartDialog.product) && ` · ${limitLabel(cartDialog.product)}`}</span>
                                 </div>
+                                {(() => {
+                                    const p = cartDialog.product!;
+                                    const reached = limitReachedText(p);
+                                    const status = limitStatus(p);
+                                    if (reached) return <p className="mt-1.5 text-xs font-medium text-red-600">{reached}</p>;
+                                    if (status) return <p className="mt-1.5 text-xs font-medium text-blue-700 dark:text-blue-400">{status}</p>;
+                                    return null;
+                                })()}
                             </div>
 
                             {/* Subtotal */}
@@ -617,7 +631,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         <Button
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={addToCart}
-                            disabled={cartSubmitting}
+                            disabled={cartSubmitting || (!!cartDialog.product && maxAdd(cartDialog.product) === 0)}
                         >
                             <ShoppingCart className="h-4 w-4 mr-1.5" />
                             Add to Cart

@@ -24,6 +24,7 @@ class Product extends Model
         'refill_price',
         'purchase_price',
         'max_per_order',
+        'limit_period',   // order | day | week
         'description',
         'image',
         'is_active',
@@ -35,6 +36,7 @@ class Product extends Model
         return [
             'weight_kg'      => 'decimal:2',
             'max_per_order'  => 'integer',
+            'limit_period'   => 'string',
             'selling_price'  => 'decimal:2',
             'cost_price'     => 'decimal:2',
             'refill_price'   => 'decimal:2',

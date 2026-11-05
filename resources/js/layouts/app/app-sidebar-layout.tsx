@@ -7,6 +7,7 @@ import { PlanExpiryDialog } from '@/components/plan-expiry-dialog';
 import { PlanStatusBanner } from '@/components/plan-status-banner';
 import { UpgradeDialog } from '@/components/upgrade-dialog';
 import { StoreLocationBanner } from '@/components/store-location-banner';
+import { StoreVisibilityBanner } from '@/components/store-visibility-banner';
 import { RiderLicenseBanner } from '@/components/rider-license-banner';
 import { InstallAppBanner } from '@/components/install-app-banner';
 import { useFlashToast } from '@/hooks/use-flash-toast';
@@ -26,6 +27,7 @@ export default function AppSidebarLayout({
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
                 <PlanStatusBanner />
                 <DocumentSuspensionBanner />
+                <StoreVisibilityBanner />
                 <StoreLocationBanner />
                 <RiderLicenseBanner />
                 {children}

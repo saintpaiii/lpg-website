@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import { fmtDate } from '@/lib/utils';
+import { limitLabel, limitReachedText, limitStatus, maxAdd as maxAddOf, type LimitPeriod } from '@/lib/order-limits';
 import StoreAvatar from '@/components/store-avatar';
 import ProductCardImage from '@/components/product-card-image';
 import ProductGallery, { type GalleryMedia } from '@/components/product-gallery';
@@ -28,8 +29,12 @@ type Product = {
     image_url: string | null;
     stock: number;
     in_cart: number;
-    /** Seller's limit per customer order (null = no limit) */
+    /** Seller's limit per customer (null = no limit), per order / day / week — see lib/order-limits */
     max_per_order?: number | null;
+    limit_period?: LimitPeriod;
+    bought_in_period?: number;
+    limit_remaining?: number | null;
+    limit_resets_at?: string | null;
     media: GalleryMedia[];
     store_id: number;
     store_name: string;
@@ -141,9 +146,10 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
 export default function ProductShowPage({ product, reviews, canRate, ratingOrderId, fromStore, similar }: Props) {
     const [qty, setQty]     = useState(1);
     // What can still be added on top of what is already in the cart
-    // Capped by the seller's max per order (one cart line per product = the quantity in the order)
-    const maxAdd = Math.max(0, Math.min(product.stock, product.max_per_order ?? Infinity) - (product.in_cart ?? 0));
-    const atOrderMax = product.max_per_order != null && (product.in_cart ?? 0) >= product.max_per_order;
+    // Capped by the seller's max per customer (per order / day / week, earlier orders of the period count)
+    const maxAdd = maxAddOf(product);
+    const limitReached = limitReachedText(product);
+    const limitInfo = limitStatus(product);
     const [txType, setTxType] = useState<'refill' | 'new_purchase'>('refill');
     const [adding, setAdding] = useState(false);
 
@@ -234,10 +240,12 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 : <span className="text-red-500 font-medium">Out of stock</span>
                             }
                             {product.max_per_order != null && product.stock > 0 && (
-                                <span className="text-gray-500"> · Max {product.max_per_order} per order</span>
+                                <span className="text-gray-500"> · {limitLabel(product)}</span>
                             )}
                         </p>
-                        {product.in_cart > 0 && (
+                        {limitInfo ? (
+                            <p className="-mt-2 text-sm text-blue-700 dark:text-blue-400">{limitInfo}</p>
+                        ) : product.in_cart > 0 && (
                             <p className="-mt-2 text-sm text-blue-700 dark:text-blue-400">{product.in_cart} already in your cart</p>
                         )}
 
@@ -321,10 +329,8 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                     Add to Cart
                                 </Button>
                                 {maxAdd === 0 && (
-                                    <p className="text-center text-sm text-gray-500">
-                                        {atOrderMax
-                                            ? `You already have the maximum (${product.max_per_order}) per order in your cart`
-                                            : 'All available stock is already in your cart'}
+                                    <p className={`text-center text-sm ${limitReached ? 'font-medium text-red-600' : 'text-gray-500'}`}>
+                                        {limitReached ?? 'All available stock is already in your cart'}
                                     </p>
                                 )}
                             </div>

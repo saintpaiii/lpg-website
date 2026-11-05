@@ -26,6 +26,7 @@ class ProductController extends Controller
             // Number for the form: weight_kg, or parsed from the old free text
             'weight_kg'        => $p->weight_kg !== null && (float) $p->weight_kg > 0 ? (float) $p->weight_kg : LpgSize::parseKg($p->weight),
             'max_per_order'    => $p->max_per_order,
+            'limit_period'     => $p->limit_period ?: 'order',
             'description'      => $p->description,
             'refill_price'     => (float) ($p->refill_price ?? 0),
             'purchase_price'   => (float) ($p->purchase_price ?? 0),
@@ -124,6 +125,7 @@ class ProductController extends Controller
             'refill_price'   => 'required|numeric|min:0|lte:purchase_price',
             'purchase_price' => 'required|numeric|min:1',
             'max_per_order'  => 'nullable|integer|min:1|max:999',
+            'limit_period'   => 'nullable|in:order,day,week',
             'reorder_level'  => 'required|integer|min:0',
         ];
     }
@@ -171,6 +173,7 @@ class ProductController extends Controller
                 'brand'          => $data['brand'] ?? null,
                 ...self::sizeAttributes($data),
                 'max_per_order'  => $data['max_per_order'] ?? null,
+                'limit_period'   => $data['limit_period'] ?? 'order',
                 'description'    => $data['description'] ?? null,
                 'refill_price'   => $data['refill_price'],
                 'purchase_price' => $data['purchase_price'],
@@ -220,6 +223,7 @@ class ProductController extends Controller
             'brand'          => $data['brand'] ?? null,
             ...self::sizeAttributes($data),
             'max_per_order'  => $data['max_per_order'] ?? null,
+            'limit_period'   => $data['limit_period'] ?? 'order',
             'description'    => $data['description'] ?? null,
             'refill_price'   => $data['refill_price'],
             'purchase_price' => $data['purchase_price'],

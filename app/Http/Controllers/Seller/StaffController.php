@@ -14,6 +14,7 @@ use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,6 +47,8 @@ class StaffController extends Controller
         }
 
         $page = $query->latest()->paginate(20)->withQueryString();
+        // The store's riders who can deliver (one query): removing the last one hides the store from customers
+        $eligible = $store->eligibleRiders()->pluck('users.id')->all();
         // Driver's license status of the riders on this page (one query)
         $license = \App\Services\StaffDocumentService::forRiders($page->getCollection());
         $staff = $page
@@ -62,6 +65,7 @@ class StaffController extends Controller
                 'schedule_end'   => $u->schedule_end,
                 'is_active'      => $u->is_active,
                 'paused_by_plan' => (bool) $u->paused_by_plan,
+                'is_last_eligible_rider' => $eligible === [$u->id],
                 'created_at'     => $u->created_at->format('M d, Y'),
                 'deleted_at'     => $u->deleted_at?->format('M d, Y'),
                 'license_status' => $u->sub_role === 'rider' ? ($license[$u->id]['license_status'] ?? 'missing') : null,
@@ -79,6 +83,8 @@ class StaffController extends Controller
             'planLimit'     => $this->planLimit($store),
             'tab'           => $tab,
             'filters'       => ['search' => $search ?? ''],
+            // Set only right after an account was created but its welcome email failed
+            'tempCredentials' => $request->session()->get('staff_temp_password'),
         ]);
     }
 
@@ -129,15 +135,31 @@ class StaffController extends Controller
             'email_verified_at'   => now(),
         ]);
 
-        Mail::to($user->email)->send(new StaffAccountCreated($user, $store->store_name, $tempPassword));
+        // The account is saved first; a mail problem must never undo it or show a 500
+        $mailed = true;
+        try {
+            Mail::to($user->email)->send(new StaffAccountCreated($user, $store->store_name, $tempPassword));
+        } catch (\Throwable $e) {
+            $mailed = false;
+            Log::warning('Staff welcome email failed', ['user_id' => $user->id, 'store_id' => $store->id, 'error' => $e->getMessage()]);
+        }
 
         NotificationService::send(
             $user->id,
             'system',
             'Welcome to ' . $store->store_name,
-            'Your staff account has been created. Check your email for login credentials.',
+            $mailed
+                ? 'Your staff account has been created. Check your email for login credentials.'
+                : 'Your staff account has been created. Your store owner will give you your temporary password.',
             ['store_id' => $store->id]
         );
+
+        if (! $mailed) {
+            // Shown once, only to the owner who created the account (flashed for the next page only)
+            return redirect()->route('seller.staff')
+                ->with('warning', "Account created, but the welcome email couldn't be sent. Give them this temporary password: {$tempPassword}")
+                ->with('staff_temp_password', ['name' => $fullName, 'email' => $user->email, 'password' => $tempPassword]);
+        }
 
         return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$data['sub_role']}. Login credentials sent to {$data['email']}.");
     }
@@ -196,6 +218,7 @@ class StaffController extends Controller
                 'schedule_end'   => $user->schedule_end,
                 'is_active'      => (bool) $user->is_active,
                 'paused_by_plan' => (bool) $user->paused_by_plan,
+                'is_last_eligible_rider' => $store->eligibleRiders()->pluck('users.id')->all() === [$user->id],
                 'busy'           => SubscriptionService::riderIsBusy($user),
                 'created_at'     => $user->created_at->format('M d, Y'),
             ],

@@ -1,5 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
+import { overLimitText, type LimitPeriod } from '@/lib/order-limits';
 import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
 import StoreLocationMap from '@/components/store-location-map';
 import { orderLoad, quoteFee, whyNoVehicle, type DeliveryOption } from '@/lib/delivery-fee';
@@ -33,6 +34,8 @@ type CartItem = {
     quantity: number;
     stock: number;
     max_per_order?: number | null;
+    limit_period?: LimitPeriod;
+    bought_in_period?: number;
     over_max?: boolean;
 };
 
@@ -708,7 +711,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.name}</p>
                                                     <p className="text-xs text-gray-500">{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</p>
                                                     {item.over_max && (
-                                                        <p className="text-xs font-medium text-red-600">Max {item.max_per_order} per order — reduce the quantity in your cart to continue</p>
+                                                        <p className="text-xs font-medium text-red-600">{overLimitText(item, 'reduce the quantity in your cart to continue')}</p>
                                                     )}
                                                 </div>
                                                 <div className="text-right shrink-0">

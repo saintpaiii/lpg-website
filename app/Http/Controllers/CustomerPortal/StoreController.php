@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\Rating;
 use App\Models\Store;
+use App\Services\PurchaseLimitService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -36,7 +37,10 @@ class StoreController extends Controller
             );
         }
 
-        $products = $query->latest()->paginate(20)->withQueryString()->through(fn ($p) => [
+        $products = $query->latest()->paginate(20)->withQueryString();
+        // Max per customer: period, what is left for this customer and what is in their cart (2 queries for the page)
+        $limits   = PurchaseLimitService::payloadForMany($request->user()?->id, $products->getCollection());
+        $products = $products->through(fn ($p) => [
             'id'             => $p->id,
             'name'           => $p->name,
             'brand'          => $p->brand,
@@ -52,6 +56,7 @@ class StoreController extends Controller
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
+            ...$limits[$p->id],
         ]);
 
         $avgRating        = round((float) (Rating::where('store_id', $store->id)->avg('rating') ?? 0), 1);

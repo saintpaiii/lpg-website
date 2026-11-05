@@ -91,15 +91,100 @@ class Store extends Model
     // ── Relationships ─────────────────────────────────────────────────────────
 
     /**
-     * Approved, not hidden for an expired permit, and on an active plan (trial or paid) — safe to show to customers.
-     * Keep in step with isOpenToCustomers().
+     * Approved, not hidden for an expired permit, on an active plan (trial or paid) and with at least one rider who
+     * can deliver — safe to show to customers. Keep in step with isOpenToCustomers().
      */
     public function scopeVisibleToCustomers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('stores.status', 'approved')->where('stores.documents_suspended', false)
             ->where('stores.subscription_plan', '!=', 'none')
             ->whereNotNull('stores.subscription_expires_at')
-            ->where('stores.subscription_expires_at', '>', now());
+            ->where('stores.subscription_expires_at', '>', now())
+            ->whereHas('eligibleRiders');
+    }
+
+    /**
+     * Riders who can deliver: active, not paused by the plan, with an approved driver's license that is still valid
+     * (same rule as StaffDocumentService::canDeliver — licenseInfo step 1). Soft-deleted users are excluded by User.
+     */
+    public function eligibleRiders(): HasMany
+    {
+        return $this->hasMany(User::class, 'store_id')
+            ->where('users.role', 'seller_staff')->where('users.sub_role', 'rider')
+            ->where('users.is_active', true)->where('users.paused_by_plan', false)
+            ->whereExists(fn ($q) => $q->select(\Illuminate\Support\Facades\DB::raw(1))->from('staff_documents')
+                ->whereColumn('staff_documents.user_id', 'users.id')
+                ->where('staff_documents.doc_type', 'drivers_license')
+                ->where('staff_documents.status', 'approved')
+                // expires_at is a DATE: plain string comparison keeps the index usable
+                ->where('staff_documents.expires_at', '>=', \App\Services\StaffDocumentService::today()->toDateString()));
+    }
+
+    /** At least one rider who can deliver (memoized for this model instance — safe in long-running workers). */
+    public function hasEligibleRider(): bool
+    {
+        return once(fn () => $this->eligibleRiders()->exists());
+    }
+
+    public static function visibilityCacheKey(int $storeId): string
+    {
+        return "store-visibility:{$storeId}";
+    }
+
+    /** Drop the cached "is my store visible" banner data (rider / license / staff / plan changes). */
+    public static function forgetVisibilityCache(?int $storeId): void
+    {
+        if ($storeId) {
+            \Illuminate\Support\Facades\Cache::forget(static::visibilityCacheKey($storeId));
+        }
+    }
+
+    /**
+     * Why customers can't see this store (empty when visible). Codes: plan, documents, no_rider, riders_inactive,
+     * license_pending, license_expired, license_rejected, license_missing. Rider reasons carry the rider to open.
+     *
+     * @return array{visible: bool, reasons: array<int, array{code: string, text: string, rider_id: ?int}>}
+     */
+    public function visibility(): array
+    {
+        $reasons = [];
+        if ($this->documents_suspended) {
+            $reasons[] = ['code' => 'documents', 'text' => 'A store document expired', 'rider_id' => null];
+        }
+        if (! \App\Services\SubscriptionService::isActive($this)) {
+            $reasons[] = ['code' => 'plan', 'text' => 'Your plan has ended', 'rider_id' => null];
+        }
+        if (! $this->hasEligibleRider()) {
+            $reasons[] = $this->riderReason();
+        }
+
+        return ['visible' => $this->status === 'approved' && $reasons === [], 'reasons' => $reasons];
+    }
+
+    /** The most useful rider problem to fix first. */
+    private function riderReason(): array
+    {
+        $riders = User::where('store_id', $this->id)->where('role', 'seller_staff')->where('sub_role', 'rider')->orderBy('id')->get();
+        if ($riders->isEmpty()) {
+            return ['code' => 'no_rider', 'text' => 'No rider yet', 'rider_id' => null];
+        }
+        $active = $riders->filter(fn (User $r) => $r->is_active && ! $r->paused_by_plan);
+        if ($active->isEmpty()) {
+            return ['code' => 'riders_inactive', 'text' => 'Your riders are deactivated or paused', 'rider_id' => $riders->first()->id];
+        }
+        $license = \App\Services\StaffDocumentService::forRiders($active);
+        foreach ([
+            'pending'  => "Your rider's driver's license is waiting for your approval",
+            'expired'  => "Your rider's license expired",
+            'rejected' => "Your rider's license was rejected",
+            'missing'  => "Your rider hasn't uploaded a driver's license",
+        ] as $status => $text) {
+            if ($rider = $active->first(fn (User $r) => ($license[$r->id]['license_status'] ?? null) === $status)) {
+                return ['code' => "license_{$status}", 'text' => $text, 'rider_id' => $rider->id];
+            }
+        }
+
+        return ['code' => 'license_missing', 'text' => "Your rider hasn't uploaded a driver's license", 'rider_id' => $active->first()->id];
     }
 
     public function loyaltySettings(): \Illuminate\Database\Eloquent\Relations\HasOne
@@ -140,11 +225,12 @@ class Store extends Model
         return $this->status === 'approved' && ! $this->documents_suspended;
     }
 
-    /** Approved, not hidden for an expired permit, and on an active plan. */
+    /** Approved, not hidden for an expired permit, on an active plan, and with a rider who can deliver. */
     public function isOpenToCustomers(): bool
     {
         return $this->status === 'approved' && ! $this->documents_suspended
-            && \App\Services\SubscriptionService::isActive($this);
+            && \App\Services\SubscriptionService::isActive($this)
+            && $this->hasEligibleRider();
     }
 
     public function documentSubmissions(): HasMany

@@ -45,6 +45,8 @@ type PausePreview = {
     staff_names: string[];
     vehicle_names: string[];
     locked_features: string[];
+    /** No rider who can deliver would remain → products hidden from customers */
+    hides_store?: boolean;
     usage: { products: number; staff: number; vehicles: number };
 };
 
@@ -303,6 +305,7 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                                             With {confirming.name}:{' '}
                                             {pausesSomething && `${pausePhrase(preview)} will be paused (not deleted). You can choose which ones stay active afterwards. `}
                                             {preview.locked_features.length > 0 && `${listPhrase(preview.locked_features)} will be locked.`}
+                                            {preview.hides_store && ' No rider who can deliver would stay active — your products would be hidden from customers.'}
                                         </span>
                                     </p>
                                     {pausesSomething && (

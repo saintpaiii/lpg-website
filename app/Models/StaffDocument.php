@@ -13,6 +13,14 @@ class StaffDocument extends Model
         'status', 'rejection_reason', 'reviewed_by', 'reviewed_at',
     ];
 
+    protected static function booted(): void
+    {
+        // A license upload / approval / rejection can show or hide the store (eligible rider) — refresh the banner
+        $forget = fn (StaffDocument $d) => Store::forgetVisibilityCache($d->store_id ?? User::whereKey($d->user_id)->value('store_id'));
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     protected function casts(): array
     {
         return [

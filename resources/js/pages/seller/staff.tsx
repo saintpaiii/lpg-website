@@ -13,7 +13,7 @@ import {
     UserX,
     Users,
 } from 'lucide-react';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog,
@@ -60,6 +60,8 @@ type StaffMember = {
     schedule_end: string | null;
     is_active: boolean;
     paused_by_plan: boolean;
+    /** The store's only rider who can deliver — removing them hides the store */
+    is_last_eligible_rider?: boolean;
     created_at: string;
     deleted_at: string | null;
     /** Riders only: driver's license status */
@@ -83,6 +85,8 @@ type Props = {
     pausedCount?: number;
     planLimit?: PlanLimit;
     filters: { search?: string };
+    /** Only right after creating an account whose welcome email failed (shown once). */
+    tempCredentials?: { name: string; email: string; password: string } | null;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -179,6 +183,7 @@ function StaffFormDialog({
     editTarget: StaffMember | null;
 }) {
     const isEdit = !!editTarget;
+    const [defaultRole] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === 'rider' ? 'rider' : 'cashier'));
 
     // Normalise stored time to HH:MM (24-hour) for <input type="time">.
     // DB may store "05:30 AM" (12-hour); the time input only accepts "HH:MM".
@@ -209,7 +214,7 @@ function StaffFormDialog({
         last_name:      editTarget?.last_name      ?? '',
         email:          editTarget?.email          ?? '',
         phone:          editTarget?.phone          ?? '',
-        sub_role:       editTarget?.sub_role       ?? 'cashier',
+        sub_role:       editTarget?.sub_role       ?? defaultRole,
         schedule_start: toHHMM(editTarget?.schedule_start),
         schedule_end:   toHHMM(editTarget?.schedule_end),
     });
@@ -303,6 +308,7 @@ function StaffFormDialog({
                             </SelectContent>
                         </Select>
                         {errors.sub_role && <p className="text-xs text-red-500">{errors.sub_role}</p>}
+                        {isEdit && editTarget?.is_last_eligible_rider && data.sub_role !== 'rider' && <LastRiderWarning />}
                     </div>
 
                     {/* Work schedule */}
@@ -360,6 +366,7 @@ function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClos
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Archive Staff Account?</DialogTitle>
+                    {target?.is_last_eligible_rider && <LastRiderWarning />}
                     <DialogDescription>
                         Archive <span className="font-semibold">{target?.name}</span>? Their account will be deactivated. You can restore it later.
                     </DialogDescription>
@@ -388,6 +395,16 @@ function ArchiveDialog({ target, onClose }: { target: StaffMember | null; onClos
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Shown before removing / pausing / changing the store's only rider who can deliver. */
+export function LastRiderWarning() {
+    return (
+        <p className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            This is your only rider who can deliver — your products will be hidden from customers.
+        </p>
     );
 }
 
@@ -421,7 +438,9 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters }: Props) {
+export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials }: Props) {
+    const [creds, setCreds] = useState(tempCredentials ?? null);
+    useEffect(() => { if (tempCredentials) setCreds(tempCredentials); }, [tempCredentials]);
     const [formOpen, setFormOpen]               = useState(false);
     const [editTarget, setEditTarget]           = useState<StaffMember | null>(null);
     const [archiveTarget, setArchiveTarget]     = useState<StaffMember | null>(null);
@@ -430,6 +449,11 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
     const [search, setSearch]                   = useState(filters.search ?? '');
 
     const deactivateForm = useForm({ reason: '', notes: '' });
+
+    // From the "hidden from customers" banner: open Add Staff with Rider selected
+    useEffect(() => {
+        if (new URLSearchParams(window.location.search).get('add') === 'rider' && (!planLimit || planLimit.can_add)) setFormOpen(true);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const isArchived = tab === 'archived';
 
@@ -468,6 +492,10 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
             toast.error(planLimit.message);
             return;
         }
+        if (!s.paused_by_plan && s.is_last_eligible_rider
+            && !window.confirm('This is your only rider who can deliver — your products will be hidden from customers. Pause anyway?')) {
+            return;
+        }
         router.patch(`/seller/staff/${s.id}/plan-pause`, {}, { preserveScroll: true });
     }
 
@@ -485,6 +513,26 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
             <Head title="Staff" />
 
             <div className="flex flex-1 flex-col gap-6 p-6">
+
+                {/* Welcome email failed — show the temporary password once, to the owner only */}
+                {creds && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="space-y-1">
+                                <p className="font-semibold">Account created, but the welcome email couldn't be sent.</p>
+                                <p>
+                                    Give <strong>{creds.name}</strong> ({creds.email}) this temporary password:{' '}
+                                    <code className="rounded bg-white px-1.5 py-0.5 font-mono text-base font-bold dark:bg-amber-900/60">{creds.password}</code>
+                                </p>
+                                <p className="text-xs">They'll be asked to change it on first login. It won't be shown again.</p>
+                            </div>
+                            <div className="flex shrink-0 gap-2">
+                                <Button size="sm" variant="outline" onClick={() => { navigator.clipboard?.writeText(creds.password); toast.success('Password copied.'); }}>Copy</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setCreds(null)}>Dismiss</Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Header */}
                 <div className="flex items-start justify-between">
@@ -695,6 +743,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                         <DialogDescription>
                             The staff member will be blocked from logging in. You can reactivate them at any time.
                         </DialogDescription>
+                        {deactivateTarget?.is_last_eligible_rider && <LastRiderWarning />}
                     </DialogHeader>
                     <div className="grid gap-4 py-2">
                         <ReasonPicker
