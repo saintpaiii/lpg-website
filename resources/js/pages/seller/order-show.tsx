@@ -24,7 +24,7 @@ import TierBadge, { type Tier } from '@/components/tier-badge';
 import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
-import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { bestFitId, riderOptionDisabled, riderOptionLabel, type Load, type RiderLoadFields } from '@/lib/rider-fit';
 import type { FailInfo } from '@/components/delivery-fail-fields';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge } from '@/components/complete-pickup-dialog';
@@ -63,6 +63,8 @@ type Order = {
     empty_tanks_collected: boolean;
     empty_tank_summary: string | null;
     grand_total: number;
+    /** Full-tank load — the rider picker checks what fits */
+    load?: Load;
     transaction_type: string;
     total_amount: number;
     payment_method: string | null;
@@ -93,7 +95,7 @@ type Order = {
     payment_record: PaymentRecord | null;
 };
 
-type Rider = { id: number; name: string; phone: string | null } & RiderLicenseFields;
+type Rider = { id: number; name: string; phone: string | null } & RiderLoadFields;
 
 type Props = {
     order: Order;
@@ -259,7 +261,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                         )}
                         {!isPickup && ['confirmed', 'preparing'].includes(order.status) && (
                             <Button
-                                onClick={() => canAssign ? setShowAssign(true) : undefined}
+                                onClick={() => { if (!canAssign) return; const best = bestFitId(riders, order.load ?? null); setSelectedRider(best ? String(best) : ''); setShowAssign(true); }}
                                 size="sm"
                                 variant="outline"
                                 disabled={!canAssign}
@@ -627,7 +629,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                             <SelectTrigger><SelectValue placeholder="Select rider…" /></SelectTrigger>
                             <SelectContent>
                                 {riders.map((r) => (
-                                    <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>{r.name} {r.phone && `· ${r.phone}`}{riderLicenseSuffix(r)}</SelectItem>
+                                    <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, order.load ?? null)}>
+                                        {riderOptionLabel(r, order.load ?? null, r.id === bestFitId(riders, order.load ?? null))}
+                                    </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>

@@ -60,10 +60,15 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->respond(function (\Symfony\Component\HttpFoundation\Response $response) {
             $status = $response->getStatusCode();
-            $inertiaPages = [403 => 'errors/403', 404 => 'errors/404', 500 => 'errors/404', 503 => 'errors/404'];
+            $inertiaPages = [403 => 'errors/403', 404 => 'errors/404'];
+            // Crashes: locally (debug) Laravel's real error page stays; in production a "Something went wrong" page —
+            // never "Page Not Found" for a crash
+            if (! config('app.debug')) {
+                $inertiaPages += [500 => 'errors/500', 503 => 'errors/500'];
+            }
 
             if (isset($inertiaPages[$status]) && !request()->expectsJson()) {
-                return Inertia::render($inertiaPages[$status])
+                return Inertia::render($inertiaPages[$status], ['status' => $status])
                     ->toResponse(request())
                     ->setStatusCode($status);
             }

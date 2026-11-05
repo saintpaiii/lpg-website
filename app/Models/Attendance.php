@@ -25,6 +25,7 @@ class Attendance extends Model
         'overtime_hours',
         'is_late',
         'notes',
+        'vehicle_id',
     ];
 
     protected function casts(): array
@@ -45,6 +46,12 @@ class Attendance extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** Rider: the vehicle taken for this shift (held until clock-out). */
+    public function vehicle(): BelongsTo
+    {
+        return $this->belongsTo(Vehicle::class);
     }
 
     public function store(): BelongsTo

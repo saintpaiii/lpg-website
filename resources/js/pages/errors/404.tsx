@@ -14,7 +14,7 @@ const PERM_ROUTES: [string, string][] = [
     ['settings.view',      '/admin/settings'],
 ];
 
-function homeUrl(role: string, subRole: string | null | undefined, permissions: string[]): string {
+export function homeUrl(role: string, subRole: string | null | undefined, permissions: string[]): string {
     if (role === 'customer') return '/customer/dashboard';
     if (role === 'seller') return '/seller/dashboard';
     if (role === 'seller_staff') {

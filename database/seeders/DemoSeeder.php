@@ -521,12 +521,14 @@ class DemoSeeder extends Seeder
         // 8b. DELIVERY VEHICLES + FEES PER VEHICLE TYPE (config defaults)
         // ══════════════════════════════════════════════════════════════════════
         // Store 1: a motorcycle for small orders, a multicab for big ones. Store 2: a tricycle.
+        // Capacities = the legal maximum per type (full tanks, RA 11592).
+        $demoVehicles = [];
         foreach ([
-            [$store1Id, 'motorcycle', 'PGC-101', 40, 2],
-            [$store1Id, 'multicab', 'PGC-202', 300, 10],
-            [$store2Id, 'tricycle', 'SDB-301', 100, 4],
+            [$store1Id, 'motorcycle', 'PGC-101', 60, 2],
+            [$store1Id, 'multicab', 'PGC-202', 300, 12],
+            [$store2Id, 'tricycle', 'SDB-301', 150, 6],
         ] as [$sid, $type, $plate, $kg, $tanks]) {
-            DB::table('vehicles')->insert([
+            $demoVehicles[$plate] = DB::table('vehicles')->insertGetId([
                 'store_id' => $sid, 'vehicle_type' => $type, 'plate_number' => $plate,
                 'max_capacity_kg' => $kg, 'max_tanks' => $tanks, 'status' => 'available',
                 'created_at' => $this->now->copy()->subDays(80), 'updated_at' => $this->now,
@@ -536,6 +538,17 @@ class DemoSeeder extends Seeder
                 ['store_id' => $sid, 'vehicle_type' => $type],
                 ['base_fee' => $d['default_base'], 'fee_per_km' => $d['default_per_km'], 'created_at' => $this->now, 'updated_at' => $this->now],
             );
+        }
+
+        // Riders are on shift today with a vehicle, so the demo can assign deliveries right away
+        // (store 1's rider already carries 2 × 11 kg + 1 × 22 kg = 95 kg full tanks → the multicab)
+        foreach ([[$rider1Id, $store1Id, 'PGC-202'], [$rider2Id, $store2Id, 'SDB-301']] as [$riderId, $sid, $plate]) {
+            DB::table('attendances')->insert([
+                'user_id' => $riderId, 'store_id' => $sid, 'date' => $this->now->toDateString(),
+                'clock_in' => $this->now->copy()->subHours(2), 'status' => 'present', 'vehicle_id' => $demoVehicles[$plate],
+                'created_at' => $this->now, 'updated_at' => $this->now,
+            ]);
+            DB::table('vehicles')->where('id', $demoVehicles[$plate])->update(['status' => 'in_use']);
         }
 
         // ══════════════════════════════════════════════════════════════════════

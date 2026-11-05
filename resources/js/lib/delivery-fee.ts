@@ -34,13 +34,23 @@ export function quoteFee(options: DeliveryOption[] | undefined, distKm: number |
     return best?.quote ?? null;
 }
 
-/** Load of order lines: kg = Σ weight_kg × qty, tanks = qty of lines with a size. */
+/** FULL tank weight (gas + cylinder) by gas size — must match config('delivery.full_tank_kg'). */
+const FULL_TANK_KG: Record<string, number> = { '2.7': 7, '5': 12, '7': 15, '11': 25, '22': 45, '50': 90 };
+
+/** Weight of one full tank for a gas size (DeliveryFeeService::fullTankKg); no size → 0. */
+export function fullTankKg(gasKg: number | null | undefined): number {
+    const gas = Math.round(Number(gasKg ?? 0) * 10) / 10;
+    if (!(gas > 0)) return 0;
+    return FULL_TANK_KG[String(gas)] ?? Math.round(gas * 2 * 10) / 10;
+}
+
+/** Load of order lines: kg = Σ full-tank weight × qty, tanks = qty of lines with a size. */
 export function orderLoad(lines: { weight_kg?: number | null; quantity: number }[]): { kg: number; tanks: number } {
     let kg = 0;
     let tanks = 0;
     for (const l of lines) {
         const w = Number(l.weight_kg ?? 0);
-        kg += w * l.quantity;
+        kg += fullTankKg(w) * l.quantity;
         if (w > 0) tanks += l.quantity;
     }
     return { kg: Math.round(kg * 100) / 100, tanks };

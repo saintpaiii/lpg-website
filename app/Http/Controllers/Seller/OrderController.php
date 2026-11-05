@@ -51,6 +51,8 @@ class OrderController extends Controller
             'empty_tanks_collected' => $o->empty_tanks_collected_at !== null,
             'empty_tank_summary'    => (int) $o->empty_tanks_required > 0 ? $o->emptyTankSummary() : null,
             'grand_total'      => $o->grandTotal(),
+            // Full-tank load (kg / tanks) — rider pickers check what fits the rider's vehicle
+            'load'             => \App\Services\DeliveryFeeService::orderLoad($o->items),
             'transaction_type' => $o->transaction_type,
             'total_amount'     => (float) $o->total_amount,
             'payment_method'      => $o->payment_method,
@@ -164,8 +166,10 @@ class OrderController extends Controller
             ->get(['id', 'name', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
+        $loads   = \App\Services\RiderLoadService::forRiders($riderRows);
         $riders = $riderRows
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']] + ($loads[$r->id] ?? []))
             ->values()
             ->all();
 
@@ -374,8 +378,10 @@ class OrderController extends Controller
             ->get(['id', 'name', 'phone', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
+        $loads   = \App\Services\RiderLoadService::forRiders($riderRows);
         $riders = $riderRows
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']] + ($loads[$r->id] ?? []))
             ->values()
             ->all();
 
@@ -700,10 +706,18 @@ class OrderController extends Controller
         $sequence = \App\Services\DeliveryRouteService::optimizeRoute($start['lat'], $start['lng'], $orders);
         $batchId  = (string) \Illuminate\Support\Str::uuid();
 
-        DB::transaction(function () use ($sequence, $rider, $store, $batchId) {
+        try {
+        DB::transaction(function () use ($sequence, $rider, $store, $batchId, $orders) {
+            // The rider's vehicle must carry ALL these orders on top of what it already has (shift row locked)
+            \App\Services\RiderLoadService::lockShift($rider);
+            if ($why = \App\Services\RiderLoadService::canTake($rider, $orders)) {
+                throw new \RuntimeException($why);
+            }
+            $vehicleId = \App\Services\RiderLoadService::currentVehicle($rider)?->id;
             foreach ($sequence as $i => $order) {
                 $attrs = [
                     'rider_id'     => $rider->id,
+                    'vehicle_id'   => $vehicleId,
                     'status'       => 'assigned',
                     'sequence'     => $i + 1,
                     'batch_id'     => $batchId,
@@ -717,6 +731,9 @@ class OrderController extends Controller
                 $order->update(['status' => 'out_for_delivery']);
             }
         });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         $count = count($sequence);
         NotificationService::send($rider->id, 'batch_delivery_assigned', 'New Delivery Route',
@@ -757,27 +774,30 @@ class OrderController extends Controller
             return back()->with('error', $why);
         }
 
-        if ($order->delivery) {
-            $order->delivery->update([
-                'rider_id'    => $rider->id,
-                'assigned_at' => now(),
-                'status'      => 'assigned',
-                'sequence'    => null,
-                'batch_id'    => null,
-            ]);
-        } else {
-            Delivery::create([
-                'order_id'    => $order->id,
-                'store_id'    => $store->id,
-                'rider_id'    => $rider->id,
-                'status'      => 'assigned',
-                'sequence'    => null,
-                'batch_id'    => null,
-                'assigned_at' => now(),
-            ]);
-        }
+        try {
+            DB::transaction(function () use ($order, $rider, $store) {
+                // Capacity: the rider's vehicle must carry this order on top of its active deliveries (shift row locked)
+                \App\Services\RiderLoadService::lockShift($rider);
+                if ($why = \App\Services\RiderLoadService::canTake($rider, [$order])) {
+                    throw new \RuntimeException($why);
+                }
+                $attrs = [
+                    'rider_id'    => $rider->id,
+                    'vehicle_id'  => \App\Services\RiderLoadService::currentVehicle($rider)?->id,
+                    'assigned_at' => now(),
+                    'status'      => 'assigned',
+                    'sequence'    => null,
+                    'batch_id'    => null,
+                ];
+                $order->delivery
+                    ? $order->delivery->update($attrs)
+                    : Delivery::create($attrs + ['order_id' => $order->id, 'store_id' => $store->id]);
 
-        $order->update(['status' => 'out_for_delivery']);
+                $order->update(['status' => 'out_for_delivery']);
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', "Delivery assigned to {$rider->name}.");
     }

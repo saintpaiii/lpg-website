@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use App\Services\RiderLoadService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -230,6 +231,8 @@ class AttendanceController extends Controller
 
         return Inertia::render('seller/attendance', [
             'rows'           => $rows,
+            // Manual clock-in of a rider: the vehicle they take (taken ones disabled)
+            'rider_vehicles' => RiderLoadService::pickerVehicles($store, $request->user()),
             'date'           => $targetDate,
             'summary'        => $summary,
             'store_location' => $store->latitude ? [
@@ -329,14 +332,19 @@ class AttendanceController extends Controller
         $store = $request->attributes->get('seller_store');
 
         $request->validate([
-            'user_id' => ['required', 'integer'],
-            'date'    => ['nullable', 'date'],
+            'user_id'    => ['required', 'integer'],
+            'date'       => ['nullable', 'date'],
+            'vehicle_id' => ['nullable', 'integer'],
         ]);
 
         $staff = User::where('id', $request->user_id)
             ->where('store_id', $store->id)
             ->where('role', 'seller_staff')
             ->firstOrFail();
+
+        if ($staff->isRider() && ! $request->input('vehicle_id')) {
+            return back()->with('error', "Choose the vehicle {$staff->name} is taking.");
+        }
 
         // Block clock-in if no schedule assigned (BUG 1)
         if (! $staff->schedule_start || ! $staff->schedule_end) {
@@ -361,12 +369,21 @@ class AttendanceController extends Controller
             $staff->schedule_end
         );
 
-        $att->update([
-            'clock_in' => $clockIn,
-            'status'   => $stats['status'],
-            'is_late'  => $stats['is_late'],
-            'notes'    => 'Manual clock-in by owner/HR',
-        ]);
+        try {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($att, $staff, $store, $request, $clockIn, $stats) {
+                if ($staff->isRider() && ($why = RiderLoadService::takeVehicle($att, $staff, $request->input('vehicle_id'), $store))) {
+                    throw new \RuntimeException($why);
+                }
+                $att->update([
+                    'clock_in' => $clockIn,
+                    'status'   => $stats['status'],
+                    'is_late'  => $stats['is_late'],
+                    'notes'    => 'Manual clock-in by owner/HR',
+                ]);
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
         return back()->with('success', "{$staff->name} clocked in at {$clockIn->format('h:i A')}.");
     }
@@ -402,9 +419,13 @@ class AttendanceController extends Controller
         if ($att->clock_out) {
             return back()->with('error', "{$staff->name} is already clocked out.");
         }
+        if ($staff->isRider() && ($n = RiderLoadService::activeDeliveryCount($staff)) > 0) {
+            return back()->with('error', "{$staff->name} still has {$n} active " . ($n === 1 ? 'delivery' : 'deliveries') . '.');
+        }
 
         $clockOut = now();
         $att->update(['clock_out' => $clockOut]);
+        RiderLoadService::releaseVehicle($att->vehicle_id);
 
         $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end);
 
@@ -449,6 +470,10 @@ class AttendanceController extends Controller
         if ($att->clock_out) {
             return back()->with('error', "{$staff->name} already has a clock-out time.");
         }
+        if ($staff->isRider() && ($n = RiderLoadService::activeDeliveryCount($staff)) > 0
+            && RiderLoadService::openAttendance($staff)?->id === $att->id) {
+            return back()->with('error', "{$staff->name} still has {$n} active " . ($n === 1 ? 'delivery' : 'deliveries') . '.');
+        }
 
         $clockOutTime = Carbon::parse("{$request->date} {$request->clock_out}");
 
@@ -457,6 +482,7 @@ class AttendanceController extends Controller
         }
 
         $att->update(['clock_out' => $clockOutTime]);
+        RiderLoadService::releaseVehicle($att->vehicle_id);
 
         $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end);
 
@@ -538,6 +564,12 @@ class AttendanceController extends Controller
                 'overtime_hours'=> $stats['overtime'],
             ] : null,
             'history' => $history,
+            // Riders: vehicle for the shift (choose at clock-in, change when no active deliveries)
+            'rider' => $user->isRider() && $store ? [
+                'vehicles'          => RiderLoadService::pickerVehicles($store, $user),
+                'current'           => RiderLoadService::present(RiderLoadService::load($user), RiderLoadService::openAttendance($user) !== null),
+                'active_deliveries' => RiderLoadService::activeDeliveryCount($user),
+            ] : null,
         ]);
     }
 
@@ -566,9 +598,15 @@ class AttendanceController extends Controller
         }
 
         $request->validate([
-            'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude'   => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'  => ['nullable', 'numeric', 'between:-180,180'],
+            'vehicle_id' => ['nullable', 'integer'],
         ]);
+
+        // Riders clock in WITH a vehicle (held until clock-out)
+        if ($user->isRider() && ! $request->input('vehicle_id')) {
+            return back()->with('error', 'Choose a vehicle to clock in.');
+        }
 
         $store   = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
         $storeId = $store?->id ?? $user->store_id;
@@ -601,31 +639,75 @@ class AttendanceController extends Controller
 
         $today = now()->toDateString();
 
-        $att = Attendance::firstOrCreate(
-            ['user_id' => $user->id, 'date' => $today],
-            ['store_id' => $storeId, 'status' => 'absent']
-        );
+        try {
+            $clockIn = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $today, $storeId, $store, $request) {
+                $att = Attendance::firstOrCreate(
+                    ['user_id' => $user->id, 'date' => $today],
+                    ['store_id' => $storeId, 'status' => 'absent']
+                );
 
-        if ($att->clock_in) {
-            return back()->with('error', 'You have already clocked in today.');
+                if ($att->clock_in) {
+                    throw new \RuntimeException('You have already clocked in today.');
+                }
+
+                // The vehicle row is locked: two riders picking the same vehicle at once can't both get it
+                if ($user->isRider() && ($why = RiderLoadService::takeVehicle($att, $user, $request->input('vehicle_id'), $store))) {
+                    throw new \RuntimeException($why);
+                }
+
+                $clockIn = now();
+                $stats   = $this->calcStats(
+                    (clone $att)->fill(['clock_in' => $clockIn]),
+                    $user->schedule_start,
+                    $user->schedule_end
+                );
+
+                $att->update([
+                    'clock_in'           => $clockIn,
+                    'clock_in_latitude'  => $request->input('latitude'),
+                    'clock_in_longitude' => $request->input('longitude'),
+                    'status'             => $stats['status'],
+                    'is_late'            => $stats['is_late'],
+                ]);
+
+                return $clockIn;
+            });
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
         }
 
-        $clockIn = now();
-        $stats   = $this->calcStats(
-            (clone $att)->fill(['clock_in' => $clockIn]),
-            $user->schedule_start,
-            $user->schedule_end
-        );
+        $vehicle = $user->isRider() ? RiderLoadService::currentVehicle($user) : null;
 
-        $att->update([
-            'clock_in'           => $clockIn,
-            'clock_in_latitude'  => $request->input('latitude'),
-            'clock_in_longitude' => $request->input('longitude'),
-            'status'             => $stats['status'],
-            'is_late'            => $stats['is_late'],
-        ]);
+        return back()->with('success', "Clocked in at {$clockIn->format('h:i A')}"
+            . ($vehicle ? ' with ' . \App\Services\DeliveryFeeService::label($vehicle->vehicle_type) . " {$vehicle->plate_number}." : '.'));
+    }
 
-        return back()->with('success', "Clocked in at {$clockIn->format('h:i A')}.");
+    /**
+     * Rider: set or change the vehicle of the open shift. Always allowed when it has none yet (e.g. the owner clocked
+     * the rider in); otherwise only without active deliveries.
+     */
+    public function myVehicle(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        abort_unless($user->isRider(), 403);
+        $request->validate(['vehicle_id' => ['required', 'integer']], ['vehicle_id.required' => 'Choose a vehicle.']);
+
+        $shift = RiderLoadService::openAttendance($user);
+        if (! $shift) {
+            return back()->with('error', 'Clock in first.');
+        }
+        if ($shift->vehicle_id && RiderLoadService::activeDeliveryCount($user) > 0) {
+            return back()->with('error', 'Finish your active deliveries before changing vehicles.');
+        }
+        $store = \App\Models\Store::find($user->store_id);
+
+        $why = \Illuminate\Support\Facades\DB::transaction(fn () => RiderLoadService::takeVehicle($shift, $user, $request->input('vehicle_id'), $store));
+        if ($why) {
+            return back()->with('error', $why);
+        }
+        $vehicle = RiderLoadService::currentVehicle($user);
+
+        return back()->with('success', 'Your vehicle today: ' . \App\Services\DeliveryFeeService::label($vehicle->vehicle_type) . " {$vehicle->plate_number}.");
     }
 
     public function myClockOut(Request $request): RedirectResponse
@@ -683,6 +765,9 @@ class AttendanceController extends Controller
         if ($att->clock_out) {
             return back()->with('error', 'You have already clocked out today.');
         }
+        if ($user->isRider() && ($n = RiderLoadService::activeDeliveryCount($user)) > 0) {
+            return back()->with('error', "You still have {$n} active " . ($n === 1 ? 'delivery' : 'deliveries') . '.');
+        }
 
         $clockOut = now();
         $att->update([
@@ -690,6 +775,7 @@ class AttendanceController extends Controller
             'clock_out_latitude'  => $request->input('latitude'),
             'clock_out_longitude' => $request->input('longitude'),
         ]);
+        RiderLoadService::releaseVehicle($att->vehicle_id);   // the vehicle is free for the next rider
 
         $stats = $this->calcStats($att->fresh(), $user->schedule_start, $user->schedule_end);
 

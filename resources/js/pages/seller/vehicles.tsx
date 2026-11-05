@@ -70,6 +70,7 @@ type Props = {
     riders: Rider[];
     planLimit?: PlanLimit;
     rates?: RateRow[];
+    vehicle_limits: VehicleLimits;
     /** Has a usable vehicle with a delivery fee */
     can_deliver?: boolean;
 };
@@ -91,15 +92,8 @@ const VEHICLE_TYPES: { value: VehicleType; label: string }[] = [
     { value: 'large_truck',  label: 'Large Truck'  },
 ];
 
-const DEFAULT_CAPACITY: Record<VehicleType, { kg: number; tanks: number }> = {
-    motorcycle:   { kg: 22,   tanks: 2   },
-    tricycle:     { kg: 66,   tanks: 6   },
-    multicab:     { kg: 165,  tanks: 15  },
-    van:          { kg: 220,  tanks: 20  },
-    pickup_truck: { kg: 275,  tanks: 25  },
-    small_truck:  { kg: 550,  tanks: 50  },
-    large_truck:  { kg: 1100, tanks: 100 },
-};
+/** Legal maximum per vehicle type (full tanks) — from config('delivery.vehicle_types') */
+type VehicleLimits = Record<string, { label: string; kg: number; tanks: number }>;
 
 const STATUS_STYLES: Record<VehicleStatus, string> = {
     available:   'bg-emerald-100 text-emerald-700',
@@ -131,7 +125,7 @@ function blankForm() {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], can_deliver = true }: Props) {
+export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], can_deliver = true, vehicle_limits }: Props) {
     // ?filter=paused (from My Plan) shows only the vehicles paused by the plan limit
     const { url } = usePage();
     const [onlyPaused, setOnlyPaused] = useState(url.includes('filter=paused'));
@@ -169,7 +163,8 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
     }
 
     function handleTypeChange(type: VehicleType) {
-        const defaults = DEFAULT_CAPACITY[type];
+        // The type's legal maximum (the seller may lower it)
+        const defaults = vehicle_limits[type] ?? { kg: 0, tanks: 0 };
         setForm(f => ({
             ...f,
             vehicle_type:    type,
@@ -296,8 +291,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                                 </td>
                                                 <td className="px-4 py-3 font-mono text-sm font-semibold">{v.plate_number}</td>
                                                 <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground">
-                                                    <span>{v.max_tanks} tanks</span>
-                                                    <span className="ml-1 text-gray-400">/ {v.max_capacity_kg} kg</span>
+                                                    <span>{v.max_tanks} tanks · {v.max_capacity_kg} kg max</span>
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell text-sm">
                                                     {v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
@@ -430,6 +424,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                 <Input
                                     type="number"
                                     min="1"
+                                    max={form.vehicle_type ? vehicle_limits[form.vehicle_type]?.tanks : undefined}
                                     value={form.max_tanks}
                                     onChange={(e) => setForm(f => ({ ...f, max_tanks: e.target.value }))}
                                     placeholder="6"
@@ -442,6 +437,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                     type="number"
                                     min="1"
                                     step="0.5"
+                                    max={form.vehicle_type ? vehicle_limits[form.vehicle_type]?.kg : undefined}
                                     value={form.max_capacity_kg}
                                     onChange={(e) => setForm(f => ({ ...f, max_capacity_kg: e.target.value }))}
                                     placeholder="66"
@@ -449,6 +445,12 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                 {errors.max_capacity_kg && <p className="text-xs text-red-500">{errors.max_capacity_kg}</p>}
                             </div>
                         </div>
+                        {form.vehicle_type && vehicle_limits[form.vehicle_type] && (
+                            <p className="-mt-1 text-xs text-muted-foreground">
+                                Legal maximum for a {vehicle_limits[form.vehicle_type].label}: {vehicle_limits[form.vehicle_type].tanks} tanks /{' '}
+                                {vehicle_limits[form.vehicle_type].kg} kg (full tanks). You can set less.
+                            </p>
+                        )}
 
                         {/* Description */}
                         <div className="grid gap-1.5">

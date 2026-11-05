@@ -282,8 +282,11 @@ class SubscriptionService
     /** Vehicles on an active delivery (vehicles.status 'in_use' is not always reset, so it isn't trusted). */
     public static function busyVehicleIds(int $storeId): array
     {
-        return Delivery::where('store_id', $storeId)->whereIn('status', Delivery::ACTIVE_STATUSES)
+        $onDelivery = Delivery::where('store_id', $storeId)->whereIn('status', Delivery::ACTIVE_STATUSES)
             ->whereNotNull('vehicle_id')->distinct()->pluck('vehicle_id')->all();
+
+        // A vehicle a rider took for the shift is in use too (plan pausing must not take it away)
+        return array_values(array_unique([...$onDelivery, ...RiderLoadService::heldVehicleIds($storeId)]));
     }
 
     /** Paused accounts lose their mobile (Sanctum) tokens; the web session is ended by LogoutPausedStaff. */

@@ -19,7 +19,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { bestFitId, riderOptionDisabled, riderOptionLabel, type Load, type RiderLoadFields } from '@/lib/rider-fit';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',  href: '/seller/dashboard'  },
@@ -52,9 +52,9 @@ type Delivery = {
     proofs: DeliveryProof[];
 };
 
-type Rider = { id: number; name: string; phone: string | null } & RiderLicenseFields;
+type Rider = { id: number; name: string; phone: string | null } & RiderLoadFields;
 type Vehicle = { id: number; vehicle_type: string; plate_number: string; max_capacity_kg: number; max_tanks: number; status: string };
-type Unassigned = { id: number; order_number: string; customer: string; status: string; redelivery: FailInfo | null };
+type Unassigned = { id: number; order_number: string; customer: string; status: string; redelivery: FailInfo | null; load?: Load };
 type Counts = { active: number; completed: number };
 type Paginated = { data: Delivery[]; current_page: number; last_page: number; total: number };
 
@@ -185,6 +185,9 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     const [dateFrom,  setDateFrom]            = useState(date_from);
     const [dateTo,    setDateTo]              = useState(date_to);
     const [assignOrderId, setAssignOrderId]   = useState('');
+    // The chosen order's load → which riders' vehicles can take it, and the "Best fit"
+    const assignNeed = unassigned.find((o) => String(o.id) === assignOrderId)?.load ?? null;
+    const assignBest = bestFitId(riders, assignNeed);
     const [assignRiderId, setAssignRiderId]   = useState('');
     const [assignVehicleId, setAssignVehicleId] = useState('');
     const [showAssign, setShowAssign]         = useState(false);
@@ -223,7 +226,6 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
         router.post('/seller/deliveries/assign', {
             order_id: assignOrderId,
             rider_id: assignRiderId,
-            vehicle_id: assignVehicleId || null,
         }, {
             onSuccess: () => { setShowAssign(false); setAssignOrderId(''); setAssignRiderId(''); setAssignVehicleId(''); },
         });
@@ -257,8 +259,15 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
 
     // Reassign a failed delivery: open Assign Delivery with that order picked
     function reassign(orderId: number) {
-        setAssignOrderId(String(orderId));
+        pickAssignOrder(String(orderId));
         setShowAssign(true);
+    }
+
+    // Choosing the order pre-selects the rider whose vehicle fits it most tightly ("Best fit")
+    function pickAssignOrder(id: string) {
+        setAssignOrderId(id);
+        const best = bestFitId(riders, unassigned.find((o) => String(o.id) === id)?.load ?? null);
+        setAssignRiderId(best ? String(best) : '');
     }
 
     const TABS = [
@@ -460,7 +469,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                     <div className="space-y-3">
                         <div className="grid gap-1.5">
                             <p className="text-sm font-medium">Order</p>
-                            <Select value={assignOrderId} onValueChange={setAssignOrderId}>
+                            <Select value={assignOrderId} onValueChange={pickAssignOrder}>
                                 <SelectTrigger><SelectValue placeholder="Select order…" /></SelectTrigger>
                                 <SelectContent>
                                     {unassigned.map((o) => (
@@ -481,32 +490,17 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                     <SelectTrigger><SelectValue placeholder="Select rider…" /></SelectTrigger>
                                     <SelectContent>
                                         {riders.map((r) => (
-                                            <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>
-                                                {r.name}{r.phone ? ` · ${r.phone}` : ''}{riderLicenseSuffix(r)}
+                                            <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, assignNeed)}>
+                                                {riderOptionLabel(r, assignNeed, r.id === assignBest)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             )}
-                        </div>
-                        <div className="grid gap-1.5">
-                            <p className="text-sm font-medium">Vehicle <span className="text-muted-foreground font-normal">(optional)</span></p>
-                            {vehicles.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No vehicles available. Add one in Vehicles.</p>
-                            ) : (
-                                <Select value={assignVehicleId || 'none'} onValueChange={(v) => setAssignVehicleId(v === 'none' ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select vehicle…" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">None</SelectItem>
-                                        {vehicles.map((v) => (
-                                            <SelectItem key={v.id} value={String(v.id)}>
-                                                {VEHICLE_TYPE_LABELS[v.vehicle_type] ?? v.vehicle_type} · {v.plate_number}
-                                                {' '}— {v.max_tanks} tanks / {v.max_capacity_kg} kg
-                                                {v.status === 'in_use' ? ' (in use)' : ''}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                            {assignNeed && assignNeed.tanks > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    This order: {assignNeed.kg} kg / {assignNeed.tanks} tank(s) (full tanks). It goes on the rider's own vehicle for today.
+                                </p>
                             )}
                         </div>
                     </div>

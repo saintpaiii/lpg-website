@@ -167,7 +167,7 @@ class FindStoreController extends Controller
                 ((float) $store->latitude != 0.0 && (float) $store->longitude != 0.0)
                     ? DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $lat, $lng)
                     : null,
-                (float) $p->weight_kg * $qty,
+                DeliveryFeeService::fullTankKg((float) $p->weight_kg) * $qty,   // full tanks, as at checkout
                 (float) $p->weight_kg > 0 ? $qty : 0,
             );
             if (! $quote) {

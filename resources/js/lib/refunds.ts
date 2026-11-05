@@ -9,6 +9,8 @@ export type RefundItem = {
     order_id: number;
     order_number: string | null;
     order_total: number;
+    /** Full-tank load of the order (a replacement carries the same items); seller list only */
+    load?: { kg: number; tanks: number } | null;
     store_name: string | null;
     customer_name: string | null;
     customer_phone: string | null;

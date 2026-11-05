@@ -7,6 +7,7 @@ import axios from 'axios';
 import DeliveryMap, { type RouteData, type RouteStop } from '@/components/delivery-map';
 import { fetchRoute } from '@/lib/map';
 import CustomerContactCard from '@/components/rider/customer-contact';
+import { LoadMeter, type RiderLoad } from '@/components/rider/load-meter';
 import DeliveryFailFields, { emptyFailValues, failValuesComplete, type FailInfo, type FailOptions, type FailValues } from '@/components/delivery-fail-fields';
 import {
     AlertTriangle,
@@ -143,6 +144,8 @@ type Props = {
     counts: Counts;
     filters: { tab?: string };
     since?: string | null;
+    /** Shift vehicle + current load (RiderLoadService) */
+    my_load?: RiderLoad;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -837,7 +840,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 // ── Route map view ─────────────────────────────────────────────────────────────
 
 /** Pull fresh stop statuses + counters without a full page visit (statuses can also change from the seller/admin side). */
-const refreshRoute = () => router.reload({ only: ['route', 'counts'] });
+const refreshRoute = () => router.reload({ only: ['route', 'counts', 'my_load'] });
 
 /** Map of today's route. While visible, follows the rider's GPS and shares it every 60s. */
 function RouteMapView({ route, onUpdateStatus, statusDisabled, onMessage }: {
@@ -901,12 +904,12 @@ function RouteMapView({ route, onUpdateStatus, statusDisabled, onMessage }: {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function RiderDeliveries({ deliveries, tab, counts, filters, route }: Props & { route: RouteData }) {
+export default function RiderDeliveries({ deliveries, tab, counts, filters, route, my_load }: Props & { route: RouteData }) {
     // New assignments / store changes since the last visit (until the rider leaves the page)
     const seen = useSeenRows(deliveries.data);
     // Live: my deliveries (assigned / reassigned / status) refresh the list, counters and map pins
     const riderId = usePage<SharedData>().props.auth.user.id as number;
-    useLiveReload(`user.${riderId}`, ['deliveries', 'counts', 'route'], (_e, kind) => kind === 'delivery');
+    useLiveReload(`user.${riderId}`, ['deliveries', 'counts', 'route', 'my_load'], (_e, kind) => kind === 'delivery');
     const flash = (usePage().props as any).flash as { success?: string; error?: string } | undefined;
     // No approved, unexpired driver's license → no pickups (the server refuses too)
     const license = usePage<SharedData>().props.rider_license;
@@ -1036,6 +1039,9 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Load meter: today's vehicle and what it carries (both views) */}
+                <LoadMeter data={my_load} />
 
                 {/* List / Map toggle (kept in the URL so it survives the proof-upload reload) */}
                 <div className="inline-flex w-fit rounded-lg border bg-white p-1 shadow-sm">

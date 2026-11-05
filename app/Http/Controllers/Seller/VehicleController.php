@@ -61,6 +61,7 @@ class VehicleController extends Controller
             'riders'   => $riders,
             // Delivery fee per vehicle type the store currently has (non-retired, not deleted)
             'rates'    => $this->rateRows($store),
+            'vehicle_limits' => self::vehicleLimits(),
             'can_deliver' => DeliveryFeeService::clientOptions($store) !== [],
             'planLimit' => [
                 'used'    => SubscriptionService::usage($store)['vehicles'],
@@ -70,6 +71,33 @@ class VehicleController extends Controller
                 'can_add' => SubscriptionService::canAdd($store, 'vehicles'),
             ],
         ]);
+    }
+
+    /**
+     * Each vehicle type has a fixed legal maximum (RA 11592 Sec. 38(d)(11): no loading LPG beyond a vehicle's
+     * capacity). The store may set a lower limit, never higher.
+     */
+    private function validateCapacity(Request $request): void
+    {
+        $request->validate(['vehicle_type' => 'required|in:' . implode(',', array_keys(DeliveryFeeService::types()))]);
+        $type  = (string) $request->input('vehicle_type');
+        $limit = DeliveryFeeService::typeLimits($type);
+        $msg   = 'A ' . DeliveryFeeService::label($type) . " can carry at most {$limit['tanks']} tanks / "
+            . rtrim(rtrim(number_format($limit['kg'], 2, '.', ''), '0'), '.') . " kg (RA 11592 forbids loading beyond a vehicle's capacity).";
+
+        $request->validate([
+            'max_tanks'       => "required|integer|min:1|max:{$limit['tanks']}",
+            'max_capacity_kg' => "required|numeric|min:1|max:{$limit['kg']}",
+        ], [
+            'max_tanks.max'       => $msg,
+            'max_capacity_kg.max' => $msg,
+        ]);
+    }
+
+    /** Legal maximum per vehicle type, for the form. */
+    public static function vehicleLimits(): array
+    {
+        return collect(DeliveryFeeService::types())->map(fn ($t, $key) => ['label' => $t['label'], ...DeliveryFeeService::typeLimits($key)])->all();
     }
 
     /** One row per vehicle type the store has now (non-retired, not deleted), with its fee (null = not set). */
@@ -129,6 +157,7 @@ class VehicleController extends Controller
         $this->ownerOnly();
         $store = $request->attributes->get('seller_store');
 
+        $this->validateCapacity($request);
         $data = $request->validate([
             'vehicle_type'      => 'required|in:motorcycle,tricycle,multicab,van,pickup_truck,small_truck,large_truck',
             'plate_number'      => 'required|string|max:20',
@@ -170,6 +199,7 @@ class VehicleController extends Controller
         $store = $request->attributes->get('seller_store');
         if ($vehicle->store_id !== $store->id) abort(403);
 
+        $this->validateCapacity($request);
         $data = $request->validate([
             'vehicle_type'      => 'required|in:motorcycle,tricycle,multicab,van,pickup_truck,small_truck,large_truck',
             'plate_number'      => 'required|string|max:20',

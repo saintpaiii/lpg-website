@@ -252,6 +252,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         Route::middleware('permission:settings.view')->group(function () {
             Route::get('settings', [SettingsController::class, 'index'])->name('settings');
             Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
-            Route::put('settings', [SettingsController::class, 'update']);
+            // The Settings page posts FormData with _method=PUT (file upload) — this is the route it hits
+            Route::put('settings', [SettingsController::class, 'update'])->name('settings.put');
         });
     });

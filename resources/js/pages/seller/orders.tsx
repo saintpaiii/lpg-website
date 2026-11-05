@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { bestFitId, riderOptionDisabled, riderOptionLabel, sumLoads, type Load, type RiderLoadFields } from '@/lib/rider-fit';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge, type PickupOrder } from '@/components/complete-pickup-dialog';
 import { orderStatusLabel } from '@/lib/order-status';
@@ -54,6 +54,8 @@ type Order = {
     empty_tanks_collected: boolean;
     empty_tank_summary: string | null;
     grand_total: number;
+    /** Full-tank load (kg / tanks) — the rider pickers check what fits */
+    load?: Load;
 };
 
 /** Confirmed/preparing orders whose payment allows dispatch (same rule as single assignment). */
@@ -61,7 +63,7 @@ const isDispatchable = (o: Order) =>
     o.fulfillment !== 'pickup' && ['confirmed', 'preparing'].includes(o.status)
     && (o.payment_status === 'paid' || o.payment_mode === 'cod' || (o.payment_mode === 'consignment' && o.payment_status === 'partial'));
 
-type Rider  = { id: number; name: string } & RiderLicenseFields;
+type Rider  = { id: number; name: string } & RiderLoadFields;
 type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number; outstanding_balance: number; overdue_balance: number };
 type Paginated = { data: Order[]; current_page: number; last_page: number; total: number };
 
@@ -160,7 +162,9 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
     }
 
     function openDialog(d: ActionDialog) {
-        setRiderId('');
+        // Pre-select the rider whose vehicle fits this order most tightly ("Best fit")
+        const best = d?.type === 'assign_rider' ? bestFitId(riders, d.order.load ?? null) : null;
+        setRiderId(best ? String(best) : '');
         setCancelReason('');
         setCancelNotes('');
         setDialog(d);
@@ -544,9 +548,13 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                     <SelectValue placeholder="Select a rider…" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {riders.map((r) => (
-                                        <SelectItem key={r.id} value={String(r.id)} disabled={riderDisabled(r)}>{r.name}{riderLicenseSuffix(r)}</SelectItem>
-                                    ))}
+                                    {(() => {
+                                        const need = dialog?.type === 'assign_rider' ? dialog.order.load ?? null : null;
+                                        const best = bestFitId(riders, need);
+                                        return riders.map((r) => (
+                                            <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, need)}>{riderOptionLabel(r, need, r.id === best)}</SelectItem>
+                                        ));
+                                    })()}
                                 </SelectContent>
                             </Select>
                         )}
@@ -565,6 +573,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
             {/* Keep the last rows reachable above the floating bar */}
             {selected.length > 0 && <div className="h-28" aria-hidden />}
             <BatchAssignBar
+                need={sumLoads(orders.data.filter((o) => selected.includes(o.id)).map((o) => o.load))}
                 count={selected.length}
                 riders={riders}
                 processing={batching}

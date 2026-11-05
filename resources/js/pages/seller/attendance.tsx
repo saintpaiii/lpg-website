@@ -65,7 +65,10 @@ type Props = {
     date: string;
     summary: Summary;
     store_location: StoreLocation | null;
+    rider_vehicles?: RiderVehicle[];
 };
+
+type RiderVehicle = { id: number; label: string; plate_number: string; max_tanks: number; max_kg: number; in_use_by: string | null; assigned_rider_id: number | null };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -178,8 +181,31 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
 
 // ── Clock-in / Clock-out forms ─────────────────────────────────────────────────
 
-function ClockInButton({ row, date }: { row: AttendanceRow; date: string }) {
-    const { post, processing } = useForm({ user_id: row.user_id, date });
+function ClockInButton({ row, date, vehicles = [] }: { row: AttendanceRow; date: string; vehicles?: RiderVehicle[] }) {
+    const preferred = vehicles.find((v) => v.assigned_rider_id === row.user_id && !v.in_use_by) ?? vehicles.find((v) => !v.in_use_by);
+    const { data, setData, post, processing } = useForm({ user_id: row.user_id, date, vehicle_id: preferred ? String(preferred.id) : '' });
+    // Riders clock in with a vehicle (held until clock-out)
+    if (row.sub_role === 'rider') {
+        return (
+            <span className="inline-flex items-center gap-1">
+                <select value={data.vehicle_id} onChange={(e) => setData('vehicle_id', e.target.value)}
+                    className="h-7 rounded-md border border-input bg-background px-1.5 text-xs" aria-label="Vehicle">
+                    <option value="">Vehicle…</option>
+                    {vehicles.map((v) => (
+                        <option key={v.id} value={v.id} disabled={!!v.in_use_by}>
+                            {v.label} {v.plate_number} · {v.max_tanks} tanks · {v.max_kg} kg{v.in_use_by ? ` — in use by ${v.in_use_by}` : ''}
+                        </option>
+                    ))}
+                </select>
+                <Button size="sm" disabled={processing || !data.vehicle_id}
+                    onClick={() => post('/seller/attendance/clock-in', { preserveScroll: true })}
+                    className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2">
+                    <ClockArrowUp className="h-3 w-3" />
+                    Clock In
+                </Button>
+            </span>
+        );
+    }
     return (
         <Button
             size="sm"
@@ -253,7 +279,7 @@ function SetClockOutDialog({ row, date, onClose }: { row: AttendanceRow; date: s
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function AttendancePage({ rows, date, summary, store_location }: Props) {
+export default function AttendancePage({ rows, date, summary, store_location, rider_vehicles = [] }: Props) {
     const { auth } = usePage<SharedData>().props;
     const canManage = auth.user.role === 'seller'
         || (auth.user.role === 'seller_staff' && (auth.user as any).sub_role === 'hr');
@@ -412,7 +438,7 @@ export default function AttendancePage({ rows, date, summary, store_location }: 
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-end gap-1 flex-wrap">
                                                             {isToday && !row.clock_in && row.schedule_start && row.schedule_end && (
-                                                                <ClockInButton row={row} date={date} />
+                                                                <ClockInButton row={row} date={date} vehicles={rider_vehicles} />
                                                             )}
                                                             {isToday && !row.clock_in && (!row.schedule_start || !row.schedule_end) && (
                                                                 <span className="text-xs text-gray-400 italic">No schedule</span>

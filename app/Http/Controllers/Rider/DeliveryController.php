@@ -157,6 +157,8 @@ class DeliveryController extends Controller
             ],
             'filters' => $request->only('tab'),
             'route'   => $this->routeData($user),
+            // Load meter: the shift vehicle and what it carries (active deliveries, full tanks)
+            'my_load' => \App\Services\RiderLoadService::present(\App\Services\RiderLoadService::load($user), \App\Services\RiderLoadService::openAttendance($user) !== null),
             'fail_options' => Delivery::failOptions(),
         ]);
     }

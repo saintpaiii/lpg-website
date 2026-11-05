@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Models\Vehicle;
 use App\Services\NotificationService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,8 +88,10 @@ class DeliveryController extends Controller
             ->get(['id', 'name', 'phone', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
+        $loads   = \App\Services\RiderLoadService::forRiders($riderRows);
         $riders = $riderRows
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']] + ($loads[$r->id] ?? []))
             ->values();
 
         // Available vehicles for this store
@@ -114,7 +117,7 @@ class DeliveryController extends Controller
             ->where('fulfillment', 'delivery')   // pick-up orders don't need a rider
             ->where(fn ($q) => $q->whereDoesntHave('delivery')
                 ->orWhereHas('delivery', fn ($d) => $d->where('status', 'failed')))
-            ->with(['customer', 'delivery'])
+            ->with(['customer', 'delivery', 'items.product'])
             ->latest()
             ->take(50)
             ->get()
@@ -124,6 +127,7 @@ class DeliveryController extends Controller
                 'customer'     => $o->customer?->name ?? '—',
                 'status'       => $o->status,
                 'redelivery'   => $o->delivery?->failInfo(),
+                'load'         => \App\Services\DeliveryFeeService::orderLoad($o->items),
             ])
             ->values();
 
@@ -168,56 +172,33 @@ class DeliveryController extends Controller
             return back()->with('error', $why);
         }
 
+        // The rider's own shift vehicle carries it (vehicle_id in the request is ignored — kept for old clients).
+        // Capacity: the vehicle's total load after this order must stay within its max kg and tanks.
         $vehicle = null;
-        if (! empty($data['vehicle_id'])) {
-            $vehicle = Vehicle::where('id', $data['vehicle_id'])->where('store_id', $store->id)->first();
-            if (! $vehicle) {
-                return back()->withErrors(['vehicle_id' => 'Invalid vehicle.']);
-            }
-            if ($vehicle->paused_by_plan) {
-                return back()->with('error', "Vehicle {$vehicle->plate_number} is inactive — over plan limit.");
-            }
+        try {
+            DB::transaction(function () use ($order, $rider, $store, &$vehicle) {
+                \App\Services\RiderLoadService::lockShift($rider);
+                if ($why = \App\Services\RiderLoadService::canTake($rider, [$order])) {
+                    throw new \RuntimeException($why);
+                }
+                $vehicle = \App\Services\RiderLoadService::currentVehicle($rider);
+                $deliveryData = [
+                    'rider_id'    => $rider->id,
+                    'vehicle_id'  => $vehicle?->id,
+                    'assigned_at' => now(),
+                    'status'      => 'assigned',
+                    'sequence'    => null,
+                    'batch_id'    => null,
+                ];
+                $order->delivery
+                    ? $order->delivery->update($deliveryData)
+                    : Delivery::create($deliveryData + ['order_id' => $order->id, 'store_id' => $store->id]);
 
-            // Capacity check: total kg of the order vs vehicle max
-            $totalKg = $order->items->sum(function ($item) {
-                $weightKg = $item->product?->weight_kg ?? 0;
-                return $weightKg * $item->quantity;
+                $order->update(['status' => 'out_for_delivery']);
             });
-
-            if ($totalKg > (float) $vehicle->max_capacity_kg) {
-                return back()->with('error', sprintf(
-                    'Order total weight (%.1f kg) exceeds %s capacity (%.1f kg). Please choose a larger vehicle.',
-                    $totalKg, $vehicle->plate_number, (float) $vehicle->max_capacity_kg
-                ));
-            }
-
-            // Mark vehicle as in_use
-            $vehicle->update(['status' => 'in_use']);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
         }
-
-        $deliveryData = [
-            'rider_id'    => $rider->id,
-            'vehicle_id'  => $vehicle?->id,
-            'assigned_at' => now(),
-            'status'      => 'assigned',
-            'sequence'    => null,
-            'batch_id'    => null,
-        ];
-
-        if ($order->delivery) {
-            // Free the old vehicle if changing
-            if ($order->delivery->vehicle_id && $order->delivery->vehicle_id !== $vehicle?->id) {
-                Vehicle::find($order->delivery->vehicle_id)?->update(['status' => 'available']);
-            }
-            $order->delivery->update($deliveryData);
-        } else {
-            Delivery::create(array_merge($deliveryData, [
-                'order_id' => $order->id,
-                'store_id' => $store->id,
-            ]));
-        }
-
-        $order->update(['status' => 'out_for_delivery']);
 
         // Notify rider
         $vehicleInfo = $vehicle ? " ({$vehicle->plate_number})" : '';
@@ -270,16 +251,9 @@ class DeliveryController extends Controller
         if ($data['status'] === 'delivered') {
             $delivery->order->update(['status' => 'delivered', 'delivered_at' => now()]);
             \App\Services\OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
-            // Free the vehicle
-            if ($delivery->vehicle_id) {
-                Vehicle::find($delivery->vehicle_id)?->update(['status' => 'available']);
-            }
+            // The vehicle stays with the rider's shift (status follows clock-in / clock-out)
         } elseif ($data['status'] === 'failed') {
             $delivery->order->update(['status' => 'preparing']);
-            // Free the vehicle on failure too
-            if ($delivery->vehicle_id) {
-                Vehicle::find($delivery->vehicle_id)?->update(['status' => 'available']);
-            }
         }
 
         return back()->with('success', 'Delivery status updated.');

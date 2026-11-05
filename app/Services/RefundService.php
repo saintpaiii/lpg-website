@@ -100,7 +100,15 @@ class RefundService
             throw new \RuntimeException($why);
         }
 
-        $original = $refund->order()->with('items')->firstOrFail();
+        $original = $refund->order()->with('items.product')->firstOrFail();
+
+        // Capacity: the rider's shift vehicle must carry the replacement (same items) on top of its active deliveries
+        if ($rider) {
+            \App\Services\RiderLoadService::lockShift($rider);
+            if ($why = \App\Services\RiderLoadService::canTake($rider, [$original])) {
+                throw new \RuntimeException($why);
+            }
+        }
 
         foreach ($original->items as $item) {
             $inventory = Inventory::where('product_id', $item->product_id)->lockForUpdate()->first();
@@ -167,6 +175,7 @@ class RefundService
             'order_id'    => $replacement->id,
             'store_id'    => $original->store_id,
             'rider_id'    => $riderId,
+            'vehicle_id'  => $rider ? \App\Services\RiderLoadService::currentVehicle($rider)?->id : null,
             'status'      => 'assigned',
             'assigned_at' => now(),
             'notes'       => $base['return_method'] === 'rider_pickup'

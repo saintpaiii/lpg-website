@@ -242,8 +242,13 @@ class DeliveryController extends Controller
             return response()->json(['message' => "Pick-up orders don't need a rider."], 422);
         }
 
+        // A rider of the order's store
+        $rider = \App\Models\User::find($data['rider_id']);
+        if (! $rider?->isRider() || (int) $rider->store_id !== (int) $order->store_id) {
+            return response()->json(['message' => "Choose a rider of this order's store."], 422);
+        }
         // Riders need an approved, unexpired driver's license
-        if (($rider = \App\Models\User::find($data['rider_id'])) && ($why = \App\Services\StaffDocumentService::assignmentError($rider))) {
+        if ($why = \App\Services\StaffDocumentService::assignmentError($rider)) {
             return response()->json(['message' => $why], 422);
         }
 
@@ -255,10 +260,18 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'Can only assign delivery for confirmed or preparing orders.'], 422);
         }
 
-        $delivery = DB::transaction(function () use ($data, $order) {
+        try {
+        $delivery = DB::transaction(function () use ($data, $order, $rider) {
+            // Capacity: the rider's shift vehicle must carry this order on top of its active deliveries
+            \App\Services\RiderLoadService::lockShift($rider);
+            if ($why = \App\Services\RiderLoadService::canTake($rider, [$order])) {
+                throw new \RuntimeException($why);
+            }
             $delivery = Delivery::create([
                 'order_id'    => $order->id,
-                'rider_id'    => $data['rider_id'],
+                'store_id'    => $order->store_id,
+                'vehicle_id'  => \App\Services\RiderLoadService::currentVehicle($rider)?->id,
+                'rider_id'    => $rider->id,
                 'status'      => 'assigned',
                 'sequence'    => null,
                 'batch_id'    => null,
@@ -270,6 +283,9 @@ class DeliveryController extends Controller
 
             return $delivery;
         });
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         $delivery->load(['order.customer', 'order.items.product', 'rider']);
 

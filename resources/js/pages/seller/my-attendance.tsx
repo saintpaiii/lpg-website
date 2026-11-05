@@ -1,4 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { preferredVehicle, VehicleChoice, type PickerVehicle } from '@/components/vehicle-choice';
 import {
     AlertCircle,
     CalendarDays,
@@ -65,6 +66,12 @@ type Props = {
     store_location: StoreLocation | null;
     /** Clock-in allowed from 30 min before the shift until it ends (null = no schedule) */
     clock_in_window: { opens_at_iso: string; ends_at_iso: string; opens_label: string } | null;
+    /** Riders: vehicles to choose from + today's vehicle/load */
+    rider?: {
+        vehicles: PickerVehicle[];
+        current: { clocked_in: boolean; vehicle: { id: number; label: string; plate: string } | null; load: { kg: number; tanks: number; max_kg: number; max_tanks: number } };
+        active_deliveries: number;
+    } | null;
 };
 
 type LocStatus = 'loading' | 'granted' | 'denied' | 'unavailable';
@@ -188,7 +195,16 @@ export default function MyAttendancePage({
     history,
     store_location,
     clock_in_window,
+    rider = null,
 }: Props) {
+    // Riders clock in WITH a vehicle (held until clock-out)
+    const [vehicleId, setVehicleId] = useState<number | null>(() => (rider ? preferredVehicle(rider.vehicles) : null));
+    const [showVehicle, setShowVehicle] = useState(false);
+    function saveVehicle() {
+        if (!vehicleId) return;
+        router.post('/rider/my-attendance/vehicle', { vehicle_id: vehicleId }, { preserveScroll: true, onSuccess: () => setShowVehicle(false) });
+    }
+
     const { auth } = usePage<SharedData>().props;
     const isRider = auth.user.role === 'rider'
         || (auth.user.role === 'seller_staff' && (auth.user as any).sub_role === 'rider');
@@ -238,6 +254,7 @@ export default function MyAttendancePage({
         router.post(`${clockBase}/clock-in`, {
             latitude:  myCoords?.lat ?? null,
             longitude: myCoords?.lng ?? null,
+            vehicle_id: rider ? vehicleId : null,
         }, {
             preserveScroll: true,
             onFinish: () => setSubmitting(null),
@@ -484,6 +501,26 @@ export default function MyAttendancePage({
                             </div>
                         )}
 
+                        {/* Rider: today's vehicle */}
+                        {rider && hasClockIn && !hasClockOut && (
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-3 text-sm">
+                                <span>
+                                    {rider.current.vehicle
+                                        ? <>Today's vehicle: <strong>{rider.current.vehicle.label} {rider.current.vehicle.plate}</strong>
+                                            <span className="text-gray-500"> · {rider.current.load.max_tanks} tanks · {rider.current.load.max_kg} kg</span></>
+                                        : <span className="font-medium text-amber-700">No vehicle yet — choose one to receive deliveries.</span>}
+                                </span>
+                                {(!rider.current.vehicle || rider.active_deliveries === 0) ? (
+                                    <button type="button" className="text-sm font-medium text-blue-600 hover:underline"
+                                        onClick={() => { setVehicleId(rider.current.vehicle?.id ?? preferredVehicle(rider.vehicles)); setShowVehicle(true); }}>
+                                        {rider.current.vehicle ? 'Change vehicle' : 'Choose vehicle'}
+                                    </button>
+                                ) : (
+                                    <span className="text-xs text-gray-500">Finish your active deliveries to change vehicles.</span>
+                                )}
+                            </div>
+                        )}
+
                         {/* Action button */}
                         <div className="flex justify-center pt-1">
                             {!schedule_start || !schedule_end ? (
@@ -582,6 +619,25 @@ export default function MyAttendancePage({
                 )}
             </div>
 
+            {/* Rider: choose / change today's vehicle */}
+            {rider && (
+                <AlertDialog open={showVehicle} onOpenChange={setShowVehicle}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Choose your vehicle for today</AlertDialogTitle>
+                            <AlertDialogDescription>Deliveries are only assigned to riders who are clocked in with a vehicle.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <VehicleChoice vehicles={rider.vehicles} value={vehicleId} onChange={setVehicleId} />
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction className="bg-blue-600 hover:bg-blue-700 text-white" disabled={!vehicleId} onClick={saveVehicle}>
+                                Use this vehicle
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            )}
+
             {/* Clock In Confirmation */}
             <AlertDialog open={showClockInConfirm} onOpenChange={setShowClockInConfirm}>
                 <AlertDialogContent>
@@ -594,12 +650,18 @@ export default function MyAttendancePage({
                             }
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {rider && (
+                        <div className="space-y-2">
+                            <p className="text-sm font-semibold">Choose your vehicle for today</p>
+                            <VehicleChoice vehicles={rider.vehicles} value={vehicleId} onChange={setVehicleId} />
+                        </div>
+                    )}
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => { setShowClockInConfirm(false); submitClockIn(); }}
-                            disabled={submitting !== null}
+                            disabled={submitting !== null || (!!rider && !vehicleId)}
                         >
                             Clock In
                         </AlertDialogAction>

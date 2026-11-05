@@ -27,7 +27,7 @@ class RefundController extends Controller
 
         $base = RefundRequest::where('store_id', $store->id);
 
-        $query = (clone $base)->with(['order', 'customer', 'coupon', 'replacementOrder', 'replacementDelivery.rider'])
+        $query = (clone $base)->with(['order.items.product', 'customer', 'coupon', 'replacementOrder', 'replacementDelivery.rider'])
             ->when($search, fn ($q) => $q->whereHas('order', fn ($o) => $o->where('order_number', 'like', "%{$search}%")))
             ->latest();
 
@@ -57,8 +57,10 @@ class RefundController extends Controller
             ->get(['id', 'name', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
+        // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
+        $loads   = \App\Services\RiderLoadService::forRiders($riderRows);
         $riders = $riderRows
-            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']])
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']] + ($loads[$r->id] ?? []))
             ->values()
             ->all();
 
@@ -133,6 +135,9 @@ class RefundController extends Controller
             'id'                   => $r->id,
             'order_id'             => $r->order_id,
             'order_number'         => $r->order?->order_number,
+            // A replacement carries the same items — the rider picker checks the vehicle's free capacity
+            // (only where the items are eager-loaded — admin / customer lists reuse this formatter)
+            'load'                 => $r->order?->relationLoaded('items') ? \App\Services\DeliveryFeeService::orderLoad($r->order->items) : null,
             'order_total'          => $r->order ? $r->order->grandTotal() : 0,
             'store_name'           => $r->store?->store_name,
             'customer_name'        => $r->customer?->name,

@@ -33,8 +33,34 @@ class DeliveryFeeService
         return static::types()[$type]['label'] ?? ucwords(str_replace('_', ' ', (string) $type));
     }
 
+    /** Weight of one FULL tank (gas + cylinder) for a gas size; products without a size weigh 0. Mirrors lib/delivery-fee.ts. */
+    public static function fullTankKg(?float $gasKg): float
+    {
+        $gas = round((float) $gasKg, 1);
+        if ($gas <= 0) {
+            return 0.0;
+        }
+        // Key like "2.7" / "11" (never the raw "2.70" decimal attribute; PHP turns '5' into int 5 anyway)
+        $key = rtrim(rtrim(number_format($gas, 1, '.', ''), '0'), '.');
+        $table = config('delivery.full_tank_kg', []);
+
+        return isset($table[$key]) ? (float) $table[$key] : round($gas * 2, 1);
+    }
+
     /**
-     * Total weight and number of tanks of a set of order lines.
+     * Legal maximum of a vehicle type (full tanks).
+     *
+     * @return array{kg: float, tanks: int}
+     */
+    public static function typeLimits(string $type): array
+    {
+        $t = static::types()[$type] ?? [];
+
+        return ['kg' => (float) ($t['max_kg'] ?? 0), 'tanks' => (int) ($t['max_tanks'] ?? 0)];
+    }
+
+    /**
+     * Total weight (FULL tanks) and number of tanks of a set of order lines.
      *
      * @param  iterable<array{product: mixed, quantity: int}|object>  $items  each with ->product / ['product'] and quantity
      * @return array{kg: float, tanks: int}
@@ -47,7 +73,7 @@ class DeliveryFeeService
             $product = is_array($item) ? ($item['product'] ?? null) : $item->product;
             $qty     = (int) (is_array($item) ? ($item['quantity'] ?? 0) : $item->quantity);
             $w       = (float) ($product?->weight_kg ?? 0);
-            $kg += $w * $qty;
+            $kg += static::fullTankKg($w) * $qty;
             if ($w > 0) {
                 $tanks += $qty;
             }

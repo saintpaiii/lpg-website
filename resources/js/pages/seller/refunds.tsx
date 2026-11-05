@@ -21,7 +21,7 @@ import {
     type ReturnMethod,
 } from '@/lib/refunds';
 import type { BreadcrumbItem } from '@/types';
-import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
+import { bestFitId, riderOptionDisabled, riderOptionLabel, type RiderLoadFields } from '@/lib/rider-fit';
 import { NotePicker, ReasonTextPicker } from '@/components/reason-picker';
 
 type Counts = { pending: number; approved: number; processed: number; rejected: number; escalated: number; all: number };
@@ -31,7 +31,7 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
-    riders: ({ id: number; name: string } & RiderLicenseFields)[];
+    riders: ({ id: number; name: string } & RiderLoadFields)[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Refunds', href: '/seller/refunds' }];
@@ -82,7 +82,8 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
     function openAccept(r: RefundItem) {
         setForm({
             resolution: r.preferred_resolution ?? 'replacement',
-            rider_id: '',
+            // Pre-select the rider whose vehicle fits the replacement most tightly ("Best fit")
+            rider_id: String(bestFitId(riders, r.load ?? null) ?? ''),
             refund_reference: '',
             discount_amount: String(r.amount),
             discount_valid_days: '30',
@@ -288,7 +289,11 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                 ) : (
                                     <select value={form.rider_id} onChange={(e) => setForm((f) => ({ ...f, rider_id: e.target.value }))} className={inputCls}>
                                         <option value="">Select a rider…</option>
-                                        {riders.map((r) => <option key={r.id} value={r.id} disabled={riderDisabled(r)}>{r.name}{riderLicenseSuffix(r)}</option>)}
+                                        {riders.map((r) => (
+                                            <option key={r.id} value={r.id} disabled={riderOptionDisabled(r, accepting?.load ?? null)}>
+                                                {riderOptionLabel(r, accepting?.load ?? null, r.id === bestFitId(riders, accepting?.load ?? null))}
+                                            </option>
+                                        ))}
                                     </select>
                                 )}
                                 <p className="text-xs text-muted-foreground">A ₱0 replacement order with the same items is created and stock is deducted.</p>
