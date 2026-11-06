@@ -62,6 +62,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::post('orders/batch-assign', [OrderController::class, 'batchAssign'])->name('orders.batch-assign');
             Route::post('orders/{order}/assign-delivery', [OrderController::class, 'assignDelivery'])->name('orders.assign-delivery');
             Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
+            // Acknowledgement receipts (one per payment) — with the orders, so staff without Invoices can open them
+            Route::get('receipts/{receipt}/pdf', [\App\Http\Controllers\PaymentReceiptController::class, 'sellerPdf'])->name('receipts.pdf');
         });
 
         // ── Messages ─────────────────────────────────────────────────────────

@@ -223,6 +223,12 @@ class Order extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /** Acknowledgement receipts — one per payment received (PaymentReceiptService). */
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(PaymentReceipt::class)->orderBy('id');
+    }
+
     public function coupon(): BelongsTo
     {
         return $this->belongsTo(Coupon::class)->withTrashed();

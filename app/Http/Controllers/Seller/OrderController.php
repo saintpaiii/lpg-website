@@ -14,6 +14,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\OrderPaymentService;
+use App\Services\PaymentReceiptService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -349,6 +350,13 @@ class OrderController extends Controller
                 ]);
             }
 
+            // Walk-in paid at the counter → acknowledgement receipt (nothing for unpaid; partial only with a known down payment)
+            if ($data['payment_status'] === 'paid') {
+                PaymentReceiptService::record($order, $order->grandTotal(), $data['payment_method'], 'walk_in');
+            } elseif ($data['payment_status'] === 'partial' && (float) $order->down_payment_amount > 0) {
+                PaymentReceiptService::record($order, (float) $order->down_payment_amount, $data['payment_method'], 'walk_in');
+            }
+
             return $order;
         });
 
@@ -392,6 +400,7 @@ class OrderController extends Controller
         }
 
         return Inertia::render('seller/order-show', [
+            'receipts'  => PaymentReceiptService::listFor($order, 'seller'),
             'breakdown' => $order->priceBreakdown(),
             'loyalty'   => $loyalty,
             'order' => $this->formatOrder($order) + [
@@ -544,7 +553,7 @@ class OrderController extends Controller
                 OrderPaymentService::handleDelivered($order->fresh());
                 // Paid in cash at the store (same as the rider's collectPayment)
                 if ($cashAtStore) {
-                    OrderPaymentService::markPaid($order->fresh(), 'cash');
+                    OrderPaymentService::markPaid($order->fresh(), 'cash', 'cash_at_store');
                 }
             }
         });
@@ -610,18 +619,22 @@ class OrderController extends Controller
             'payment_method' => 'required|in:cash,gcash,bank_transfer,maya',
         ]);
 
-        if ($data['payment_status'] === 'paid') {
-            OrderPaymentService::markPaid($order, $data['payment_method']);
-        } else {
-            $order->update($data);
+        DB::transaction(function () use ($order, $data) {
+            if ($data['payment_status'] === 'paid') {
+                // Receipt for whatever was still owed
+                OrderPaymentService::markPaid($order, $data['payment_method'], 'seller_recorded');
+            } else {
+                // No amount is known here → no receipt
+                $order->update($data);
 
-            if ($invoice = $order->invoice) {
-                $invoice->update([
-                    'payment_status' => $data['payment_status'],
-                    'payment_method' => $data['payment_method'],
-                ]);
+                if ($invoice = $order->invoice) {
+                    $invoice->update([
+                        'payment_status' => $data['payment_status'],
+                        'payment_method' => $data['payment_method'],
+                    ]);
+                }
             }
-        }
+        });
 
         return back()->with('success', "Payment updated for {$order->order_number}.");
     }

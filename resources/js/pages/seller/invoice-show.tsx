@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
 import { InvoiceDocument, InvoiceStatusBadge, type InvoiceDoc } from '@/components/invoice-document';
+import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
 import type { BreadcrumbItem } from '@/types';
 
 
@@ -37,7 +38,7 @@ type Invoice = {
     order: { id: number; order_number: string; transaction_type: string; items: InvoiceItem[] } | null;
 };
 
-type Props = { invoice: Invoice; doc: InvoiceDoc };
+type Props = { invoice: Invoice; doc: InvoiceDoc; receipts: PaymentReceiptRow[] };
 
 
 function fmt(n: number) {
@@ -46,7 +47,7 @@ function fmt(n: number) {
 
 const COD_METHODS = ['cash', 'gcash', 'bank_transfer', 'maya'] as const;
 
-export default function SellerInvoiceShow({ invoice, doc }: Props) {
+export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Invoices',  href: '/seller/invoices'  },
@@ -63,17 +64,24 @@ export default function SellerInvoiceShow({ invoice, doc }: Props) {
     const [recordLoading,  setRecordLoading]  = useState(false);
 
     const grandTotal = doc.breakdown.grand_total;
+    // What is still owed — "Amount Received" is added to what was already paid
+    const remaining  = Math.max(0, Math.round((grandTotal - invoice.paid_amount) * 100) / 100);
+    const [recordError, setRecordError] = useState<string | null>(null);
 
     function submitRecordPayment() {
         if (!recordAmount || parseFloat(recordAmount) <= 0) return;
         setRecordLoading(true);
+        setRecordError(null);
         router.post(`/seller/invoices/${invoice.id}/record-payment`, {
             payment_method: recordMethod,
             amount: parseFloat(recordAmount),
         }, {
             preserveScroll: true,
             onSuccess: () => { setRecordOpen(false); },
-            onError:   () => toast.error('Failed to record payment. Please try again.'),
+            onError:   (errors) => {
+                if (errors.amount) setRecordError(errors.amount);
+                else toast.error('Failed to record payment. Please try again.');
+            },
             onFinish:  () => setRecordLoading(false),
         });
     }
@@ -108,7 +116,7 @@ export default function SellerInvoiceShow({ invoice, doc }: Props) {
                             <Button
                                 size="sm"
                                 className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
-                                onClick={() => { setRecordAmount(String(grandTotal)); setRecordOpen(true); }}
+                                onClick={() => { setRecordAmount(remaining.toFixed(2)); setRecordError(null); setRecordOpen(true); }}
                             >
                                 <Banknote className="h-4 w-4" />
                                 Record Payment
@@ -204,6 +212,8 @@ export default function SellerInvoiceShow({ invoice, doc }: Props) {
                                 )}
                             </CardContent>
                         </Card>
+
+                        <PaymentReceiptsCard receipts={receipts} />
                     </div>
                 </div>
             </div>
@@ -219,7 +229,9 @@ export default function SellerInvoiceShow({ invoice, doc }: Props) {
                     </DialogHeader>
                     <div className="space-y-4 py-1">
                         <p className="text-sm text-muted-foreground">
-                            Invoice <strong className="font-mono">{invoice.invoice_number}</strong> · Total due: <strong>{fmt(grandTotal)}</strong>
+                            Invoice <strong className="font-mono">{invoice.invoice_number}</strong> · Total: <strong>{fmt(grandTotal)}</strong>
+                            {invoice.paid_amount > 0 && <> · Paid: <strong>{fmt(invoice.paid_amount)}</strong></>}
+                            {' '}· Balance: <strong>{fmt(remaining)}</strong>
                         </p>
                         <div className="grid gap-1.5">
                             <label className="text-sm font-medium">Payment Method</label>
@@ -239,11 +251,14 @@ export default function SellerInvoiceShow({ invoice, doc }: Props) {
                                 type="number"
                                 min="0.01"
                                 step="0.01"
+                                max={remaining}
                                 value={recordAmount}
-                                onChange={(e) => setRecordAmount(e.target.value)}
-                                placeholder={String(grandTotal)}
+                                onChange={(e) => { setRecordAmount(e.target.value); setRecordError(null); }}
+                                placeholder={remaining.toFixed(2)}
                                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
+                            <p className="text-xs text-muted-foreground">Added to what was already paid. A receipt is issued for this amount.</p>
+                            {recordError && <p className="text-xs text-red-600">{recordError}</p>}
                         </div>
                     </div>
                     <DialogFooter>

@@ -131,15 +131,15 @@ class OrderController extends Controller
 
             $localMethod = PayMongoService::mapPaymentMethod($paymongoMethod ?? '');
 
-            $payment->update([
-                'status'              => 'paid',
-                'paymongo_payment_id' => $paymongoPayId,
-                'payment_method'      => $localMethod,
-                'paid_at'             => now(),
-            ]);
-
             $wasPartial = $order->payment_status === 'partial';
-            $newStatus  = OrderPaymentService::applyOnlinePayment($order, $localMethod);
+            // Locked + re-checked: when the webhook got there first this does nothing (null)
+            $newStatus  = OrderPaymentService::applyPaidCheckoutRow($payment->id, $localMethod, $paymongoPayId);
+            $order->refresh();
+            $newStatus ??= $order->payment_status;
+
+            if ($order->status === 'cancelled') {
+                return ['status' => 'paid', 'message' => 'Payment received, but this order was cancelled. The store will refund you.'];
+            }
 
             if ($newStatus === 'partial') {
                 return ['status' => 'partial', 'message' => 'Down payment confirmed! The remaining balance is due after delivery.'];
@@ -319,6 +319,7 @@ class OrderController extends Controller
         }
 
         return Inertia::render('customer/order-show', [
+            'receipts'  => \App\Services\PaymentReceiptService::listFor($order, 'customer'),
             'breakdown' => $order->priceBreakdown(),
             'order' => [
                 'id'               => $order->id,

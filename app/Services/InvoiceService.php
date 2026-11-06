@@ -64,8 +64,11 @@ class InvoiceService
         return $code;
     }
 
-    /** The store's invoice code; creates one (backfill rule) when the store has none. Call with the store row locked. */
-    private static function ensurePrefix(Store $store): string
+    /**
+     * The store's invoice code; creates one (backfill rule) when the store has none. Call with the store row locked.
+     * Also used by PaymentReceiptService (receipts are "{prefix}-AR-000001").
+     */
+    public static function ensurePrefix(Store $store): string
     {
         if ($store->invoice_prefix) {
             return $store->invoice_prefix;
@@ -91,10 +94,11 @@ class InvoiceService
         return $prefix . '-' . str_pad((string) $n, 6, '0', STR_PAD_LEFT);
     }
 
-    /** Store has issued a store-series invoice → its invoice code can no longer change. */
+    /** Store has issued a store-series invoice or an acknowledgement receipt → its invoice code can no longer change. */
     public static function prefixLocked(Store $store): bool
     {
-        return Invoice::withTrashed()->where('store_id', $store->id)->whereNotNull('vat_status')->exists();
+        return Invoice::withTrashed()->where('store_id', $store->id)->whereNotNull('vat_status')->exists()
+            || \App\Models\PaymentReceipt::where('store_id', $store->id)->exists();
     }
 
     // ── VAT ───────────────────────────────────────────────────────────────────

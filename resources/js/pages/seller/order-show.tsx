@@ -29,6 +29,7 @@ import type { FailInfo } from '@/components/delivery-fail-fields';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge } from '@/components/complete-pickup-dialog';
 import { orderStatusLabel } from '@/lib/order-status';
+import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
 
 type OrderItem = {
     id: number;
@@ -126,7 +127,7 @@ type CustomerLoyaltyInfo = {
     cancelled_orders: number;
 } | null;
 
-export default function SellerOrderShow({ order, riders, breakdown, loyalty }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo }) {
+export default function SellerOrderShow({ order, riders, breakdown, loyalty, receipts = [] }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo; receipts?: PaymentReceiptRow[] }) {
     // Live: this order's status / delivery changes reload the page data
     const liveStoreId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
     useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
@@ -510,6 +511,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty }: P
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* One acknowledgement receipt per payment */}
+                        <PaymentReceiptsCard receipts={receipts} />
 
                         {/* Delivery */}
                         {order.delivery && (

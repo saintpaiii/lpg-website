@@ -397,7 +397,7 @@ class DeliveryController extends Controller
             return back()->with('error', 'Payment was already recorded for this order.');
         }
 
-        DB::transaction(fn () => OrderPaymentService::markPaid($order, 'cash'));
+        DB::transaction(fn () => OrderPaymentService::markPaid($order, 'cash', 'cash_on_delivery'));
 
         if ($order->store_id) {
             NotificationService::sendToStore(

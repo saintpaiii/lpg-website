@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\Delivery;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\RefundRequest;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Single place for order payment / delivery side effects:
@@ -17,10 +19,28 @@ use App\Models\RefundRequest;
 class OrderPaymentService
 {
     /**
-     * Mark an order as fully paid. Safe to call more than once.
+     * Lock the order row and load its latest values into $order (callers keep using their instance).
+     * Only effective inside a transaction — every payment path runs in one.
      */
-    public static function markPaid(Order $order, ?string $method = null): void
+    private static function lockOrder(Order $order): void
     {
+        $locked = Order::withTrashed()->whereKey($order->id)->lockForUpdate()->first();
+        if ($locked) {
+            $order->setRawAttributes($locked->getAttributes(), true);
+            $order->unsetRelation('invoice');
+        }
+    }
+
+    /**
+     * Mark an order as fully paid. Safe to call more than once (an already-paid order gets no second receipt).
+     * Issues the acknowledgement receipt for the amount still owed before this call, unless $issueReceipt is false
+     * (applyOnlinePayment issues its own).
+     */
+    public static function markPaid(Order $order, ?string $method = null, ?string $source = null, ?string $reference = null, bool $issueReceipt = true): void
+    {
+        self::lockOrder($order);
+        $before = PaymentReceiptService::paidSoFar($order);
+
         $settlesConsignment = $order->payment_mode === 'consignment' && $order->payment_status === 'partial';
 
         $updates = ['payment_status' => 'paid'];
@@ -45,6 +65,41 @@ class OrderPaymentService
         if ($settlesConsignment) {
             LoyaltyService::recordBalancePaid($order->fresh());
         }
+
+        if ($issueReceipt) {
+            PaymentReceiptService::record($order, $order->grandTotal() - $before, $method, $source ?? 'seller_recorded', $reference);
+        }
+    }
+
+    /**
+     * Apply ONE paid PayMongo checkout row exactly once — used by the webhook, the return-verify and the
+     * unpaid-orders job, which can see the same payment at the same time. The Payment row is locked and its status
+     * re-checked: the second caller sees 'paid' and does nothing (returns null).
+     *
+     * @return string|null The order's new payment_status, or null when the row was already applied / has no order
+     */
+    public static function applyPaidCheckoutRow(int $paymentId, ?string $method, ?string $paymongoPayId): ?string
+    {
+        return DB::transaction(function () use ($paymentId, $method, $paymongoPayId) {
+            $payment = Payment::whereKey($paymentId)->lockForUpdate()->first();
+            if (! $payment || $payment->status === 'paid') {
+                return null;
+            }
+
+            $payment->update([
+                'status'              => 'paid',
+                'paymongo_payment_id' => $paymongoPayId,
+                'payment_method'      => $method,
+                'paid_at'             => now(),
+            ]);
+
+            $order = $payment->order;
+            if (! $order) {
+                return null;
+            }
+
+            return self::applyOnlinePayment($order, $method, $paymongoPayId, $payment);
+        });
     }
 
     /**
@@ -53,9 +108,29 @@ class OrderPaymentService
      *
      * @return string The order's new payment_status
      */
-    public static function applyOnlinePayment(Order $order, ?string $method): string
+    public static function applyOnlinePayment(Order $order, ?string $method, ?string $reference = null, ?Payment $payment = null): string
     {
+        self::lockOrder($order);
         $order->loadMissing('store');
+        $before = PaymentReceiptService::paidSoFar($order);
+
+        // The money arrived for an order that is already cancelled / being refunded: leave its statuses alone,
+        // acknowledge the money and ask the store to refund it
+        if ($order->status === 'cancelled' || in_array($order->payment_status, ['to_refund', 'refunded'], true)) {
+            PaymentReceiptService::record($order, (float) ($payment?->amount ?? 0), $method, 'online', $reference, $payment?->id);
+
+            if ($order->store_id) {
+                NotificationService::sendToStore(
+                    $order->store_id,
+                    'payment',
+                    'Payment for a Cancelled Order',
+                    "Payment received for cancelled order {$order->order_number} — please refund the customer.",
+                    ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
+                );
+            }
+
+            return (string) $order->payment_status;
+        }
 
         if ($order->payment_mode === 'consignment' && $order->payment_status === 'unpaid') {
             $order->update([
@@ -83,11 +158,14 @@ class OrderPaymentService
                 );
             }
 
+            PaymentReceiptService::record($order, PaymentReceiptService::paidSoFar($order) - $before, $method, 'online', $reference, $payment?->id);
+
             return 'partial';
         }
 
         $wasPartial = $order->payment_status === 'partial';
-        static::markPaid($order, $method);
+        static::markPaid($order, $method, 'online', $reference, false);
+        PaymentReceiptService::record($order, $order->grandTotal() - $before, $method, 'online', $reference, $payment?->id);
 
         if ($wasPartial && $order->store) {
             NotificationService::sendToStore(

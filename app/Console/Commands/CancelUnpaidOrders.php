@@ -113,22 +113,10 @@ class CancelUnpaidOrders extends Command
 
             $localMethod = PayMongoService::mapPaymentMethod($first['attributes']['source']['type'] ?? '');
 
-            DB::transaction(function () use ($sessionId, $first, $localMethod) {
-                foreach (Payment::where('paymongo_checkout_id', $sessionId)->get() as $payment) {
-                    if ($payment->status === 'paid') {
-                        continue;
-                    }
-                    $payment->update([
-                        'status'              => 'paid',
-                        'paymongo_payment_id' => $first['id'] ?? null,
-                        'payment_method'      => $localMethod,
-                        'paid_at'             => now(),
-                    ]);
-                    if ($payment->order) {
-                        OrderPaymentService::applyOnlinePayment($payment->order, $localMethod);
-                    }
-                }
-            });
+            // Each row locked + re-checked (the webhook / return-verify may apply the same payment at the same time)
+            foreach (Payment::where('paymongo_checkout_id', $sessionId)->pluck('id') as $paymentId) {
+                OrderPaymentService::applyPaidCheckoutRow($paymentId, $localMethod, $first['id'] ?? null);
+            }
 
             return true;
         }

@@ -137,7 +137,7 @@ class DeliveryController extends Controller
             return response()->json(['message' => 'Payment was already recorded for this order.'], 422);
         }
 
-        DB::transaction(fn () => \App\Services\OrderPaymentService::markPaid($order, 'cash'));
+        DB::transaction(fn () => \App\Services\OrderPaymentService::markPaid($order, 'cash', 'cash_on_delivery'));
 
         $delivery->load(['order.customer', 'order.items.product', 'rider']);
 

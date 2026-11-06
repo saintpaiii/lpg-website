@@ -23,6 +23,7 @@ import TrackingCard from '@/components/tracking-card';
 import { orderStatusLabel } from '@/lib/order-status';
 import StoreLocationMap from '@/components/store-location-map';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
+import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
 import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
 
 type Payment = {
@@ -312,7 +313,7 @@ function peso(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 }
 
-export default function OrderShow({ order, breakdown }: Props & { breakdown: PriceBreakdown }) {
+export default function OrderShow({ order, breakdown, receipts = [] }: Props & { breakdown: PriceBreakdown; receipts?: PaymentReceiptRow[] }) {
     // From the chat's "View map & route" (#pickup-map): scroll to the pick-up map once, on mount
     useEffect(() => {
         if (typeof window === 'undefined' || window.location.hash !== '#pickup-map') return;
@@ -940,6 +941,9 @@ export default function OrderShow({ order, breakdown }: Props & { breakdown: Pri
                                 )}
                             </CardContent>
                         </Card>
+
+                        {/* One acknowledgement receipt per payment */}
+                        <PaymentReceiptsCard receipts={receipts} />
                     </div>
                 </div>
             </div>

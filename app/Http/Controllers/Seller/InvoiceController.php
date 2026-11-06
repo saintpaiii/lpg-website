@@ -9,6 +9,7 @@ use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -177,6 +178,7 @@ class InvoiceController extends Controller
         $shippingFee = (float) ($invoice->order?->shipping_fee ?? 0);
 
         return Inertia::render('seller/invoice-show', [
+            'receipts'  => $invoice->order ? \App\Services\PaymentReceiptService::listFor($invoice->order, 'seller') : [],
             'doc'       => $doc,
             'breakdown' => $doc['breakdown'],
             'invoice' => [
@@ -250,36 +252,55 @@ class InvoiceController extends Controller
             'amount'         => 'required|numeric|min:0.01',
         ]);
 
-        $amount = (float) $data['amount'];
+        // "Amount Received" is ADDED to what was already paid (₱500 + ₱500 = ₱1,000 paid); one receipt per payment
+        $amount = round((float) $data['amount'], 2);
         $total  = $invoice->grand_total !== null
             ? (float) $invoice->grand_total
             : (float) $invoice->total_amount + (float) ($invoice->order?->shipping_fee ?? 0);
-        $status = $amount >= $total ? 'paid' : 'partial';
 
-        // Invoice + order together (the invoice email is sent after the commit)
-        DB::transaction(function () use ($invoice, $amount, $status, $data) {
-            $invoice->update([
+        // Invoice + order together, rows locked (the emails are sent after the commit)
+        $status = DB::transaction(function () use ($invoice, $amount, $total, $data) {
+            $order = $invoice->order ? \App\Models\Order::whereKey($invoice->order->id)->lockForUpdate()->first() : null;
+            $inv   = Invoice::whereKey($invoice->id)->lockForUpdate()->first();
+            if ($inv->payment_status === 'paid') {
+                throw ValidationException::withMessages(['amount' => 'This invoice is already fully paid.']);
+            }
+
+            $paidBefore = round((float) $inv->paid_amount, 2);
+            $remaining  = round(max(0, $total - $paidBefore), 2);
+            if ($amount > $remaining) {
+                throw ValidationException::withMessages(['amount' => 'More than the balance of ₱' . number_format($remaining, 2) . '.']);
+            }
+
+            $paidNow = round($paidBefore + $amount, 2);
+            $status  = $paidNow >= $total ? 'paid' : 'partial';
+
+            $inv->update([
                 'payment_status' => $status,
-                'paid_amount'    => $amount,
+                'paid_amount'    => $paidNow,
                 'payment_method' => $data['payment_method'],
                 'paid_at'        => $status === 'paid' ? now() : null,
             ]);
 
-            if ($invoice->order) {
+            if ($order) {
                 $settlesConsignment = $status === 'paid'
-                    && $invoice->order->payment_mode === 'consignment' && $invoice->order->payment_status === 'partial';
+                    && $order->payment_mode === 'consignment' && $order->payment_status === 'partial';
 
-                $invoice->order->update([
+                $order->update([
                     'payment_status' => $status,
                     'payment_method' => $data['payment_method'],
-                ] + ($status === 'paid' && $invoice->order->payment_mode === 'consignment' ? ['remaining_balance' => 0] : []));
+                ] + ($order->payment_mode === 'consignment' ? ['remaining_balance' => round(max(0, $total - $paidNow), 2)] : []));
 
                 if ($settlesConsignment) {
-                    \App\Services\LoyaltyService::recordBalancePaid($invoice->order->fresh());
+                    \App\Services\LoyaltyService::recordBalancePaid($order->fresh());
                 }
+
+                \App\Services\PaymentReceiptService::record($order, $amount, $data['payment_method'], 'seller_recorded');
             }
+
+            return $status;
         });
 
-        return back()->with('success', 'Payment recorded successfully.');
+        return back()->with('success', $status === 'paid' ? 'Payment recorded — the invoice is fully paid.' : 'Payment recorded.');
     }
 }

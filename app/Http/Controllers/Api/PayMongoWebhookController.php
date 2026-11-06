@@ -62,24 +62,13 @@ class PayMongoWebhookController extends Controller
         $paymongoPayId  = $firstPm['data']['id'] ?? null;
         $localMethod    = $paymongoMethod ? PayMongoService::mapPaymentMethod($paymongoMethod) : null;
 
+        // One row per order (one per store); each is applied once, under a lock — the return-verify may run at the same time
         foreach ($payments as $payment) {
             if ($payment->status === 'paid') {
                 continue;
             }
 
-            $payment->update([
-                'status'              => 'paid',
-                'paymongo_payment_id' => $paymongoPayId,
-                'payment_method'      => $localMethod,
-                'paid_at'             => now(),
-            ]);
-
-            $order = $payment->order;
-            if (! $order) {
-                continue;
-            }
-
-            OrderPaymentService::applyOnlinePayment($order, $localMethod);
+            OrderPaymentService::applyPaidCheckoutRow($payment->id, $localMethod, $paymongoPayId);
         }
     }
 }
