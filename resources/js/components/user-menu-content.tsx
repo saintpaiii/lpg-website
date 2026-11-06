@@ -35,7 +35,8 @@ export function UserMenuContent({ user, onLogoutRequest }: Props) {
                 <DropdownMenuItem asChild>
                     <Link
                         className="block w-full cursor-pointer"
-                        href={edit()}
+                        // Customers: their portal profile page (the /settings pages are for the other roles)
+                        href={auth.user?.role === 'customer' ? '/customer/profile' : edit()}
                         prefetch
                         onClick={cleanup}
                     >

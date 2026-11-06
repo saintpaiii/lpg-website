@@ -74,6 +74,7 @@ Route::middleware(['auth', 'verified', 'customer'])
 
         Route::get('invoices', [InvoiceController::class, 'index'])->middleware('id.verified:history')->name('invoices');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('id.verified:history')->name('invoices.show');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->middleware('id.verified:history')->name('invoices.pdf');
 
         // Saved delivery addresses
         Route::get('addresses', [AddressController::class, 'index'])->name('addresses.index');

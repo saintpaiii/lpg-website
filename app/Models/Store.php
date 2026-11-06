@@ -14,6 +14,12 @@ class Store extends Model
 
     protected $fillable = [
         'user_id',
+        // Tax & invoice (Settings → Tax & Invoice); invoice_next_number is only changed by InvoiceService
+        'vat_status',
+        'tin',
+        'registered_name',
+        'registered_address',
+        'invoice_prefix',
         'store_name',
         'description',
         'address',
@@ -91,8 +97,9 @@ class Store extends Model
     // ── Relationships ─────────────────────────────────────────────────────────
 
     /**
-     * Approved, not hidden for an expired permit, on an active plan (trial or paid) and with at least one rider who
-     * can deliver — safe to show to customers. Keep in step with isOpenToCustomers().
+     * Approved, not hidden for an expired permit, on an active plan (trial or paid), with at least one rider who
+     * can deliver AND a vehicle that can take a delivery (with a delivery fee) — safe to show to customers.
+     * Keep in step with isOpenToCustomers().
      */
     public function scopeVisibleToCustomers(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
@@ -100,7 +107,8 @@ class Store extends Model
             ->where('stores.subscription_plan', '!=', 'none')
             ->whereNotNull('stores.subscription_expires_at')
             ->where('stores.subscription_expires_at', '>', now())
-            ->whereHas('eligibleRiders');
+            ->whereHas('eligibleRiders')
+            ->whereHas('deliveryReadyVehicles');
     }
 
     /**
@@ -126,6 +134,27 @@ class Store extends Model
         return once(fn () => $this->eligibleRiders()->exists());
     }
 
+    /**
+     * Vehicles that can take a delivery: not deleted, available / in use, not paused by the plan, AND the store has a
+     * delivery fee for that vehicle type. Same rule as DeliveryFeeService::usableVehicles() + a rate ("priced") —
+     * keep both in step.
+     */
+    public function deliveryReadyVehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class)
+            ->whereIn('vehicles.status', ['available', 'in_use'])
+            ->where('vehicles.paused_by_plan', false)
+            ->whereExists(fn ($q) => $q->select(\Illuminate\Support\Facades\DB::raw(1))->from('store_delivery_rates')
+                ->whereColumn('store_delivery_rates.store_id', 'vehicles.store_id')
+                ->whereColumn('store_delivery_rates.vehicle_type', 'vehicles.vehicle_type'));
+    }
+
+    /** At least one delivery-ready vehicle (memoized for this model instance). */
+    public function hasDeliveryReadyVehicle(): bool
+    {
+        return once(fn () => $this->deliveryReadyVehicles()->exists());
+    }
+
     public static function visibilityCacheKey(int $storeId): string
     {
         return "store-visibility:{$storeId}";
@@ -141,7 +170,8 @@ class Store extends Model
 
     /**
      * Why customers can't see this store (empty when visible). Codes: plan, documents, no_rider, riders_inactive,
-     * license_pending, license_expired, license_rejected, license_missing. Rider reasons carry the rider to open.
+     * license_pending, license_expired, license_rejected, license_missing, no_vehicle, vehicles_unavailable,
+     * no_delivery_fee. Rider reasons carry the rider to open.
      *
      * @return array{visible: bool, reasons: array<int, array{code: string, text: string, rider_id: ?int}>}
      */
@@ -157,8 +187,21 @@ class Store extends Model
         if (! $this->hasEligibleRider()) {
             $reasons[] = $this->riderReason();
         }
+        if (! $this->hasDeliveryReadyVehicle()) {
+            $reasons[] = $this->vehicleReason();
+        }
 
         return ['visible' => $this->status === 'approved' && $reasons === [], 'reasons' => $reasons];
+    }
+
+    /** Why no vehicle can take a delivery (same branches as DeliveryFeeService::whyNoVehicleCode). */
+    private function vehicleReason(): array
+    {
+        return match (\App\Services\DeliveryFeeService::whyNoVehicleCode($this, 0, 0)) {
+            'no_vehicle'           => ['code' => 'no_vehicle', 'text' => 'No delivery vehicle yet', 'rider_id' => null],
+            'vehicles_unavailable' => ['code' => 'vehicles_unavailable', 'text' => 'Your vehicles are in maintenance or paused', 'rider_id' => null],
+            default                => ['code' => 'no_delivery_fee', 'text' => 'Set the delivery fee for your vehicle type', 'rider_id' => null],
+        };
     }
 
     /** The most useful rider problem to fix first. */
@@ -228,12 +271,13 @@ class Store extends Model
         return $this->status === 'approved' && ! $this->documents_suspended;
     }
 
-    /** Approved, not hidden for an expired permit, on an active plan, and with a rider who can deliver. */
+    /** Approved, not hidden for an expired permit, on an active plan, with a rider who can deliver and a delivery-ready vehicle. */
     public function isOpenToCustomers(): bool
     {
         return $this->status === 'approved' && ! $this->documents_suspended
             && \App\Services\SubscriptionService::isActive($this)
-            && $this->hasEligibleRider();
+            && $this->hasEligibleRider()
+            && $this->hasDeliveryReadyVehicle();
     }
 
     public function documentSubmissions(): HasMany

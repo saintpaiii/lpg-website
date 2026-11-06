@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
-import AppLayout from '@/layouts/app-layout';
+import SettingsShell from '@/layouts/settings/settings-shell';
 import SettingsLayout from '@/layouts/settings/layout';
 import type { BreadcrumbItem } from '@/types';
 import type { FormEvent } from 'react';
@@ -46,7 +46,7 @@ export default function Password() {
     }
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <SettingsShell breadcrumbs={breadcrumbs}>
             <Head title="Password settings" />
             <h1 className="sr-only">Password settings</h1>
 
@@ -121,6 +121,6 @@ export default function Password() {
                     </form>
                 </div>
             </SettingsLayout>
-        </AppLayout>
+        </SettingsShell>
     );
 }

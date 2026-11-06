@@ -90,7 +90,7 @@ class DeliveryFeeService
         return $all->filter(fn (Vehicle $v) => $v->deleted_at === null && $v->status !== 'retired')->values();
     }
 
-    /** Vehicles that can take a delivery now: available / in use, not paused by the plan. */
+    /** Vehicles that can take a delivery now: available / in use, not paused by the plan (+ a fee → Store::deliveryReadyVehicles). */
     public static function usableVehicles(Store $store): Collection
     {
         return static::vehicles($store)
@@ -143,6 +143,27 @@ class DeliveryFeeService
             'base_fee'     => (float) $best['rate']->base_fee,
             'fee_per_km'   => (float) $best['rate']->fee_per_km,
         ];
+    }
+
+    /**
+     * Why quote() found nothing, as a code: no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy
+     * (same branches as whyNoVehicle; Store::deliveryReadyVehicles is the "usable + priced" rule as a query).
+     */
+    public static function whyNoVehicleCode(Store $store, float $kg, int $tanks): string
+    {
+        if (static::vehicles($store)->isEmpty()) {
+            return 'no_vehicle';
+        }
+        $usable = static::usableVehicles($store);
+        if ($usable->isEmpty()) {
+            return 'vehicles_unavailable';
+        }
+        $rates = static::rates($store);
+        if ($usable->filter(fn (Vehicle $v) => $rates->has($v->vehicle_type))->isEmpty()) {
+            return 'no_delivery_fee';
+        }
+
+        return 'too_heavy';
     }
 
     /** Why quote() found nothing — for checkout messages. */

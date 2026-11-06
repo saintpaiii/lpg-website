@@ -24,6 +24,15 @@ class Vehicle extends Model
         'paused_by_plan',
     ];
 
+    protected static function booted(): void
+    {
+        // Customers see a store only with a delivery-ready vehicle → refresh the owner's "hidden" banner at once
+        $forget = fn (Vehicle $v) => Store::forgetVisibilityCache($v->store_id);
+        static::saved($forget);
+        static::deleted($forget);
+        static::restored($forget);
+    }
+
     protected function casts(): array
     {
         return [

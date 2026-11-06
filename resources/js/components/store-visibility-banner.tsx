@@ -8,9 +8,17 @@ export type StoreVisibility = { visible: boolean; reasons: Reason[]; staff_full:
 /** Plan and document reasons have their own banners (PlanStatusBanner, DocumentSuspensionBanner). */
 const OTHER_BANNERS = ['plan', 'documents'];
 
+/** Vehicle reasons (Store::vehicleReason) — fixed on the Vehicles page */
+const VEHICLE_ACTIONS: Record<string, string> = {
+    no_vehicle:           'Add a vehicle',
+    vehicles_unavailable: 'Open Vehicles',
+    no_delivery_fee:      'Set delivery fees',
+};
+
 /**
  * "Your products are hidden from customers — No rider yet." A store needs at least one rider who can deliver
- * (active, not paused, approved valid driver's license) to be shown. Owner gets the fix button; staff get the text.
+ * (active, not paused, approved valid driver's license) AND a vehicle that can take a delivery with a delivery fee
+ * to be shown. Owner gets the fix button; staff get the text.
  */
 export function StoreVisibilityBanner() {
     const { auth, storeVisibility } = usePage<SharedData & { storeVisibility?: StoreVisibility }>().props;
@@ -20,7 +28,9 @@ export function StoreVisibilityBanner() {
 
     const isOwner = auth.user?.role === 'seller';
     const full = reason.code === 'no_rider' && storeVisibility.staff_full;
+    const isVehicle = reason.code in VEHICLE_ACTIONS;
     const action = !isOwner ? null
+        : isVehicle ? { href: '/seller/vehicles', label: VEHICLE_ACTIONS[reason.code] }
         : full ? { href: '/seller/plan', label: 'My Plan' }
         : reason.code === 'no_rider' ? { href: '/seller/staff?add=rider', label: 'Add a rider' }
         : reason.code === 'license_pending' && reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'Review license' }
@@ -33,7 +43,7 @@ export function StoreVisibilityBanner() {
             <p className="flex-1 min-w-0">
                 <strong>Your products are hidden from customers</strong> — {reason.text}.
                 {full && ' Your staff limit is full — deactivate someone or upgrade your plan.'}
-                {!isOwner && ' Ask your store owner to add or approve a rider.'}
+                {!isOwner && (isVehicle ? ' Ask your store owner to set up a delivery vehicle.' : ' Ask your store owner to add or approve a rider.')}
             </p>
             {action && (
                 <Link href={action.href} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">

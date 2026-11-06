@@ -112,6 +112,8 @@ class CheckoutController extends Controller
                     'delivery_options'       => $options = DeliveryFeeService::clientOptions($store),
                     'can_deliver'            => $options !== [],
                     'no_delivery_reason'     => $options === [] ? DeliveryFeeService::whyNoVehicle($store, 0, 0) : null,
+                    // no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy — picks the hint under the message
+                    'no_delivery_code'       => $options === [] ? DeliveryFeeService::whyNoVehicleCode($store, 0, 0) : null,
                     'store_lat'            => $store->latitude  ? (float) $store->latitude  : null,
                     'store_lng'              => $store->longitude ? (float) $store->longitude : null,
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
@@ -342,6 +344,10 @@ class CheckoutController extends Controller
                 'fulfillments'               => 'nullable|array',
                 'fulfillments.*'             => 'in:delivery,pickup',
                 'empty_tanks_confirmed'      => 'nullable|boolean',
+                // Optional: the buyer's TIN for a business invoice (on every store's order of this checkout)
+                'buyer_tin'                  => ['nullable', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3,5}$/'],
+            ], [
+                'buyer_tin.regex' => 'Use the TIN format 000-000-000-00000.',
             ]);
 
             $deliveryLat  = isset($data['delivery_latitude'])  ? (float) $data['delivery_latitude']  : null;
@@ -544,8 +550,15 @@ class CheckoutController extends Controller
                         $store->loadMissing(['vehicles', 'deliveryRates']);
                         $quote = DeliveryFeeService::quote($store, $distKm, $load['kg'], $load['tanks']);
                         if (! $quote) {
-                            throw new CheckoutRuleException("{$store->store_name}: " . DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks'])
-                                . ' Choose pick-up or reduce the quantity.');
+                            // "Reduce the quantity" only helps when the load is too heavy
+                            $tooHeavy = DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks']) === 'too_heavy';
+                            $hint = match (true) {
+                                $tooHeavy && (bool) $store->allow_pickup => ' Choose pick-up, or reduce the quantity.',
+                                $tooHeavy                                => ' Reduce the quantity or remove some items.',
+                                (bool) $store->allow_pickup              => ' You can pick it up at the store instead.',
+                                default                                  => " This store can't deliver right now. Please try another store.",
+                            };
+                            throw new CheckoutRuleException("{$store->store_name}: " . DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks']) . $hint);
                         }
                         $finalFee    = $quote['fee'];
                         $vehicleType = $quote['vehicle_type'];
@@ -642,6 +655,7 @@ class CheckoutController extends Controller
                         'fulfillment'                => $p['isPickup'] ? 'pickup' : 'delivery',
                         'delivery_vehicle_type'      => $p['vehicleType'],
                         'empty_tanks_required'       => $p['emptyTanks'],
+                        'buyer_tin'                  => ($data['buyer_tin'] ?? null) ?: null,
                     ]);
 
                     foreach ($p['orderedItems'] as $item) {

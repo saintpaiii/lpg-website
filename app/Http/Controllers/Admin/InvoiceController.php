@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Invoice;
-use App\Models\Setting;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -230,19 +229,21 @@ class InvoiceController extends Controller
     public function show(Request $request, Invoice $invoice): Response
     {
         $invoice->load(['customer', 'order.items.product']);
+        $doc = \App\Services\InvoiceService::viewData($invoice);
 
-        $company = [
-            'name'    => Setting::get('company_name', 'LPG Distributor'),
-            'address' => Setting::get('company_address', 'Cavite, Philippines'),
-            'phone'   => Setting::get('company_phone', ''),
-            'email'   => Setting::get('company_email', ''),
-        ];
-
+        // The STORE is the issuer — the page shows the store's invoice, never a platform header
         return Inertia::render('admin/invoice-show', [
-            'breakdown' => $invoice->order?->priceBreakdown()
-                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
-            'invoice' => $this->withGrandTotal($this->formatInvoice($invoice), $invoice),
-            'company' => $company,
+            'doc'       => $doc,
+            'breakdown' => $doc['breakdown'],
+            'invoice'   => $this->withGrandTotal($this->formatInvoice($invoice), $invoice),
+        ]);
+    }
+
+    public function pdf(Invoice $invoice)
+    {
+        return response(\App\Services\InvoiceService::pdf($invoice), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$invoice->invoice_number}.pdf\"",
         ]);
     }
 

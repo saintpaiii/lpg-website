@@ -66,10 +66,11 @@ class InvoiceController extends Controller
         }
 
         $invoice->load(['order.items.product', 'customer']);
+        $doc = \App\Services\InvoiceService::viewData($invoice);
 
         return Inertia::render('customer/invoice-show', [
-            'breakdown' => $invoice->order?->priceBreakdown()
-                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
+            'doc'       => $doc,
+            'breakdown' => $doc['breakdown'],
             'invoice' => [
                 'id'             => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
@@ -97,6 +98,20 @@ class InvoiceController extends Controller
                     ])->values()->all(),
                 ] : null,
             ],
+        ]);
+    }
+
+    /** The customer's own invoice as an A4 PDF. */
+    public function pdf(Request $request, Invoice $invoice)
+    {
+        $customer = $this->getCustomer($request);
+        if (! $customer || $invoice->customer_id !== $customer->id) {
+            abort(403);
+        }
+
+        return response(\App\Services\InvoiceService::pdf($invoice), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$invoice->invoice_number}.pdf\"",
         ]);
     }
 }

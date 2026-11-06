@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Seller;
 
 use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
+use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +39,66 @@ class SettingsController extends Controller
                 'allow_pickup'             => (bool) $store->allow_pickup,
                 'pickup_instructions'      => $store->pickup_instructions ?? '',
             ],
+            // Tax & Invoice card (owner edits; staff with Settings see it read-only)
+            'tax' => [
+                'vat_status'         => $store->vat_status === 'vat' ? 'vat' : 'non_vat',
+                'tin'                => $store->tin ?? '',
+                'registered_name'    => $store->registered_name ?? '',
+                'registered_address' => $store->registered_address ?? '',
+                'invoice_prefix'     => $store->invoice_prefix ?? '',
+                'next_number'        => InvoiceService::nextNumber($store),
+                'prefix_locked'      => InvoiceService::prefixLocked($store),
+                'store_address'      => InvoiceService::storeAddress($store),
+            ],
+            'can_edit_tax' => auth()->user()->role === 'seller',
         ]);
+    }
+
+    /** Settings → Tax & Invoice (owner only — route middleware seller_owner). */
+    public function updateTax(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+
+        $request->merge([
+            'invoice_prefix' => strtoupper(trim((string) $request->input('invoice_prefix'))),
+            'tin'            => trim((string) $request->input('tin')) ?: null,
+        ]);
+        $locked  = InvoiceService::prefixLocked($store);
+        $changed = $request->input('invoice_prefix') !== (string) $store->invoice_prefix;
+
+        $rules = [
+            'vat_status'         => ['required', 'in:vat,non_vat'],
+            'tin'                => ['nullable', 'required_if:vat_status,vat', 'regex:/^\d{3}-\d{3}-\d{3}-\d{3,5}$/'],
+            'registered_name'    => ['nullable', 'string', 'max:255'],
+            'registered_address' => ['nullable', 'string', 'max:500'],
+        ];
+        // The code is checked only when it changed (a backfilled code like "SG2" saves untouched)
+        if ($changed && ! $locked) {
+            $rules['invoice_prefix'] = ['required', 'regex:/^[A-Z][A-Z0-9]{1,4}$/', 'not_in:INV',
+                \Illuminate\Validation\Rule::unique('stores', 'invoice_prefix')->ignore($store->id)];
+        }
+
+        $data = $request->validate($rules, [
+            'tin.required_if'          => 'Enter your TIN — required for VAT-registered stores.',
+            'tin.regex'                => 'Use the format 000-000-000-00000.',
+            'invoice_prefix.required'  => 'Enter an invoice code.',
+            'invoice_prefix.regex'     => '2–5 letters or digits, starting with a letter (e.g. PGC).',
+            'invoice_prefix.not_in'    => '"INV" is reserved — choose another code.',
+            'invoice_prefix.unique'    => 'Another store already uses this code.',
+        ]);
+
+        $updates = [
+            'vat_status'         => $data['vat_status'],
+            'tin'                => $data['tin'] ?? null,
+            'registered_name'    => ($data['registered_name'] ?? null) ?: null,
+            'registered_address' => ($data['registered_address'] ?? null) ?: null,
+        ];
+        if (isset($rules['invoice_prefix'])) {
+            $updates['invoice_prefix'] = $data['invoice_prefix'];
+        }
+        $store->update($updates);
+
+        return back()->with('success', 'Tax & invoice settings saved.');
     }
 
     public function update(Request $request): RedirectResponse

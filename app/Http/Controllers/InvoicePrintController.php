@@ -2,76 +2,45 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\Setting;
+use App\Models\Store;
+use App\Models\User;
+use App\Services\InvoiceService;
+use App\Services\StaffAccess;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * Printable invoice (/invoices/{invoice}/print). The STORE is the issuer, so the page shows the store's header.
+ * Access: admin / platform staff with invoices.view → any; seller → own store; seller staff → own store with the
+ * Invoices module; customer → own invoices (same ID rule as the invoice history); everyone else → 403.
+ */
 class InvoicePrintController extends Controller
 {
-    public function show(Request $request, Invoice $invoice): Response
+    public static function canView(User $user, Invoice $invoice): bool
     {
-        $user = $request->user();
-
-        // Staff can print any invoice; customers can only print their own
-        if ($user->role === 'customer') {
-            $customer = \App\Models\Customer::where('user_id', $user->id)->first();
-            if (! $customer || $invoice->customer_id !== $customer->id) {
-                abort(403);
-            }
-        } elseif (! $user->isStaff()) {
-            abort(403);
+        if ($user->isAdmin() || ($user->is_platform_staff && $user->hasPermission('invoices.view'))) {
+            return true;
         }
 
-        $invoice->load(['order.items.product', 'customer']);
+        return match ($user->role) {
+            'seller'       => Store::where('user_id', $user->id)->where('id', $invoice->store_id)->exists(),
+            'seller_staff' => $user->store_id !== null && (int) $user->store_id === (int) $invoice->store_id
+                && StaffAccess::levelFor($user, 'invoices') !== null,
+            'customer'     => ! $user->isLockedNewcomer()
+                && Customer::where('user_id', $user->id)->where('id', $invoice->customer_id)->exists(),
+            default        => false,
+        };
+    }
 
-        $company = [
-            'name'    => Setting::get('company_name', 'LPG Distribution Cavite'),
-            'address' => Setting::get('company_address', ''),
-            'phone'   => Setting::get('company_phone', ''),
-            'email'   => Setting::get('company_email', ''),
-        ];
+    public function show(Request $request, Invoice $invoice): Response
+    {
+        abort_unless(self::canView($request->user(), $invoice), 403);
 
         return Inertia::render('invoice-print', [
-            'invoice' => [
-                'id'             => $invoice->id,
-                'invoice_number' => $invoice->invoice_number,
-                'total_amount'   => (float) $invoice->total_amount,
-                'payment_status' => $invoice->payment_status,
-                'paid_amount'    => (float) $invoice->paid_amount,
-                'payment_method' => $invoice->payment_method,
-                'due_date'       => $invoice->due_date?->format('M d, Y'),
-                'paid_at'        => $invoice->paid_at?->format('M d, Y'),
-                'created_at'     => $invoice->created_at->format('M d, Y'),
-                'customer'       => $invoice->customer ? [
-                    'name'     => $invoice->customer->name,
-                    'phone'    => $invoice->customer->phone,
-                    // Pick-up orders have no delivery address
-                    'address'  => $invoice->order?->isPickup() ? 'Pick-up at the store' : $invoice->customer->address,
-                    'city'     => $invoice->order?->isPickup() ? null : $invoice->customer->city,
-                    'barangay' => $invoice->order?->isPickup() ? null : $invoice->customer->barangay,
-                ] : null,
-                'order' => $invoice->order ? [
-                    'order_number'     => $invoice->order->order_number,
-                    'status'           => $invoice->order->status,
-                    'fulfillment'      => $invoice->order->fulfillment ?? 'delivery',
-                    'transaction_type' => $invoice->order->transaction_type,
-                    'ordered_at'       => $invoice->order->ordered_at?->format('M d, Y g:i A'),
-                    'delivered_at'     => $invoice->order->delivered_at?->format('M d, Y g:i A'),
-                    'items'            => $invoice->order->items->map(fn ($i) => [
-                        'quantity'   => $i->quantity,
-                        'unit_price' => (float) $i->unit_price,
-                        'subtotal'   => (float) $i->subtotal,
-                        'product'    => $i->product ? [
-                            'name'      => $i->product->name,
-                            'brand'     => $i->product->brand,
-                            'weight_kg' => (float) $i->product->weight_kg,
-                        ] : null,
-                    ])->values()->all(),
-                ] : null,
-            ],
-            'company' => $company,
+            'doc' => InvoiceService::viewData($invoice),
         ]);
     }
 }

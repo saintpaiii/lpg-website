@@ -8,7 +8,7 @@ import TwoFactorSetupModal from '@/components/two-factor-setup-modal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useTwoFactorAuth } from '@/hooks/use-two-factor-auth';
-import AppLayout from '@/layouts/app-layout';
+import SettingsShell from '@/layouts/settings/settings-shell';
 import SettingsLayout from '@/layouts/settings/layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -53,7 +53,7 @@ export default function TwoFactor({
     }
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <SettingsShell breadcrumbs={breadcrumbs}>
             <Head title="Two-factor authentication" />
             <h1 className="sr-only">Two-factor authentication settings</h1>
 
@@ -127,6 +127,6 @@ export default function TwoFactor({
                     />
                 </div>
             </SettingsLayout>
-        </AppLayout>
+        </SettingsShell>
     );
 }

@@ -1,4 +1,5 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { ChevronRight, Palette, ShieldCheck } from 'lucide-react';
 import { AddressFields } from '@/components/address-fields';
 import AddressMap, { lookupBarangay } from '@/components/address-map';
 import LocationAddressTools from '@/components/location-address-tools';
@@ -29,6 +30,13 @@ type Profile = {
 type Props = { profile: Profile };
 
 export default function CustomerProfile({ profile }: Props) {
+    // /customer/profile#password (user menu → Password, or /settings/password) → jump to the Change Password card
+    useEffect(() => {
+        if (window.location.hash === '#password') {
+            document.getElementById('password')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }, []);
+
     const profileForm = useForm({
         first_name:  profile.first_name,
         middle_name: profile.middle_name,
@@ -240,7 +248,7 @@ export default function CustomerProfile({ profile }: Props) {
                 </Card>
 
                 {/* Password form */}
-                <Card>
+                <Card id="password" className="scroll-mt-20">
                     <CardHeader>
                         <CardTitle className="text-base">Change Password</CardTitle>
                     </CardHeader>
@@ -298,6 +306,25 @@ export default function CustomerProfile({ profile }: Props) {
                                 </Button>
                             </div>
                         </form>
+                    </CardContent>
+                </Card>
+
+                {/* Account security and display (the shared /settings pages, inside this portal) */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Security &amp; display</CardTitle>
+                    </CardHeader>
+                    <CardContent className="divide-y p-0">
+                        <Link href="/settings/two-factor" className="flex items-center gap-3 px-6 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                            <ShieldCheck className="h-4 w-4 shrink-0 text-blue-600" />
+                            <span className="flex-1 font-medium">Two-factor authentication</span>
+                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </Link>
+                        <Link href="/settings/appearance" className="flex items-center gap-3 px-6 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/60">
+                            <Palette className="h-4 w-4 shrink-0 text-blue-600" />
+                            <span className="flex-1 font-medium">Appearance (light / dark)</span>
+                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                        </Link>
                     </CardContent>
                 </Card>
             </div>

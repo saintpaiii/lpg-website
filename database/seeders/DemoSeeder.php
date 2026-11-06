@@ -157,6 +157,16 @@ class DemoSeeder extends Seeder
             'updated_at'              => $this->now,
         ]);
 
+        // Tax & invoice: store 1 is VAT-registered, store 2 Non-VAT; each has its own invoice series
+        // (the migration's backfill ran before these stores existed)
+        DB::table('stores')->where('id', $store1Id)->update([
+            'vat_status' => 'vat', 'tin' => '123-456-789-00000', 'registered_name' => 'Petron Gasul Cavite LPG Trading',
+            'invoice_prefix' => 'PGC', 'invoice_next_number' => 1,
+        ]);
+        DB::table('stores')->where('id', $store2Id)->update([
+            'vat_status' => 'non_vat', 'tin' => null, 'invoice_prefix' => 'SDB', 'invoice_next_number' => 1,
+        ]);
+
         // Link sellers back to their stores
         DB::table('users')->where('id', $seller1Id)->update(['store_id' => $store1Id]);
         DB::table('users')->where('id', $seller2Id)->update(['store_id' => $store2Id]);

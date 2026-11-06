@@ -10,6 +10,14 @@ class StoreDeliveryRate extends Model
 {
     protected $fillable = ['store_id', 'vehicle_type', 'base_fee', 'fee_per_km'];
 
+    protected static function booted(): void
+    {
+        // A vehicle type without a fee can't deliver → store visibility changes (banner cache)
+        $forget = fn (StoreDeliveryRate $r) => Store::forgetVisibilityCache($r->store_id);
+        static::saved($forget);
+        static::deleted($forget);
+    }
+
     protected function casts(): array
     {
         return [

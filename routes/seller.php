@@ -102,6 +102,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
             Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('plan.feature:export')->name('invoices.export');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+            Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
             Route::post('invoices/{invoice}/record-payment', [InvoiceController::class, 'recordPayment'])->name('invoices.record-payment');
         });
 
@@ -269,5 +270,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
             // The Settings page posts FormData with _method=PUT (file upload) — this is the route it hits
             Route::put('settings', [SettingsController::class, 'update'])->name('settings.put');
+            // Tax & Invoice (VAT status, TIN, invoice code) — the owner only; staff see it read-only
+            Route::put('settings/tax', [SettingsController::class, 'updateTax'])->middleware('seller_owner')->name('settings.tax');
         });
     });

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Separator } from '@/components/ui/separator';
-import AppLayout from '@/layouts/app-layout';
+import SettingsShell from '@/layouts/settings/settings-shell';
 import SettingsLayout from '@/layouts/settings/layout';
 
 export default function Profile() {
@@ -56,7 +56,7 @@ export default function Profile() {
     };
 
     return (
-        <AppLayout>
+        <SettingsShell>
             <Head title="Profile Settings" />
 
             <SettingsLayout>
@@ -194,6 +194,6 @@ export default function Profile() {
                     </form>
                 </div>
             </SettingsLayout>
-        </AppLayout>
+        </SettingsShell>
     );
 }

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -9,9 +9,9 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
-import type { NavItem } from '@/types';
+import type { NavItem, SharedData } from '@/types';
 
-const sidebarNavItems: NavItem[] = [
+const defaultNavItems: NavItem[] = [
     {
         title: 'Profile',
         href: edit(),
@@ -34,8 +34,18 @@ const sidebarNavItems: NavItem[] = [
     },
 ];
 
+// Customers: Profile and Password live on their portal profile page
+const customerNavItems: NavItem[] = [
+    { title: 'Profile', href: '/customer/profile', icon: null },
+    { title: 'Password', href: '/customer/profile#password', icon: null },
+    { title: 'Two-factor auth', href: show(), icon: null },
+    { title: 'Appearance', href: editAppearance(), icon: null },
+];
+
 export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
+    const { auth } = usePage<SharedData>().props;
+    const sidebarNavItems = auth.user?.role === 'customer' ? customerNavItems : defaultNavItems;
 
     // When server-side rendering, we only render the layout on the client...
     if (typeof window === 'undefined') {

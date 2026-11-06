@@ -219,6 +219,9 @@ export function AppSidebar() {
 
     const homeHref = isRider
         ? '/rider/deliveries'
+        // Customers normally use the Customer Portal layout; never send them to /notifications from here
+        : role === 'customer'
+        ? '/customer/dashboard'
         : (items.find((i) => i.href !== '/settings/profile')?.href
             ?? (role === 'platform_staff' ? '/admin/welcome' : '/admin/dashboard'));
 

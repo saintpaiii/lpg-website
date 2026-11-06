@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Seller;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Invoice;
+use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -69,6 +71,8 @@ class InvoiceController extends Controller
         ];
 
         return Inertia::render('seller/invoices', [
+            // Owner: "Add your TIN and VAT status…" until the store has a TIN
+            'tax_notice' => auth()->user()->role === 'seller' && ! $store->tin,
             'invoices' => $invoices,
             'counts'   => $counts,
             'tab'       => $tab,
@@ -161,6 +165,8 @@ class InvoiceController extends Controller
             ->orderByDesc('created_at')
             ->first();
 
+        $doc = InvoiceService::viewData($invoice);
+
         $isOnline = $latestPayment !== null;
         $payRef   = $latestPayment?->paymongo_checkout_id;
         $paidVia  = null;
@@ -171,8 +177,8 @@ class InvoiceController extends Controller
         $shippingFee = (float) ($invoice->order?->shipping_fee ?? 0);
 
         return Inertia::render('seller/invoice-show', [
-            'breakdown' => $invoice->order?->priceBreakdown()
-                ?? ['subtotal' => (float) $invoice->total_amount, 'delivery_fee' => 0, 'store_discount' => 0, 'coupon_code' => null, 'coupon_discount' => 0, 'coupon_on_delivery' => 0, 'grand_total' => (float) $invoice->total_amount],
+            'doc'       => $doc,
+            'breakdown' => $doc['breakdown'],
             'invoice' => [
                 'id'                  => $invoice->id,
                 'invoice_number'      => $invoice->invoice_number,
@@ -212,6 +218,18 @@ class InvoiceController extends Controller
         ]);
     }
 
+    /** The invoice as an A4 PDF (store-scoped: another store's invoice → 404). */
+    public function pdf(Invoice $invoice)
+    {
+        $store = request()->attributes->get('seller_store');
+        if ($invoice->store_id !== $store->id) abort(404);
+
+        return response(InvoiceService::pdf($invoice), 200, [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => "inline; filename=\"{$invoice->invoice_number}.pdf\"",
+        ]);
+    }
+
     /**
      * Record a manual (COD) payment for an invoice.
      */
@@ -220,6 +238,9 @@ class InvoiceController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($invoice->store_id !== $store->id) abort(403);
 
+        if ($invoice->payment_status === 'voided' || $invoice->order()->withTrashed()->value('status') === 'cancelled') {
+            return back()->with('error', 'This invoice is void.');
+        }
         if ($invoice->payment_status === 'paid') {
             return back()->with('error', 'This invoice is already fully paid.');
         }
@@ -230,29 +251,34 @@ class InvoiceController extends Controller
         ]);
 
         $amount = (float) $data['amount'];
-        $total  = (float) $invoice->total_amount + (float) ($invoice->order?->shipping_fee ?? 0);
+        $total  = $invoice->grand_total !== null
+            ? (float) $invoice->grand_total
+            : (float) $invoice->total_amount + (float) ($invoice->order?->shipping_fee ?? 0);
         $status = $amount >= $total ? 'paid' : 'partial';
 
-        $invoice->update([
-            'payment_status' => $status,
-            'paid_amount'    => $amount,
-            'payment_method' => $data['payment_method'],
-            'paid_at'        => $status === 'paid' ? now() : null,
-        ]);
-
-        if ($invoice->order) {
-            $settlesConsignment = $status === 'paid'
-                && $invoice->order->payment_mode === 'consignment' && $invoice->order->payment_status === 'partial';
-
-            $invoice->order->update([
+        // Invoice + order together (the invoice email is sent after the commit)
+        DB::transaction(function () use ($invoice, $amount, $status, $data) {
+            $invoice->update([
                 'payment_status' => $status,
+                'paid_amount'    => $amount,
                 'payment_method' => $data['payment_method'],
-            ] + ($status === 'paid' && $invoice->order->payment_mode === 'consignment' ? ['remaining_balance' => 0] : []));
+                'paid_at'        => $status === 'paid' ? now() : null,
+            ]);
 
-            if ($settlesConsignment) {
-                \App\Services\LoyaltyService::recordBalancePaid($invoice->order->fresh());
+            if ($invoice->order) {
+                $settlesConsignment = $status === 'paid'
+                    && $invoice->order->payment_mode === 'consignment' && $invoice->order->payment_status === 'partial';
+
+                $invoice->order->update([
+                    'payment_status' => $status,
+                    'payment_method' => $data['payment_method'],
+                ] + ($status === 'paid' && $invoice->order->payment_mode === 'consignment' ? ['remaining_balance' => 0] : []));
+
+                if ($settlesConsignment) {
+                    \App\Services\LoyaltyService::recordBalancePaid($invoice->order->fresh());
+                }
             }
-        }
+        });
 
         return back()->with('success', 'Payment recorded successfully.');
     }

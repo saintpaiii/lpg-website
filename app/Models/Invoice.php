@@ -22,6 +22,17 @@ class Invoice extends Model
         'payment_method',
         'paid_at',
         'due_date',
+        // Store-series invoice snapshot (null vat_status = issued before store invoices)
+        'vat_status',
+        'seller_name',
+        'seller_tin',
+        'seller_address',
+        'buyer_tin',
+        'grand_total',
+        'vatable_sales',
+        'vat_amount',
+        'emailed_at',
+        'paid_emailed_at',
     ];
 
     protected function casts(): array
@@ -31,7 +42,19 @@ class Invoice extends Model
             'paid_amount'         => 'decimal:2',
             'paid_at'             => 'datetime',
             'due_date'            => 'date',
+            'grand_total'         => 'decimal:2',
+            'vatable_sales'       => 'decimal:2',
+            'vat_amount'          => 'decimal:2',
+            'emailed_at'          => 'datetime',
+            'paid_emailed_at'     => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Invoice email (with PDF) — every payment path updates the invoice, so the model is the one place to hook
+        static::created(fn (Invoice $i) => \App\Services\InvoiceService::onCreated($i));
+        static::updated(fn (Invoice $i) => \App\Services\InvoiceService::onUpdated($i));
     }
 
     public function store(): BelongsTo

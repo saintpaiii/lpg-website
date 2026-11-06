@@ -41,6 +41,8 @@ type Props = {
     search: string;
     date_from: string;
     date_to: string;
+    /** Owner: the store has no TIN yet */
+    tax_notice?: boolean;
 };
 
 const TABS = [
@@ -56,7 +58,7 @@ const PAY_COLORS: Record<string, string> = {
     partial: 'bg-yellow-100 text-yellow-700',
 };
 
-export default function SellerInvoices({ invoices, counts, tab, search, date_from, date_to }: Props) {
+export default function SellerInvoices({ invoices, counts, tab, search, date_from, date_to, tax_notice = false }: Props) {
     const [searchVal, setSearchVal] = useState(search);
     const [dateFrom,  setDateFrom]  = useState(date_from);
     const [dateTo,    setDateTo]    = useState(date_to);
@@ -119,6 +121,13 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                         </ExportLink>
                     </div>
                 </div>
+
+                {tax_notice && (
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                        <span>Add your TIN and VAT status in Settings → Tax &amp; Invoice so your invoices show them.</span>
+                        <Link href="/seller/settings" className="font-medium underline underline-offset-2">Open Settings →</Link>
+                    </div>
+                )}
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b">

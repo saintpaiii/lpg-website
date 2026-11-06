@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarDays, ChevronLeft, ChevronRight, FileDown, PackageCheck, Receipt, TrendingUp } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, FileDown, Landmark, PackageCheck, Receipt, TrendingUp } from 'lucide-react';
 
 interface Summary {
     total_sales: number;
@@ -33,7 +33,16 @@ interface Paginated<T> {
     to: number | null;
 }
 
+/** Tax reminder (estimate only) — RevenueController::index */
+interface TaxReminder {
+    vat_status: 'vat' | 'non_vat';
+    month_sales: number;
+    vat_collected: number | null;
+    percentage_tax_estimate: number | null;
+}
+
 interface Props {
+    tax: TaxReminder;
     summary: Summary;
     orders: Paginated<SaleRow>;
     filters: { date_from?: string; date_to?: string };
@@ -47,7 +56,7 @@ const MODE_LABELS: Record<string, string> = {
     cod:         'COD',
 };
 
-export default function SellerRevenue({ summary, orders, filters }: Props) {
+export default function SellerRevenue({ tax, summary, orders, filters }: Props) {
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo,   setDateTo]   = useState(filters.date_to ?? '');
 
@@ -106,6 +115,32 @@ export default function SellerRevenue({ summary, orders, filters }: Props) {
                         </Card>
                     ))}
                 </div>
+
+                {/* Tax reminder — estimate only */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                        <CardTitle className="text-sm font-medium text-muted-foreground">
+                            {tax.vat_status === 'vat' ? 'VAT this month' : 'Percentage tax this month'}
+                        </CardTitle>
+                        <Landmark className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                        {tax.vat_status === 'vat' ? (
+                            <p>
+                                VAT collected this month: <strong className="text-base">{fmt(tax.vat_collected ?? 0)}</strong> — from your VAT invoices.
+                                You pay this to the BIR minus the VAT on your supplier purchases (input VAT). Ask your accountant.
+                            </p>
+                        ) : (
+                            <p>
+                                Estimated percentage tax this month: <strong className="text-base">{fmt(tax.percentage_tax_estimate ?? 0)}</strong> (3% of {fmt(tax.month_sales)}).
+                                Paid to the BIR quarterly. Ask your accountant.
+                            </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                            Estimate only — the platform does not file or pay taxes for your store. Archived orders are not counted.
+                        </p>
+                    </CardContent>
+                </Card>
 
                 {/* Sales */}
                 <Card>

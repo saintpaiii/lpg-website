@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Http\Controllers\Controller;
+use App\Models\Invoice;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,10 +68,25 @@ class RevenueController extends Controller
                 'total'          => $o->grandTotal(),
             ]);
 
+        $monthSales = self::saleTotal($month);
+
+        // Tax reminder (estimate only — the platform never files or pays taxes for the store)
+        $isVat = $store->vat_status === 'vat';
+        $tax = [
+            'vat_status'              => $isVat ? 'vat' : 'non_vat',
+            'month_sales'             => $monthSales,
+            // No join: the month's order ids as a subquery (soft-deleted invoices are left out by default)
+            'vat_collected'           => $isVat
+                ? round((float) Invoice::whereIn('order_id', (clone $month)->select('orders.id'))->where('vat_status', 'vat')->sum('vat_amount'), 2)
+                : null,
+            'percentage_tax_estimate' => $isVat ? null : round($monthSales * 0.03, 2),
+        ];
+
         return Inertia::render('seller/revenue', [
+            'tax'     => $tax,
             'summary' => [
                 'total_sales'         => $totalSales,
-                'month_sales'         => self::saleTotal($month),
+                'month_sales'         => $monthSales,
                 'orders'              => $orderCount,
                 'average_order_value' => $orderCount > 0 ? round($totalSales / $orderCount, 2) : 0,
             ],
@@ -83,7 +99,10 @@ class RevenueController extends Controller
     {
         $store  = $request->attributes->get('seller_store');
         $format = $request->get('format', 'csv');
-        $rows   = $this->filteredQuery($request, $store->id)->get();
+        $rows   = $this->filteredQuery($request, $store->id)->with('invoice')->get();
+        // VAT stores: the VAT on each order's invoice (blank when it has none, e.g. older INV- invoices)
+        $isVat  = $store->vat_status === 'vat';
+        $vatOf  = fn (Order $o) => $o->invoice && $o->invoice->vat_status === 'vat' ? (float) $o->invoice->vat_amount : null;
 
         $from     = $request->get('date_from') ?: now()->startOfMonth()->toDateString();
         $to       = $request->get('date_to')   ?: now()->toDateString();
@@ -96,7 +115,8 @@ class RevenueController extends Controller
             'subtotal'  => $this->peso((float) $o->total_amount),
             'shipping'  => $this->peso((float) $o->shipping_fee),
             'total'     => $this->peso($o->grandTotal()),
-        ])->values()->all();
+        ] + ($isVat ? ['vat' => $vatOf($o) !== null ? $this->peso($vatOf($o)) : ''] : []))->values()->all();
+        $sumVat = $rows->sum(fn (Order $o) => $vatOf($o) ?? 0);
 
         $sumSub   = $rows->sum(fn ($o) => (float) $o->total_amount);
         $sumShip  = $rows->sum(fn ($o) => (float) $o->shipping_fee);
@@ -119,15 +139,17 @@ class RevenueController extends Controller
                     ['key' => 'subtotal',  'label' => 'Items Subtotal', 'align' => 'right'],
                     ['key' => 'shipping',  'label' => 'Delivery Fee', 'align' => 'right'],
                     ['key' => 'total',     'label' => 'Total', 'align' => 'right'],
+                    ...($isVat ? [['key' => 'vat', 'label' => 'VAT', 'align' => 'right']] : []),
                 ],
                 'rows'      => $data,
-                'totalsRow' => ['order' => 'TOTAL', 'delivered' => '', 'payment' => '', 'subtotal' => $this->peso($sumSub), 'shipping' => $this->peso($sumShip), 'total' => $this->peso($sumTotal)],
+                'totalsRow' => ['order' => 'TOTAL', 'delivered' => '', 'payment' => '', 'subtotal' => $this->peso($sumSub), 'shipping' => $this->peso($sumShip), 'total' => $this->peso($sumTotal)]
+                    + ($isVat ? ['vat' => $this->peso($sumVat)] : []),
             ]);
         }
 
         $csv   = array_map(fn ($r) => array_values($r), $data);
-        $csv[] = ['TOTAL', '', '', $this->peso($sumSub), $this->peso($sumShip), $this->peso($sumTotal)];
+        $csv[] = ['TOTAL', '', '', $this->peso($sumSub), $this->peso($sumShip), $this->peso($sumTotal), ...($isVat ? [$this->peso($sumVat)] : [])];
 
-        return $this->csvResponse($filename, ['Order #', 'Delivered on', 'Payment', 'Items Subtotal', 'Delivery Fee', 'Total'], $csv);
+        return $this->csvResponse($filename, ['Order #', 'Delivered on', 'Payment', 'Items Subtotal', 'Delivery Fee', 'Total', ...($isVat ? ['VAT'] : [])], $csv);
     }
 }

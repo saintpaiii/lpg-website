@@ -65,6 +65,7 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
         Route::get('invoices/export', [InvoiceController::class, 'export'])->name('invoices.export');
         Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+        Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'pdf'])->name('invoices.pdf');
     });
 
     Route::middleware('permission:reports.view')->group(function () {

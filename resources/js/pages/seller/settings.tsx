@@ -27,6 +27,7 @@ import {
 import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Spinner } from '@/components/ui/spinner';
+import { TaxInvoiceCard, type TaxSettings } from '@/components/tax-invoice-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -60,6 +61,9 @@ interface StoreData {
 
 interface Props {
     store: StoreData;
+    tax: TaxSettings;
+    /** Owner — staff with Settings see the Tax & Invoice card read-only */
+    can_edit_tax: boolean;
 }
 
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -97,7 +101,7 @@ function MapClickHandler({ onPickRef }: { onPickRef: React.RefObject<((lat: numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SellerSettings({ store }: Props) {
+export default function SellerSettings({ store, tax, can_edit_tax }: Props) {
     // The Loyalty Program page is owner-only; staff with settings.view see plain text
     const isOwner = usePage<SharedData>().props.auth.user?.role === 'seller';
     const { has } = usePlan();
@@ -676,6 +680,9 @@ export default function SellerSettings({ store }: Props) {
                         </Button>
                     </div>
                 </form>
+
+                {/* Own form + endpoint (owner only) */}
+                <TaxInvoiceCard tax={tax} canEdit={can_edit_tax} storeName={store.store_name} />
             </div>
         </AppLayout>
     );

@@ -31,13 +31,6 @@ class OrderController extends Controller
         return $prefix . str_pad($count + 1, 5, '0', STR_PAD_LEFT);
     }
 
-    private function generateInvoiceNumber(): string
-    {
-        $year   = date('Y');
-        $prefix = "INV-{$year}-";
-        $count  = Invoice::withTrashed()->whereYear('created_at', $year)->count();
-        return $prefix . str_pad($count + 1, 5, '0', STR_PAD_LEFT);
-    }
 
     private function formatOrder(Order $o): array
     {
@@ -503,24 +496,8 @@ class OrderController extends Controller
                     ]);
                 }
 
-                if (! $order->invoice()->exists()) {
-                    Invoice::create([
-                        'store_id'           => $store->id,
-                        'invoice_number'     => $this->generateInvoiceNumber(),
-                        'order_id'           => $order->id,
-                        'customer_id'        => $order->customer_id,
-                        'total_amount'       => $order->total_amount,
-                        'payment_status'     => $order->payment_status,
-                        'paid_amount'        => match ($order->payment_status) {
-                            'paid'    => $order->grandTotal(),
-                            'partial' => (float) ($order->down_payment_amount ?? 0),
-                            default   => 0,
-                        },
-                        'payment_method'     => $order->payment_method,
-                        'paid_at'            => $order->payment_status === 'paid' ? now() : null,
-                        'due_date'           => now()->addDays(7),
-                    ]);
-                }
+                // The store's own invoice series + VAT snapshot (locks the order + store rows; one invoice per order)
+                \App\Services\InvoiceService::issue($order);
             }
 
             if ($newStatus === 'cancelled' && ! in_array($oldStatus, ['cancelled', 'pending'])) {

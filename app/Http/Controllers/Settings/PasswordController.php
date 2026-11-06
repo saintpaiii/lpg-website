@@ -14,8 +14,13 @@ class PasswordController extends Controller
     /**
      * Show the user's password settings page.
      */
-    public function edit(): Response
+    public function edit(): Response|RedirectResponse
     {
+        // Customers change their password on their portal profile page (Change Password card)
+        if (request()->user()->role === 'customer') {
+            return redirect('/customer/profile#password');
+        }
+
         return Inertia::render('settings/password');
     }
 

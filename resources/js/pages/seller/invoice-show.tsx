@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Printer } from 'lucide-react';
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, FileDown, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import AppLayout from '@/layouts/app-layout';
-import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
+import { InvoiceDocument, InvoiceStatusBadge, type InvoiceDoc } from '@/components/invoice-document';
 import type { BreadcrumbItem } from '@/types';
 
 
@@ -37,14 +37,8 @@ type Invoice = {
     order: { id: number; order_number: string; transaction_type: string; items: InvoiceItem[] } | null;
 };
 
-type Props = { invoice: Invoice };
+type Props = { invoice: Invoice; doc: InvoiceDoc };
 
-const PAY_COLORS: Record<string, string> = {
-    paid:    'bg-green-100 text-green-700 border-green-200',
-    unpaid:  'bg-red-100 text-red-700 border-red-200',
-    partial: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    voided:  'bg-gray-100 text-gray-500 border-gray-200',
-};
 
 function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -52,14 +46,15 @@ function fmt(n: number) {
 
 const COD_METHODS = ['cash', 'gcash', 'bank_transfer', 'maya'] as const;
 
-export default function SellerInvoiceShow({ invoice, breakdown }: Props & { breakdown: PriceBreakdown }) {
+export default function SellerInvoiceShow({ invoice, doc }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Invoices',  href: '/seller/invoices'  },
         { title: invoice.invoice_number, href: `/seller/invoices/${invoice.id}` },
     ];
 
-    const canRecordPayment = !invoice.is_online
+    // Never on a void invoice / cancelled order (the server refuses it too)
+    const canRecordPayment = !invoice.is_online && !doc.is_void && doc.order?.status !== 'cancelled'
         && ['unpaid', 'partial'].includes(invoice.payment_status);
 
     const [recordOpen,     setRecordOpen]     = useState(false);
@@ -67,7 +62,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
     const [recordAmount,   setRecordAmount]   = useState('');
     const [recordLoading,  setRecordLoading]  = useState(false);
 
-    const grandTotal = breakdown.grand_total;
+    const grandTotal = doc.breakdown.grand_total;
 
     function submitRecordPayment() {
         if (!recordAmount || parseFloat(recordAmount) <= 0) return;
@@ -87,7 +82,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={invoice.invoice_number} />
 
-            <div className="p-6 space-y-6 max-w-3xl">
+            <div className="p-4 sm:p-6 space-y-6 max-w-5xl">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
@@ -99,9 +94,7 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl font-bold font-mono">{invoice.invoice_number}</h1>
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${PAY_COLORS[invoice.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
-                                    {invoice.payment_status}
-                                </span>
+                                <InvoiceStatusBadge doc={doc} />
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 Issued {invoice.created_at}
@@ -126,68 +119,29 @@ export default function SellerInvoiceShow({ invoice, breakdown }: Props & { brea
                                 <Button size="sm" variant="outline">View Order</Button>
                             </Link>
                         )}
-                        {invoice.payment_status === 'paid' && (
-                            <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
-                                <Button size="sm" variant="outline" className="gap-1.5">
-                                    <Printer className="h-4 w-4" />
-                                    Print
-                                </Button>
-                            </a>
-                        )}
+                        <a href={`/invoices/${invoice.id}/print`} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="gap-1.5">
+                                <Printer className="h-4 w-4" />
+                                Print
+                            </Button>
+                        </a>
+                        <a href={`/seller/invoices/${invoice.id}/pdf`} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="outline" className="gap-1.5">
+                                <FileDown className="h-4 w-4" />
+                                Download PDF
+                            </Button>
+                        </a>
                     </div>
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Items */}
-                    <Card className="lg:col-span-2">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">Items</CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-muted/30">
-                                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Product</th>
-                                        <th className="text-center px-4 py-2 font-medium text-muted-foreground">Qty</th>
-                                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Price</th>
-                                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Subtotal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {(invoice.order?.items ?? []).map((item, idx) => (
-                                        <tr key={idx} className="border-b last:border-0">
-                                            <td className="px-4 py-3">
-                                                <p className="font-medium">{item.product}</p>
-                                                {item.brand && <p className="text-xs text-muted-foreground">{item.brand}</p>}
-                                            </td>
-                                            <td className="px-4 py-3 text-center">{item.qty}</td>
-                                            <td className="px-4 py-3 text-right">{fmt(item.price)}</td>
-                                            <td className="px-4 py-3 text-right font-medium">{fmt(item.subtotal)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                                <tfoot>
-                                    <PriceBreakdownRows breakdown={breakdown} labelSpan={3} totalLabel="Total (paid by customer to your store)" />
-                                </tfoot>
-                            </table>
-
-
-                        </CardContent>
-                    </Card>
+                    {/* The store's invoice (same layout as print / PDF / customer view) */}
+                    <div className="lg:col-span-2">
+                        <InvoiceDocument doc={doc} />
+                    </div>
 
                     {/* Right panel */}
                     <div className="space-y-4">
-                        {invoice.customer && (
-                            <Card>
-                                <CardHeader className="pb-2"><CardTitle className="text-sm">Customer</CardTitle></CardHeader>
-                                <CardContent className="text-sm space-y-1">
-                                    <p className="font-semibold">{invoice.customer.name}</p>
-                                    {invoice.customer.phone && <p className="text-muted-foreground">{invoice.customer.phone}</p>}
-                                    <p className="text-xs text-muted-foreground">{[invoice.customer.address, invoice.customer.city].filter(Boolean).join(', ')}</p>
-                                </CardContent>
-                            </Card>
-                        )}
-
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm">Payment</CardTitle></CardHeader>
                             <CardContent className="text-sm space-y-2">

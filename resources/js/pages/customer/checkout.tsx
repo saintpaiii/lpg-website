@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { overLimitText, type LimitPeriod } from '@/lib/order-limits';
-import { Banknote, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
+import { Banknote, ChevronDown, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
 import StoreLocationMap from '@/components/store-location-map';
 import { orderLoad, quoteFee, whyNoVehicle, type DeliveryOption } from '@/lib/delivery-fee';
 import { formatAddress } from '@/data/cavite-locations';
@@ -48,6 +48,8 @@ type StoreGroup = {
     delivery_options: DeliveryOption[];
     can_deliver: boolean;
     no_delivery_reason: string | null;
+    /** Why the store can't deliver at all: no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy */
+    no_delivery_code?: string | null;
     store_lat: number | null;
     store_lng: number | null;
     max_delivery_radius_km: number | null;
@@ -142,6 +144,13 @@ async function fetchOsrmRoute(
     return r.ok ? { coords: r.coords, durationMin: r.durationMin ?? 0 } : null;
 }
 
+/** What the customer can do when delivery isn't possible ("reduce the quantity" only when the load is too heavy). */
+function deliveryHint(code: string | null, pickup: boolean): string {
+    if (code === 'too_heavy') return pickup ? 'Choose pick-up, or reduce the quantity.' : 'Reduce the quantity or remove some items.';
+    if (code === 'too_far') return pickup ? 'Choose pick-up, or use another address.' : 'Use another address closer to the store.';
+    return pickup ? 'You can pick it up at the store instead.' : "This store can't deliver right now. Please try another store.";
+}
+
 export default function CheckoutPage({ stores: allStores, customer, savedAddresses = [] }: Props) {
     // Stores that are not available right now are shown greyed and left out of totals and the order
     const stores = allStores.filter((sg) => sg.store_available !== false);
@@ -188,6 +197,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
         () => Object.fromEntries(stores.map((sg) => [sg.store_id, sg.min_down_payment_percent])),
     );
     const [notes, setNotes]             = useState('');
+    // Optional buyer TIN for a business invoice (goes on every store's invoice of this checkout)
+    const [showTin, setShowTin]         = useState(false);
+    const [buyerTin, setBuyerTin]       = useState('');
+    const tinInvalid = buyerTin.trim() !== '' && !/^\d{3}-\d{3}-\d{3}-\d{3,5}$/.test(buyerTin.trim());
     // Store promo coupon
     const [promo, setPromo]             = useState<CouponRules | null>(null);
     const [couponInput, setCouponInput] = useState('');
@@ -361,10 +374,14 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
         // Can't deliver: no vehicle fits / no vehicle, or beyond the store's radius
         const blocked  = isDelivery ? (!quote ? whyNoVehicle(sg.delivery_options, sg.no_delivery_reason)
             : tooFar ? `${sg.store_name} doesn't deliver that far (${distKm!.toFixed(1)} km, limit ${sg.max_delivery_radius_km} km).` : null) : null;
+        // Which hint fits: vehicles exist with fees but none can carry it → too heavy; no options at all → the server's code
+        const blockedCode = !blocked ? null
+            : !quote ? ((sg.delivery_options ?? []).length > 0 ? 'too_heavy' : (sg.no_delivery_code ?? 'no_vehicle'))
+            : 'too_far';
         const fee      = quote?.fee ?? 0;
         const coupon   = sg.coupons.find((c) => c.id === selectedCoupons[sg.store_id]) ?? null;
         const discount = coupon ? Math.min(coupon.amount, subtotal) : 0;
-        return { store: sg, subtotal, fee, coupon, discount, quote, blocked };
+        return { store: sg, subtotal, fee, coupon, discount, quote, blocked, blockedCode };
     });
 
     // Promo coupon spread across the orders (recomputed live as delivery fees change)
@@ -417,6 +434,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
             toast.error('Please confirm you have the empty tank(s) ready for exchange.');
             return;
         }
+        if (tinInvalid) {
+            toast.error('Use the TIN format 000-000-000-00000.');
+            return;
+        }
         setLoading(true);
         try {
             const res = await axios.post<{ checkout_url?: string; redirect_url?: string; error?: string }>(
@@ -435,6 +456,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     estimated_delivery_minutes: allPickup ? null : estimatedMins,
                     fulfillments:               Object.fromEntries(stores.map((sg) => [sg.store_id, fulfillmentOf(sg)])),
                     empty_tanks_confirmed:      hasRefill ? emptyConfirmed : null,
+                    buyer_tin:                  buyerTin.trim() || null,
                 },
             );
             if (res.data.redirect_url) {
@@ -629,7 +651,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     </Card>
                 ))}
 
-                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance, quote, blocked }) => {
+                {storeTotals.map(({ store: sg, subtotal: storeSubtotal, fee, discount, promoCut, total, mode, dpPct, down, balance, quote, blocked, blockedCode }) => {
                     const pickup = fulfillmentOf(sg) === 'pickup';
                     const refillSummary = refillSummaryOf(sg);
                     return (
@@ -660,7 +682,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     <div className="mb-3 rounded-lg border border-red-300 bg-red-50 px-3 py-2.5 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
                                         <p className="font-medium">Delivery isn't possible for this order.</p>
                                         <p className="mt-0.5">{blocked}</p>
-                                        <p className="mt-1 text-xs">{sg.allow_pickup ? 'Choose pick-up, or reduce the quantity.' : 'Reduce the quantity or remove some items.'}</p>
+                                        <p className="mt-1 text-xs">{deliveryHint(blockedCode, !!sg.allow_pickup)}</p>
                                         {sg.allow_pickup && (
                                             <Button type="button" size="sm" variant="outline" className="mt-2 border-red-300 bg-white text-red-700 hover:bg-red-50 dark:bg-transparent"
                                                 onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: 'pickup' }))}>
@@ -973,6 +995,28 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                             placeholder="Any special instructions for your delivery…"
                             textareaClassName="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                         />
+                    </CardContent>
+                </Card>
+
+                {/* Business invoice: optional buyer TIN */}
+                <Card>
+                    <CardContent className="pt-6">
+                        <button type="button" onClick={() => setShowTin((v) => !v)} aria-expanded={showTin}
+                            className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium text-gray-800 dark:text-gray-200">
+                            <span>Need an invoice for your business? Add your TIN</span>
+                            <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${showTin ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showTin && (
+                            <div className="mt-3 grid gap-1.5">
+                                <label htmlFor="buyer-tin" className="text-sm font-medium">TIN (optional)</label>
+                                <input id="buyer-tin" inputMode="numeric" value={buyerTin} onChange={(e) => setBuyerTin(e.target.value)}
+                                    placeholder="000-000-000-00000" maxLength={20}
+                                    className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:max-w-xs dark:bg-gray-800 dark:text-white ${tinInvalid ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`} />
+                                <p className={`text-xs ${tinInvalid ? 'text-red-600' : 'text-gray-500'}`}>
+                                    {tinInvalid ? 'Use the format 000-000-000-00000.' : 'Printed on the invoice of every store in this order.'}
+                                </p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 

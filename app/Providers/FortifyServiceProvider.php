@@ -24,6 +24,8 @@ class FortifyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(LoginResponseContract::class, LoginResponse::class);
+        // After the 2FA code: same role home + "intended only within your own portal" rule
+        $this->app->singleton(\Laravel\Fortify\Contracts\TwoFactorLoginResponse::class, LoginResponse::class);
         $this->app->singleton(RegisterResponseContract::class, RegisteredUserResponse::class);
 
         // Use our extended rate limiter (3-minute lockout instead of 1-minute)
