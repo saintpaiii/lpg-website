@@ -111,6 +111,12 @@ class StoreController extends Controller
             'usage'     => \App\Services\SubscriptionService::usage($store),
             'limits'    => \App\Services\SubscriptionService::limits($store),
             'paused'    => \App\Services\SubscriptionService::pausedCounts($store),
+            // Cash recorded by the admin, waiting for the owner to accept
+            'awaiting'  => ($a = \App\Services\SubscriptionService::waitingCash($store)) ? [
+                'plan'   => \App\Services\SubscriptionService::planName($a->plan_key),
+                'amount' => (float) $a->amount,
+                'since'  => $a->created_at->format('M j, Y g:i A'),
+            ] : null,
             'payments'  => $store->subscriptionPayments()->where('status', 'paid')->latest('paid_at')->limit(5)->get()
                 ->map(fn ($p) => [
                     'id'             => $p->id,

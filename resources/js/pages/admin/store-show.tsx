@@ -116,6 +116,8 @@ type StoreSubscription = {
     usage?: { products: number; staff: number; vehicles: number };
     limits?: { products: number | null; staff: number | null; vehicles: number | null };
     paused?: { products: number; staff: number; vehicles: number };
+    /** Cash recorded by the admin, waiting for the owner to accept */
+    awaiting?: { plan: string; amount: number; since: string } | null;
     payments: { id: number; receipt_number: string | null; plan: string; amount: number; method: string; period: string; paid_at: string | null }[];
 };
 
@@ -420,6 +422,11 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                                     <span><span className="text-muted-foreground">Days left:</span> {subscription.days_left}</span>
                                 )}
                             </div>
+                            {subscription.awaiting && (
+                                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <strong>Waiting for seller:</strong> {subscription.awaiting.plan} ₱{subscription.awaiting.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })} (since {subscription.awaiting.since}) — the plan changes when the owner accepts.
+                                </p>
+                            )}
                             {subscription.usage && subscription.limits && (
                                 <div className="grid gap-2 sm:grid-cols-3">
                                     {([['products', 'Published products'], ['staff', 'Staff accounts'], ['vehicles', 'Vehicles']] as const).map(([k, label]) => {

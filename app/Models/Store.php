@@ -328,6 +328,13 @@ class Store extends Model
         return $this->hasMany(Vehicle::class);
     }
 
+    /** A cash payment recorded by the admin that the owner has not accepted / declined yet */
+    public function awaitingCashRequest(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        // At most one waits per store (recordCash refuses a second one)
+        return $this->hasOne(SubscriptionPayment::class)->where('status', 'awaiting_seller');
+    }
+
     public function subscriptionPayments(): HasMany
     {
         return $this->hasMany(SubscriptionPayment::class);

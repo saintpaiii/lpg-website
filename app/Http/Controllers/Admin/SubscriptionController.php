@@ -10,6 +10,7 @@ use App\Models\SubscriptionPlan;
 use App\Services\SubscriptionService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -62,6 +63,7 @@ class SubscriptionController extends Controller
         $now = now();
         $q = Store::query()
             ->whereIn('status', ['approved', 'suspended'])
+            ->with('awaitingCashRequest')   // one query for the whole page
             ->withSum(['subscriptionPayments as total_paid' => fn ($p) => $p->where('status', 'paid')->whereIn('method', self::PAID_METHODS)], 'amount')
             ->when($request->get('search'), fn ($w, $s) => $w->where('store_name', 'like', "%{$s}%"))
             ->when($request->get('plan'), fn ($w, $p) => $w->where('subscription_plan', $p))
@@ -87,6 +89,14 @@ class SubscriptionController extends Controller
             'expires'    => $s->subscription_expires_at?->format('M j, Y g:i A'),
             'days_left'  => SubscriptionService::daysLeft($s),
             'total_paid' => round((float) ($s->total_paid ?? 0), 2),
+            'store_status' => $s->status,
+            'expires_date' => $s->subscription_expires_at?->format('M j, Y'),
+            'awaiting'   => ($a = $s->awaitingCashRequest) ? [
+                'id'         => $a->id,
+                'plan'       => SubscriptionService::planName($a->plan_key),
+                'amount'     => (float) $a->amount,
+                'created_at' => $a->created_at->format('M j, Y'),
+            ] : null,
         ]);
     }
 
@@ -202,17 +212,44 @@ class SubscriptionController extends Controller
         return back()->with('success', "{$data['days']} free day(s) given to {$store->store_name} — active until {$store->subscription_expires_at->format('M j, Y')}.");
     }
 
+    /** Records the cash as a REQUEST — the store's plan changes only when the owner accepts it on My Plan. */
     public function recordCash(Request $request, Store $store): RedirectResponse
     {
         abort_unless($request->user()->isAdmin(), 403);
         $data = $request->validate([
             'plan_key'  => 'required|in:' . implode(',', SubscriptionService::PLAN_KEYS),
             'reference' => 'nullable|string|max:100',
+            'confirm'   => 'accepted',
+        ], [
+            'plan_key.required' => 'Choose a plan.',
+            'confirm.accepted'  => 'Tick the box to confirm the seller paid.',
         ]);
 
-        $payment = SubscriptionService::recordCash($store, $data['plan_key'], $data['reference'] ?? null, $request->user());
+        try {
+            SubscriptionService::recordCash($store, $data['plan_key'], $data['reference'] ?? null, $request->user());
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
 
-        return back()->with('success', "Cash payment recorded for {$store->store_name} ({$payment->receipt_number}).");
+        return back()->with('success', "Sent to {$store->store_name} — the plan changes when the seller accepts.");
+    }
+
+    /** "What will change" for the Record cash dialog (same data the seller sees). */
+    public function preview(Request $request, Store $store): JsonResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+        $data = $request->validate(['plan' => 'required|in:' . implode(',', SubscriptionService::PLAN_KEYS)]);
+
+        return response()->json(SubscriptionService::changePreview($store, $data['plan']));
+    }
+
+    public function cancelRequest(Request $request, SubscriptionPayment $payment): RedirectResponse
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        return SubscriptionService::cancelCashRequest($payment)
+            ? back()->with('success', 'Cash payment request cancelled — the store owner was told.')
+            : back()->with('error', 'This request is no longer waiting.');
     }
 
     public function updatePlan(Request $request, SubscriptionPlan $plan): RedirectResponse

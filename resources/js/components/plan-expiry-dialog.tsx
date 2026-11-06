@@ -1,4 +1,4 @@
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { PlanCardButton, PlanCards } from '@/components/plan-cards';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,7 +9,7 @@ const STORAGE_KEY = 'plan-expiry-dialog-seen';
 
 /** Store owner only: once a day while the plan ends within 3 days or has ended — compare plans and pick one. */
 export function PlanExpiryDialog() {
-    const { auth, plan, planCatalog } = usePage<SharedData>().props;
+    const { auth, plan, planCatalog, cash_request_waiting } = usePage<SharedData>().props;
     const state = planNeedsAttention(plan);
     const [open, setOpen] = useState(false);
 
@@ -34,12 +34,20 @@ export function PlanExpiryDialog() {
                         {state === 'expired' ? 'Your plan has ended' : `Your plan ends in ${plan.days_left} day${plan.days_left === 1 ? '' : 's'}`}
                     </DialogTitle>
                     <DialogDescription>
-                        {state === 'expired'
-                            ? 'Your products are hidden from customers until you choose a plan.'
-                            : `Choose a plan before ${plan.expires_label} so your products stay visible to customers.`}
+                        {cash_request_waiting
+                            ? 'A cash payment is waiting for your approval.'
+                            : state === 'expired'
+                                ? 'Your products are hidden from customers until you choose a plan.'
+                                : `Choose a plan before ${plan.expires_label} so your products stay visible to customers.`}
                     </DialogDescription>
                 </DialogHeader>
-                <PlanCards
+                {/* Cash recorded by the platform waits for the owner → point to it instead of the plan cards */}
+                {cash_request_waiting ? (
+                    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <p className="min-w-0 flex-1">A cash payment is waiting for your approval — review it in My Plan.</p>
+                        <Link href="/seller/plan" onClick={() => setOpen(false)} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700">Review it</Link>
+                    </div>
+                ) : <PlanCards
                     catalog={planCatalog}
                     currentKey={plan.active && !plan.is_trial ? plan.key : null}
                     renderAction={(p) => (
@@ -47,7 +55,7 @@ export function PlanExpiryDialog() {
                             {plan.active && plan.key === p.key ? 'Extend 30 days' : `Choose ${p.name}`}
                         </PlanCardButton>
                     )}
-                />
+                />}
             </DialogContent>
         </Dialog>
     );

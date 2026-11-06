@@ -55,6 +55,8 @@ export type SharedData = {
     sidebarBadges?: Record<string, number>;
     /** Store plan (owner, staff and riders of a store) */
     plan?: import('./plans').PlanSummary | null;
+    /** Store owner only: a cash payment recorded by the platform admin waits for Accept / Decline */
+    cash_request_waiting?: boolean;
     /** Plan comparison for the owner's "plan ends soon" popup */
     planCatalog?: import('./plans').PlanCatalog | null;
     /** "Report a website problem" catalog */

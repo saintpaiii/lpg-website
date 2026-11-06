@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\Mail;
 /**
  * Store subscription plans — every plan rule lives here.
  *
- * Plans are prepaid for 30 days (PayMongo, or cash recorded by the admin) and never renew by themselves.
+ * Plans are prepaid for 30 days (PayMongo, or cash recorded by the admin and ACCEPTED by the store owner) and never
+ * renew by themselves.
  * Same plan while active → +30 days after the current end; a different plan → starts now (old days dropped).
  * A store without an active plan is hidden from customers (Store::scopeVisibleToCustomers / isOpenToCustomers).
  */
@@ -532,7 +533,9 @@ class SubscriptionService
 
         // A free price (admin set ₱0) needs no payment
         if ((float) $plan->price <= 0) {
-            static::markPaid($payment, 'gift', 'Free plan price');
+            if (static::markPaid($payment, 'gift', 'Free plan price')) {
+                static::declineWaitingCash($store, 'Seller paid online instead');
+            }
 
             return ['checkout_url' => url("/seller/plan?payment=success&p={$payment->id}")];
         }
@@ -599,9 +602,9 @@ class SubscriptionService
      * success page may arrive at the same moment — only the first one applies the 30 days.
      * A 'cancelled' payment that PayMongo reports as paid is applied (the money was received).
      */
-    public static function markPaid(SubscriptionPayment $payment, string $method, ?string $reference = null, ?User $recordedBy = null): bool
+    public static function markPaid(SubscriptionPayment $payment, string $method, ?string $reference = null, ?User $recordedBy = null, ?string $requireStatus = null): bool
     {
-        $result = static::apply($payment, $method, $reference, $recordedBy);
+        $result = static::apply($payment, $method, $reference, $recordedBy, $requireStatus);
         if (! $result) {
             return false;
         }
@@ -619,6 +622,11 @@ class SubscriptionService
             "{$store->store_name} paid ₱" . number_format((float) $payment->amount, 2) . " for the {$planName} plan ({$payment->receipt_number}).");
         static::applyPlanLimits($store);
 
+        // The seller paid online while a cash request waited → that request is declined (the admin returns the cash)
+        if ($method === 'paymongo') {
+            static::declineWaitingCash($store, 'Seller paid online instead');
+        }
+
         return true;
     }
 
@@ -628,11 +636,15 @@ class SubscriptionService
      *
      * @return array{0: SubscriptionPayment, 1: Store}|null  null when it was already applied
      */
-    private static function apply(SubscriptionPayment $payment, string $method, ?string $reference, ?User $recordedBy): ?array
+    private static function apply(SubscriptionPayment $payment, string $method, ?string $reference, ?User $recordedBy, ?string $requireStatus = null): ?array
     {
-        $result = Cache::lock('subscription-receipt', 15)->block(10, fn () => DB::transaction(function () use ($payment, $method, $reference, $recordedBy) {
+        $result = Cache::lock('subscription-receipt', 15)->block(10, fn () => DB::transaction(function () use ($payment, $method, $reference, $recordedBy, $requireStatus) {
             $p = SubscriptionPayment::whereKey($payment->id)->lockForUpdate()->first();
             if (! $p || $p->status === 'paid') {
+                return null;
+            }
+            // A cash request is applied only by the seller's Accept (still waiting), never by any other path
+            if ($requireStatus !== null ? $p->status !== $requireStatus : in_array($p->status, ['awaiting_seller', 'declined'], true)) {
                 return null;
             }
             $store = Store::withTrashed()->whereKey($p->store_id)->lockForUpdate()->first();
@@ -722,24 +734,210 @@ class SubscriptionService
         return $payment;
     }
 
-    /** Cash (or bank) payment received by the admin. */
+    // ── Cash payments: the admin records, the SELLER accepts ──────────────────
+    //
+    // Recording cash only creates a request (status 'awaiting_seller') — the store's plan does not change until the
+    // owner accepts it on My Plan (or it is declined / cancelled by the admin / expires after 7 days).
+
+    public const CASH_REQUEST_DAYS = 7;
+
+    /** Plan rank for "is this a downgrade?" (the trial is Premium). */
+    private const RANK = ['trial' => 3, 'premium' => 3, 'pro' => 2, 'basic' => 1];
+
+    /** The store's cash request waiting for the owner, if any. */
+    public static function waitingCash(Store $store): ?SubscriptionPayment
+    {
+        return SubscriptionPayment::where('store_id', $store->id)->where('status', 'awaiting_seller')->latest('id')->first();
+    }
+
+    /**
+     * What a plan payment would do to this store right now — the admin's Record cash dialog and the seller's
+     * "Confirm your cash payment" card show the same box. `extends` mirrors apply() exactly.
+     */
+    public static function changePreview(Store $store, string $planKey): array
+    {
+        $active   = static::isActive($store);
+        $current  = $active ? $store->subscription_plan : 'none';
+        $days     = (int) config('plans.days', 30);
+        $extends  = $active && $store->subscription_plan === $planKey;
+        $newEnd   = ($extends ? $store->subscription_expires_at->copy() : now())->addDays($days);
+        $daysLeft = static::daysLeft($store);
+        $pause    = $extends ? null : static::previewPause($store, $planKey);
+        $plan     = static::plan($planKey);
+
+        return [
+            'current' => [
+                'plan_key'  => $current,
+                'label'     => $active ? static::planName($current) : 'No active plan',
+                'active'    => $active,
+                'days_left' => $daysLeft,
+                'ends'      => $active ? $store->subscription_expires_at->format('M j, Y') : null,
+                // Sent back on Accept — if the plan changed meanwhile the seller must review again
+                'ends_at'   => $active ? $store->subscription_expires_at->toIso8601String() : null,
+            ],
+            'plan_key'  => $planKey,
+            'plan'      => static::planName($planKey),
+            'price'     => (float) ($plan?->price ?? 0),
+            'days'      => $days,
+            'extends'   => $extends,
+            'new_end'   => $newEnd->format('M j, Y'),
+            'downgrade' => $active && (self::RANK[$current] ?? 0) > (self::RANK[$planKey] ?? 0),
+            'lost_days' => ! $extends && $active ? $daysLeft : 0,
+            'preview'   => $pause && static::previewHasChanges($pause) ? $pause : null,
+        ];
+    }
+
+    /** Has the store's plan changed since the seller saw it? (plan key + end date) */
+    public static function planChangedSince(Store $store, ?string $shownKey, ?string $shownEndsAt): bool
+    {
+        $now     = static::isActive($store) ? $store->subscription_plan : 'none';
+        $nowEnds = static::isActive($store) ? $store->subscription_expires_at->getTimestamp() : null;
+        $shown   = $shownEndsAt ? \Carbon\Carbon::parse($shownEndsAt)->getTimestamp() : null;
+
+        return $now !== $shownKey || $nowEnds !== $shown;
+    }
+
+    /**
+     * Cash received by the admin → a request the store owner must accept. Nothing changes on the store yet.
+     *
+     * @throws \DomainException with the message for the admin
+     */
     public static function recordCash(Store $store, string $planKey, ?string $reference, User $admin): SubscriptionPayment
     {
         $plan = static::plan($planKey);
-        $payment = SubscriptionPayment::create([
-            'store_id'    => $store->id,
-            'plan_key'    => $planKey,
-            'amount'      => $plan?->price ?? 0,
-            'status'      => 'pending',
-            'method'      => 'cash',
-            'days'        => (int) config('plans.days', 30),
-            'reference'   => $reference,
-            'created_by'  => $admin->id,
-            'recorded_by' => $admin->id,
-        ]);
-        static::markPaid($payment, 'cash', $reference, $admin);
 
-        return $payment->fresh();
+        $payment = DB::transaction(function () use ($store, $planKey, $reference, $admin, $plan) {
+            // Lock the store so two admins can't create two requests at once
+            $locked = Store::whereKey($store->id)->lockForUpdate()->first();
+            if (! $locked || $locked->status !== 'approved') {
+                throw new \DomainException("This store is not active — it can't accept a cash payment right now.");
+            }
+            if (SubscriptionPayment::where('store_id', $store->id)->where('status', 'awaiting_seller')->exists()) {
+                throw new \DomainException('This store already has a cash payment waiting for the seller — cancel it first.');
+            }
+
+            return SubscriptionPayment::create([
+                'store_id'    => $store->id,
+                'plan_key'    => $planKey,
+                'amount'      => $plan?->price ?? 0,
+                'status'      => 'awaiting_seller',
+                'method'      => 'cash',
+                'days'        => (int) config('plans.days', 30),
+                'reference'   => $reference,
+                'created_by'  => $admin->id,
+                'recorded_by' => $admin->id,
+            ]);
+        });
+
+        $planName = static::planName($planKey);
+        $amount   = static::peso($payment->amount);
+        static::notifyOwner($store, 'Confirm your cash payment',
+            "The platform recorded {$amount} cash for the {$planName} plan. Please review and accept it in My Plan — nothing changes until you accept.",
+            'Please confirm your cash payment', [
+                "The platform recorded {$amount} cash for the {$planName} plan" . ($reference ? " (reference {$reference})" : '') . '.',
+                'Nothing changes on your store until you accept it. Open My Plan to see exactly what will change, then accept or decline.',
+                'If you don\'t answer within ' . self::CASH_REQUEST_DAYS . ' days, the request is cancelled.',
+            ], 'Review in My Plan');
+
+        return $payment;
+    }
+
+    /**
+     * The owner accepts a waiting cash request. The plan starts now (paid_at / receipt = today); the amount stays
+     * what the admin recorded and recorded_by stays the admin.
+     *
+     * @return 'ok'|'changed'|'gone'
+     */
+    public static function acceptCash(SubscriptionPayment $payment, Store $store, User $owner, ?string $shownKey, ?string $shownEndsAt): string
+    {
+        if ($payment->fresh()?->status !== 'awaiting_seller') {
+            return 'gone';
+        }
+        if (static::planChangedSince($store->fresh() ?? $store, $shownKey, $shownEndsAt)) {
+            return 'changed';
+        }
+        // apply() takes the cache lock itself (not re-entrant) and re-checks the status on the locked row
+        if (! static::markPaid($payment, 'cash', $payment->reference, null, 'awaiting_seller')) {
+            return 'gone';
+        }
+
+        $p = $payment->fresh();
+        $p->update(['notes' => mb_substr(trim(($p->notes ? $p->notes . ' · ' : '') . "Accepted by {$owner->name} on " . now()->format('M j, Y g:i A')), 0, 500)]);
+
+        return 'ok';
+    }
+
+    /** The owner declines: nothing changes; admins are told to return the cash. False when it no longer waits. */
+    public static function declineCash(SubscriptionPayment $payment, ?string $reason): bool
+    {
+        $done = DB::transaction(function () use ($payment, $reason) {
+            $p = SubscriptionPayment::whereKey($payment->id)->lockForUpdate()->first();
+            if (! $p || $p->status !== 'awaiting_seller') {
+                return false;
+            }
+            $p->update(['status' => 'declined', 'notes' => $reason ? mb_substr($reason, 0, 500) : 'Declined by the seller']);
+
+            return true;
+        });
+
+        if ($done) {
+            $store = $payment->store;
+            static::notifyAdmins('Cash payment declined',
+                "{$store?->store_name} declined the cash payment for " . static::planName($payment->plan_key) . ' (' . static::peso($payment->amount) . ')'
+                . ' — return the cash or record the right plan.' . ($reason ? " Reason: {$reason}" : ''));
+        }
+
+        return $done;
+    }
+
+    /** The admin withdraws a waiting request. False when it no longer waits. */
+    public static function cancelCashRequest(SubscriptionPayment $payment): bool
+    {
+        $done = SubscriptionPayment::whereKey($payment->id)->where('status', 'awaiting_seller')
+            ->update(['status' => 'cancelled', 'notes' => 'Cancelled by admin']) > 0;
+
+        if ($done && ($store = $payment->store) && ! $store->trashed()) {
+            static::notifyOwner($store, 'Cash payment request cancelled', 'The cash payment request was cancelled.',
+                'The cash payment request was cancelled', [
+                    'The platform cancelled the cash payment request for the ' . static::planName($payment->plan_key) . ' plan (' . static::peso($payment->amount) . ').',
+                    'Nothing changed on your plan.',
+                ], 'View my plan');
+        }
+
+        return $done;
+    }
+
+    /** Waiting cash requests of a store → declined (the seller paid online instead). */
+    private static function declineWaitingCash(Store $store, string $note): void
+    {
+        $waiting = SubscriptionPayment::where('store_id', $store->id)->where('status', 'awaiting_seller')->get();
+        foreach ($waiting as $p) {
+            if (SubscriptionPayment::whereKey($p->id)->where('status', 'awaiting_seller')->update(['status' => 'declined', 'notes' => $note]) > 0) {
+                static::notifyAdmins('Cash payment declined',
+                    "{$store->store_name} paid online instead — return the cash recorded for " . static::planName($p->plan_key)
+                    . ' (' . static::peso($p->amount) . ').');
+            }
+        }
+    }
+
+    /** For the seller's "Confirm your cash payment" card. */
+    public static function cashRequestData(SubscriptionPayment $p, Store $store): array
+    {
+        return [
+            'id'          => $p->id,
+            'plan_key'    => $p->plan_key,
+            'plan'        => static::planName($p->plan_key),
+            'amount'      => (float) $p->amount,
+            'reference'   => $p->reference,
+            'recorded_on' => $p->created_at->format('M j, Y'),
+            'recorded_by' => 'Platform admin',
+            'change'      => static::changePreview($store, $p->plan_key),
+        ];
+    }
+
+    private static function peso($n): string
+    {
+        return '₱' . number_format((float) $n, 2);
     }
 
     // ── Scheduled ─────────────────────────────────────────────────────────────
@@ -791,10 +989,34 @@ class SubscriptionService
             $counts['expired']++;
         }
 
-        // Abandoned checkouts
+        // Abandoned checkouts (only 'pending' — cash requests have their own 7-day rule below)
         $counts['cancelled'] = SubscriptionPayment::where('status', 'pending')
             ->where('created_at', '<', now()->subDay())
             ->update(['status' => 'cancelled']);
+
+        // Cash requests the owner never answered (not filtered by store — a deleted store's request expires too)
+        $counts['cash_expired'] = 0;
+        $stale = SubscriptionPayment::where('status', 'awaiting_seller')
+            ->where('created_at', '<', now()->subDays(self::CASH_REQUEST_DAYS))->get();
+        foreach ($stale as $p) {
+            $note = 'Expired — not accepted in ' . self::CASH_REQUEST_DAYS . ' days';
+            if (SubscriptionPayment::whereKey($p->id)->where('status', 'awaiting_seller')->update(['status' => 'cancelled', 'notes' => $note]) === 0) {
+                continue;
+            }
+            $counts['cash_expired']++;
+            $store  = $p->store;   // withTrashed relation
+            $what   = static::planName($p->plan_key) . ' (' . static::peso($p->amount) . ')';
+            static::notifyAdmins('Cash payment request expired',
+                ($store?->store_name ?? 'A store') . " did not accept the cash payment for {$what} within " . self::CASH_REQUEST_DAYS . ' days — return the cash or record it again.');
+            if ($store && ! $store->trashed()) {
+                static::notifyOwner($store, 'Cash payment request expired',
+                    "The cash payment request for {$what} expired because it was not accepted in " . self::CASH_REQUEST_DAYS . ' days. Nothing changed on your plan.',
+                    'The cash payment request expired', [
+                        "The cash payment request for {$what} was not accepted within " . self::CASH_REQUEST_DAYS . ' days, so it was cancelled.',
+                        'Nothing changed on your plan. Contact the platform if you paid in cash.',
+                    ], 'View my plan');
+            }
+        }
 
         return $counts;
     }

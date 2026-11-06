@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use App\Services\SubscriptionService;
 use Illuminate\Console\Command;
 
-/** Plan reminders (last 3 days), end-of-plan notices, and cancelling abandoned checkouts. */
+/** Plan reminders (last 3 days), end-of-plan notices, cancelling abandoned checkouts and unanswered cash requests. */
 class ProcessSubscriptions extends Command
 {
     protected $signature   = 'subscriptions:process';
@@ -15,7 +15,7 @@ class ProcessSubscriptions extends Command
     {
         $counts = SubscriptionService::runHourly();
 
-        $this->info("Reminders sent: {$counts['reminded']} · Plans ended: {$counts['expired']} · Stale checkouts cancelled: {$counts['cancelled']}");
+        $this->info("Reminders sent: {$counts['reminded']} · Plans ended: {$counts['expired']} · Stale checkouts cancelled: {$counts['cancelled']} · Cash requests expired: {$counts['cash_expired']}");
 
         return self::SUCCESS;
     }

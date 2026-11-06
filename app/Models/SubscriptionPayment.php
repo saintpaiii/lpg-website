@@ -8,7 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One plan period of a store: a PayMongo or cash purchase, the free trial, or free days given by the admin.
- * status: pending | paid | cancelled · method: paymongo | cash | trial | gift
+ * status: pending | paid | cancelled | awaiting_seller | declined · method: paymongo | cash | trial | gift
+ * (awaiting_seller = cash recorded by the admin, waiting for the store owner to accept; declined = the owner said no)
  */
 class SubscriptionPayment extends Model
 {

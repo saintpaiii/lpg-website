@@ -1,9 +1,12 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { CalendarClock, CalendarPlus, Check, ChevronLeft, ChevronRight, Crown, FileDown, Gift, HandCoins, Hourglass, PhilippinePeso, Search, Store, Wallet, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import axios from 'axios';
+import { CalendarClock, CalendarPlus, Check, ChevronLeft, ChevronRight, Clock, Crown, FileDown, Gift, HandCoins, Hourglass, Loader2, PhilippinePeso, Search, Store, Wallet, X } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { PlanChangeBox, type PlanChange } from '@/components/plan-change-box';
 import { peso } from '@/components/plan-cards';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +33,10 @@ type StoreRow = {
     expires: string | null;
     days_left: number;
     total_paid: number;
+    store_status: 'approved' | 'suspended';
+    expires_date: string | null;
+    /** Cash recorded by the admin, waiting for the owner to accept */
+    awaiting: { id: number; plan: string; amount: number; created_at: string } | null;
 };
 
 type PaymentRow = {
@@ -82,6 +89,7 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
         date_from: filters.date_from ?? '', date_to: filters.date_to ?? '', method: filters.method ?? '' });
     const [giveFor, setGiveFor] = useState<StoreRow | null>(null);
     const [cashFor, setCashFor] = useState<StoreRow | null>(null);
+    const [cancelFor, setCancelFor] = useState<StoreRow | null>(null);
 
     function visit(params: Record<string, string | number> = {}) {
         router.get('/admin/subscriptions', { tab, ...f, ...params }, { preserveScroll: true, preserveState: true });
@@ -183,7 +191,17 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
                                                 </td>
                                                 <td className="px-4 py-2.5">{s.plan}</td>
                                                 <td className="px-4 py-2.5">
-                                                    <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', ADMIN_PLAN_STATUS[s.status]?.cls)}>{ADMIN_PLAN_STATUS[s.status]?.label}</span>
+                                                    <div className="flex flex-col items-start gap-1">
+                                                        <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold', ADMIN_PLAN_STATUS[s.status]?.cls)}>{ADMIN_PLAN_STATUS[s.status]?.label}</span>
+                                                        {s.store_status === 'suspended' && (
+                                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Store suspended</span>
+                                                        )}
+                                                        {s.awaiting && (
+                                                            <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300" title={`Sent ${s.awaiting.created_at}`}>
+                                                                <Clock className="h-3 w-3" /> Waiting for seller: {s.awaiting.plan} {peso(s.awaiting.amount)}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{s.expires ?? '—'}</td>
                                                 <td className="px-4 py-2.5 text-right tabular-nums">{s.status === 'expired' || s.status === 'none' ? '—' : s.days_left}</td>
@@ -193,9 +211,15 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
                                                         <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setGiveFor(s)}>
                                                             <CalendarPlus className="h-3.5 w-3.5" /> Give free days
                                                         </Button>
-                                                        <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setCashFor(s)}>
-                                                            <HandCoins className="h-3.5 w-3.5" /> Record cash
-                                                        </Button>
+                                                        {s.awaiting ? (
+                                                            <Button size="sm" variant="outline" className="h-8 gap-1 text-xs text-red-600 hover:text-red-700" onClick={() => setCancelFor(s)}>
+                                                                <X className="h-3.5 w-3.5" /> Cancel request
+                                                            </Button>
+                                                        ) : s.store_status === 'approved' && (
+                                                            <Button size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => setCashFor(s)}>
+                                                                <HandCoins className="h-3.5 w-3.5" /> Record cash
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -310,6 +334,7 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
             <GiveDaysDialog store={giveFor} onClose={() => setGiveFor(null)} />
             {/* Record cash payment */}
             <RecordCashDialog store={cashFor} plans={plans.plans} onClose={() => setCashFor(null)} />
+            <CancelRequestDialog store={cancelFor} onClose={() => setCancelFor(null)} />
         </AppLayout>
     );
 }
@@ -359,43 +384,129 @@ function GiveDaysDialog({ store, onClose }: { store: StoreRow | null; onClose: (
 }
 
 function RecordCashDialog({ store, plans, onClose }: { store: StoreRow | null; plans: CatalogPlan[]; onClose: () => void }) {
-    const form = useForm({ plan_key: 'basic', reference: '' });
+    const form = useForm({ plan_key: '', reference: '', confirm: false });
     const chosen = plans.find((p) => p.key === form.data.plan_key);
+    const [change, setChange] = useState<PlanChange | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    // Fresh form every time the dialog opens / closes (no default plan)
+    useEffect(() => {
+        form.reset();
+        form.clearErrors();
+        setChange(null);
+        setLoadError(null);
+    }, [store?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Load "what will change" for the chosen plan (the tick is cleared — it confirms THIS plan)
+    useEffect(() => {
+        setChange(null);
+        setLoadError(null);
+        form.setData('confirm', false);
+        if (!store || !form.data.plan_key) return;
+        let alive = true;
+        setLoading(true);
+        axios.get<PlanChange>(`/admin/subscriptions/stores/${store.id}/preview`, { params: { plan: form.data.plan_key } })
+            .then((r) => { if (alive) setChange(r.data); })
+            .catch(() => { if (alive) setLoadError('Could not load what will change. Try again.'); })
+            .finally(() => { if (alive) setLoading(false); });
+        return () => { alive = false; };
+    }, [store?.id, form.data.plan_key]); // eslint-disable-line react-hooks/exhaustive-deps
 
     function submit(e: FormEvent) {
         e.preventDefault();
         if (!store) return;
         form.post(`/admin/subscriptions/stores/${store.id}/record-cash`, {
             preserveScroll: true,
-            onSuccess: () => { form.reset(); onClose(); },
+            onSuccess: () => onClose(),
         });
     }
 
+    const current = store
+        ? (store.status === 'expired' || store.status === 'none'
+            ? 'No active plan'
+            : `${store.plan} — ${store.days_left} day${store.days_left === 1 ? '' : 's'} left (ends ${store.expires_date})`)
+        : '';
+
     return (
         <Dialog open={!!store} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Record cash payment — {store?.store_name}</DialogTitle>
-                    <DialogDescription>Same plan while active → 30 days are added. A different plan starts today.</DialogDescription>
+                    <DialogDescription>Nothing changes yet — the seller must accept this before the plan changes.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
+                    <p className="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                        <span className="text-muted-foreground">Current plan:</span> <strong>{current}</strong>
+                    </p>
                     <div className="grid gap-1.5">
-                        <Label htmlFor="rc-plan">Plan</Label>
+                        <Label htmlFor="rc-plan">Plan the seller paid for</Label>
                         <select id="rc-plan" className={cn(selectCls, 'w-full')} value={form.data.plan_key} onChange={(e) => form.setData('plan_key', e.target.value)}>
+                            <option value="" disabled>Choose a plan…</option>
                             {plans.map((p) => <option key={p.key} value={p.key}>{p.name} — {peso(p.price)}</option>)}
                         </select>
+                        {form.errors.plan_key && <p className="text-xs text-red-600">{form.errors.plan_key}</p>}
                     </div>
+                    {loading && <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Checking what will change…</p>}
+                    {loadError && <p className="text-sm text-red-600">{loadError}</p>}
+                    {change && (
+                        <div className="space-y-1">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What will change when the seller accepts</p>
+                            <PlanChangeBox change={change} />
+                        </div>
+                    )}
                     <div className="grid gap-1.5">
                         <Label htmlFor="rc-ref">Reference (optional)</Label>
                         <Input id="rc-ref" value={form.data.reference} maxLength={100} onChange={(e) => form.setData('reference', e.target.value)} placeholder="OR number, bank ref…" />
                         {form.errors.reference && <p className="text-xs text-red-600">{form.errors.reference}</p>}
                     </div>
-                    <p className="text-sm">Amount: <strong>{chosen ? peso(chosen.price) : '—'}</strong></p>
+                    {chosen && change && (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-md border px-3 py-2 text-sm">
+                            <Checkbox className="mt-0.5" checked={form.data.confirm} onCheckedChange={(v) => form.setData('confirm', v === true)} />
+                            <span>The seller paid <strong>{peso(chosen.price)}</strong> in cash for the <strong>{chosen.name}</strong> plan.</span>
+                        </label>
+                    )}
+                    {form.errors.confirm && <p className="text-xs text-red-600">{form.errors.confirm}</p>}
                     <DialogFooter className="gap-2">
                         <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Record payment</Button>
+                        <Button type="submit" disabled={form.processing || !chosen || !change || !form.data.confirm}>
+                            {form.processing && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}
+                            Send to seller for approval
+                        </Button>
                     </DialogFooter>
                 </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function CancelRequestDialog({ store, onClose }: { store: StoreRow | null; onClose: () => void }) {
+    const [busy, setBusy] = useState(false);
+    const a = store?.awaiting;
+
+    function cancel() {
+        if (!a) return;
+        setBusy(true);
+        router.post(`/admin/subscriptions/payments/${a.id}/cancel-request`, {}, {
+            preserveScroll: true,
+            onSuccess: () => onClose(),
+            onFinish: () => setBusy(false),
+        });
+    }
+
+    return (
+        <Dialog open={!!a} onOpenChange={(o) => { if (!o && !busy) onClose(); }}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Cancel the cash payment request?</DialogTitle>
+                    <DialogDescription>
+                        {store?.store_name}: {a?.plan} {a ? peso(a.amount) : ''} (sent {a?.created_at}). The plan stays as it is and the owner is told.
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2">
+                    <Button variant="outline" onClick={onClose} disabled={busy}>Keep it</Button>
+                    <Button variant="destructive" onClick={cancel} disabled={busy}>Cancel request</Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

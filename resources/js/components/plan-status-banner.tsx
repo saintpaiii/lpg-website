@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { AlertTriangle, Crown } from 'lucide-react';
+import { AlertTriangle, Crown, HandCoins } from 'lucide-react';
 import { planNeedsAttention } from '@/lib/plans';
 import type { SharedData } from '@/types';
 
@@ -8,11 +8,24 @@ import type { SharedData } from '@/types';
  * Not shown on My Plan itself.
  */
 export function PlanStatusBanner() {
-    const { auth, plan } = usePage<SharedData>().props;
+    const { auth, plan, cash_request_waiting } = usePage<SharedData>().props;
     const state = planNeedsAttention(plan);
     const onPlanPage = typeof window !== 'undefined' && window.location.pathname.startsWith('/seller/plan');
 
-    if (auth.user?.role !== 'seller' || !plan || !state || onPlanPage) return null;
+    if (auth.user?.role !== 'seller' || onPlanPage) return null;
+
+    // A cash payment from the platform waits for the owner — that comes first (no "Choose a plan / Renew now")
+    if (cash_request_waiting) {
+        return (
+            <div className="flex flex-wrap items-center gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                <HandCoins className="h-4 w-4 shrink-0" />
+                <p className="min-w-0 flex-1">The platform recorded a cash payment for your plan — please review it in My Plan.</p>
+                <Link href="/seller/plan" className="rounded-md bg-amber-600 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-700">Review it</Link>
+            </div>
+        );
+    }
+
+    if (!plan || !state) return null;
 
     if (state === 'expired') {
         return (

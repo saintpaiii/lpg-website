@@ -89,6 +89,9 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                             {invoices.total} invoice{invoices.total !== 1 ? 's' : ''}
                         </span>
                     </CardTitle>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        An invoice is made when the store confirms your order. If you paid before that, your payment receipt is on the order&apos;s page (My Orders → View).
+                    </p>
                 </CardHeader>
                 <CardContent className="p-0">
                     {invoices.data.length === 0 ? (

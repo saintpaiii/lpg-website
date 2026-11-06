@@ -185,6 +185,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('plan', [SellerSubscriptionController::class, 'index'])->name('plan');
             Route::post('plan/checkout', [SellerSubscriptionController::class, 'checkout'])->middleware('throttle:10,1')->name('plan.checkout');
             Route::get('plan/receipts/{payment}/pdf', [SellerSubscriptionController::class, 'receipt'])->name('plan.receipt');
+            // Cash recorded by the platform admin — the plan changes only when the owner accepts
+            Route::post('plan/cash/{payment}/accept', [SellerSubscriptionController::class, 'acceptCash'])->middleware('throttle:10,1')->name('plan.cash.accept');
+            Route::post('plan/cash/{payment}/decline', [SellerSubscriptionController::class, 'declineCash'])->middleware('throttle:10,1')->name('plan.cash.decline');
 
             Route::get('revenue', [RevenueController::class, 'index'])->name('revenue');
             Route::get('revenue/export', [RevenueController::class, 'export'])->middleware('plan.feature:export')->name('revenue.export');

@@ -126,6 +126,8 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::get('subscriptions/export', [SubscriptionController::class, 'export'])->name('subscriptions.export');
     Route::post('subscriptions/stores/{store}/give-days', [SubscriptionController::class, 'giveDays'])->name('subscriptions.give-days');
     Route::post('subscriptions/stores/{store}/record-cash', [SubscriptionController::class, 'recordCash'])->name('subscriptions.record-cash');
+    Route::get('subscriptions/stores/{store}/preview', [SubscriptionController::class, 'preview'])->middleware('throttle:30,1')->name('subscriptions.preview');
+    Route::post('subscriptions/payments/{payment}/cancel-request', [SubscriptionController::class, 'cancelRequest'])->name('subscriptions.cancel-request');
     Route::put('subscriptions/plans/{plan}', [SubscriptionController::class, 'updatePlan'])->name('subscriptions.plans.update');
     Route::get('subscriptions/payments/{payment}/pdf', [SubscriptionController::class, 'receipt'])->name('subscriptions.receipt');
 

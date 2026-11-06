@@ -108,6 +108,11 @@ class HandleInertiaRequests extends Middleware
                 ? \Illuminate\Support\Facades\Cache::remember(\App\Services\SubscriptionService::summaryCacheKey($store->id), 30,
                     fn () => \App\Services\SubscriptionService::summary($store))
                 : null,
+            // Store OWNER only: a cash payment recorded by the admin waits for their Accept / Decline (banner on every page).
+            // Separate from the cached 'plan' summary, which staff and riders get too.
+            'cash_request_waiting' => fn () => $store && $user->role === 'seller'
+                ? \App\Models\SubscriptionPayment::where('store_id', $store->id)->where('status', 'awaiting_seller')->exists()
+                : false,
             // Is the store visible to customers, and why not (owner + non-rider staff banner). Re-queried on the full
             // store row (the shared $store row has only a few columns); cached 30 s, forgotten on rider / license changes.
             'storeVisibility' => fn () => $store && ($user->role === 'seller' || ($user->role === 'seller_staff' && $user->sub_role !== 'rider'))

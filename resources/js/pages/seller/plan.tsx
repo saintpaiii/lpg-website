@@ -1,7 +1,8 @@
 import { Head, Link, router } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, CalendarClock, Car, ChevronLeft, ChevronRight, Crown, FileDown, Loader2, Package, Users } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Car, ChevronLeft, ChevronRight, Crown, FileDown, HandCoins, Loader2, Package, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { PlanChangeBox, type PlanChange } from '@/components/plan-change-box';
 import { PlanCardButton, PlanCards, peso } from '@/components/plan-cards';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,8 +23,20 @@ type PaymentRow = {
     method_label: string;
     period: string;
     paid_at: string | null;
-    status: 'paid' | 'pending' | 'cancelled';
+    status: 'paid' | 'pending' | 'cancelled' | 'awaiting_seller' | 'declined';
     notes: string | null;
+};
+
+/** Seller\SubscriptionController::index 'cash_request' (SubscriptionService::cashRequestData) */
+type CashRequest = {
+    id: number;
+    plan_key: PlanKey;
+    plan: string;
+    amount: number;
+    reference: string | null;
+    recorded_on: string;
+    recorded_by: string;
+    change: PlanChange;
 };
 
 type Props = {
@@ -35,6 +48,7 @@ type Props = {
     paused: { products: number; staff: number; vehicles: number };
     /** SubscriptionService::previewPause per plan — null when nothing would change */
     previews: Partial<Record<PlanKey, PausePreview | null>>;
+    cash_request: CashRequest | null;
 };
 
 type PausePreview = {
@@ -97,7 +111,84 @@ function UsageBar({ icon: Icon, label, used, limit, paused = 0, pausedHref }: {
     );
 }
 
-export default function SellerPlan({ plan, catalog, usage, payments, choose, paused, previews }: Props) {
+/** "Confirm your cash payment" — the admin recorded cash; nothing changes until the owner accepts. */
+function CashRequestCard({ req }: { req: CashRequest }) {
+    const change = req.change;
+    const [step, setStep] = useState<'idle' | 'confirm-downgrade' | 'decline'>('idle');
+    const [reason, setReason] = useState('');
+    const [busy, setBusy] = useState(false);
+
+    // A new box from the server (plan changed meanwhile) → start over
+    useEffect(() => { setStep('idle'); }, [change.current.plan_key, change.current.ends_at, change.new_end]);
+
+    function accept() {
+        setBusy(true);
+        router.post(`/seller/plan/cash/${req.id}/accept`, {
+            shown_plan: change.current.plan_key,
+            shown_ends_at: change.current.ends_at,
+        }, { preserveScroll: true, onFinish: () => setBusy(false) });
+    }
+
+    function decline() {
+        setBusy(true);
+        router.post(`/seller/plan/cash/${req.id}/decline`, { reason }, { preserveScroll: true, onFinish: () => setBusy(false) });
+    }
+
+    return (
+        <Card className="border-2 border-amber-400 shadow-sm dark:border-amber-600">
+            <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base"><HandCoins className="h-5 w-5 text-amber-600" /> Confirm your cash payment</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+                <p>
+                    The platform recorded <strong>{peso(req.amount)}</strong> cash for the <strong>{req.plan}</strong> plan on {req.recorded_on}
+                    {req.reference && <> (ref <span className="break-all font-mono">{req.reference}</span>)</>}. Nothing changes until you accept.
+                </p>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What will change</p>
+                    <PlanChangeBox change={change} />
+                </div>
+
+                {step === 'decline' ? (
+                    <div className="space-y-2 rounded-lg border p-3">
+                        <label htmlFor="cash-decline" className="text-sm font-medium">Reason (optional)</label>
+                        <textarea id="cash-decline" value={reason} maxLength={255} rows={2} onChange={(e) => setReason(e.target.value)}
+                            placeholder="e.g. I paid for Pro, not Basic"
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setStep('idle')} disabled={busy}>Back</Button>
+                            <Button variant="destructive" size="sm" onClick={decline} disabled={busy}>
+                                {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />} Decline payment
+                            </Button>
+                        </div>
+                    </div>
+                ) : step === 'confirm-downgrade' ? (
+                    <div className="space-y-2 rounded-lg border border-red-300 bg-red-50 p-3 text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+                        <p className="font-medium">
+                            Switch to {req.plan}?{change.lost_days > 0 && ` The remaining ${change.lost_days} day${change.lost_days === 1 ? '' : 's'} of your ${change.current.label} are lost.`}
+                        </p>
+                        <div className="flex flex-wrap justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={() => setStep('idle')} disabled={busy}>Back</Button>
+                            <Button size="sm" className="bg-red-600 text-white hover:bg-red-700" onClick={accept} disabled={busy}>
+                                {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />} Yes, switch to {req.plan}
+                            </Button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => (change.downgrade ? setStep('confirm-downgrade') : accept())} disabled={busy}>
+                            {busy && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />} Accept and start {req.plan}
+                        </Button>
+                        <Button variant="outline" onClick={() => setStep('decline')} disabled={busy}>Decline</Button>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+
+export default function SellerPlan({ plan, catalog, usage, payments, choose, paused, previews, cash_request = null }: Props) {
     const [confirming, setConfirming] = useState<CatalogPlan | null>(null);
     // A plan that pauses / locks something needs "I understand" before paying
     const [understood, setUnderstood] = useState(false);
@@ -154,6 +245,8 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                     <h1 className="flex items-center gap-2 text-2xl font-bold"><Crown className="h-6 w-6 text-amber-500" /> My Plan</h1>
                     <p className="text-sm text-muted-foreground">No commission — your store keeps 100% of its sales. Plans are prepaid for 30 days and never renew by themselves.</p>
                 </div>
+
+                {cash_request && <CashRequestCard req={cash_request} />}
 
                 {/* Current plan */}
                 <div className="grid gap-4 lg:grid-cols-3">
@@ -241,7 +334,10 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                                                 <td className="px-4 py-2.5">{p.method_label}</td>
                                                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{p.period}</td>
                                                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
-                                                    {p.status === 'pending' ? <span className="text-amber-600">Waiting for payment</span> : p.paid_at}
+                                                    {p.status === 'pending' ? <span className="text-amber-600">Waiting for payment</span>
+                                                        : p.status === 'awaiting_seller' ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Waiting for you</span>
+                                                        : p.status === 'declined' ? <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300" title={p.notes ?? undefined}>Declined</span>
+                                                        : p.paid_at}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-right">
                                                     {p.status === 'paid' && p.receipt_number && (
@@ -322,6 +418,12 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                                         I understand
                                     </label>
                                 </div>
+                            )}
+                            {cash_request && (
+                                <p className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <HandCoins className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <span>A cash payment for {cash_request.plan} is waiting for your approval — pay online anyway? If you do, the cash request is declined and the platform returns the cash.</span>
+                                </p>
                             )}
                             <p className="text-base">Amount: <strong>{peso(confirming.price)}</strong></p>
                             {error && <p className="rounded-md bg-red-50 px-3 py-2 text-red-700 dark:bg-red-950/30 dark:text-red-300">{error}</p>}
