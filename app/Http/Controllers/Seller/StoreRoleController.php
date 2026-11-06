@@ -24,6 +24,7 @@ class StoreRoleController extends Controller
         $data  = $this->validated($request, $store);
 
         $role = StoreRoleService::save(new StoreRole(['store_id' => $store->id]), $data['name'], (bool) ($data['is_rider'] ?? false), $data['modules'] ?? []);
+        $this->saveRate($role, $store, $data);
 
         // The Add / Edit Staff form ticks the new role right away
         return back()->with('success', "Role \"{$role->name}\" created.")->with('created_role_id', $role->id);
@@ -36,6 +37,7 @@ class StoreRoleController extends Controller
         $data = $this->validated($request, $store, $role->id, $role->levels());
 
         StoreRoleService::save($role, $data['name'], (bool) ($data['is_rider'] ?? false), $data['modules'] ?? []);
+        $this->saveRate($role, $store, $data);
 
         return back()->with('success', "Role \"{$role->name}\" saved.");
     }
@@ -60,6 +62,14 @@ class StoreRoleController extends Controller
         return back()->with('success', "Role \"{$name}\" deleted.");
     }
 
+    /** With Payroll on the plan every role has its own hourly pay (required in the role form). */
+    private function saveRate(StoreRole $role, Store $store, array $data): void
+    {
+        if (SubscriptionService::hasFeature($store, 'payroll')) {
+            $role->update(['hourly_rate' => round((float) $data['hourly_rate'], 2)]);
+        }
+    }
+
     /**
      * @param  array<string, string>  $savedLevels  module => level the role already has (update only)
      */
@@ -71,8 +81,16 @@ class StoreRoleController extends Controller
             'is_rider'  => ['boolean'],
             'modules'   => ['nullable', 'array'],
             'modules.*' => ['nullable', 'in:off,view,full'],
+            // Payroll on the plan → a role is never saved without pay; otherwise ignored
+            'hourly_rate' => SubscriptionService::hasFeature($store, 'payroll')
+                ? ['required', 'numeric', 'min:1', 'max:10000']
+                : ['nullable'],
         ], [
             'modules.*.in' => 'Choose Off, View only or Full access.',
+            'hourly_rate.required' => 'Set the hourly pay for this role.',
+            'hourly_rate.numeric'  => 'Enter an amount.',
+            'hourly_rate.min'      => 'At least ₱1 per hour.',
+            'hourly_rate.max'      => 'At most ₱10,000 per hour.',
         ]);
 
         // Unique per store, ignoring upper / lower case

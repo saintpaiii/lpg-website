@@ -17,7 +17,10 @@ const STATUS_LABEL: Record<string, string> = { released: 'Released', paid: 'Paid
 /** "160 h + 6 h OT × ₱65.00" for hourly payslips, "₱500.00/day" for older ones */
 function payLine(p: PayrollSummary) {
     if (p.pay_basis === 'hourly') {
-        return `${p.regular_hours} h${p.overtime_hours_paid ? ` + ${p.overtime_hours_paid} h OT` : ''} × ${peso(p.hourly_rate)}/h`;
+        // "160 h × ₱65.00 + 6 h OT × ₱81.25" — overtime at its real rate (rate × multiplier)
+        const rate = p.hourly_rate ?? 0;
+        const otRate = Math.round(rate * (p.overtime_multiplier ?? 1.25) * 100) / 100;
+        return `${p.regular_hours} h × ${peso(rate)}${p.overtime_hours_paid ? ` + ${p.overtime_hours_paid} h OT × ${peso(otRate)}` : ''}`;
     }
     return `${peso(p.daily_rate)}/day (older payslip)`;
 }

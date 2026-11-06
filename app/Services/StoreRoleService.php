@@ -104,6 +104,7 @@ class StoreRoleService
                 'is_starter'  => $r->starter_key !== null,
                 'starter_key' => $r->starter_key,
                 'members'     => (int) $r->members_count,
+                'hourly_rate' => $r->hourly_rate !== null ? (float) $r->hourly_rate : null,
                 'modules'     => (object) $r->levels(),
             ])->all();
     }

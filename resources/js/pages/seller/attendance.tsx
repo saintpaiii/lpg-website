@@ -483,6 +483,10 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                     </CardContent>
                 </Card>
 
+                <p className="-mt-3 text-xs text-gray-400">
+                    Hours shown are clock-in to clock-out. Payroll subtracts the 60-min unpaid meal break.
+                </p>
+
                 {/* Missing Clock Out note */}
                 {canManage && (
                     <p className="text-xs text-gray-400 italic text-center">

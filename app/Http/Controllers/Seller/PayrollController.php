@@ -50,10 +50,6 @@ class PayrollController extends Controller
         return [
             'payroll_period'         => $s->payroll_period,
             'overtime_multiplier'    => (float) $s->overtime_multiplier,
-            'default_hourly_rate'    => (float) $s->default_hourly_rate,
-            'meal_break_paid'        => (bool) $s->meal_break_paid,
-            'meal_break_minutes'     => (int) $s->meal_break_minutes,
-            'meal_break_after_hours' => (float) $s->meal_break_after_hours,
         ];
     }
 
@@ -74,6 +70,8 @@ class PayrollController extends Controller
             'pay_basis'            => $hourly ? 'hourly' : 'daily',
             'hourly_rate'          => $hourly ? (float) $p->hourly_rate : null,
             'rate_source'          => $hourly ? ($p->breakdown['rules']['rate_source'] ?? null) : null,
+            // The multiplier the payslip was made with (for "6 h OT × ₱81.25")
+            'overtime_multiplier'  => $hourly ? (float) ($p->breakdown['rules']['overtime_multiplier'] ?? 1.25) : null,
             'regular_hours'        => (int) $p->regular_hours,
             'overtime_hours_paid'  => (int) $p->overtime_hours_paid,
             'daily_rate'           => $hourly ? null : (float) $p->daily_rate,
@@ -143,6 +141,10 @@ class PayrollController extends Controller
             'settings'     => self::rules($settings),
             'is_owner'     => $this->isOwner(),
             'can_generate' => $this->canGenerate(),
+            // Owner only: roles whose staff can't get a payslip yet (banner)
+            'roles_without_rate' => $this->isOwner()
+                ? array_column(PayrollCalculator::rolesNeedingRate($store), 'name')
+                : [],
         ]);
     }
 
@@ -268,6 +270,7 @@ class PayrollController extends Controller
         }
 
         $made = $locked = 0;
+        $skipped = [];   // "Ana Cruz (Rider)" — no personal rate and no role rate
         foreach ($staffList as $staff) {
             // Skip staff with no attendance records in the period
             $hasAttendance = Attendance::where('user_id', $staff->id)
@@ -291,7 +294,18 @@ class PayrollController extends Controller
                 continue;
             }
 
-            $calc = PayrollCalculator::calculate($staff, $store, $start, $end, $settings);
+            // No hourly rate (no personal rate, no role rate) → no payslip. A draft for this period (e.g. made with
+            // the old store default) is removed so it can't be released by mistake.
+            if (PayrollCalculator::hourlyRateFor($staff, $store)['source'] === 'none') {
+                if ($existing && ! $existing->trashed() && $existing->status === 'draft') {
+                    $existing->delete();
+                }
+                $roles = StaffAccess::roleNames($staff);
+                $skipped[] = $staff->name . ' (' . ($roles ? implode(', ', $roles) : 'no role') . ')';
+                continue;
+            }
+
+            $calc =PayrollCalculator::calculate($staff, $store, $start, $end, $settings);
             unset($calc['rate_source']);   // kept in breakdown.rules
             $attrs = $calc + ['status' => 'draft', 'released_at' => null, 'paid_at' => null];
 
@@ -313,7 +327,21 @@ class PayrollController extends Controller
             $msg .= " {$locked} already released/paid — not changed.";
         }
 
-        return back()->with('success', $msg);
+        $warning = null;
+        if ($skipped) {
+            $n = count($skipped);
+            $warning = "Not generated for {$n} staff without an hourly rate: " . implode(', ', $skipped) . '. '
+                . ($this->isOwner() ? 'Set their role rate in Payroll Settings.' : 'Ask the store owner to set their role rate.');
+        }
+
+        // Nothing made, nothing locked, only skipped people → that's an error, not a success
+        if ($made === 0 && $locked === 0 && $warning) {
+            return back()->with('error', $warning);
+        }
+
+        $redirect = back()->with('success', $msg);
+
+        return $warning ? $redirect->with('warning', $warning) : $redirect;
     }
 
     // ── Mark Released / Paid (owner) ──────────────────────────────────────────
@@ -569,10 +597,12 @@ class PayrollController extends Controller
         $roleNames = StaffAccess::roleNamesFor($staff);
 
         return Inertia::render('seller/payroll-settings', [
-            'settings' => self::rules($settings),
-            'roles'    => $roles,
-            'staff'    => $staff->map(function ($u) use ($store, $settings, $roleNames) {
-                $eff = PayrollCalculator::hourlyRateFor($u, $store, $settings);
+            'settings'    => self::rules($settings),
+            'roles'       => $roles,
+            // Roles with active staff (no personal rate) but no rate → "No rate yet" badge
+            'needs_rate'  => PayrollCalculator::rolesNeedingRate($store),
+            'staff'    => $staff->map(function ($u) use ($store, $roleNames) {
+                $eff = PayrollCalculator::hourlyRateFor($u, $store);
                 return [
                     'id'                   => $u->id,
                     'name'                 => $u->name,
@@ -595,32 +625,46 @@ class PayrollController extends Controller
 
         $data = $request->validate([
             'payroll_period'         => ['required', 'in:weekly,bi_weekly,monthly'],
-            'overtime_multiplier'    => ['required', 'numeric', 'min:1', 'max:3'],
-            'default_hourly_rate'    => ['required', 'numeric', 'min:0', 'max:10000'],
-            'meal_break_paid'        => ['required', 'boolean'],
-            'meal_break_minutes'     => ['required', 'integer', 'in:0,30,60'],
-            'meal_break_after_hours' => ['required', 'numeric', 'min:1', 'max:12'],
+            'overtime_multiplier'    => ['required', 'numeric', 'min:1.25', 'max:3'],
             'rates'                  => ['nullable', 'array'],
-            'rates.*'                => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'rates.*'                => ['nullable', 'numeric', 'min:1', 'max:10000'],
         ], [
-            'rates.*.numeric' => 'Enter an amount (or leave it empty to use the default).',
+            'overtime_multiplier.min' => 'At least 1.25 — the Labor Code minimum (Art. 87).',
+            'rates.*.numeric' => 'Enter an amount.',
+            'rates.*.min'     => 'At least ₱1 per hour.',
             'rates.*.max'     => 'At most ₱10,000 per hour.',
         ]);
+
+        // Only this store's roles; a role id that wasn't sent keeps its saved rate
+        $storeRoleIds = StoreRole::where('store_id', $store->id)->pluck('id')->all();
+        $newRates = [];
+        foreach ($data['rates'] ?? [] as $roleId => $rate) {
+            if (in_array((int) $roleId, $storeRoleIds, true)) {
+                $newRates[(int) $roleId] = ($rate === null || $rate === '') ? null : round((float) $rate, 2);
+            }
+        }
+
+        // A role can't be left without a rate while it has active staff without a personal rate
+        $missing = PayrollCalculator::rolesNeedingRate($store, $newRates);
+        if ($missing) {
+            throw \Illuminate\Validation\ValidationException::withMessages(collect($missing)->mapWithKeys(fn ($r) => [
+                "rates.{$r['id']}" => "{$r['name']} has {$r['people']} staff — set an hourly rate.",
+            ])->all());
+        }
 
         StorePayrollSettings::forStore($store->id)->update([
             'payroll_period'         => $data['payroll_period'],
             'overtime_multiplier'    => $data['overtime_multiplier'],
-            'default_hourly_rate'    => $data['default_hourly_rate'],
-            'meal_break_paid'        => (bool) $data['meal_break_paid'],
-            'meal_break_minutes'     => (int) $data['meal_break_minutes'],
-            'meal_break_after_hours' => $data['meal_break_after_hours'],
+            // Standard meal break for every store (not editable)
+            'meal_break_paid'        => false,
+            'meal_break_minutes'     => PayrollCalculator::MEAL_BREAK_MINUTES,
+            'meal_break_after_hours' => PayrollCalculator::MEAL_BREAK_AFTER_HOURS,
             'late_deduction_per_day' => 0,
         ]);
 
-        // Hourly rate per role (only roles of this store); empty = uses the default
-        foreach ($data['rates'] ?? [] as $roleId => $rate) {
-            StoreRole::where('store_id', $store->id)->where('id', (int) $roleId)
-                ->update(['hourly_rate' => ($rate === null || $rate === '') ? null : round((float) $rate, 2)]);
+        // Hourly rate per role (only roles of this store)
+        foreach ($newRates as $roleId => $rate) {
+            StoreRole::where('store_id', $store->id)->where('id', $roleId)->update(['hourly_rate' => $rate]);
         }
 
         return back()->with('success', 'Payroll settings saved.');
@@ -639,7 +683,9 @@ class PayrollController extends Controller
         }
 
         $data = $request->validate([
-            'hourly_rate_override' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'hourly_rate_override' => ['nullable', 'numeric', 'min:1', 'max:10000'],
+        ], [
+            'hourly_rate_override.min' => 'At least ₱1 per hour — or leave it empty to remove it.',
         ]);
 
         $rate = $data['hourly_rate_override'] ?? null;

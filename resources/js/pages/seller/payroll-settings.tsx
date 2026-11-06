@@ -1,5 +1,5 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calculator, Pencil, Plus, Settings2, ShieldCheck, Trash2, UserRound } from 'lucide-react';
+import { Calculator, Info, Pencil, Plus, Settings2, ShieldCheck, Trash2, UserRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { PayrollTabs } from '@/components/payroll-tabs';
 import { peso, rateSourceLabel } from '@/components/payslip-view';
@@ -16,10 +16,6 @@ import type { BreadcrumbItem } from '@/types';
 type Rules = {
     payroll_period: string;
     overtime_multiplier: number;
-    default_hourly_rate: number;
-    meal_break_paid: boolean;
-    meal_break_minutes: number;
-    meal_break_after_hours: number;
 };
 
 type RoleRate = { id: number; name: string; is_starter: boolean; is_rider: boolean; members: number; hourly_rate: number | null };
@@ -33,7 +29,10 @@ type StaffRate = {
     rate_source: string;
 };
 
-type Props = { settings: Rules; roles: RoleRate[]; staff: StaffRate[] };
+/** A role with active staff (no personal rate) but no hourly rate — PayrollCalculator::rolesNeedingRate */
+type NeedsRate = { id: number; name: string; people: number };
+
+type Props = { settings: Rules; roles: RoleRate[]; needs_rate: NeedsRate[]; staff: StaffRate[] };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -45,14 +44,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const selectCls = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none dark:bg-input/30';
 
+/** Standard meal break (PayrollCalculator::MEAL_BREAK_MINUTES / MEAL_BREAK_AFTER_HOURS) */
+const MEAL_BREAK_MINUTES = 60;
+const MEAL_BREAK_AFTER_HOURS = 5;
+/** Overtime multiplier floor (Labor Code Art. 87) — PayrollCalculator::MIN_OVERTIME_MULTIPLIER */
+const MIN_OT_MULTIPLIER = 1.25;
+
 /**
  * Same rule as App\Services\PayrollCalculator::dayLine for the example day:
  * shift 8:00 AM – 5:00 PM, worked 8:05 AM – 6:40 PM.
  */
-function exampleDay(rate: number, mult: number, breakPaid: boolean, breakMin: number, afterHours: number) {
+function exampleDay(rate: number, mult: number) {
     const shiftStart = 8 * 60, shiftEnd = 17 * 60, clockIn = 8 * 60 + 5, clockOut = 18 * 60 + 40;
     const windowMin = Math.max(0, Math.min(clockOut, shiftEnd) - Math.max(clockIn, shiftStart));
-    const brk = !breakPaid && windowMin >= afterHours * 60 ? breakMin : 0;
+    const brk = windowMin >= MEAL_BREAK_AFTER_HOURS * 60 ? MEAL_BREAK_MINUTES : 0;
     const regH = Math.floor(Math.max(0, windowMin - brk) / 60);
     const otH = Math.floor(Math.max(0, clockOut - shiftEnd) / 60);
     const pay = Math.round((regH * rate + otH * rate * mult) * 100) / 100;
@@ -97,7 +102,7 @@ function PersonalRateDialog({ staff, target, onClose }: { staff: StaffRate[]; ta
                     </div>
                     <div className="grid gap-1.5">
                         <Label htmlFor="pr-rate">₱ per hour</Label>
-                        <Input id="pr-rate" type="number" step="0.01" min="0" max="10000" value={rate} placeholder="e.g. 80"
+                        <Input id="pr-rate" type="number" step="0.01" min="1" max="10000" value={rate} placeholder="e.g. 80"
                             onChange={(e) => setRate(e.target.value)} />
                         {error && <p className="text-xs text-red-500">{error}</p>}
                     </div>
@@ -113,25 +118,27 @@ function PersonalRateDialog({ staff, target, onClose }: { staff: StaffRate[]; ta
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function PayrollSettingsPage({ settings, roles, staff }: Props) {
+export default function PayrollSettingsPage({ settings, roles, needs_rate, staff }: Props) {
     const form = useForm({
         payroll_period:         settings.payroll_period,
         overtime_multiplier:    String(settings.overtime_multiplier),
-        default_hourly_rate:    String(settings.default_hourly_rate),
-        meal_break_paid:        settings.meal_break_paid,
-        meal_break_minutes:     String(settings.meal_break_minutes),
-        meal_break_after_hours: String(settings.meal_break_after_hours),
         rates: Object.fromEntries(roles.map((r) => [String(r.id), r.hourly_rate === null ? '' : String(r.hourly_rate)])) as Record<string, string>,
     });
     const [personal, setPersonal] = useState<StaffRate | 'new' | null>(null);
 
     const d = form.data;
-    const defaultRate = Number(d.default_hourly_rate) || 0;
-    const mult = Number(d.overtime_multiplier) || 1;
-    const ex = useMemo(
-        () => exampleDay(defaultRate, mult, d.meal_break_paid, Number(d.meal_break_minutes) || 0, Number(d.meal_break_after_hours) || 0),
-        [defaultRate, mult, d.meal_break_paid, d.meal_break_minutes, d.meal_break_after_hours],
+    const needs = new Map(needs_rate.map((n) => [n.id, n]));
+
+    // Live example for one role, at the rate TYPED in the form (not saved yet)
+    const [exampleRoleId, setExampleRoleId] = useState<string>(
+        () => String((roles.find((r) => r.hourly_rate !== null) ?? roles[0])?.id ?? ''),
     );
+    const exampleRole = roles.find((r) => String(r.id) === exampleRoleId);
+    const typedRate = (d.rates[exampleRoleId] ?? '').trim();
+    const exampleRate = typedRate === '' ? null : Number(typedRate) || 0;
+    // Payroll never pays overtime below ×1.25, so the example doesn't either
+    const mult = Math.max(Number(d.overtime_multiplier) || MIN_OT_MULTIPLIER, MIN_OT_MULTIPLIER);
+    const ex = useMemo(() => exampleDay(exampleRate ?? 0, mult), [exampleRate, mult]);
     const errors = form.errors as Record<string, string>;
     const withPersonal = staff.filter((s) => s.hourly_rate_override !== null);
 
@@ -160,31 +167,40 @@ export default function PayrollSettingsPage({ settings, roles, staff }: Props) {
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-blue-600" /> Hourly rate per role</CardTitle>
-                            <p className="text-xs text-gray-500">Someone with several roles is paid the highest rate among them. Empty = uses the default rate.</p>
+                            <p className="text-xs text-gray-500">Each role has its own pay. Someone with several roles gets the highest rate. A personal rate (below) beats the role rate.</p>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y">
-                                {roles.map((r) => (
+                                {roles.map((r) => {
+                                    const empty = (d.rates[String(r.id)] ?? '').trim() === '';
+                                    const needed = empty && needs.has(r.id);
+                                    const err = errors[`rates.${r.id}`];
+                                    return (
                                     <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                                         <div className="min-w-0">
-                                            <p className="flex items-center gap-1.5 text-sm font-medium">
+                                            <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                                                 {r.name}
                                                 {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
+                                                {needed && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate yet</span>}
                                             </p>
                                             <p className="text-xs text-gray-500">{r.members} staff</p>
+                                            {empty && !needed && <p className="text-xs text-gray-400">No rate yet — needed before you give it to someone</p>}
                                         </div>
                                         <div className="flex items-center gap-1.5">
                                             <span className="text-sm text-gray-500">₱</span>
-                                            <Input type="number" step="0.01" min="0" max="10000" className="h-8 w-32 text-right"
+                                            <Input type="number" step="0.01" min="1" max="10000"
+                                                className={`h-8 w-32 text-right ${needed || err ? 'border-orange-400 focus-visible:ring-orange-300' : ''}`}
                                                 value={d.rates[String(r.id)] ?? ''}
-                                                placeholder={`uses default ${peso(defaultRate)}`}
+                                                placeholder="e.g. 65.00"
                                                 onChange={(e) => form.setData('rates', { ...d.rates, [String(r.id)]: e.target.value })} />
                                             <span className="text-xs text-gray-500">/h</span>
                                         </div>
-                                        {errors[`rates.${r.id}`] && <p className="w-full text-xs text-red-500">{errors[`rates.${r.id}`]}</p>}
+                                        {err && <p className="w-full text-xs text-red-500">{err}</p>}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
+                            <p className="border-t px-4 py-2 text-xs text-gray-400">Check that rates meet the minimum wage for your region (DOLE – NWPC wage orders).</p>
                         </CardContent>
                     </Card>
 
@@ -194,51 +210,24 @@ export default function PayrollSettingsPage({ settings, roles, staff }: Props) {
                             <CardTitle className="text-base">Rules</CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-4">
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="default-rate">Default hourly rate (₱)</Label>
-                                    <Input id="default-rate" type="number" step="0.01" min="0" max="10000" value={d.default_hourly_rate}
-                                        onChange={(e) => form.setData('default_hourly_rate', e.target.value)} />
-                                    <p className="text-xs text-gray-400">For roles without their own rate.</p>
-                                    {errors.default_hourly_rate && <p className="text-xs text-red-500">{errors.default_hourly_rate}</p>}
-                                </div>
-                                <div className="grid gap-1.5">
-                                    <Label htmlFor="ot-mult">Overtime multiplier</Label>
-                                    <Input id="ot-mult" type="number" step="0.01" min="1" max="3" value={d.overtime_multiplier}
-                                        onChange={(e) => form.setData('overtime_multiplier', e.target.value)} />
-                                    <p className="text-xs text-gray-400">1.25 = PH Labor Code overtime premium.</p>
-                                    {errors.overtime_multiplier && <p className="text-xs text-red-500">{errors.overtime_multiplier}</p>}
-                                </div>
+                            <div className="grid gap-1.5 sm:max-w-xs">
+                                <Label htmlFor="ot-mult">Overtime multiplier</Label>
+                                <Input id="ot-mult" type="number" step="0.01" min="1.25" max="3" value={d.overtime_multiplier}
+                                    onChange={(e) => form.setData('overtime_multiplier', e.target.value)} />
+                                <p className="text-xs text-gray-400">1.25 = legal minimum (Labor Code Art. 87). You can pay more, e.g. 1.5.</p>
+                                {errors.overtime_multiplier && <p className="text-xs text-red-500">{errors.overtime_multiplier}</p>}
                             </div>
 
+                            {/* Standard rule for every store — not editable */}
                             <div className="grid gap-1.5">
                                 <Label>Meal break</Label>
-                                <div className="inline-flex w-fit overflow-hidden rounded-md border text-sm" role="radiogroup">
-                                    {[{ v: false, l: 'Unpaid' }, { v: true, l: 'Paid' }].map((o) => (
-                                        <button key={o.l} type="button" role="radio" aria-checked={d.meal_break_paid === o.v}
-                                            onClick={() => form.setData('meal_break_paid', o.v)}
-                                            className={`px-4 py-1.5 font-medium ${d.meal_break_paid === o.v ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50 dark:bg-transparent dark:hover:bg-gray-800'}`}>
-                                            {o.l}
-                                        </button>
-                                    ))}
-                                </div>
-                                {!d.meal_break_paid && (
-                                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-                                        <select className={`${selectCls} w-auto`} value={d.meal_break_minutes} onChange={(e) => form.setData('meal_break_minutes', e.target.value)}>
-                                            <option value="0">0 minutes</option>
-                                            <option value="30">30 minutes</option>
-                                            <option value="60">60 minutes</option>
-                                        </select>
-                                        <span className="text-gray-500">subtracted when the person worked at least</span>
-                                        <Input type="number" step="0.5" min="1" max="12" className="h-9 w-20" value={d.meal_break_after_hours}
-                                            onChange={(e) => form.setData('meal_break_after_hours', e.target.value)} />
-                                        <span className="text-gray-500">hours</span>
-                                    </div>
-                                )}
-                                {d.meal_break_paid && <p className="text-xs text-gray-400">Nothing is subtracted for the break.</p>}
-                                {(errors.meal_break_minutes || errors.meal_break_after_hours) && (
-                                    <p className="text-xs text-red-500">{errors.meal_break_minutes ?? errors.meal_break_after_hours}</p>
-                                )}
+                                <p className="flex items-start gap-2 rounded-md border bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                                    <span>
+                                        <strong>Meal break: 60 minutes, unpaid</strong> (Labor Code Art. 85). Subtracted automatically when the person worked
+                                        5 hours or more in their shift. Short coffee/rest breaks are paid.
+                                    </span>
+                                </p>
                             </div>
 
                             <div className="grid gap-1.5 sm:max-w-xs">
@@ -252,14 +241,28 @@ export default function PayrollSettingsPage({ settings, roles, staff }: Props) {
 
                             {/* Live example — same rule as the payslip */}
                             <div className="rounded-md border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
-                                <p className="flex items-center gap-1.5 font-medium"><Calculator className="h-4 w-4" /> Example at the default rate</p>
-                                <p className="mt-1">
-                                    Shift 8:00 AM – 5:00 PM, worked 8:05 AM – 6:40 PM → <strong>{ex.regH} h regular</strong> + <strong>{ex.otH} h overtime</strong> = <strong>{peso(ex.pay)}</strong>
+                                <p className="flex flex-wrap items-center gap-1.5 font-medium">
+                                    <Calculator className="h-4 w-4" /> Example for
+                                    <select aria-label="Role for the example" value={exampleRoleId} onChange={(e) => setExampleRoleId(e.target.value)}
+                                        className="h-7 rounded-md border border-blue-200 bg-white px-2 text-sm font-medium text-blue-900 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:outline-none dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">
+                                        {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                                    </select>
                                 </p>
-                                <p className="mt-0.5 text-xs opacity-80">
-                                    {ex.regH} × {peso(defaultRate)} + {ex.otH} × {peso(defaultRate * mult)}
-                                    {ex.brk ? ` · ${ex.brk} min unpaid break` : ' · no break subtracted'} · early arrival and late minutes are not paid · whole hours only
-                                </p>
+                                {roles.length === 0 ? (
+                                    <p className="mt-1">Create a role in Staff to see the example.</p>
+                                ) : exampleRate === null ? (
+                                    <p className="mt-1">Type a rate for {exampleRole?.name} to see the example.</p>
+                                ) : (
+                                    <>
+                                        <p className="mt-1">
+                                            Shift 8:00 AM – 5:00 PM, worked 8:05 AM – 6:40 PM → <strong>{ex.regH} h regular</strong> + <strong>{ex.otH} h overtime</strong> = <strong>{peso(ex.pay)}</strong>
+                                        </p>
+                                        <p className="mt-0.5 text-xs opacity-80">
+                                            {ex.regH} × {peso(exampleRate)} + {ex.otH} × {peso(exampleRate * mult)}
+                                            {' '}· {ex.brk} min unpaid meal break · early arrival and late minutes are not paid · whole hours only
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -308,7 +311,12 @@ export default function PayrollSettingsPage({ settings, roles, staff }: Props) {
                                 <summary className="cursor-pointer select-none">Everyone's current rate</summary>
                                 <ul className="mt-1.5 space-y-0.5">
                                     {staff.map((s) => (
-                                        <li key={s.id}>{s.name}: <strong>{peso(s.effective_rate)}/h</strong> ({rateSourceLabel(s.rate_source)})</li>
+                                        <li key={s.id}>
+                                            {s.name}:{' '}
+                                            {s.rate_source === 'none'
+                                                ? <strong className="text-orange-600">No rate yet</strong>
+                                                : <><strong>{peso(s.effective_rate)}/h</strong> ({rateSourceLabel(s.rate_source)})</>}
+                                        </li>
                                     ))}
                                 </ul>
                             </details>

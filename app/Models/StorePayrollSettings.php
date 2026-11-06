@@ -12,8 +12,8 @@ class StorePayrollSettings extends Model
         'payroll_period'         => 'monthly',
         'overtime_multiplier'    => 1.25,     // PH Labor Code overtime premium
         'late_deduction_per_day' => 0,        // no fixed late deduction (late minutes are unpaid)
-        'default_hourly_rate'    => 62.50,
-        'meal_break_paid'        => false,
+        // default_hourly_rate is no longer used (each role has its own rate); the column stays, unused
+        'meal_break_paid'       => false,
         'meal_break_minutes'     => 60,
         'meal_break_after_hours' => 5,
     ];

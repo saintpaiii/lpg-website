@@ -43,6 +43,8 @@ export type PayrollSummary = {
     pay_basis: 'hourly' | 'daily';
     hourly_rate: number | null;
     rate_source: string | null;
+    /** Hourly payslips: the overtime multiplier it was made with */
+    overtime_multiplier: number | null;
     regular_hours: number;
     overtime_hours_paid: number;
     daily_rate: number | null;
@@ -79,10 +81,11 @@ export function fmtPeriod(start: string, end: string) {
     return `${fmtDay(start)} – ${fmtDay(end)}`;
 }
 
-/** "role: Cashier" / "personal rate" / "store default" */
+/** "role: Cashier" / "personal rate" / "no rate yet" ('store default' only on payslips made before per-role rates) */
 export function rateSourceLabel(source: string | null | undefined) {
     if (source === 'personal') return 'personal rate';
     if (source?.startsWith('role:')) return `role: ${source.slice(5)}`;
+    if (source === 'none') return 'no rate yet';
     return 'store default';
 }
 

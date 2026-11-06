@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { BadgeDollarSign, ClipboardList, Eye, RefreshCw } from 'lucide-react';
+import { AlertTriangle, BadgeDollarSign, ClipboardList, Eye, RefreshCw } from 'lucide-react';
 import { ExportLink } from '@/components/export-link';
 import { PayrollTabs } from '@/components/payroll-tabs';
 import { PAYROLL_STATUS_STYLE, peso, rateSourceLabel, type PayrollSummary } from '@/components/payslip-view';
@@ -17,14 +17,12 @@ type Props = {
     settings: {
         payroll_period: string;
         overtime_multiplier: number;
-        default_hourly_rate: number;
-        meal_break_paid: boolean;
-        meal_break_minutes: number;
-        meal_break_after_hours: number;
     };
     is_owner: boolean;
     /** Owner or Payroll Full access */
     can_generate?: boolean;
+    /** Owner only: roles with active staff but no hourly rate (their staff get no payslip) */
+    roles_without_rate?: string[];
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -46,7 +44,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function PayrollPage({ payrolls, period_start, period_end, is_owner, can_generate = is_owner }: Props) {
+export default function PayrollPage({ payrolls, period_start, period_end, is_owner, can_generate = is_owner, roles_without_rate = [] }: Props) {
     const generateForm = useForm({ period_start, period_end });
     const releaseForm  = useForm({});
     const paidForm     = useForm({});
@@ -111,6 +109,16 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                     <p className="-mt-2 text-xs text-gray-500">
                         Generate makes or updates <strong>draft</strong> payslips. Drafts use current rates and schedules; released and paid payslips are never changed.
                     </p>
+                )}
+
+                {is_owner && roles_without_rate.length > 0 && (
+                    <div role="alert" className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        <span>
+                            <strong>{roles_without_rate.join(', ')}</strong> {roles_without_rate.length === 1 ? 'has' : 'have'} no hourly rate yet — their staff can't get a payslip.
+                        </span>
+                        <Link href="/seller/payroll/settings" className="font-medium underline underline-offset-2 hover:text-amber-700">Set rates →</Link>
+                    </div>
                 )}
 
                 {/* Summary */}

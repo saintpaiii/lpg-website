@@ -13,11 +13,14 @@ use Illuminate\Support\Carbon;
 /**
  * Hourly payroll math (approved rules):
  *
- *  - Rate: personal hourly rate > the HIGHEST hourly rate among the person's store roles > the store default.
+ *  - Rate: personal hourly rate > the HIGHEST hourly rate among the person's store roles. No store-wide default:
+ *    someone with neither gets no payslip (see rolesNeedingRate / PayrollController::generate).
  *  - Paid time follows the SHIFT WINDOW: regular = max(clock-in, shift start) → min(clock-out, shift end), minus the
- *    unpaid meal break when that window is at least N hours; overtime = shift end → clock-out.
- *    Early arrival and late minutes are not paid; there is no fixed late deduction.
- *  - Regular and overtime are each floored to WHOLE hours per day. Overtime pay = hours × rate × multiplier.
+ *    standard 60-minute UNPAID meal break (Labor Code Art. 85) when that window is 5 hours or more (store policy).
+ *    The break is the same for every store (the store_payroll_settings meal_break columns are no longer read).
+ *    Overtime = shift end → clock-out. Early arrival and late minutes are not paid; there is no fixed late deduction.
+ *  - Regular and overtime are each floored to WHOLE hours per day. Overtime pay = hours × rate × multiplier, where the
+ *    multiplier is never below 1.25 (Labor Code Art. 87).
  *  - No clock-out, no usable schedule (none, or end ≤ start) or a manual "day off" row → not paid (with a note).
  *  - Late = clock-in more than 15 min after the shift start, never on an extra day (same as AttendanceController::calcStats).
  */
@@ -25,8 +28,26 @@ class PayrollCalculator
 {
     public const LATE_GRACE_MINUTES = 15;
 
-    /** @return array{rate: float, source: string} source = personal | role:{name} | default */
-    public static function hourlyRateFor(User $staff, Store $store, StorePayrollSettings $s): array
+    /** Standard meal break: 60 min unpaid (Art. 85), subtracted when the paid shift window is 5 hours or more. */
+    public const MEAL_BREAK_MINUTES     = 60;
+    public const MEAL_BREAK_AFTER_HOURS = 5;
+
+    /** Overtime premium floor: hourly rate + 25% (Art. 87). */
+    public const MIN_OVERTIME_MULTIPLIER = 1.25;
+
+    /** The store's overtime multiplier, never below 1.25 (safety net for old rows). */
+    public static function overtimeMultiplier(StorePayrollSettings $s): float
+    {
+        return max((float) $s->overtime_multiplier, self::MIN_OVERTIME_MULTIPLIER);
+    }
+
+    /**
+     * Personal rate, else the HIGHEST rate among the person's roles of this store. There is no store-wide default:
+     * with neither, the rate is 0 with source 'none' and payroll is not generated for that person.
+     *
+     * @return array{rate: float, source: string} source = personal | role:{name} | none
+     */
+    public static function hourlyRateFor(User $staff, Store $store, ?StorePayrollSettings $s = null): array
     {
         if ($staff->hourly_rate_override !== null) {
             return ['rate' => (float) $staff->hourly_rate_override, 'source' => 'personal'];
@@ -46,16 +67,47 @@ class PayrollCalculator
             return ['rate' => (float) $best->hourly_rate, 'source' => "role:{$best->name}"];
         }
 
-        return ['rate' => (float) $s->default_hourly_rate, 'source' => 'default'];
+        return ['rate' => 0.0, 'source' => 'none'];
+    }
+
+    /**
+     * Roles of this store that need a rate: hourly_rate empty while at least one active, non-archived member has no
+     * personal rate. One definition for the settings validation, the settings badges and the payroll page banner.
+     *
+     * @param  array<int, float|null>|null  $rates  role id => rate to check instead of the saved one (settings form)
+     * @return list<array{id: int, name: string, people: int}>
+     */
+    public static function rolesNeedingRate(Store $store, ?array $rates = null): array
+    {
+        $roles = StoreRole::where('store_id', $store->id)
+            ->withCount(['users as people' => fn ($q) => $q
+                ->whereNull('users.deleted_at')
+                ->where('users.is_active', true)
+                ->whereNull('users.hourly_rate_override')])
+            ->orderByRaw('starter_key IS NULL')
+            ->orderBy('id')
+            ->get();
+
+        $out = [];
+        foreach ($roles as $r) {
+            $rate = ($rates !== null && array_key_exists($r->id, $rates)) ? $rates[$r->id] : $r->hourly_rate;
+            if (($rate === null || $rate === '') && $r->people > 0) {
+                $out[] = ['id' => $r->id, 'name' => $r->name, 'people' => (int) $r->people];
+            }
+        }
+
+        return $out;
     }
 
     /** "₱65.00/hour (role: Cashier)" style label of a rate source. */
     public static function sourceLabel(?string $source): string
     {
         return match (true) {
-            $source === 'personal'                         => 'personal rate',
+            $source === 'personal'                                => 'personal rate',
             $source !== null && str_starts_with($source, 'role:') => 'role: ' . substr($source, 5),
-            default                                        => 'store default',
+            $source === 'none'                                    => 'no rate yet',
+            // Only payslips made before per-role rates (Prompt D) have 'default'
+            default                                               => 'store default',
         };
     }
 
@@ -134,8 +186,7 @@ class PayrollCalculator
         $to     = $a->clock_out->lessThan($shiftEnd) ? $a->clock_out : $shiftEnd;
         $window = self::minutes($from, $to);
 
-        $break = (! $s->meal_break_paid && $window >= (float) $s->meal_break_after_hours * 60)
-            ? (int) $s->meal_break_minutes : 0;
+        $break = $window >= self::MEAL_BREAK_AFTER_HOURS * 60 ? self::MEAL_BREAK_MINUTES : 0;
         $regularMin = max(0, $window - $break);
         $otMin      = $a->clock_out->greaterThan($shiftEnd) ? self::minutes($shiftEnd, $a->clock_out) : 0;
 
@@ -150,7 +201,7 @@ class PayrollCalculator
             'break_min' => $break,
             'regular_h' => $regularH,
             'ot_h'      => $otH,
-            'pay'       => round($regularH * $rate + $otH * $rate * (float) $s->overtime_multiplier, 2),
+            'pay'       => round($regularH * $rate + $otH * $rate * self::overtimeMultiplier($s), 2),
             'note'      => implode(' · ', $notes),
         ]);
     }
@@ -161,7 +212,7 @@ class PayrollCalculator
     public static function calculate(User $staff, Store $store, string $periodStart, string $periodEnd, StorePayrollSettings $s): array
     {
         ['rate' => $rate, 'source' => $source] = self::hourlyRateFor($staff, $store, $s);
-        $multiplier = (float) $s->overtime_multiplier;
+        $multiplier = self::overtimeMultiplier($s);
 
         $rows = Attendance::where('user_id', $staff->id)
             ->where('store_id', $store->id)
@@ -170,15 +221,20 @@ class PayrollCalculator
             ->get()
             ->keyBy(fn ($a) => $a->date->toDateString());
 
-        // Dates listed: every day from max(period start, account created) to min(period end, today) + any rows
+        // Dates listed: every day from max(period start, account created) to min(period end, YESTERDAY) + rows up to
+        // yesterday. Today is still running: it is listed only when that shift is finished (clocked in AND out) —
+        // never as Absent / Day off / "No clock-out".
         $from = max(Carbon::parse($periodStart)->startOfDay(), $staff->created_at?->copy()->startOfDay() ?? Carbon::parse($periodStart));
-        $to   = min(Carbon::parse($periodEnd)->startOfDay(), now()->startOfDay());
+        $to   = min(Carbon::parse($periodEnd)->startOfDay(), now()->subDay()->startOfDay());
         $dates = [];
         for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
             $dates[$d->toDateString()] = true;
         }
-        foreach ($rows->keys() as $k) {
-            $dates[$k] = true;
+        $yesterday = now()->subDay()->toDateString();
+        foreach ($rows as $k => $a) {
+            if ($k <= $yesterday || ($a->clock_in && $a->clock_out)) {
+                $dates[$k] = true;
+            }
         }
         ksort($dates);
 
@@ -243,9 +299,10 @@ class PayrollCalculator
                 'rules'    => [
                     'rate_source'            => $source,
                     'overtime_multiplier'    => $multiplier,
-                    'meal_break_paid'        => (bool) $s->meal_break_paid,
-                    'meal_break_minutes'     => (int) $s->meal_break_minutes,
-                    'meal_break_after_hours' => (float) $s->meal_break_after_hours,
+                    // Fixed standard break (same keys as before, so older payslips keep showing their own rules)
+                    'meal_break_paid'        => false,
+                    'meal_break_minutes'     => self::MEAL_BREAK_MINUTES,
+                    'meal_break_after_hours' => (float) self::MEAL_BREAK_AFTER_HOURS,
                     'schedule'               => $staff->schedule_start && $staff->schedule_end
                         ? Carbon::parse($staff->schedule_start)->format('g:i A') . ' – ' . Carbon::parse($staff->schedule_end)->format('g:i A')
                         : null,

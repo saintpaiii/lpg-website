@@ -7,6 +7,8 @@ use App\Mail\StaffAccountCreated;
 use App\Models\AccountAction;
 use App\Models\Permission;
 use App\Models\RolePermission;
+use App\Models\Store;
+use App\Models\StoreRole;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Services\NotificationService;
@@ -15,9 +17,11 @@ use App\Services\StoreRoleService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -57,11 +61,10 @@ class StaffController extends Controller
         $roleNames = StaffAccess::roleNamesFor($page->getCollection());
         $roleIds   = \Illuminate\Support\Facades\DB::table('store_role_user')->whereIn('user_id', $page->getCollection()->pluck('id'))
             ->get()->groupBy('user_id')->map(fn ($r) => $r->pluck('store_role_id')->map(fn ($id) => (int) $id)->all());
-        // Effective hourly rate (personal > highest role rate > default) — shown with a link to Payroll Settings
-        $paySettings = \App\Models\StorePayrollSettings::forStore($store->id);
+        // Effective hourly rate (personal > highest role rate; 'none' = no rate yet) — shown with a link to Payroll Settings
         $staff = $page
             ->through(fn ($u) => [
-                'pay_rate'       => \App\Services\PayrollCalculator::hourlyRateFor($u, $store, $paySettings),
+                'pay_rate'       => \App\Services\PayrollCalculator::hourlyRateFor($u, $store),
                 'id'             => $u->id,
                 'name'           => $u->name,
                 'first_name'     => $u->first_name,
@@ -115,7 +118,7 @@ class StaffController extends Controller
     {
         $store = request()->attributes->get('seller_store');
 
-        $data = $request->validate([
+        $data = $this->validateStaff($request, $store, [
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
@@ -127,9 +130,6 @@ class StaffController extends Controller
             'work_days.*'    => 'integer|between:1,7',
             'schedule_start' => 'required|string|max:10',
             'schedule_end'   => 'required|string|max:10',
-        ], [
-            'role_ids.required' => 'Choose at least one role.',
-            'role_ids.min'      => 'Choose at least one role.',
         ]);
 
         // Plan limit: refuse BEFORE the account is created / the email is sent
@@ -143,26 +143,31 @@ class StaffController extends Controller
         $fullName     = trim("{$data['first_name']} {$data['last_name']}");
         $tempPassword = self::randomPassword();   // emailed; they must change it at first login
 
-        $user = User::create([
-            'name'                => $fullName,
-            'first_name'          => $data['first_name'],
-            'middle_name'         => $data['middle_name'] ?? null,
-            'last_name'           => $data['last_name'],
-            'email'               => $data['email'],
-            'phone'               => $data['phone'] ?? null,
-            'role'                => 'seller_staff',
-            'sub_role'            => 'custom',   // derived from the roles right below
-            'store_id'            => $store->id,
-            'schedule_start'      => $data['schedule_start'] ?? null,
-            'schedule_end'        => $data['schedule_end'] ?? null,
-            'work_days'           => self::workDays($data['work_days'] ?? null),
-            'password'            => Hash::make($tempPassword),
-            'must_change_password' => true,
-            'is_active'           => true,
-            'email_verified_at'   => now(),
-        ]);
+        [$user, $rateNote] = DB::transaction(function () use ($store, $data, $fullName, $tempPassword) {   // account + role rates + roles together
+            $user = User::create([
+                'name'                => $fullName,
+                'first_name'          => $data['first_name'],
+                'middle_name'         => $data['middle_name'] ?? null,
+                'last_name'           => $data['last_name'],
+                'email'               => $data['email'],
+                'phone'               => $data['phone'] ?? null,
+                'role'                => 'seller_staff',
+                'sub_role'            => 'custom',   // derived from the roles right below
+                'store_id'            => $store->id,
+                'schedule_start'      => $data['schedule_start'] ?? null,
+                'schedule_end'        => $data['schedule_end'] ?? null,
+                'work_days'           => self::workDays($data['work_days'] ?? null),
+                'password'            => Hash::make($tempPassword),
+                'must_change_password' => true,
+                'is_active'           => true,
+                'email_verified_at'   => now(),
+            ]);
 
-        StoreRoleService::assign($user, $data['role_ids']);
+            $rateNote = $this->saveRoleRates($store, $data, null);
+            StoreRoleService::assign($user, $data['role_ids']);
+
+            return [$user, $rateNote];
+        });
         $roleList = implode(', ', StaffAccess::roleNames($user->fresh()));
 
         // The account is saved first; a mail problem must never undo it or show a 500
@@ -187,11 +192,89 @@ class StaffController extends Controller
         if (! $mailed) {
             // Shown once, only to the owner who created the account (flashed for the next page only)
             return redirect()->route('seller.staff')
-                ->with('warning', "Account created, but the welcome email couldn't be sent. Give them this temporary password: {$tempPassword}")
+                ->with('warning', "Account created, but the welcome email couldn't be sent. Give them this temporary password: {$tempPassword}{$rateNote}")
                 ->with('staff_temp_password', ['name' => $fullName, 'email' => $user->email, 'password' => $tempPassword]);
         }
 
-        return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$roleList}. Login credentials sent to {$data['email']}.");
+        return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$roleList}. Login credentials sent to {$data['email']}.{$rateNote}");
+    }
+
+    /**
+     * Roles that need an hourly rate from this form (only when the store has Payroll):
+     * ticked roles of this store with no rate — on Edit only the NEWLY ticked ones, and none when the person has a
+     * personal rate. So editing just a phone number is never blocked.
+     *
+     * @return \Illuminate\Support\Collection<int, StoreRole>
+     */
+    private function rolesNeedingRate(Store $store, array $roleIds, ?User $user)
+    {
+        if (! SubscriptionService::hasFeature($store, 'payroll')) {
+            return collect();
+        }
+        if ($user && $user->hourly_rate_override !== null) {
+            return collect();
+        }
+        $ids = array_map('intval', array_filter($roleIds, 'is_numeric'));
+        if ($user) {
+            $ids = array_diff($ids, StaffAccess::roles($user)->pluck('id')->map(fn ($id) => (int) $id)->all());
+        }
+        if (! $ids) {
+            return collect();
+        }
+
+        // Only roles that really belong to this store (role_ids.* exists may have failed)
+        return StoreRole::where('store_id', $store->id)->whereIn('id', $ids)->whereNull('hourly_rate')->orderBy('id')->get();
+    }
+
+    /** Add / Edit Staff validation + "Set the hourly pay for {role}." for every role that needs a rate. */
+    private function validateStaff(Request $request, Store $store, array $rules, ?User $user = null): array
+    {
+        return Validator::make($request->all(), $rules + [
+            'role_rates'   => 'nullable|array',
+            'role_rates.*' => 'nullable|numeric|min:1|max:10000',
+        ], [
+            'role_ids.required'    => 'Choose at least one role.',
+            'role_ids.min'         => 'Choose at least one role.',
+            'role_rates.*.numeric' => 'Enter an amount.',
+            'role_rates.*.min'     => 'At least ₱1 per hour.',
+            'role_rates.*.max'     => 'At most ₱10,000 per hour.',
+        ])->after(function ($v) use ($request, $store, $user) {
+            $ids = $request->input('role_ids');
+            if (! is_array($ids)) {
+                return;
+            }
+            $rates = (array) $request->input('role_rates', []);
+            foreach ($this->rolesNeedingRate($store, $ids, $user) as $role) {
+                $rate = $rates[$role->id] ?? null;
+                if ($rate === null || $rate === '') {
+                    $v->errors()->add("role_rates.{$role->id}", "Set the hourly pay for {$role->name}.");
+                }
+            }
+        })->validate();
+    }
+
+    /**
+     * Saves the hourly pay typed for roles that need one (never overwrites an existing rate).
+     * Returns " Hourly pay set: Rider ₱62.50, HR ₱70.00." or '' (call BEFORE assigning the roles).
+     */
+    private function saveRoleRates(Store $store, array $data, ?User $user): string
+    {
+        $rates = $data['role_rates'] ?? [];
+        $set = [];
+        foreach ($this->rolesNeedingRate($store, $data['role_ids'], $user) as $role) {
+            $rate = $rates[$role->id] ?? null;
+            if ($rate === null || $rate === '') {
+                continue;
+            }
+            $rate = round((float) $rate, 2);
+            $updated = StoreRole::where('store_id', $store->id)->where('id', $role->id)->whereNull('hourly_rate')
+                ->update(['hourly_rate' => $rate]);
+            if ($updated) {
+                $set[] = "{$role->name} ₱" . number_format($rate, 2);
+            }
+        }
+
+        return $set ? ' Hourly pay set: ' . implode(', ', $set) . '.' : '';
     }
 
     /** 12 characters, letters + digits, no look-alikes (0/O, 1/l/I). */
@@ -301,7 +384,7 @@ class StaffController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($user->store_id !== $store->id) abort(403);
 
-        $data = $request->validate([
+        $data = $this->validateStaff($request, $store, [
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
@@ -313,10 +396,7 @@ class StaffController extends Controller
             'work_days.*'    => 'integer|between:1,7',
             'schedule_start' => 'nullable|string|max:10',
             'schedule_end'   => 'nullable|string|max:10',
-        ], [
-            'role_ids.required' => 'Choose at least one role.',
-            'role_ids.min'      => 'Choose at least one role.',
-        ]);
+        ], $user);
 
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
         $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
@@ -335,9 +415,14 @@ class StaffController extends Controller
             'work_days'      => self::workDays($data['work_days'] ?? null),
         ];
 
-        $user->update($updates);
-        StoreRoleService::assign($user, $data['role_ids']);   // re-derives sub_role (rider or not)
-        return back()->with('success', "{$fullName} updated.");
+        $rateNote = DB::transaction(function () use ($user, $updates, $store, $data) {
+            $user->update($updates);
+            $note = $this->saveRoleRates($store, $data, $user);       // before assign: "newly ticked" = not held yet
+            StoreRoleService::assign($user, $data['role_ids']);   // re-derives sub_role (rider or not)
+            return $note;
+        });
+
+        return back()->with('success', "{$fullName} updated.{$rateNote}");
     }
 
     public function updatePermissions(Request $request, User $user): RedirectResponse

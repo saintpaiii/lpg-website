@@ -455,6 +455,8 @@ class DemoSeeder extends Seeder
         ]);
         $counter = \App\Services\StoreRoleService::save(new \App\Models\StoreRole(['store_id' => $store1Id]), 'Counter + Stock', false,
             ['orders' => 'full', 'invoices' => 'full', 'inventory' => 'full', 'products' => 'view']);
+        // Lower than Cashier ₱65 → cashier1 still gets ₱65/h (highest of their roles)
+        $counter->update(['hourly_rate' => 60]);
         DB::table('store_role_user')->insertOrIgnore(['store_role_id' => $counter->id, 'user_id' => $cashier1Id]);
 
         // ── Payroll: hourly rate per starter role + the default payroll settings of each store ──

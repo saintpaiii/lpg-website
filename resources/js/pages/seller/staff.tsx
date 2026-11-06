@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { rateSourceLabel } from '@/components/payslip-view';
+import { usePlan } from '@/hooks/use-plan';
 import {
     AlertTriangle,
     Archive,
@@ -63,7 +64,7 @@ type StaffMember = {
     /** Names / ids of their store roles */
     role_names?: string[];
     role_ids?: number[];
-    /** Effective hourly rate: source = personal | role:{name} | default */
+    /** Effective hourly rate: source = personal | role:{name} | none */
     pay_rate?: { rate: number; source: string };
     /** ISO weekdays 1=Mon…7=Sun */
     work_days?: number[];
@@ -252,6 +253,8 @@ function StaffFormDialog({
         work_days: number[];
         schedule_start: string;
         schedule_end: string;
+        /** Hourly pay typed for ticked roles that have none yet (role id → amount); saved to the role */
+        role_rates: Record<string, string>;
     }>({
         first_name:     editTarget?.first_name     ?? '',
         middle_name:    editTarget?.middle_name    ?? '',
@@ -262,6 +265,7 @@ function StaffFormDialog({
         work_days:      editTarget?.work_days      ?? DEFAULT_WORK_DAYS,
         schedule_start: toHHMM(editTarget?.schedule_start),
         schedule_end:   toHHMM(editTarget?.schedule_end),
+        role_rates:     {},
     });
 
     // Load the person's values once per opening (not on every keystroke — changing the email must not reset the form)
@@ -278,7 +282,26 @@ function StaffFormDialog({
             work_days:      editTarget.work_days ?? DEFAULT_WORK_DAYS,
             schedule_start: toHHMM(editTarget.schedule_start),
             schedule_end:   toHHMM(editTarget.schedule_end),
+            role_rates:     {},   // never carry typed rates over from the previous person
         });
+    }
+
+    // Ticked roles with no hourly rate yet → ask it here (Payroll plans only). Edit: only roles NEWLY ticked, and none
+    // when the person has a personal rate (same rule as StaffController::rolesNeedingRate).
+    const payrollEnabled = usePlan().has('payroll');
+    const heldRoleIds = isEdit ? (editTarget?.role_ids ?? []) : [];
+    const hasPersonalRate = isEdit && editTarget?.pay_rate?.source === 'personal';
+    const rolesNeedingRate = !payrollEnabled || hasPersonalRate ? [] : roles.filter((r) =>
+        data.role_ids.includes(r.id) && r.hourly_rate === null && !heldRoleIds.includes(r.id));
+    const formErrors = errors as Record<string, string>;
+
+    /** Ticking / unticking roles; an unticked role also loses its typed rate */
+    function changeRoles(ids: number[]) {
+        setData((prev) => ({
+            ...prev,
+            role_ids: ids,
+            role_rates: Object.fromEntries(Object.entries(prev.role_rates).filter(([id]) => ids.includes(Number(id)))),
+        }));
     }
 
     function handleSubmit(e: FormEvent) {
@@ -356,7 +379,22 @@ function StaffFormDialog({
 
                     <div className="grid gap-1.5">
                         <Label>Roles <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(one or more)</span></Label>
-                        <RolesChecklist roles={roles} value={data.role_ids} onChange={(ids) => setData('role_ids', ids)} />
+                        <RolesChecklist roles={roles} value={data.role_ids} onChange={changeRoles} />
+                        {rolesNeedingRate.map((r) => (
+                            <div key={r.id} className="grid gap-1 rounded-md border border-orange-200 bg-orange-50/60 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/30">
+                                <Label htmlFor={`role-rate-${r.id}`} className="text-sm">
+                                    Hourly pay for {r.name} (₱) <span className="text-red-500">*</span>
+                                </Label>
+                                <Input id={`role-rate-${r.id}`} type="number" step="0.01" min="1" max="10000" placeholder="e.g. 65.00"
+                                    className="bg-background sm:max-w-[12rem]" value={data.role_rates[String(r.id)] ?? ''}
+                                    onChange={(e) => {
+                                        const v = e.target.value;
+                                        setData((prev) => ({ ...prev, role_rates: { ...prev.role_rates, [String(r.id)]: v } }));
+                                    }} />
+                                <p className="text-xs text-gray-500">Saved to the role — everyone with this role gets it. Change it later in Payroll Settings.</p>
+                                {formErrors[`role_rates.${r.id}`] && <p className="text-xs text-red-500">{formErrors[`role_rates.${r.id}`]}</p>}
+                            </div>
+                        ))}
                         <button type="button" onClick={createRole}
                             className="inline-flex items-center gap-1 justify-self-start text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
                             {canEditRoles ? <Plus className="h-3.5 w-3.5" /> : <Lock className="h-3 w-3" />} Create a new role
@@ -514,6 +552,8 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
 export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials, roles = [], canEditRoles = false, modules = [], templates = [] }: Props) {
     const [creds, setCreds] = useState(tempCredentials ?? null);
     useEffect(() => { if (tempCredentials) setCreds(tempCredentials); }, [tempCredentials]);
+    // Pay rates only mean something with Payroll on the plan (Basic stores can't open payroll settings)
+    const showPayRate = usePlan().has('payroll');
     const [formOpen, setFormOpen]               = useState(false);
     const [editTarget, setEditTarget]           = useState<StaffMember | null>(null);
     const [archiveTarget, setArchiveTarget]     = useState<StaffMember | null>(null);
@@ -750,11 +790,15 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                                     <p className="mt-1 text-xs text-gray-400">
                                                         {fmtWorkDays(s.work_days)}{s.schedule_start && s.schedule_end ? ` · ${fmtTime(s.schedule_start)}–${fmtTime(s.schedule_end)}` : ''}
                                                     </p>
-                                                    {s.pay_rate && (
+                                                    {showPayRate && s.pay_rate && (s.pay_rate.source === 'none' ? (
+                                                        <Link href="/seller/payroll/settings" className="text-xs font-medium text-orange-600 hover:underline" title="Pay Rates & Rules">
+                                                            No rate yet
+                                                        </Link>
+                                                    ) : (
                                                         <Link href="/seller/payroll/settings" className="text-xs text-blue-600 hover:underline" title="Pay Rates & Rules">
                                                             ₱{Number(s.pay_rate.rate.toFixed(2))}/h ({rateSourceLabel(s.pay_rate.source).replace('role: ', '')})
                                                         </Link>
-                                                    )}
+                                                    ))}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">{s.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">

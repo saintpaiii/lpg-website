@@ -33,6 +33,8 @@ export type StoreRoleRow = {
     starter_key: string | null;
     /** Staff with this role (archived ones included) */
     members: number;
+    /** ₱ per hour (Payroll); null = no rate yet */
+    hourly_rate: number | null;
     modules: Record<string, ModuleLevel>;
 };
 
@@ -81,9 +83,18 @@ export function WorkDaysPicker({ value, onChange }: { value: number[]; onChange:
     );
 }
 
+/** "₱65/h" after a role name, or an orange "No rate" tag — only when the plan has Payroll */
+function RoleRateTag({ rate }: { rate: number | null }) {
+    if (rate == null) {
+        return <span className="shrink-0 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate</span>;
+    }
+    return <span className="shrink-0 text-xs font-normal text-gray-500">₱{Number(rate.toFixed(2)).toLocaleString('en-PH')}/h</span>;
+}
+
 // ── Role picker (Add / Edit staff) ─────────────────────────────────────────────
 
 export function RolesChecklist({ roles, value, onChange }: { roles: StoreRoleRow[]; value: number[]; onChange: (ids: number[]) => void }) {
+    const showRate = usePlan().has('payroll');
     const chosen = roles.filter((r) => value.includes(r.id));
     const riderMixed = chosen.some((r) => r.is_rider) && chosen.some((r) => !r.is_rider);
     return (
@@ -97,6 +108,7 @@ export function RolesChecklist({ roles, value, onChange }: { roles: StoreRoleRow
                                 onChange={() => onChange(on ? value.filter((id) => id !== r.id) : [...value, r.id])} />
                             <span className="truncate">{r.name}</span>
                             {r.is_rider && <Truck className="h-3.5 w-3.5 shrink-0 text-orange-500" aria-label="Delivers orders" />}
+                            {showRate && <RoleRateTag rate={r.hourly_rate} />}
                         </label>
                     );
                 })}
@@ -162,9 +174,12 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
 }) {
     const isNew = !role;
     const { has } = usePlan();
-    const { data, setData, post, put, processing, errors, reset } = useForm<{ name: string; is_rider: boolean; modules: Record<string, 'off' | ModuleLevel> }>({
+    // With Payroll on the plan every role has its own hourly pay (required)
+    const payrollEnabled = has('payroll');
+    const { data, setData, post, put, processing, errors, reset } = useForm<{ name: string; is_rider: boolean; hourly_rate: string; modules: Record<string, 'off' | ModuleLevel> }>({
         name: role?.name ?? '',
         is_rider: role?.is_rider ?? false,
+        hourly_rate: role?.hourly_rate != null ? String(role.hourly_rate) : '',
         modules: Object.fromEntries(modules.map((m) => [m.key, role?.modules?.[m.key] ?? 'off'])),
     });
     const readOnly = !canEdit;
@@ -183,10 +198,13 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
         setStartFrom(value);
         let src: { is_rider: boolean; modules: Record<string, ModuleLevel> } = { is_rider: false, modules: {} };
         if (value.startsWith('tpl:')) src = templates.find((t) => t.key === value.slice(4)) ?? src;
-        if (value.startsWith('role:')) src = roles.find((r) => String(r.id) === value.slice(5)) ?? src;
+        // "Copy of {role}" also copies that role's rate (templates don't fill a rate)
+        const copied = value.startsWith('role:') ? roles.find((r) => String(r.id) === value.slice(5)) : undefined;
+        if (copied) src = copied;
         setData((prev) => ({
             ...prev,
             is_rider: src.is_rider,
+            hourly_rate: copied?.hourly_rate != null ? String(copied.hourly_rate) : prev.hourly_rate,
             modules: Object.fromEntries(modules.map((m) => {
                 let level: 'off' | ModuleLevel = src.modules[m.key] ?? 'off';
                 if (lockOf(m)) level = 'off';                        // the plan doesn't have it
@@ -269,6 +287,17 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                         {errors.name && <p className="text-xs text-red-500">{errors.name}</p>}
                     </div>
 
+                    {payrollEnabled && (
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="role-rate">Hourly pay (₱)</Label>
+                            <Input id="role-rate" type="number" step="0.01" min="1" max="10000" required={!readOnly} disabled={readOnly}
+                                className="sm:max-w-[12rem]" value={data.hourly_rate} placeholder="e.g. 65.00"
+                                onChange={(e) => setData('hourly_rate', e.target.value)} />
+                            <p className="text-xs text-gray-500">Paid for each whole hour worked. Overtime adds the multiplier from Payroll Settings.</p>
+                            {errors.hourly_rate && <p className="text-xs text-red-500">{errors.hourly_rate}</p>}
+                        </div>
+                    )}
+
                     <label className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${readOnly ? 'opacity-70' : 'cursor-pointer'}`}>
                         <input type="checkbox" className="mt-0.5 h-4 w-4 accent-blue-600" checked={data.is_rider} disabled={readOnly}
                             onChange={(e) => setData('is_rider', e.target.checked)} />
@@ -326,6 +355,7 @@ export function RolesTab({ roles, modules, canEdit, templates = [] }: { roles: S
     const [creating, setCreating] = useState(false);
     const [deleting, setDeleting] = useState<StoreRoleRow | null>(null);
     const labelOf = Object.fromEntries(modules.map((m) => [m.key, m.label]));
+    const showRate = usePlan().has('payroll');
 
     function newRole() {
         if (!canEdit) {
@@ -365,6 +395,7 @@ export function RolesTab({ roles, modules, canEdit, templates = [] }: { roles: S
                                 <div className="min-w-0">
                                     <p className="flex flex-wrap items-center gap-1.5 font-medium">
                                         {r.name}
+                                        {showRate && <RoleRateTag rate={r.hourly_rate} />}
                                         {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
                                         {r.is_rider && <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700"><Truck className="h-3 w-3" /> Delivers orders</span>}
                                         <span className="text-xs font-normal text-gray-500">· {r.members} staff</span>
