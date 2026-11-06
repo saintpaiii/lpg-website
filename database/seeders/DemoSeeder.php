@@ -449,10 +449,64 @@ class DemoSeeder extends Seeder
             $role = $starterRoles[$u->store_id]->firstWhere('starter_key', $u->sub_role) ?? $starterRoles[$u->store_id]->firstWhere('starter_key', 'cashier');
             DB::table('store_role_user')->insertOrIgnore(['store_role_id' => $role->id, 'user_id' => $u->id]);
         }
-        DB::table('users')->where('role', 'seller_staff')->update(['work_days' => json_encode([1, 2, 3, 4, 5, 6])]);
+        // Every demo staff member works Mon–Sat, 8:00 AM – 5:00 PM (clock-in and payroll need a schedule)
+        DB::table('users')->where('role', 'seller_staff')->update([
+            'work_days' => json_encode([1, 2, 3, 4, 5, 6]), 'schedule_start' => '08:00', 'schedule_end' => '17:00',
+        ]);
         $counter = \App\Services\StoreRoleService::save(new \App\Models\StoreRole(['store_id' => $store1Id]), 'Counter + Stock', false,
             ['orders' => 'full', 'invoices' => 'full', 'inventory' => 'full', 'products' => 'view']);
         DB::table('store_role_user')->insertOrIgnore(['store_role_id' => $counter->id, 'user_id' => $cashier1Id]);
+
+        // ── Payroll: hourly rate per starter role + the default payroll settings of each store ──
+        foreach (['cashier' => 65, 'warehouse' => 60, 'rider' => 62.5, 'hr' => 70] as $key => $rate) {
+            DB::table('store_roles')->where('starter_key', $key)->update(['hourly_rate' => $rate]);
+        }
+        foreach ([$store1Id, $store2Id] as $sid) {
+            DB::table('store_payroll_settings')->insert(
+                ['store_id' => $sid, 'created_at' => $this->now, 'updated_at' => $this->now] + \App\Models\StorePayrollSettings::DEFAULTS
+            );
+        }
+
+        // Complete attendance (clock-in AND clock-out) for the cashier and the warehouse staff on the days before today
+        // in this month (the last 2 weeks when the month just started): normal days, one late day, one overtime day,
+        // and the cashier also works one Sunday (extra day).
+        $from = $this->now->copy()->startOfMonth()->max($this->now->copy()->subDays(14))->startOfDay();
+        if ($from->gte($this->now->copy()->startOfDay())) {
+            $from = $this->now->copy()->subDays(14)->startOfDay();
+        }
+        foreach ([$cashier1Id, $warehouse1Id] as $n => $staffId) {
+            $workIdx = 0;
+            $extraDone = false;
+            for ($d = $from->copy(); $d->lt($this->now->copy()->startOfDay()); $d->addDay()) {
+                $date  = $d->toDateString();
+                $extra = false;
+                if ($d->isSunday()) {
+                    if ($n !== 0 || $extraDone) {
+                        continue;   // day off
+                    }
+                    [$in, $out, $extra, $extraDone] = ['09:00', '13:00', true, true];
+                } else {
+                    // 2nd work day: late (8:20); 4th: overtime until 7:30 PM; otherwise a normal day
+                    [$in, $out] = match ($workIdx++ % 6) {
+                        1       => ['08:20', '17:00'],
+                        3       => ['08:00', '19:30'],
+                        default => ['07:55', '17:05'],
+                    };
+                }
+                $clockIn  = \Illuminate\Support\Carbon::parse("{$date} {$in}");
+                $clockOut = \Illuminate\Support\Carbon::parse("{$date} {$out}");
+                $hours    = $clockIn->diffInSeconds($clockOut, true) / 3600;
+                DB::table('attendances')->insert([
+                    'user_id' => $staffId, 'store_id' => $store1Id, 'date' => $date,
+                    'clock_in' => $clockIn, 'clock_out' => $clockOut,
+                    'status' => $hours >= 8 ? 'present' : ($hours >= 4 ? 'half_day' : 'undertime'),
+                    'is_late' => ! $extra && $in === '08:20',
+                    'is_extra_day' => $extra,
+                    'overtime_hours' => round(max(0, $hours - 9), 2),
+                    'created_at' => $this->now, 'updated_at' => $this->now,
+                ]);
+            }
+        }
 
         // ══════════════════════════════════════════════════════════════════════
         // 7. STORE 1 PRODUCTS (5 products — Petron Gasul Cavite)

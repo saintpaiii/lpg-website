@@ -148,6 +148,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── My Payslips (self — all seller_staff) ────────────────────────────
         Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('my-payslips');
+        // Outside the plan group: staff keep their payslips after a downgrade (own + released/paid only)
+        Route::get('my-payslips/{payroll}', [PayrollController::class, 'myPayslip'])->whereNumber('payroll')->name('my-payslips.show');
+        Route::get('my-payslips/{payroll}/pdf', [PayrollController::class, 'myPayslipPdf'])->whereNumber('payroll')->name('my-payslips.pdf');
 
         // ── My Attendance (self — all seller_staff except rider) ──────────────
         Route::get('my-attendance', [AttendanceController::class, 'myAttendance'])->name('my-attendance');
@@ -168,6 +171,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::get('payroll/settings', [PayrollController::class, 'settings'])->name('payroll.settings');
             Route::post('payroll/settings', [PayrollController::class, 'updateSettings'])->name('payroll.settings.update');
             Route::patch('payroll/staff/{user}/rate', [PayrollController::class, 'updateStaffRate'])->name('payroll.staff-rate');
+            // Payslip — after payroll/settings + payroll/export, numeric only (else "settings" binds as an id)
+            Route::get('payroll/{payroll}', [PayrollController::class, 'show'])->whereNumber('payroll')->name('payroll.show');
+            Route::get('payroll/{payroll}/pdf', [PayrollController::class, 'pdf'])->whereNumber('payroll')->name('payroll.pdf');
         });
 
         // ── Revenue (seller owner only) ────────────────────────────────────────

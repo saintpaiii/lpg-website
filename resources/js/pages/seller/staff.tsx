@@ -1,4 +1,5 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { rateSourceLabel } from '@/components/payslip-view';
 import {
     AlertTriangle,
     Archive,
@@ -62,6 +63,8 @@ type StaffMember = {
     /** Names / ids of their store roles */
     role_names?: string[];
     role_ids?: number[];
+    /** Effective hourly rate: source = personal | role:{name} | default */
+    pay_rate?: { rate: number; source: string };
     /** ISO weekdays 1=Mon…7=Sun */
     work_days?: number[];
     schedule_start: string | null;
@@ -261,7 +264,10 @@ function StaffFormDialog({
         schedule_end:   toHHMM(editTarget?.schedule_end),
     });
 
-    if (isEdit && editTarget && data.email !== editTarget.email) {
+    // Load the person's values once per opening (not on every keystroke — changing the email must not reset the form)
+    const [loadedFor, setLoadedFor] = useState<number | null>(editTarget?.id ?? null);
+    if (open && isEdit && editTarget && loadedFor !== editTarget.id) {
+        setLoadedFor(editTarget.id);
         setData({
             first_name:     editTarget.first_name     ?? '',
             middle_name:    editTarget.middle_name    ?? '',
@@ -279,7 +285,7 @@ function StaffFormDialog({
         e.preventDefault();
         if (isEdit) {
             put(`/seller/staff/${editTarget?.id}`, {
-                onSuccess: () => { reset(); onClose(); },
+                onSuccess: () => { setLoadedFor(null); reset(); onClose(); },
             });
         } else {
             post('/seller/staff', {
@@ -288,7 +294,7 @@ function StaffFormDialog({
         }
     }
 
-    function handleClose() { setCreatingRole(false); reset(); onClose(); }
+    function handleClose() { setCreatingRole(false); setLoadedFor(null); reset(); onClose(); }
 
     function createRole() {
         if (!canEditRoles) {
@@ -744,6 +750,11 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                                     <p className="mt-1 text-xs text-gray-400">
                                                         {fmtWorkDays(s.work_days)}{s.schedule_start && s.schedule_end ? ` · ${fmtTime(s.schedule_start)}–${fmtTime(s.schedule_end)}` : ''}
                                                     </p>
+                                                    {s.pay_rate && (
+                                                        <Link href="/seller/payroll/settings" className="text-xs text-blue-600 hover:underline" title="Pay Rates & Rules">
+                                                            ₱{Number(s.pay_rate.rate.toFixed(2))}/h ({rateSourceLabel(s.pay_rate.source).replace('role: ', '')})
+                                                        </Link>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">{s.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">

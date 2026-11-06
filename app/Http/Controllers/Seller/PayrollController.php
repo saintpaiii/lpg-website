@@ -6,18 +6,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Concerns\GeneratesExport;
 use App\Models\Attendance;
 use App\Models\Payroll;
-use App\Models\StorePayRate;
 use App\Models\StorePayrollSettings;
+use App\Models\StoreRole;
 use App\Models\User;
+use App\Services\PayrollCalculator;
+use App\Services\StaffAccess;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+/**
+ * Store payroll — hourly pay per role (App\Services\PayrollCalculator has the rules).
+ * Old payrolls (pay_basis 'daily') are kept and shown with their old daily-rate figures.
+ */
 class PayrollController extends Controller
 {
     use GeneratesExport;
+
     private function isOwner(): bool
     {
         return auth()->user()->role === 'seller';
@@ -37,100 +44,66 @@ class PayrollController extends Controller
         return $user->role === 'seller' || $user->hasPermission('payroll.manage');
     }
 
-    /**
-     * Resolve the daily rate for a staff member:
-     * individual override > store role rate > default 500.
-     */
-    private function resolveRate(User $staff, int $storeId): float
+    /** The rules shown on the payroll pages (and used by the live example on the settings page). */
+    private static function rules(StorePayrollSettings $s): array
     {
-        if ($staff->daily_rate_override !== null) {
-            return (float) $staff->daily_rate_override;
-        }
-
-        $rate = StorePayRate::where('store_id', $storeId)
-            ->where('sub_role', $staff->sub_role)
-            ->value('daily_rate');
-
-        return $rate !== null ? (float) $rate : 500.0;
+        return [
+            'payroll_period'         => $s->payroll_period,
+            'overtime_multiplier'    => (float) $s->overtime_multiplier,
+            'default_hourly_rate'    => (float) $s->default_hourly_rate,
+            'meal_break_paid'        => (bool) $s->meal_break_paid,
+            'meal_break_minutes'     => (int) $s->meal_break_minutes,
+            'meal_break_after_hours' => (float) $s->meal_break_after_hours,
+        ];
     }
 
-    /**
-     * Calculate payroll figures for a staff member over a date range.
-     *
-     * Basic pay is based on ACTUAL hours worked per day:
-     *   present (8+ h)     → full daily_rate
-     *   half_day (4–7.99h) → daily_rate × 0.5
-     *   undertime (< 4h)   → daily_rate × (hours_worked / 8)
-     *   absent / no_schedule / day_off → ₱0
-     *
-     * Late flag (is_late = true) triggers a separate deduction per day.
-     * Undertime is now baked into basic_pay — undertime_deduction is always 0.
-     */
-    private function calcPayroll(
-        User $staff,
-        int $storeId,
-        string $periodStart,
-        string $periodEnd,
-        StorePayrollSettings $settings,
-        float $dailyRate
-    ): array {
-        $records = Attendance::where('user_id', $staff->id)
-            ->where('store_id', $storeId)
-            ->whereBetween('date', [$periodStart, $periodEnd])
-            ->get();
-
-        $hourlyRate = $dailyRate / 8;
-
-        $basicPay      = 0.0;
-        $daysPresent   = 0;
-        $daysHalfDay   = 0;  // half_day + undertime combined for display
-        $daysAbsent    = $records->whereIn('status', ['absent', 'no_schedule'])->count();
-        $daysLate      = $records->where('is_late', true)->count();   // arrived late (any status)
-        $totalOT       = (float) $records->sum('overtime_hours');
-
-        // Calculate basic pay from actual hours worked per day
-        $payableStatuses = ['present', 'half_day', 'undertime', 'late'];
-        foreach ($records->whereIn('status', $payableStatuses) as $rec) {
-            if (! $rec->clock_in) continue;
-
-            // Use seconds for precision (matches calcStats)
-            $hoursWorked = $rec->clock_out
-                ? round($rec->clock_in->diffInSeconds($rec->clock_out) / 3600, 4)
-                : 0.0;
-
-            if ($hoursWorked >= 8.0) {
-                $daysPresent++;
-                $basicPay += $dailyRate;
-            } elseif ($hoursWorked >= 4.0) {
-                $daysHalfDay++;
-                $basicPay += $dailyRate * 0.5;
-            } else {
-                // undertime (< 4h) — proportional pay, including 0-minute edge case
-                $daysHalfDay++;  // counted in half_day column for display
-                $basicPay += $dailyRate * ($hoursWorked / 8.0);
-            }
-        }
-
-        $overtimePay    = $totalOT * ($hourlyRate * (float) $settings->overtime_multiplier);
-        $lateDeduction  = $daysLate * (float) $settings->late_deduction_per_day;
-        $absentDeduction = $daysAbsent * $dailyRate;  // informational only
-        $grossPay       = $basicPay + $overtimePay;
-        $netPay         = $grossPay - $lateDeduction;  // absent days already contribute ₱0 to basicPay
+    /** One payroll row for the lists (index / my payslips). */
+    private static function row(Payroll $p, array $roleNames = []): array
+    {
+        $hourly = $p->pay_basis === 'hourly';
 
         return [
-            'days_present'         => $daysPresent,
-            'days_late'            => $daysLate,
-            'days_absent'          => $daysAbsent,
-            'days_half_day'        => $daysHalfDay,
-            'total_overtime_hours' => round($totalOT, 2),
-            'daily_rate'           => $dailyRate,
-            'basic_pay'            => round($basicPay, 2),
-            'overtime_pay'         => round($overtimePay, 2),
-            'late_deduction'       => round($lateDeduction, 2),
-            'absent_deduction'     => round($absentDeduction, 2),
-            'undertime_deduction'  => 0.00,  // now baked into basic_pay
-            'gross_pay'            => round($grossPay, 2),
-            'net_pay'              => round(max(0, $netPay), 2),
+            'id'                   => $p->id,
+            'user_id'              => $p->user_id,
+            'name'                 => $p->user?->name ?? '—',
+            'sub_role'             => $p->user?->sub_role,
+            'role_names'           => $roleNames,
+            'store_name'           => $p->relationLoaded('store') ? ($p->store?->store_name ?? '—') : null,
+            'period_start'         => $p->period_start->toDateString(),
+            'period_end'           => $p->period_end->toDateString(),
+            'pay_basis'            => $hourly ? 'hourly' : 'daily',
+            'hourly_rate'          => $hourly ? (float) $p->hourly_rate : null,
+            'rate_source'          => $hourly ? ($p->breakdown['rules']['rate_source'] ?? null) : null,
+            'regular_hours'        => (int) $p->regular_hours,
+            'overtime_hours_paid'  => (int) $p->overtime_hours_paid,
+            'daily_rate'           => $hourly ? null : (float) $p->daily_rate,
+            'days_present'         => $p->days_present,
+            'days_late'            => $p->days_late,
+            'days_absent'          => $p->days_absent,
+            'days_half_day'        => $p->days_half_day,
+            'total_overtime_hours' => (float) $p->total_overtime_hours,
+            'basic_pay'            => (float) $p->basic_pay,
+            'overtime_pay'         => (float) $p->overtime_pay,
+            'late_deduction'       => (float) $p->late_deduction,
+            'absent_deduction'     => (float) $p->absent_deduction,
+            'undertime_deduction'  => (float) ($p->undertime_deduction ?? 0),
+            'gross_pay'            => (float) $p->gross_pay,
+            'net_pay'              => (float) $p->net_pay,
+            'status'               => $p->status,
+            'released_at'          => $p->released_at?->format('M d, Y'),
+            'paid_at'              => $p->paid_at?->format('M d, Y'),
+        ];
+    }
+
+    /** Everything the payslip page / PDF shows. */
+    private static function payslip(Payroll $p): array
+    {
+        $p->loadMissing(['user', 'store']);
+        $hourly = $p->pay_basis === 'hourly';
+
+        return self::row($p, $p->user ? StaffAccess::roleNames($p->user) : []) + [
+            'lines' => $hourly ? ($p->breakdown['lines'] ?? []) : [],
+            'rules' => $hourly ? ($p->breakdown['rules'] ?? null) : null,
         ];
     }
 
@@ -155,56 +128,19 @@ class PayrollController extends Controller
             ->where('period_end',   $periodEnd)
             ->get();
 
-        // HR: hide own row
+        // A staff member with Payroll access never sees their own row
         if (! $this->isOwner()) {
             $payrolls = $payrolls->filter(fn ($p) => $p->user_id !== $authUser->id)->values();
         }
-        $roleNames = \App\Services\StaffAccess::roleNamesFor($payrolls->pluck('user')->filter());
+        $roleNames = StaffAccess::roleNamesFor($payrolls->pluck('user')->filter());
 
-        $settings = StorePayrollSettings::firstOrCreate(
-            ['store_id' => $store->id],
-            ['payroll_period' => 'monthly', 'overtime_multiplier' => 1.25, 'late_deduction_per_day' => 50.00]
-        );
-
-        $payRates = StorePayRate::where('store_id', $store->id)
-            ->pluck('daily_rate', 'sub_role');
+        $settings = StorePayrollSettings::forStore($store->id);
 
         return Inertia::render('seller/payroll', [
-            'payrolls'     => $payrolls->map(fn ($p) => [
-                'id'                   => $p->id,
-                'user_id'              => $p->user_id,
-                'name'                 => $p->user->name,
-                'sub_role'             => $p->user->sub_role,
-                'role_names'           => $roleNames[$p->user_id] ?? [],
-                // Only custom roles: no role rate yet → the ₱500 default (unless the person has their own rate)
-                'default_rate'         => $p->user->sub_role === 'custom' && $p->user->daily_rate_override === null,
-                'period_start'         => $p->period_start->toDateString(),
-                'period_end'           => $p->period_end->toDateString(),
-                'days_present'         => $p->days_present,
-                'days_late'            => $p->days_late,
-                'days_absent'          => $p->days_absent,
-                'days_half_day'        => $p->days_half_day,
-                'total_overtime_hours' => (float) $p->total_overtime_hours,
-                'daily_rate'           => (float) $p->daily_rate,
-                'basic_pay'            => (float) $p->basic_pay,
-                'overtime_pay'         => (float) $p->overtime_pay,
-                'late_deduction'       => (float) $p->late_deduction,
-                'absent_deduction'     => (float) $p->absent_deduction,
-                'undertime_deduction'  => (float) ($p->undertime_deduction ?? 0),
-                'gross_pay'            => (float) $p->gross_pay,
-                'net_pay'              => (float) $p->net_pay,
-                'status'               => $p->status,
-                'released_at'          => $p->released_at?->toDateTimeString(),
-                'paid_at'              => $p->paid_at?->toDateTimeString(),
-            ])->values(),
+            'payrolls'     => $payrolls->map(fn ($p) => self::row($p, $roleNames[$p->user_id] ?? []))->values(),
             'period_start' => $periodStart,
             'period_end'   => $periodEnd,
-            'settings'     => [
-                'payroll_period'         => $settings->payroll_period,
-                'overtime_multiplier'    => (float) $settings->overtime_multiplier,
-                'late_deduction_per_day' => (float) $settings->late_deduction_per_day,
-            ],
-            'pay_rates'    => $payRates,
+            'settings'     => self::rules($settings),
             'is_owner'     => $this->isOwner(),
             'can_generate' => $this->canGenerate(),
         ]);
@@ -228,44 +164,52 @@ class PayrollController extends Controller
         if (! $this->isOwner()) {
             $payrolls = $payrolls->filter(fn ($p) => $p->user_id !== auth()->id())->values();
         }
+        $roleNames = StaffAccess::roleNamesFor($payrolls->pluck('user')->filter());
 
         $filename = $this->exportFilename('payroll', $store->store_name, $periodStart, $periodEnd, $format);
+        $hasDaily = $payrolls->contains(fn ($p) => $p->pay_basis !== 'hourly');
 
-        $columns = [
-            ['key' => 'name',           'label' => 'Name'],
-            ['key' => 'sub_role',       'label' => 'Role'],
-            ['key' => 'days_present',   'label' => 'Present',    'align' => 'right'],
-            ['key' => 'days_late',      'label' => 'Late',       'align' => 'right'],
-            ['key' => 'days_absent',    'label' => 'Absent',     'align' => 'right'],
-            ['key' => 'days_half_day',  'label' => 'Half Day',   'align' => 'right'],
-            ['key' => 'ot_hours',       'label' => 'OT Hrs',     'align' => 'right'],
-            ['key' => 'daily_rate',     'label' => 'Daily Rate', 'align' => 'right'],
-            ['key' => 'basic_pay',      'label' => 'Basic Pay',  'align' => 'right'],
-            ['key' => 'overtime_pay',   'label' => 'OT Pay',     'align' => 'right'],
-            ['key' => 'deductions',     'label' => 'Deductions', 'align' => 'right'],
-            ['key' => 'net_pay',        'label' => 'Net Pay',    'align' => 'right'],
-            ['key' => 'status',         'label' => 'Status'],
-        ];
+        $columns = array_values(array_filter([
+            ['key' => 'name',         'label' => 'Name'],
+            ['key' => 'roles',        'label' => 'Roles'],
+            ['key' => 'days_present', 'label' => 'Present', 'align' => 'right'],
+            ['key' => 'days_late',    'label' => 'Late',    'align' => 'right'],
+            ['key' => 'days_absent',  'label' => 'Absent',  'align' => 'right'],
+            ['key' => 'regular_h',    'label' => 'Regular h', 'align' => 'right'],
+            ['key' => 'ot_h',         'label' => 'OT h',    'align' => 'right'],
+            ['key' => 'rate',         'label' => 'Rate/h',  'align' => 'right'],
+            // Older (daily-rate) payrolls only
+            $hasDaily ? ['key' => 'daily_rate', 'label' => 'Daily Rate', 'align' => 'right'] : null,
+            ['key' => 'basic_pay',    'label' => 'Basic Pay', 'align' => 'right'],
+            ['key' => 'overtime_pay', 'label' => 'OT Pay',  'align' => 'right'],
+            ['key' => 'deductions',   'label' => 'Deductions', 'align' => 'right'],
+            ['key' => 'net_pay',      'label' => 'Net Pay', 'align' => 'right'],
+            ['key' => 'status',       'label' => 'Status'],
+        ]));
 
-        $rows = $payrolls->map(fn ($p) => [
-            'name'          => $p->user->name,
-            'sub_role'      => $p->user->sub_role ?? '—',
-            'days_present'  => $p->days_present,
-            'days_late'     => $p->days_late,
-            'days_absent'   => $p->days_absent,
-            'days_half_day' => $p->days_half_day,
-            'ot_hours'      => number_format((float) $p->total_overtime_hours, 2),
-            'daily_rate'    => $this->peso((float) $p->daily_rate),
-            'basic_pay'     => $this->peso((float) $p->basic_pay),
-            'overtime_pay'  => $this->peso((float) $p->overtime_pay),
-            'deductions'    => $this->peso((float) $p->late_deduction + (float) $p->absent_deduction + (float) ($p->undertime_deduction ?? 0)),
-            'net_pay'       => $this->peso((float) $p->net_pay),
-            'status'        => $p->status,
-            '_net'          => (float) $p->net_pay,
-        ])->values()->all();
+        $rows = $payrolls->map(function ($p) use ($roleNames) {
+            $hourly = $p->pay_basis === 'hourly';
+            return [
+                'name'         => $p->user->name,
+                'roles'        => implode(', ', $roleNames[$p->user_id] ?? []) ?: ($p->user->sub_role ?? '—'),
+                'days_present' => $p->days_present,
+                'days_late'    => $p->days_late,
+                'days_absent'  => $p->days_absent,
+                'regular_h'    => $hourly ? (int) $p->regular_hours : '—',
+                'ot_h'         => $hourly ? (int) $p->overtime_hours_paid : number_format((float) $p->total_overtime_hours, 2),
+                'rate'         => $hourly ? $this->peso((float) $p->hourly_rate) : '—',
+                'daily_rate'   => $hourly ? '—' : $this->peso((float) $p->daily_rate),
+                'basic_pay'    => $this->peso((float) $p->basic_pay),
+                'overtime_pay' => $this->peso((float) $p->overtime_pay),
+                'deductions'   => $this->peso((float) $p->late_deduction + (float) $p->absent_deduction + (float) ($p->undertime_deduction ?? 0)),
+                'net_pay'      => $this->peso((float) $p->net_pay),
+                'status'       => $p->status,
+                '_net'         => (float) $p->net_pay,
+            ];
+        })->values()->all();
 
-        $totalNet = collect($rows)->sum('_net');
-        $dateLabel = \Carbon\Carbon::parse($periodStart)->format('M d, Y') . ' – ' . \Carbon\Carbon::parse($periodEnd)->format('M d, Y');
+        $totalNet  = collect($rows)->sum('_net');
+        $dateLabel = Carbon::parse($periodStart)->format('M d, Y') . ' – ' . Carbon::parse($periodEnd)->format('M d, Y');
 
         if ($format === 'pdf') {
             return $this->pdfResponse($filename, [
@@ -274,8 +218,8 @@ class PayrollController extends Controller
                 'orgSub'       => $store->city ?? 'Cavite, Philippines',
                 'dateRange'    => $dateLabel,
                 'summaryItems' => [
-                    ['label' => 'Period',     'value' => $dateLabel],
-                    ['label' => 'Staff',      'value' => count($rows)],
+                    ['label' => 'Period',       'value' => $dateLabel],
+                    ['label' => 'Staff',        'value' => count($rows)],
                     ['label' => 'Total Payout', 'value' => $this->peso($totalNet)],
                 ],
                 'columns'   => $columns,
@@ -284,9 +228,11 @@ class PayrollController extends Controller
             ]);
         }
 
-        $headings = ['Name', 'Role', 'Present', 'Late', 'Absent', 'Half Day', 'OT Hrs', 'Daily Rate', 'Basic Pay', 'OT Pay', 'Deductions', 'Net Pay', 'Status'];
-        $csvRows  = array_map(fn ($r) => [$r['name'], $r['sub_role'], $r['days_present'], $r['days_late'], $r['days_absent'], $r['days_half_day'], $r['ot_hours'], $r['daily_rate'], $r['basic_pay'], $r['overtime_pay'], $r['deductions'], $r['net_pay'], $r['status']], $rows);
-        $csvRows[] = ['TOTAL', '', '', '', '', '', '', '', '', '', '', $this->peso($totalNet), ''];
+        $keys     = array_column($columns, 'key');
+        $headings = array_column($columns, 'label');
+        $csvRows  = array_map(fn ($r) => array_map(fn ($k) => $r[$k], $keys), $rows);
+        $csvRows[] = array_map(fn ($k) => match ($k) { 'name' => 'TOTAL', 'net_pay' => $this->peso($totalNet), default => '' }, $keys);
+
         return $this->csvResponse($filename, $headings, $csvRows);
     }
 
@@ -305,11 +251,10 @@ class PayrollController extends Controller
 
         $store    = $request->attributes->get('seller_store');
         $authUser = auth()->user();
+        $start    = Carbon::parse($request->period_start)->toDateString();
+        $end      = Carbon::parse($request->period_end)->toDateString();
 
-        $settings = StorePayrollSettings::firstOrCreate(
-            ['store_id' => $store->id],
-            ['payroll_period' => 'monthly', 'overtime_multiplier' => 1.25, 'late_deduction_per_day' => 50.00]
-        );
+        $settings = StorePayrollSettings::forStore($store->id);
 
         $staffList = User::where('store_id', $store->id)
             ->where('role', 'seller_staff')
@@ -317,47 +262,61 @@ class PayrollController extends Controller
             ->where('is_active', true)
             ->get();
 
-        // HR: filter self out
+        // Staff with Payroll access never generate their own payslip
         if (! $this->isOwner()) {
             $staffList = $staffList->filter(fn ($s) => $s->id !== $authUser->id);
         }
 
+        $made = $locked = 0;
         foreach ($staffList as $staff) {
             // Skip staff with no attendance records in the period
             $hasAttendance = Attendance::where('user_id', $staff->id)
                 ->where('store_id', $store->id)
-                ->whereBetween('date', [$request->period_start, $request->period_end])
+                ->whereBetween('date', [$start, $end])
                 ->exists();
-
             if (! $hasAttendance) {
                 continue;
             }
 
-            $dailyRate = $this->resolveRate($staff, $store->id);
-            $calc      = $this->calcPayroll(
-                $staff,
-                $store->id,
-                $request->period_start,
-                $request->period_end,
-                $settings,
-                $dailyRate
-            );
+            $existing = Payroll::withTrashed()
+                ->where('store_id', $store->id)
+                ->where('user_id', $staff->id)
+                ->whereDate('period_start', $start)
+                ->whereDate('period_end', $end)
+                ->first();
 
-            Payroll::updateOrCreate(
-                [
-                    'store_id'     => $store->id,
-                    'user_id'      => $staff->id,
-                    'period_start' => $request->period_start,
-                    'period_end'   => $request->period_end,
-                ],
-                $calc + ['status' => 'draft']
-            );
+            // Released / paid payslips are final — never recalculated
+            if ($existing && ! $existing->trashed() && in_array($existing->status, ['released', 'paid'], true)) {
+                $locked++;
+                continue;
+            }
+
+            $calc = PayrollCalculator::calculate($staff, $store, $start, $end, $settings);
+            unset($calc['rate_source']);   // kept in breakdown.rules
+            $attrs = $calc + ['status' => 'draft', 'released_at' => null, 'paid_at' => null];
+
+            if ($existing) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+                $existing->fill($attrs)->save();
+            } else {
+                Payroll::create($attrs + [
+                    'store_id' => $store->id, 'user_id' => $staff->id, 'period_start' => $start, 'period_end' => $end,
+                ]);
+            }
+            $made++;
         }
 
-        return back()->with('success', 'Payroll generated successfully.');
+        $msg = "Payroll generated for {$made} staff.";
+        if ($locked > 0) {
+            $msg .= " {$locked} already released/paid — not changed.";
+        }
+
+        return back()->with('success', $msg);
     }
 
-    // ── Mark Released ─────────────────────────────────────────────────────────
+    // ── Mark Released / Paid (owner) ──────────────────────────────────────────
 
     public function markReleased(Request $request, Payroll $payroll): RedirectResponse
     {
@@ -375,8 +334,6 @@ class PayrollController extends Controller
         return back()->with('success', 'Payroll marked as released.');
     }
 
-    // ── Mark Paid ─────────────────────────────────────────────────────────────
-
     public function markPaid(Request $request, Payroll $payroll): RedirectResponse
     {
         if (! $this->isOwner()) {
@@ -393,7 +350,193 @@ class PayrollController extends Controller
         return back()->with('success', 'Payroll marked as paid.');
     }
 
-    // ── Payroll Settings page ─────────────────────────────────────────────────
+    // ── Payslip (owner / Payroll staff) ───────────────────────────────────────
+
+    /** Owner, or Payroll staff — but never their own payslip on the store side. */
+    private function authorizeStorePayslip(Request $request, Payroll $payroll): void
+    {
+        $store = $request->attributes->get('seller_store');
+        if ($payroll->store_id !== $store->id || ! $this->canView()) {
+            abort(403);
+        }
+        if (! $this->isOwner() && $payroll->user_id === auth()->id()) {
+            abort(403);
+        }
+    }
+
+    public function show(Request $request, Payroll $payroll): Response
+    {
+        $this->authorizeStorePayslip($request, $payroll);
+
+        return Inertia::render('seller/payslip', [
+            'payslip'  => self::payslip($payroll),
+            'mode'     => 'store',
+            'is_rider' => false,
+            'pdf_url'  => "/seller/payroll/{$payroll->id}/pdf",
+            'back_url' => '/seller/payroll?' . http_build_query([
+                'period_start' => $payroll->period_start->toDateString(),
+                'period_end'   => $payroll->period_end->toDateString(),
+            ]),
+        ]);
+    }
+
+    public function pdf(Request $request, Payroll $payroll)
+    {
+        $this->authorizeStorePayslip($request, $payroll);
+
+        return $this->payslipPdf($payroll);
+    }
+
+    // ── My payslips (self — store staff and riders) ───────────────────────────
+
+    private static function isRiderUser(User $user): bool
+    {
+        return $user->role === 'rider' || ($user->role === 'seller_staff' && $user->sub_role === 'rider');
+    }
+
+    /** Only the person's own payslip, and only once released or paid — else 404. */
+    private function ownPayslip(Request $request, Payroll $payroll): void
+    {
+        if ($payroll->user_id !== $request->user()->id || ! in_array($payroll->status, ['released', 'paid'], true)) {
+            abort(404);
+        }
+    }
+
+    public function myPayslips(Request $request): Response
+    {
+        $user = $request->user();
+
+        $payslips = Payroll::with(['store', 'user'])
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['released', 'paid'])
+            ->orderByDesc('period_start')
+            ->get()
+            ->map(fn ($p) => self::row($p));
+
+        return Inertia::render('seller/my-payslips', [
+            'payslips'  => $payslips,
+            'user_name' => $user->name,
+            'sub_role'  => $user->sub_role ?? $user->role,
+            'is_rider'  => self::isRiderUser($user),
+        ]);
+    }
+
+    public function myPayslip(Request $request, Payroll $payroll): Response
+    {
+        $this->ownPayslip($request, $payroll);
+        $isRider = self::isRiderUser($request->user());
+        $base    = $isRider ? '/rider/my-payslips' : '/seller/my-payslips';
+
+        return Inertia::render('seller/payslip', [
+            'payslip'  => self::payslip($payroll),
+            'mode'     => 'self',
+            'is_rider' => $isRider,
+            'pdf_url'  => "{$base}/{$payroll->id}/pdf",
+            'back_url' => $base,
+        ]);
+    }
+
+    public function myPayslipPdf(Request $request, Payroll $payroll)
+    {
+        $this->ownPayslip($request, $payroll);
+
+        return $this->payslipPdf($payroll);
+    }
+
+    /** One payslip as a PDF: the day lines as the table, the totals as summary items. */
+    private function payslipPdf(Payroll $payroll)
+    {
+        $data   = self::payslip($payroll);
+        $store  = $payroll->store;
+        $period = Carbon::parse($data['period_start'])->format('M d, Y') . ' – ' . Carbon::parse($data['period_end'])->format('M d, Y');
+        $roles  = implode(', ', $data['role_names']) ?: ($data['sub_role'] ?? '—');
+        $file   = $this->exportFilename('payslip', $data['name'], $data['period_start'], $data['period_end'], 'pdf');
+
+        $summary = [
+            ['label' => 'Staff',  'value' => $data['name']],
+            ['label' => 'Roles',  'value' => $roles],
+            ['label' => 'Status', 'value' => ucfirst($data['status'])],
+        ];
+
+        if ($data['pay_basis'] === 'hourly') {
+            $rate  = (float) $data['hourly_rate'];
+            $mult  = (float) ($data['rules']['overtime_multiplier'] ?? 1.25);
+            $rules = $data['rules'] ?? [];
+            $summary = array_merge($summary, [
+                ['label' => 'Rate', 'value' => $this->peso($rate) . '/hour (' . PayrollCalculator::sourceLabel($data['rate_source']) . ')'],
+                ['label' => 'Regular', 'value' => "{$data['regular_hours']} h × {$this->peso($rate)} = {$this->peso($data['basic_pay'])}"],
+                ['label' => 'Overtime', 'value' => "{$data['overtime_hours_paid']} h × {$this->peso($rate * $mult)} (×{$mult}) = {$this->peso($data['overtime_pay'])}"],
+                ['label' => 'Gross',   'value' => $this->peso($data['gross_pay'])],
+                ['label' => 'Net pay', 'value' => $this->peso($data['net_pay'])],
+            ]);
+            $subtitle = self::smallPrint($rules);
+
+            $columns = [
+                ['key' => 'date',      'label' => 'Date'],
+                ['key' => 'day',       'label' => 'Day'],
+                ['key' => 'clock_in',  'label' => 'In'],
+                ['key' => 'clock_out', 'label' => 'Out'],
+                ['key' => 'worked',    'label' => 'Worked',    'align' => 'right'],
+                ['key' => 'break',     'label' => 'Break',     'align' => 'right'],
+                ['key' => 'regular_h', 'label' => 'Regular h', 'align' => 'right'],
+                ['key' => 'ot_h',      'label' => 'OT h',      'align' => 'right'],
+                ['key' => 'pay',       'label' => 'Pay',       'align' => 'right'],
+                ['key' => 'note',      'label' => 'Note'],
+            ];
+            $rows = array_map(fn ($l) => [
+                'date'      => Carbon::parse($l['date'])->format('M d'),
+                'day'       => $l['day'],
+                'clock_in'  => $l['clock_in'] ?? '—',
+                'clock_out' => $l['clock_out'] ?? '—',
+                'worked'    => $l['worked'] ?? '—',
+                'break'     => $l['break_min'] ? "{$l['break_min']} min" : '—',
+                'regular_h' => in_array($l['kind'], ['absent', 'day_off'], true) ? '—' : $l['regular_h'],
+                'ot_h'      => in_array($l['kind'], ['absent', 'day_off'], true) ? '—' : $l['ot_h'],
+                'pay'       => in_array($l['kind'], ['absent', 'day_off'], true) ? '—' : $this->peso((float) $l['pay']),
+                'note'      => $l['note'],
+            ], $data['lines']);
+            $totals = ['date' => 'TOTAL', 'regular_h' => $data['regular_hours'], 'ot_h' => $data['overtime_hours_paid'], 'pay' => $this->peso($data['gross_pay'])];
+        } else {
+            $summary = array_merge($summary, [
+                ['label' => 'Daily rate', 'value' => $this->peso((float) $data['daily_rate'])],
+                ['label' => 'Days',       'value' => "{$data['days_present']} present · {$data['days_late']} late · {$data['days_absent']} absent"],
+                ['label' => 'Basic pay',  'value' => $this->peso($data['basic_pay'])],
+                ['label' => 'Overtime',   'value' => $this->peso($data['overtime_pay'])],
+                ['label' => 'Deductions', 'value' => $this->peso($data['late_deduction'] + $data['absent_deduction'] + $data['undertime_deduction'])],
+                ['label' => 'Net pay',    'value' => $this->peso($data['net_pay'])],
+            ]);
+            $subtitle = 'Older payslip (daily rate) — no day-by-day breakdown.';
+            $columns  = [['key' => 'note', 'label' => 'Note']];
+            $rows     = [];
+            $totals   = null;
+        }
+
+        return $this->pdfResponse($file, array_filter([
+            'title'        => 'Payslip',
+            'orgName'      => $store?->store_name ?? '—',
+            'orgSub'       => $store?->city ?? 'Cavite, Philippines',
+            'dateRange'    => $period,
+            'subtitle'     => $subtitle,
+            'summaryItems' => $summary,
+            'columns'      => $columns,
+            'rows'         => $rows,
+            'totalsRow'    => $totals,
+        ], fn ($v) => $v !== null));
+    }
+
+    /** "Meal break: unpaid 60 min (when 5+ hours worked) · Whole hours only · Late time is unpaid" */
+    private static function smallPrint(array $rules): string
+    {
+        $after = rtrim(rtrim(number_format((float) ($rules['meal_break_after_hours'] ?? 5), 2), '0'), '.');
+        $break = ($rules['meal_break_paid'] ?? false)
+            ? 'Meal break: paid'
+            : "Meal break: unpaid {$rules['meal_break_minutes']} min (when {$after}+ hours worked)";
+        $shift = ! empty($rules['schedule']) ? "Shift {$rules['schedule']} · " : '';
+
+        return "{$shift}{$break} · Whole hours only · Late time is unpaid";
+    }
+
+    // ── Payroll Settings ──────────────────────────────────────────────────────
 
     public function settings(Request $request): Response
     {
@@ -401,51 +544,44 @@ class PayrollController extends Controller
             abort(403);
         }
 
-        $store = $request->attributes->get('seller_store');
+        $store    = $request->attributes->get('seller_store');
+        $settings = StorePayrollSettings::forStore($store->id);
 
-        $settings = StorePayrollSettings::firstOrCreate(
-            ['store_id' => $store->id],
-            ['payroll_period' => 'monthly', 'overtime_multiplier' => 1.25, 'late_deduction_per_day' => 50.00]
-        );
-
-        $payRates = StorePayRate::where('store_id', $store->id)
+        $roles = StoreRole::where('store_id', $store->id)
+            ->withCount(['users as members_count' => fn ($q) => $q->whereNull('users.deleted_at')])
+            ->orderByRaw('starter_key IS NULL')
+            ->orderBy('id')
             ->get()
-            ->keyBy('sub_role')
-            ->map(fn ($r) => (float) $r->daily_rate);
-
-        // Ensure all sub_roles exist
-        foreach (['cashier', 'warehouse', 'rider', 'hr'] as $subRole) {
-            if (! isset($payRates[$subRole])) {
-                StorePayRate::firstOrCreate(
-                    ['store_id' => $store->id, 'sub_role' => $subRole],
-                    ['daily_rate' => 500.00]
-                );
-                $payRates[$subRole] = 500.0;
-            }
-        }
-
-        // Staff with individual rate overrides
-        $staffRates = User::where('store_id', $store->id)
-            ->where('role', 'seller_staff')
-            ->whereNull('deleted_at')
-            ->whereNotNull('daily_rate_override')
-            ->get()
-            ->map(fn ($u) => [
-                'id'                  => $u->id,
-                'name'                => $u->name,
-                'sub_role'            => $u->sub_role,
-                'role_names'          => \App\Services\StaffAccess::roleNames($u),
-                'daily_rate_override' => (float) $u->daily_rate_override,
+            ->map(fn ($r) => [
+                'id'          => $r->id,
+                'name'        => $r->name,
+                'is_starter'  => $r->starter_key !== null,
+                'is_rider'    => (bool) $r->is_rider,
+                'members'     => (int) $r->members_count,
+                'hourly_rate' => $r->hourly_rate !== null ? (float) $r->hourly_rate : null,
             ]);
 
+        $staff = User::where('store_id', $store->id)
+            ->where('role', 'seller_staff')
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get();
+        $roleNames = StaffAccess::roleNamesFor($staff);
+
         return Inertia::render('seller/payroll-settings', [
-            'settings'   => [
-                'payroll_period'         => $settings->payroll_period,
-                'overtime_multiplier'    => (float) $settings->overtime_multiplier,
-                'late_deduction_per_day' => (float) $settings->late_deduction_per_day,
-            ],
-            'pay_rates'  => $payRates,
-            'staff_rates'=> $staffRates,
+            'settings' => self::rules($settings),
+            'roles'    => $roles,
+            'staff'    => $staff->map(function ($u) use ($store, $settings, $roleNames) {
+                $eff = PayrollCalculator::hourlyRateFor($u, $store, $settings);
+                return [
+                    'id'                   => $u->id,
+                    'name'                 => $u->name,
+                    'role_names'           => $roleNames[$u->id] ?? [],
+                    'hourly_rate_override' => $u->hourly_rate_override !== null ? (float) $u->hourly_rate_override : null,
+                    'effective_rate'       => $eff['rate'],
+                    'rate_source'          => $eff['source'],
+                ];
+            })->values(),
         ]);
     }
 
@@ -460,33 +596,37 @@ class PayrollController extends Controller
         $data = $request->validate([
             'payroll_period'         => ['required', 'in:weekly,bi_weekly,monthly'],
             'overtime_multiplier'    => ['required', 'numeric', 'min:1', 'max:3'],
-            'late_deduction_per_day' => ['required', 'numeric', 'min:0'],
-            'pay_rates.*'            => ['numeric', 'min:0'],
-            // store_pay_rates.sub_role is an enum of the 4 starter roles (custom roles use the ₱500 default for now)
-            'pay_rates'              => ['nullable', 'array:cashier,warehouse,rider,hr'],
+            'default_hourly_rate'    => ['required', 'numeric', 'min:0', 'max:10000'],
+            'meal_break_paid'        => ['required', 'boolean'],
+            'meal_break_minutes'     => ['required', 'integer', 'in:0,30,60'],
+            'meal_break_after_hours' => ['required', 'numeric', 'min:1', 'max:12'],
+            'rates'                  => ['nullable', 'array'],
+            'rates.*'                => ['nullable', 'numeric', 'min:0', 'max:10000'],
+        ], [
+            'rates.*.numeric' => 'Enter an amount (or leave it empty to use the default).',
+            'rates.*.max'     => 'At most ₱10,000 per hour.',
         ]);
 
-        StorePayrollSettings::updateOrCreate(
-            ['store_id' => $store->id],
-            [
-                'payroll_period'         => $data['payroll_period'],
-                'overtime_multiplier'    => $data['overtime_multiplier'],
-                'late_deduction_per_day' => $data['late_deduction_per_day'],
-            ]
-        );
+        StorePayrollSettings::forStore($store->id)->update([
+            'payroll_period'         => $data['payroll_period'],
+            'overtime_multiplier'    => $data['overtime_multiplier'],
+            'default_hourly_rate'    => $data['default_hourly_rate'],
+            'meal_break_paid'        => (bool) $data['meal_break_paid'],
+            'meal_break_minutes'     => (int) $data['meal_break_minutes'],
+            'meal_break_after_hours' => $data['meal_break_after_hours'],
+            'late_deduction_per_day' => 0,
+        ]);
 
-        if (! empty($data['pay_rates'])) {
-            foreach ($data['pay_rates'] as $subRole => $rate) {
-                StorePayRate::updateOrCreate(
-                    ['store_id' => $store->id, 'sub_role' => $subRole],
-                    ['daily_rate' => $rate]
-                );
-            }
+        // Hourly rate per role (only roles of this store); empty = uses the default
+        foreach ($data['rates'] ?? [] as $roleId => $rate) {
+            StoreRole::where('store_id', $store->id)->where('id', (int) $roleId)
+                ->update(['hourly_rate' => ($rate === null || $rate === '') ? null : round((float) $rate, 2)]);
         }
 
         return back()->with('success', 'Payroll settings saved.');
     }
 
+    /** Personal hourly rate of one staff member (wins over their roles); empty = remove it. */
     public function updateStaffRate(Request $request, User $user): RedirectResponse
     {
         if (! $this->isOwner()) {
@@ -494,61 +634,17 @@ class PayrollController extends Controller
         }
 
         $store = $request->attributes->get('seller_store');
-        if ($user->store_id !== $store->id) {
+        if ($user->store_id !== $store->id || $user->role !== 'seller_staff') {
             abort(403);
         }
 
         $data = $request->validate([
-            'daily_rate_override' => ['nullable', 'numeric', 'min:0'],
+            'hourly_rate_override' => ['nullable', 'numeric', 'min:0', 'max:10000'],
         ]);
 
-        $user->update(['daily_rate_override' => $data['daily_rate_override'] ?: null]);
+        $rate = $data['hourly_rate_override'] ?? null;
+        $user->update(['hourly_rate_override' => ($rate === null || $rate === '') ? null : round((float) $rate, 2)]);
 
-        return back()->with('success', 'Staff rate updated.');
-    }
-
-    // ── My Payslips (self — all seller_staff and riders) ──────────────────────
-
-    public function myPayslips(Request $request): Response
-    {
-        $user = $request->user();
-
-        $payslips = Payroll::with('store')
-            ->where('user_id', $user->id)
-            ->whereIn('status', ['released', 'paid'])
-            ->orderByDesc('period_start')
-            ->get()
-            ->map(fn ($p) => [
-                'id'                   => $p->id,
-                'store_name'           => $p->store->store_name ?? '—',
-                'period_start'         => $p->period_start->toDateString(),
-                'period_end'           => $p->period_end->toDateString(),
-                'days_present'         => $p->days_present,
-                'days_late'            => $p->days_late,
-                'days_absent'          => $p->days_absent,
-                'days_half_day'        => $p->days_half_day,
-                'total_overtime_hours' => (float) $p->total_overtime_hours,
-                'daily_rate'           => (float) $p->daily_rate,
-                'basic_pay'            => (float) $p->basic_pay,
-                'overtime_pay'         => (float) $p->overtime_pay,
-                'late_deduction'       => (float) $p->late_deduction,
-                'absent_deduction'     => (float) $p->absent_deduction,
-                'undertime_deduction'  => (float) ($p->undertime_deduction ?? 0),
-                'gross_pay'            => (float) $p->gross_pay,
-                'net_pay'              => (float) $p->net_pay,
-                'status'               => $p->status,
-                'released_at'          => $p->released_at?->format('M d, Y'),
-                'paid_at'              => $p->paid_at?->format('M d, Y'),
-            ]);
-
-        $isRider = $user->role === 'rider'
-            || ($user->role === 'seller_staff' && $user->sub_role === 'rider');
-
-        return Inertia::render('seller/my-payslips', [
-            'payslips'  => $payslips,
-            'user_name' => $user->name,
-            'sub_role'  => $user->sub_role ?? $user->role,
-            'is_rider'  => $isRider,
-        ]);
+        return back()->with('success', $rate === null || $rate === '' ? "Personal rate of {$user->name} removed." : "Personal rate of {$user->name} saved.");
     }
 }

@@ -38,6 +38,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'work_days',
         'must_change_password',
         'daily_rate_override',
+        'hourly_rate_override',
         'deactivation_reason',
         'deactivation_notes',
         'deactivated_at',
@@ -69,6 +70,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'id_verified'             => 'boolean',
             'must_change_password'    => 'boolean',
             'daily_rate_override'     => 'decimal:2',
+            'hourly_rate_override'    => 'decimal:2',
             'work_days'               => 'array',   // ISO weekdays 1=Mon…7=Sun; null = Mon–Sat
             'id_verified_at'          => 'datetime',
         ];

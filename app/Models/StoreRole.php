@@ -14,11 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class StoreRole extends Model
 {
-    protected $fillable = ['store_id', 'name', 'is_rider', 'starter_key'];
+    protected $fillable = ['store_id', 'name', 'is_rider', 'starter_key', 'hourly_rate'];
 
     protected function casts(): array
     {
-        return ['is_rider' => 'boolean'];
+        return ['is_rider' => 'boolean', 'hourly_rate' => 'decimal:2'];
     }
 
     public function store(): BelongsTo

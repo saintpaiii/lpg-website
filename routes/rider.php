@@ -36,6 +36,8 @@ Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('ri
 
     // ── My Payslips ───────────────────────────────────────────────────────────
     Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('my-payslips');
+    Route::get('my-payslips/{payroll}', [PayrollController::class, 'myPayslip'])->whereNumber('payroll')->name('my-payslips.show');
+    Route::get('my-payslips/{payroll}/pdf', [PayrollController::class, 'myPayslipPdf'])->whereNumber('payroll')->name('my-payslips.pdf');
 
     // ── Self attendance ───────────────────────────────────────────────────────
     Route::get('my-attendance', [AttendanceController::class, 'myAttendance'])->name('my-attendance');

@@ -57,8 +57,11 @@ class StaffController extends Controller
         $roleNames = StaffAccess::roleNamesFor($page->getCollection());
         $roleIds   = \Illuminate\Support\Facades\DB::table('store_role_user')->whereIn('user_id', $page->getCollection()->pluck('id'))
             ->get()->groupBy('user_id')->map(fn ($r) => $r->pluck('store_role_id')->map(fn ($id) => (int) $id)->all());
+        // Effective hourly rate (personal > highest role rate > default) — shown with a link to Payroll Settings
+        $paySettings = \App\Models\StorePayrollSettings::forStore($store->id);
         $staff = $page
             ->through(fn ($u) => [
+                'pay_rate'       => \App\Services\PayrollCalculator::hourlyRateFor($u, $store, $paySettings),
                 'id'             => $u->id,
                 'name'           => $u->name,
                 'first_name'     => $u->first_name,

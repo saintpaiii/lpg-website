@@ -61,7 +61,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                         );
                     }
 
-                    const active = isCurrentOrParentUrl(item.href);
+                    const active = item.isActive ?? isCurrentOrParentUrl(item.href);
                     return (
                         <SidebarMenuItem key={item.title}>
                             <SidebarMenuButton
