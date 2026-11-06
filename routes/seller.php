@@ -32,11 +32,11 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // Dashboard
         Route::get('dashboard', [DashboardController::class, 'index'])
-            ->middleware('permission:dashboard.view')
+            ->middleware('module:dashboard')
             ->name('dashboard');
 
         // ── Products ─────────────────────────────────────────────────────────
-        Route::middleware('permission:products.view')->group(function () {
+        Route::middleware('module:products')->group(function () {
             Route::get('products', [ProductController::class, 'index'])->name('products');
             Route::post('products', [ProductController::class, 'store'])->name('products.store');
             Route::put('products/{product}', [ProductController::class, 'update'])->name('products.update');
@@ -49,7 +49,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         });
 
         // ── Orders ───────────────────────────────────────────────────────────
-        Route::middleware('permission:orders.view')->group(function () {
+        Route::middleware('module:orders')->group(function () {
             Route::get('orders', [OrderController::class, 'index'])->name('orders');
             Route::get('orders/export', [OrderController::class, 'export'])->middleware('plan.feature:export')->name('orders.export');
             Route::get('orders/create', [OrderController::class, 'create'])->name('orders.create');
@@ -64,8 +64,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::delete('orders/{order}', [OrderController::class, 'destroy'])->name('orders.destroy');
         });
 
-        // ── Deliveries ───────────────────────────────────────────────────────
-        Route::middleware('permission:messages.view')->group(function () {
+        // ── Messages ─────────────────────────────────────────────────────────
+        Route::middleware('module:messages')->group(function () {
             // ── Messages (chat) — 'start' / 'unread-count' before the {conversation} wildcard ──
             Route::get('messages', [SellerMessageController::class, 'index'])->name('messages');
             Route::post('messages/start', [SellerMessageController::class, 'start'])->name('messages.start');
@@ -80,7 +80,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::delete('quick-replies/{quickReply}', [SellerMessageController::class, 'destroyQuickReply'])->name('quick-replies.destroy');
         });
 
-        Route::middleware('permission:deliveries.view')->group(function () {
+        Route::middleware('module:deliveries')->group(function () {
             Route::get('deliveries', [DeliveryController::class, 'index'])->name('deliveries');
             Route::post('deliveries/assign', [DeliveryController::class, 'assign'])->name('deliveries.assign');
             Route::patch('deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->name('deliveries.status');
@@ -98,7 +98,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             ->withTrashed()->name('vehicles.restore');
 
         // ── Invoices ─────────────────────────────────────────────────────────
-        Route::middleware('permission:invoices.view')->group(function () {
+        Route::middleware('module:invoices')->group(function () {
             Route::get('invoices', [InvoiceController::class, 'index'])->name('invoices');
             Route::get('invoices/export', [InvoiceController::class, 'export'])->middleware('plan.feature:export')->name('invoices.export');
             Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
@@ -106,7 +106,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         });
 
         // ── Inventory ────────────────────────────────────────────────────────
-        Route::middleware('permission:inventory.view')->group(function () {
+        Route::middleware('module:inventory')->group(function () {
             Route::get('inventory', [InventoryController::class, 'index'])->name('inventory');
             Route::post('inventory/{product}/stock-in', [InventoryController::class, 'stockIn'])->name('inventory.stock-in');
             Route::post('inventory/{product}/stock-out', [InventoryController::class, 'stockOut'])->name('inventory.stock-out');
@@ -128,14 +128,23 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
                 ->withTrashed()->name('staff.restore');
             Route::delete('staff/{user}/force', [StaffController::class, 'forceDestroy'])
                 ->withTrashed()->name('staff.force-delete');
+
+            // Staff roles (Off / View only / Full access per module) — creating / editing / deleting is a Pro feature
+            Route::middleware('plan.feature:custom_roles')->group(function () {
+                Route::post('roles', [\App\Http\Controllers\Seller\StoreRoleController::class, 'store'])->name('roles.store');
+                Route::put('roles/{role}', [\App\Http\Controllers\Seller\StoreRoleController::class, 'update'])->name('roles.update');
+                Route::delete('roles/{role}', [\App\Http\Controllers\Seller\StoreRoleController::class, 'destroy'])->name('roles.destroy');
+            });
         });
 
-        // ── Attendance (seller owner + HR staff) ─────────────────────────────
+        // ── Attendance of other staff (owner + staff with the Attendance module; writes need Full access) ──
+        Route::middleware('module:attendance')->group(function () {
         Route::get('attendance', [AttendanceController::class, 'index'])->name('attendance');
         Route::get('attendance/export', [AttendanceController::class, 'export'])->middleware('plan.feature:export')->name('attendance.export');
         Route::post('attendance/clock-in', [AttendanceController::class, 'clockIn'])->name('attendance.clock-in');
         Route::post('attendance/clock-out', [AttendanceController::class, 'clockOut'])->name('attendance.clock-out');
         Route::post('attendance/set-clock-out', [AttendanceController::class, 'setClockOut'])->name('attendance.set-clock-out');
+        });
 
         // ── My Payslips (self — all seller_staff) ────────────────────────────
         Route::get('my-payslips', [PayrollController::class, 'myPayslips'])->name('my-payslips');
@@ -182,7 +191,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         });
 
         // ── Refund requests (handled by the seller) ──────────────────────────
-        Route::middleware('permission:orders.view')->group(function () {
+        Route::middleware('module:orders')->group(function () {
             Route::get('refunds', [SellerRefundController::class, 'index'])->name('refunds');
             Route::patch('refunds/{refund}/accept', [SellerRefundController::class, 'accept'])->name('refunds.accept');
             Route::patch('refunds/{refund}/reject', [SellerRefundController::class, 'reject'])->name('refunds.reject');
@@ -190,18 +199,18 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── Reviews ──────────────────────────────────────────────────────────
         Route::get('reviews', [ReviewController::class, 'index'])
-            ->middleware('permission:products.view')
+            ->middleware('module:products')
             ->name('reviews');
 
         // ── Reports ──────────────────────────────────────────────────────────
-        Route::middleware('permission:reports.view')->group(function () {
+        Route::middleware('module:reports')->group(function () {
             Route::get('reports', [ReportsController::class, 'index'])->name('reports');
             Route::get('reports/export', [ReportsController::class, 'export'])->middleware('plan.feature:export')->name('reports.export');
         });
 
         // ── Customer Reports (customer / rider reports for this store + reports the store files) ──
         // (separate from the sales 'reports' pages above)
-        Route::middleware('permission:customer_reports.manage')->group(function () {
+        Route::middleware('module:customer_reports')->group(function () {
             Route::post('reports/user', [SellerUserReportController::class, 'store'])->middleware('throttle:20,60')->name('reports.user.store');
             Route::get('customer-reports', [SellerUserReportController::class, 'index'])->name('customer-reports');
             Route::get('customer-reports/{userReport}', [SellerUserReportController::class, 'show'])->name('customer-reports.show');
@@ -236,7 +245,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
 
         // ── DSS (Premium plan) ───────────────────────────────────────────────
         Route::get('dss', [DssController::class, 'index'])
-            ->middleware(['permission:dss.view', 'plan.feature:dss'])
+            ->middleware(['module:dss', 'plan.feature:dss'])
             ->name('dss');
 
         // ── Store Documents (permit renewals, extra documents) — owner only ──
@@ -249,7 +258,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
         });
 
         // ── Settings ─────────────────────────────────────────────────────────
-        Route::middleware('permission:settings.view')->group(function () {
+        Route::middleware('module:settings')->group(function () {
             Route::get('settings', [SettingsController::class, 'index'])->name('settings');
             Route::post('settings', [SettingsController::class, 'update'])->name('settings.update');
             // The Settings page posts FormData with _method=PUT (file upload) — this is the route it hits

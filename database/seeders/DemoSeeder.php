@@ -353,6 +353,14 @@ class DemoSeeder extends Seeder
             ['messages.view',            'Messages',        'View customer and rider messages'],
             ['messages.reply',           'Messages',        'Reply to customer and rider messages'],
             ['customer_reports.manage',  'Customer Reports', 'View and reply to reports from customers and riders'],
+            ['customer_reports.view',    'Customer Reports', 'View reports from customers and riders'],
+
+            // Store staff modules (custom roles)
+            ['attendance.view',          'Attendance',      "View other staff's attendance"],
+            ['attendance.manage',        'Attendance',      'Clock staff in and out, fix attendance'],
+            ['payroll.view',             'Payroll',         'View payroll'],
+            ['payroll.manage',           'Payroll',         'Generate payroll'],
+            ['loyalty_customers.view',   'Loyalty',         'View the loyal customers list'],
 
             ['settings.view',            'Settings',        'View system settings'],
             ['settings.edit',            'Settings',        'Edit system settings'],
@@ -430,6 +438,21 @@ class DemoSeeder extends Seeder
                 ]);
             }
         }
+
+        // ── Store staff roles: the 4 starter roles per store, staff attached by their sub_role, work days Mon–Sat,
+        // and one custom example role "Counter + Stock" given to the cashier on top of Cashier
+        foreach ([$store1Id, $store2Id] as $sid) {
+            \App\Services\StoreRoleService::seedStarters($sid);
+        }
+        $starterRoles = DB::table('store_roles')->whereNotNull('starter_key')->get()->groupBy('store_id');
+        foreach (DB::table('users')->where('role', 'seller_staff')->whereNotNull('store_id')->get(['id', 'store_id', 'sub_role']) as $u) {
+            $role = $starterRoles[$u->store_id]->firstWhere('starter_key', $u->sub_role) ?? $starterRoles[$u->store_id]->firstWhere('starter_key', 'cashier');
+            DB::table('store_role_user')->insertOrIgnore(['store_role_id' => $role->id, 'user_id' => $u->id]);
+        }
+        DB::table('users')->where('role', 'seller_staff')->update(['work_days' => json_encode([1, 2, 3, 4, 5, 6])]);
+        $counter = \App\Services\StoreRoleService::save(new \App\Models\StoreRole(['store_id' => $store1Id]), 'Counter + Stock', false,
+            ['orders' => 'full', 'invoices' => 'full', 'inventory' => 'full', 'products' => 'view']);
+        DB::table('store_role_user')->insertOrIgnore(['store_role_id' => $counter->id, 'user_id' => $cashier1Id]);
 
         // ══════════════════════════════════════════════════════════════════════
         // 7. STORE 1 PRODUCTS (5 products — Petron Gasul Cavite)

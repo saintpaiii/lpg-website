@@ -73,39 +73,7 @@ class SocialAuthController extends Controller
         }
 
         // Role-based redirect (mirrors LoginResponse)
-        $redirect = match (true) {
-            $user->role === 'platform_staff'
-                => $user->platformStaffHomeUrl(),
-
-            in_array($user->role, ['platform_admin', 'admin', 'manager'])
-                => route('admin.dashboard'),
-
-            $user->role === 'seller'
-                => route('seller.dashboard'),
-
-            $user->role === 'seller_staff' && $user->sub_role === 'rider'
-                => route('rider.deliveries'),
-
-            $user->role === 'seller_staff' && $user->sub_role === 'warehouse'
-                => route('seller.inventory'),
-
-            $user->role === 'seller_staff'
-                => route('seller.invoices'),
-
-            $user->role === 'cashier'
-                => route('admin.invoices'),
-
-            $user->role === 'warehouse'
-                => route('admin.dashboard'),
-
-            $user->role === 'rider'
-                => route('rider.deliveries'),
-
-            $user->role === 'customer'
-                => route('customer.products'),
-
-            default => route('home'),
-        };
+        $redirect = $user->role === 'customer' ? route('customer.products') : $user->homeUrl();
 
         return redirect()->intended($redirect)
             ->with('success', 'Welcome, ' . $user->name . '!');

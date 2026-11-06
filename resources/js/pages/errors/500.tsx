@@ -8,7 +8,7 @@ import { homeUrl } from './404';
 export default function ServerError({ status = 500 }: { status?: number }) {
     const { auth } = usePage<SharedData>().props;
     const href = auth?.user
-        ? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions ?? [])
+        ? (auth.home_url ?? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions ?? []))
         : '/';
 
     return (

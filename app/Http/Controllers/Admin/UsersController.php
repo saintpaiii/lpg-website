@@ -45,6 +45,9 @@ class UsersController extends Controller
         }
 
         $users = $query->paginate(25)->withQueryString();
+        // Store staff: show their store role names (one query)
+        $roleNames = \App\Services\StaffAccess::roleNamesFor($users->getCollection()->where('role', 'seller_staff'));
+        $users->getCollection()->each(fn ($u) => $u->setAttribute('role_names', $roleNames[$u->id] ?? null));
 
         return Inertia::render('admin/users', [
             'users'  => $users,
@@ -146,6 +149,7 @@ class UsersController extends Controller
                 'phone'       => $user->phone,
                 'role'        => $user->role,
                 'sub_role'    => $user->sub_role,
+                'role_names'  => $user->role === 'seller_staff' ? \App\Services\StaffAccess::roleNamesFor([$user])[$user->id] ?? [] : null,
                 'is_active'   => (bool) $user->is_active,
                 'id_verified' => (bool) $user->id_verified,
                 'valid_id'    => $user->valid_id,

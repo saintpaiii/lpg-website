@@ -35,6 +35,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'sub_role',
         'schedule_start',
         'schedule_end',
+        'work_days',
         'must_change_password',
         'daily_rate_override',
         'deactivation_reason',
@@ -68,6 +69,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'id_verified'             => 'boolean',
             'must_change_password'    => 'boolean',
             'daily_rate_override'     => 'decimal:2',
+            'work_days'               => 'array',   // ISO weekdays 1=Mon…7=Sun; null = Mon–Sat
             'id_verified_at'          => 'datetime',
         ];
     }
@@ -125,18 +127,41 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Home page of a store owner or store staff member (same mapping as LoginResponse).
-     * Null for every other role.
+     * The ONE home page of every role (login, "already logged in", landing, OTP, social login, error pages).
+     * Store staff: the rider app for riders, else the first module they can view (config staff_modules.home_order),
+     * else My Attendance.
      */
-    public function sellerHomeUrl(): ?string
+    public function homeUrl(): string
     {
         return match (true) {
-            $this->role === 'seller'                                     => route('seller.dashboard'),
-            $this->role === 'seller_staff' && $this->sub_role === 'rider'     => route('rider.deliveries'),
-            $this->role === 'seller_staff' && $this->sub_role === 'warehouse' => route('seller.inventory'),
-            $this->role === 'seller_staff'                               => route('seller.invoices'),   // seller.dashboard needs a permission staff may lack
-            default                                                      => null,
+            $this->role === 'platform_staff'                                   => $this->platformStaffHomeUrl(),
+            in_array($this->role, ['platform_admin', 'admin', 'manager'], true) => route('admin.dashboard'),
+            $this->role === 'seller'                                           => route('seller.dashboard'),
+            $this->role === 'seller_staff'                                     => url(\App\Services\StaffAccess::homeUrl($this)),
+            // Legacy single-distributor staff roles
+            $this->role === 'cashier'                                          => route('admin.invoices'),
+            $this->role === 'warehouse'                                        => route('admin.dashboard'),
+            $this->role === 'rider'                                            => route('rider.deliveries'),
+            $this->role === 'customer'                                         => route('customer.dashboard'),
+            default                                                            => route('home'),
         };
+    }
+
+    /** Store roles of a staff member (store_role_user). */
+    public function storeRoles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(StoreRole::class, 'store_role_user');
+    }
+
+    /** Work days (ISO 1=Mon…7=Sun); default Mon–Sat. */
+    public function workDays(): array
+    {
+        return $this->work_days ?: [1, 2, 3, 4, 5, 6];
+    }
+
+    public function worksOn(\DateTimeInterface|string $date): bool
+    {
+        return in_array((int) \Illuminate\Support\Carbon::parse($date)->isoWeekday(), array_map('intval', $this->workDays()), true);
     }
 
     /** Platform admins, or platform staff allowed to review verifications / stores — may open private documents. */
@@ -208,6 +233,11 @@ class User extends Authenticatable implements MustVerifyEmail
             return true;
         }
 
+        // Store staff: their store roles + per-person extra access (one memoized check)
+        if ($this->role === 'seller_staff') {
+            return \App\Services\StaffAccess::can($this, $permission);
+        }
+
         $perm = \App\Models\Permission::where('name', $permission)->first();
         if (! $perm) {
             return false;
@@ -224,10 +254,7 @@ class User extends Authenticatable implements MustVerifyEmail
             return false;
         }
 
-        // seller_staff uses sub_role for permission lookup (e.g. 'cashier', 'warehouse', 'rider')
-        $roleKey = ($this->role === 'seller_staff' && $this->sub_role)
-            ? $this->sub_role
-            : $this->role;
+        $roleKey = $this->role;
 
         return RolePermission::where('role', $roleKey)
             ->where('permission_id', $perm->id)
@@ -255,9 +282,12 @@ class User extends Authenticatable implements MustVerifyEmail
                 ->toArray();
         }
 
-        $roleKey = ($this->role === 'seller_staff' && $this->sub_role)
-            ? $this->sub_role
-            : $this->role;
+        // Store staff: their store roles + per-person extra access
+        if ($this->role === 'seller_staff') {
+            return \App\Services\StaffAccess::permissionsFor($this);
+        }
+
+        $roleKey = $this->role;
 
         // Start with role defaults
         $rolePerms = RolePermission::where('role', $roleKey)

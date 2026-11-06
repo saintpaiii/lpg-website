@@ -34,7 +34,7 @@ export function homeUrl(role: string, subRole: string | null | undefined, permis
 export default function NotFound() {
     const { auth } = usePage<SharedData>().props;
     const href = auth?.user
-        ? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions)
+        ? (auth.home_url ?? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions))
         : '/';
 
     return (

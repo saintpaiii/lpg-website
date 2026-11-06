@@ -1,5 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { LogOut, Settings } from 'lucide-react';
+import { Link, usePage } from '@inertiajs/react';
+import { ArrowLeftRight, LogOut, Settings } from 'lucide-react';
 import {
     DropdownMenuGroup,
     DropdownMenuItem,
@@ -9,7 +9,7 @@ import {
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { edit } from '@/routes/profile';
-import type { User } from '@/types';
+import type { SharedData, User } from '@/types';
 
 type Props = {
     user: User;
@@ -18,6 +18,10 @@ type Props = {
 
 export function UserMenuContent({ user, onLogoutRequest }: Props) {
     const cleanup = useMobileNavigation();
+    // A rider who also has a store-portal role switches between the rider app and the store portal
+    const { props: { auth }, url } = usePage<SharedData>();
+    const inStorePortal = url.startsWith('/seller');
+    const canSwitch = !!auth.can_switch_portal;
 
     return (
         <>
@@ -39,6 +43,14 @@ export function UserMenuContent({ user, onLogoutRequest }: Props) {
                         Settings
                     </Link>
                 </DropdownMenuItem>
+                {canSwitch && (
+                    <DropdownMenuItem asChild>
+                        <Link className="block w-full cursor-pointer" href={inStorePortal ? '/rider/deliveries' : (auth.store_portal_url ?? '/seller/my-documents')} onClick={cleanup}>
+                            <ArrowLeftRight className="mr-2" />
+                            {inStorePortal ? 'Switch to Rider App' : 'Switch to Store Portal'}
+                        </Link>
+                    </DropdownMenuItem>
+                )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem

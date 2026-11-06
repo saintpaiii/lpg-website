@@ -23,11 +23,18 @@ class PayrollController extends Controller
         return auth()->user()->role === 'seller';
     }
 
+    /** Owner, or staff with the Payroll module (View only or Full access). */
     private function canView(): bool
     {
         $user = auth()->user();
-        return $user->role === 'seller'
-            || ($user->role === 'seller_staff' && $user->sub_role === 'hr');
+        return $user->role === 'seller' || $user->hasPermission('payroll.view') || $user->hasPermission('payroll.manage');
+    }
+
+    /** Owner, or staff with Full access to Payroll (generate). Release / paid / settings stay owner-only. */
+    private function canGenerate(): bool
+    {
+        $user = auth()->user();
+        return $user->role === 'seller' || $user->hasPermission('payroll.manage');
     }
 
     /**
@@ -152,6 +159,7 @@ class PayrollController extends Controller
         if (! $this->isOwner()) {
             $payrolls = $payrolls->filter(fn ($p) => $p->user_id !== $authUser->id)->values();
         }
+        $roleNames = \App\Services\StaffAccess::roleNamesFor($payrolls->pluck('user')->filter());
 
         $settings = StorePayrollSettings::firstOrCreate(
             ['store_id' => $store->id],
@@ -167,6 +175,9 @@ class PayrollController extends Controller
                 'user_id'              => $p->user_id,
                 'name'                 => $p->user->name,
                 'sub_role'             => $p->user->sub_role,
+                'role_names'           => $roleNames[$p->user_id] ?? [],
+                // Only custom roles: no role rate yet → the ₱500 default (unless the person has their own rate)
+                'default_rate'         => $p->user->sub_role === 'custom' && $p->user->daily_rate_override === null,
                 'period_start'         => $p->period_start->toDateString(),
                 'period_end'           => $p->period_end->toDateString(),
                 'days_present'         => $p->days_present,
@@ -195,6 +206,7 @@ class PayrollController extends Controller
             ],
             'pay_rates'    => $payRates,
             'is_owner'     => $this->isOwner(),
+            'can_generate' => $this->canGenerate(),
         ]);
     }
 
@@ -282,7 +294,7 @@ class PayrollController extends Controller
 
     public function generate(Request $request): RedirectResponse
     {
-        if (! $this->canView()) {
+        if (! $this->canGenerate()) {
             abort(403);
         }
 
@@ -422,6 +434,7 @@ class PayrollController extends Controller
                 'id'                  => $u->id,
                 'name'                => $u->name,
                 'sub_role'            => $u->sub_role,
+                'role_names'          => \App\Services\StaffAccess::roleNames($u),
                 'daily_rate_override' => (float) $u->daily_rate_override,
             ]);
 
@@ -448,8 +461,9 @@ class PayrollController extends Controller
             'payroll_period'         => ['required', 'in:weekly,bi_weekly,monthly'],
             'overtime_multiplier'    => ['required', 'numeric', 'min:1', 'max:3'],
             'late_deduction_per_day' => ['required', 'numeric', 'min:0'],
-            'pay_rates'              => ['nullable', 'array'],
             'pay_rates.*'            => ['numeric', 'min:0'],
+            // store_pay_rates.sub_role is an enum of the 4 starter roles (custom roles use the ₱500 default for now)
+            'pay_rates'              => ['nullable', 'array:cashier,warehouse,rider,hr'],
         ]);
 
         StorePayrollSettings::updateOrCreate(

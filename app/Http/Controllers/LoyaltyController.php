@@ -146,7 +146,7 @@ class LoyaltyController extends Controller
     private function authorizeCustomerView(Request $request): void
     {
         $user = $request->user();
-        abort_unless($user->role === 'seller' || ($user->role === 'seller_staff' && $user->sub_role === 'hr'), 403);
+        abort_unless($user->role === 'seller' || ($user->role === 'seller_staff' && $user->hasPermission('loyalty_customers.view')), 403);
     }
 
     private function customerQuery(Request $request, int $storeId)

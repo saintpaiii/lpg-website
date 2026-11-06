@@ -48,6 +48,7 @@ type AttendanceToday = {
     is_late: boolean;
     hours_worked: number;
     overtime_hours: number;
+    is_extra_day?: boolean;
 } | null;
 
 type HistoryRow = {
@@ -55,6 +56,7 @@ type HistoryRow = {
     clock_in: string | null;
     clock_out: string | null;
     status: string;
+    is_extra_day?: boolean;
 };
 
 type Props = {
@@ -64,6 +66,8 @@ type Props = {
     attendance: AttendanceToday;
     history: HistoryRow[];
     store_location: StoreLocation | null;
+    /** Today is not one of my work days (Mon–Sat by default): "Day off" — clocking in is allowed ("Extra day") */
+    day_off_today?: boolean;
     /** Clock-in allowed from 30 min before the shift until it ends (null = no schedule) */
     clock_in_window: { opens_at_iso: string; ends_at_iso: string; opens_label: string } | null;
     /** Riders: vehicles to choose from + today's vehicle/load */
@@ -196,6 +200,7 @@ export default function MyAttendancePage({
     store_location,
     clock_in_window,
     rider = null,
+    day_off_today = false,
 }: Props) {
     // Riders clock in WITH a vehicle (held until clock-out)
     const [vehicleId, setVehicleId] = useState<number | null>(() => (rider ? preferredVehicle(rider.vehicles) : null));
@@ -458,7 +463,13 @@ export default function MyAttendancePage({
                         <div className="flex items-center justify-between">
                             <span className="text-sm text-gray-500">Status</span>
                             <div className="flex flex-col items-end gap-0.5">
-                                <StatusBadge status={attendance?.status ?? 'absent'} />
+                                <StatusBadge status={attendance?.status ?? (day_off_today ? 'day_off' : 'absent')} />
+                                {attendance?.is_extra_day && (
+                                    <span className="text-xs font-medium text-indigo-600">Extra day — paid like any worked day</span>
+                                )}
+                                {day_off_today && !attendance?.clock_in && (
+                                    <span className="text-xs text-gray-500">Today is your day off. You can still clock in (Extra day).</span>
+                                )}
                                 {attendance?.is_late && attendance?.status !== 'late' && (
                                     <span className="text-xs text-yellow-600 font-medium">Late arrival</span>
                                 )}
@@ -609,6 +620,7 @@ export default function MyAttendancePage({
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[h.status] ?? 'bg-gray-100 text-gray-500'}`}>
                                                     {STATUS_LABEL[h.status] ?? h.status}
                                                 </span>
+                                                {h.is_extra_day && <span className="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">Extra day</span>}
                                             </td>
                                         </tr>
                                     ))}

@@ -22,6 +22,9 @@ type PayrollRow = {
     user_id: number;
     name: string;
     sub_role: string;
+    role_names?: string[];
+    /** Custom role without a role rate → ₱500 default */
+    default_rate?: boolean;
     period_start: string;
     period_end: string;
     days_present: number;
@@ -53,6 +56,8 @@ type Props = {
     };
     pay_rates: Record<string, number>;
     is_owner: boolean;
+    /** Owner or Payroll Full access */
+    can_generate?: boolean;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -92,11 +97,11 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-function RoleBadge({ role }: { role: string }) {
+function RoleBadge({ role, names }: { role: string; names?: string[] }) {
     const labels: Record<string, string> = { cashier: 'Cashier', warehouse: 'Warehouse', rider: 'Rider', hr: 'HR' };
     return (
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SUB_ROLE_STYLE[role] ?? 'bg-gray-100 text-gray-500'}`}>
-            {labels[role] ?? role}
+            {names?.length ? names.join(', ') : (labels[role] ?? role)}
         </span>
     );
 }
@@ -152,7 +157,7 @@ function ExpandedRow({ row }: { row: PayrollRow }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function PayrollPage({ payrolls, period_start, period_end, settings, is_owner }: Props) {
+export default function PayrollPage({ payrolls, period_start, period_end, settings, is_owner, can_generate = is_owner }: Props) {
     const [expanded, setExpanded] = useState<number | null>(null);
 
     const generateForm = useForm({
@@ -206,7 +211,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, settin
                                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                         </div>
-                        <Button
+                        {can_generate && <Button
                             size="sm"
                             disabled={generateForm.processing}
                             onClick={() => generateForm.post('/seller/payroll/generate', {
@@ -217,7 +222,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, settin
                         >
                             <RefreshCw className="h-3.5 w-3.5" />
                             Generate
-                        </Button>
+                        </Button>}
                         {is_owner && (
                             <Button
                                 size="sm"
@@ -319,7 +324,8 @@ export default function PayrollPage({ payrolls, period_start, period_end, settin
                                                     <td className="px-4 py-3">
                                                         <p className="font-medium text-gray-900">{row.name}</p>
                                                         <div className="mt-0.5">
-                                                            <RoleBadge role={row.sub_role} />
+                                                            <RoleBadge role={row.sub_role} names={row.role_names} />
+                                                            {row.default_rate && <span className="ml-1 text-[11px] text-gray-400">default ₱500 (no role rate)</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-center text-gray-700">{row.days_present}</td>

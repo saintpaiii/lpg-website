@@ -36,7 +36,9 @@ class EnsureIsSeller
         }
 
         $isSeller      = $user->role === 'seller';
-        $isSellerStaff = $user->role === 'seller_staff' && $user->sub_role !== 'rider';
+        // Riders enter the store portal only when they ALSO have a role that is not a rider role ("Switch to Store Portal")
+        $isSellerStaff = $user->role === 'seller_staff'
+            && ($user->sub_role !== 'rider' || \App\Services\StaffAccess::hasStorePortalRoles($user));
 
         if (! $isSeller && ! $isSellerStaff) {
             return redirect()->route('login')->withErrors([

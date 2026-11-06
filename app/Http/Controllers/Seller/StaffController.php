@@ -10,6 +10,8 @@ use App\Models\RolePermission;
 use App\Models\User;
 use App\Models\UserPermission;
 use App\Services\NotificationService;
+use App\Services\StaffAccess;
+use App\Services\StoreRoleService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,6 +53,10 @@ class StaffController extends Controller
         $eligible = $store->eligibleRiders()->pluck('users.id')->all();
         // Driver's license status of the riders on this page (one query)
         $license = \App\Services\StaffDocumentService::forRiders($page->getCollection());
+        // Role names + ids of the people on this page (one query each)
+        $roleNames = StaffAccess::roleNamesFor($page->getCollection());
+        $roleIds   = \Illuminate\Support\Facades\DB::table('store_role_user')->whereIn('user_id', $page->getCollection()->pluck('id'))
+            ->get()->groupBy('user_id')->map(fn ($r) => $r->pluck('store_role_id')->map(fn ($id) => (int) $id)->all());
         $staff = $page
             ->through(fn ($u) => [
                 'id'             => $u->id,
@@ -61,6 +67,9 @@ class StaffController extends Controller
                 'email'          => $u->email,
                 'phone'          => $u->phone,
                 'sub_role'       => $u->sub_role,
+                'role_names'     => $roleNames[$u->id] ?? [],
+                'role_ids'       => $roleIds[$u->id] ?? [],
+                'work_days'      => $u->workDays(),
                 'schedule_start' => $u->schedule_start,
                 'schedule_end'   => $u->schedule_end,
                 'is_active'      => $u->is_active,
@@ -85,6 +94,10 @@ class StaffController extends Controller
             'filters'       => ['search' => $search ?? ''],
             // Set only right after an account was created but its welcome email failed
             'tempCredentials' => $request->session()->get('staff_temp_password'),
+            // Staff roles (Roles tab + the Add / Edit form); creating / editing is a Pro feature
+            'roles'          => StoreRoleService::listFor($store),
+            'canEditRoles'   => StoreRoleService::canEdit($store),
+            'modules'        => collect(StaffAccess::modules())->map(fn ($m, $k) => ['key' => $k, 'label' => $m['label'], 'description' => $m['description'], 'view_only' => (bool) ($m['view_only'] ?? false)])->values(),
         ]);
     }
 
@@ -98,9 +111,15 @@ class StaffController extends Controller
             'last_name'      => 'required|string|max:100',
             'email'          => 'required|email|unique:users,email',
             'phone'          => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'sub_role'       => 'required|in:cashier,warehouse,rider,hr',
+            'role_ids'       => 'required|array|min:1',
+            'role_ids.*'     => ['integer', \Illuminate\Validation\Rule::exists('store_roles', 'id')->where('store_id', $store->id)],
+            'work_days'      => 'nullable|array',
+            'work_days.*'    => 'integer|between:1,7',
             'schedule_start' => 'required|string|max:10',
             'schedule_end'   => 'required|string|max:10',
+        ], [
+            'role_ids.required' => 'Choose at least one role.',
+            'role_ids.min'      => 'Choose at least one role.',
         ]);
 
         // Plan limit: refuse BEFORE the account is created / the email is sent
@@ -112,10 +131,7 @@ class StaffController extends Controller
         $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
 
         $fullName     = trim("{$data['first_name']} {$data['last_name']}");
-        $tempPassword = strtolower($data['last_name']);
-        if (strlen($tempPassword) < 8) {
-            $tempPassword .= '123';
-        }
+        $tempPassword = self::randomPassword();   // emailed; they must change it at first login
 
         $user = User::create([
             'name'                => $fullName,
@@ -125,15 +141,19 @@ class StaffController extends Controller
             'email'               => $data['email'],
             'phone'               => $data['phone'] ?? null,
             'role'                => 'seller_staff',
-            'sub_role'            => $data['sub_role'],
+            'sub_role'            => 'custom',   // derived from the roles right below
             'store_id'            => $store->id,
             'schedule_start'      => $data['schedule_start'] ?? null,
             'schedule_end'        => $data['schedule_end'] ?? null,
+            'work_days'           => self::workDays($data['work_days'] ?? null),
             'password'            => Hash::make($tempPassword),
             'must_change_password' => true,
             'is_active'           => true,
             'email_verified_at'   => now(),
         ]);
+
+        StoreRoleService::assign($user, $data['role_ids']);
+        $roleList = implode(', ', StaffAccess::roleNames($user->fresh()));
 
         // The account is saved first; a mail problem must never undo it or show a 500
         $mailed = true;
@@ -161,7 +181,32 @@ class StaffController extends Controller
                 ->with('staff_temp_password', ['name' => $fullName, 'email' => $user->email, 'password' => $tempPassword]);
         }
 
-        return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$data['sub_role']}. Login credentials sent to {$data['email']}.");
+        return redirect()->route('seller.staff')->with('success', "{$fullName} added as {$roleList}. Login credentials sent to {$data['email']}.");
+    }
+
+    /** 12 characters, letters + digits, no look-alikes (0/O, 1/l/I). */
+    public static function randomPassword(int $length = 12): string
+    {
+        $letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
+        $digits  = '23456789';
+        $all     = $letters . $digits;
+        do {
+            $p = '';
+            for ($i = 0; $i < $length; $i++) {
+                $p .= $all[random_int(0, strlen($all) - 1)];
+            }
+        } while (! preg_match('/[a-zA-Z]/', $p) || ! preg_match('/\d/', $p));
+
+        return $p;
+    }
+
+    /** Work days from the form (ISO 1=Mon…7=Sun); Mon–Sat when nothing was sent. */
+    private static function workDays(?array $days): array
+    {
+        $days = array_values(array_unique(array_map('intval', $days ?? [])));
+        sort($days);
+
+        return $days ?: [1, 2, 3, 4, 5, 6];
     }
 
     public function show(User $user): Response
@@ -169,29 +214,18 @@ class StaffController extends Controller
         $store = request()->attributes->get('seller_store');
         if ($user->store_id !== $store->id) abort(403);
 
-        // Seller-relevant permission groups only
-        $sellerGroups = ['Dashboard', 'Products', 'Orders', 'Deliveries', 'Invoices', 'Inventory', 'DSS', 'Settings'];
+        // Store-portal modules (config/staff_modules.php) — one group per module, its permissions inside
+        $byName = Permission::whereIn('name', StaffAccess::allModulePermissions())->get()->keyBy('name');
+        $allPermissions = [];
+        foreach (StaffAccess::modules() as $module) {
+            $allPermissions[$module['label']] = collect($module['permissions'])
+                ->filter(fn ($n) => isset($byName[$n]))
+                ->map(fn ($n) => ['id' => $byName[$n]->id, 'name' => $n, 'description' => $byName[$n]->description])
+                ->values()->all();
+        }
 
-        $allPermissions = Permission::orderBy('group')->orderBy('name')
-            ->whereIn('group', $sellerGroups)
-            ->get()
-            ->groupBy('group')
-            ->map(fn ($perms) => $perms->map(fn ($p) => [
-                'id'          => $p->id,
-                'name'        => $p->name,
-                'description' => $p->description,
-            ])->values())
-            ->toArray();
-
-        $roleKey = $user->sub_role ?? 'seller_staff';
-
-        $roleDefaults = RolePermission::where('role', $roleKey)
-            ->with('permission')
-            ->get()
-            ->pluck('permission.name')
-            ->filter()
-            ->values()
-            ->toArray();
+        // What the person's roles give (the overrides are shown on top as "extra access")
+        $roleDefaults = StaffAccess::rolePermissions($user);
 
         $userOverrides = UserPermission::where('user_id', $user->id)
             ->with('permission')
@@ -214,6 +248,9 @@ class StaffController extends Controller
                 'email'          => $user->email,
                 'phone'          => $user->phone,
                 'sub_role'       => $user->sub_role,
+                'role_names'     => StaffAccess::roleNames($user),
+                'role_ids'       => StaffAccess::roles($user)->pluck('id')->all(),
+                'work_days'      => $user->workDays(),
                 'schedule_start' => $user->schedule_start,
                 'schedule_end'   => $user->schedule_end,
                 'is_active'      => (bool) $user->is_active,
@@ -223,6 +260,7 @@ class StaffController extends Controller
                 'created_at'     => $user->created_at->format('M d, Y'),
             ],
             'planLimit'      => $this->planLimit($store),
+            'roles'          => StoreRoleService::listFor($store),
             'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
             'userOverrides'  => $userOverrides,
@@ -259,9 +297,15 @@ class StaffController extends Controller
             'last_name'      => 'required|string|max:100',
             'email'          => "required|email|unique:users,email,{$user->id}",
             'phone'          => ['nullable', 'string', 'regex:/^09\d{9}$/'],
-            'sub_role'       => 'required|in:cashier,warehouse,rider,hr',
+            'role_ids'       => 'required|array|min:1',
+            'role_ids.*'     => ['integer', \Illuminate\Validation\Rule::exists('store_roles', 'id')->where('store_id', $store->id)],
+            'work_days'      => 'nullable|array',
+            'work_days.*'    => 'integer|between:1,7',
             'schedule_start' => 'nullable|string|max:10',
             'schedule_end'   => 'nullable|string|max:10',
+        ], [
+            'role_ids.required' => 'Choose at least one role.',
+            'role_ids.min'      => 'Choose at least one role.',
         ]);
 
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
@@ -276,12 +320,13 @@ class StaffController extends Controller
             'last_name'      => $data['last_name'],
             'email'          => $data['email'],
             'phone'          => $data['phone'] ?? null,
-            'sub_role'       => $data['sub_role'],
             'schedule_start' => $data['schedule_start'] ?? null,
             'schedule_end'   => $data['schedule_end'] ?? null,
+            'work_days'      => self::workDays($data['work_days'] ?? null),
         ];
 
         $user->update($updates);
+        StoreRoleService::assign($user, $data['role_ids']);   // re-derives sub_role (rider or not)
         return back()->with('success', "{$fullName} updated.");
     }
 
@@ -294,7 +339,8 @@ class StaffController extends Controller
             'permissions' => ['array'],
         ]);
 
-        $permMap = Permission::pluck('id', 'name');
+        // Only store-portal permissions (never platform ones like users.* / stores.*)
+        $permMap = Permission::whereIn('name', StaffAccess::allModulePermissions())->pluck('id', 'name');
         UserPermission::where('user_id', $user->id)->delete();
 
         foreach ($request->input('permissions', []) as $name => $granted) {
@@ -308,7 +354,10 @@ class StaffController extends Controller
             ]);
         }
 
-        return redirect()->route('seller.staff.show', $user)->with('success', 'Permissions updated successfully.');
+        StaffAccess::forget($user);
+        \Illuminate\Support\Facades\Cache::forget(\App\Services\SidebarBadgeService::key($user->id));
+
+        return redirect()->route('seller.staff.show', $user)->with('success', 'Extra access updated.');
     }
 
     public function resetPermissions(User $user): RedirectResponse
@@ -318,7 +367,10 @@ class StaffController extends Controller
 
         UserPermission::where('user_id', $user->id)->delete();
 
-        return redirect()->route('seller.staff.show', $user)->with('success', 'Permissions reset to defaults.');
+        StaffAccess::forget($user);
+        \Illuminate\Support\Facades\Cache::forget(\App\Services\SidebarBadgeService::key($user->id));
+
+        return redirect()->route('seller.staff.show', $user)->with('success', 'Extra access removed — only the roles apply now.');
     }
 
     public function destroy(Request $request, User $user): RedirectResponse

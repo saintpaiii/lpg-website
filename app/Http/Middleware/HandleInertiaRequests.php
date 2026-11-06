@@ -81,6 +81,16 @@ class HandleInertiaRequests extends Middleware
                 // Customers only: false = brand-new unverified customer (history pages locked too)
                 'has_customer_history' => fn () => $user && $user->role === 'customer' ? $user->hasCustomerHistory() : null,
                 'permissions'        => $user ? $user->getPermissions() : [],
+                // Where "home" is for this user (error pages, logo) — User::homeUrl
+                'home_url'           => fn () => $user ? $user->homeUrl() : '/',
+                // Store staff: names of their roles (shown instead of the derived sub_role)
+                'role_names'         => fn () => $user && $user->role === 'seller_staff' ? \App\Services\StaffAccess::roleNames($user) : [],
+                // A rider who also has a store-portal role: "Switch to Store Portal" / "Switch to Rider App"
+                'can_switch_portal'  => fn () => $user && $user->role === 'seller_staff' && $user->sub_role === 'rider'
+                    && \App\Services\StaffAccess::hasStorePortalRoles($user),
+                // HR (starter role) manages attendance instead of clocking in themself — no "My Attendance"
+                'self_clock'         => fn () => $user && $user->role === 'seller_staff' && ! \App\Services\StaffAccess::hasStarter($user, 'hr'),
+                'store_portal_url'   => fn () => $user && $user->role === 'seller_staff' ? \App\Services\StaffAccess::homeUrl($user, true) : null,
                 'store'              => $store ? [
                     'id'                   => $store->id,
                     'store_name'           => $store->store_name,

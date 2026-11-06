@@ -9,6 +9,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use App\Services\RiderLoadService;
+use App\Services\StaffAccess;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -54,12 +55,24 @@ class AttendanceController extends Controller
     use GeneratesExport;
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Only seller owner or HR staff may manage attendance. */
+    /** Owner, or staff with Full access to "Attendance of other staff" (clock others in / out). */
     private function canManage(): bool
     {
         $user = auth()->user();
-        return $user->role === 'seller'
-            || ($user->role === 'seller_staff' && $user->sub_role === 'hr');
+        return $user->role === 'seller' || $user->hasPermission('attendance.manage');
+    }
+
+    /** Owner, or staff who may see everyone's attendance. */
+    private function canViewAll(): bool
+    {
+        $user = auth()->user();
+        return $user->role === 'seller' || $user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage');
+    }
+
+    /** HR (starter role) keeps managing attendance instead of clocking in themself. */
+    private static function isHr(User $user): bool
+    {
+        return $user->role === 'seller_staff' && StaffAccess::hasStarter($user, 'hr');
     }
 
     /**
@@ -74,12 +87,24 @@ class AttendanceController extends Controller
      *
      * @return array{status:string, is_late:bool, hours_worked:float, overtime:float}
      */
-    private function calcStats(?Attendance $attendance, ?string $scheduleStart, ?string $scheduleEnd): array
+    private function calcStats(?Attendance $attendance, ?string $scheduleStart, ?string $scheduleEnd, bool $workDay = true): array
     {
         $blank = ['status' => 'absent', 'is_late' => false, 'hours_worked' => 0.0, 'overtime' => 0.0];
 
         if (! $attendance || ! $attendance->clock_in) {
-            return $blank;
+            // Not one of the person's work days and nobody clocked in → day off (never absent / late)
+            return $workDay ? $blank : ['status' => 'day_off', 'is_late' => false, 'hours_worked' => 0.0, 'overtime' => 0.0];
+        }
+
+        // Clocked in on a day off = "Extra day": normal hours-based status (paid like any worked day), never late
+        if (! $workDay) {
+            $stats = $this->calcStats($attendance, $scheduleStart, $scheduleEnd, true);
+            $stats['is_late'] = false;
+            if ($stats['status'] === 'late') {
+                $stats['status'] = 'present';
+            }
+
+            return $stats;
         }
 
         // day_off is a manual override — preserve it untouched
@@ -142,7 +167,7 @@ class AttendanceController extends Controller
 
     public function index(Request $request): Response|RedirectResponse
     {
-        if (! $this->canManage()) {
+        if (! $this->canViewAll()) {
             abort(403);
         }
 
@@ -170,9 +195,10 @@ class AttendanceController extends Controller
             ->get()
             ->keyBy('user_id');
 
-        $rows = $staffList->map(function (User $staff) use ($records, $targetDate, $store) {
+        $roleNames = StaffAccess::roleNamesFor($staffList);
+        $rows = $staffList->map(function (User $staff) use ($records, $targetDate, $store, $roleNames) {
             $att   = $records->get($staff->id);
-            $stats = $this->calcStats($att, $staff->schedule_start, $staff->schedule_end);
+            $stats = $this->calcStats($att, $staff->schedule_start, $staff->schedule_end, $staff->worksOn($targetDate));
 
             // Persist recalculated values to DB when they have changed
             if ($att && $att->status !== 'day_off') {
@@ -217,6 +243,9 @@ class AttendanceController extends Controller
                 'missing_clock_out' => $isMissingClockOut,
                 'clock_in_distance' => $clockInDistance,
                 'clock_in_manual'   => str_contains($att?->notes ?? '', 'Manual clock-in'),
+                'is_extra_day'      => (bool) $att?->is_extra_day,
+                'role_names'        => $roleNames[$staff->id] ?? [],
+                'work_days'         => $staff->workDays(),
             ];
         })->values();
 
@@ -267,16 +296,16 @@ class AttendanceController extends Controller
             ->where('date', $targetDate)
             ->get()->keyBy('user_id');
 
-        $rows = $staffList->map(function (User $staff) use ($records) {
+        $rows = $staffList->map(function (User $staff) use ($records, $targetDate) {
             $att   = $records->get($staff->id);
-            $stats = $this->calcStats($att, $staff->schedule_start, $staff->schedule_end);
+            $stats = $this->calcStats($att, $staff->schedule_start, $staff->schedule_end, $staff->worksOn($targetDate));
             return [
                 'name'           => $staff->name,
                 'sub_role'       => $staff->sub_role ?? '—',
                 'schedule'       => ($staff->schedule_start && $staff->schedule_end) ? "{$staff->schedule_start} – {$staff->schedule_end}" : '—',
                 'clock_in'       => $att?->clock_in?->format('h:i A') ?? '—',
                 'clock_out'      => $att?->clock_out?->format('h:i A') ?? '—',
-                'status'         => str_replace('_', ' ', $stats['status']),
+                'status'         => str_replace('_', ' ', $stats['status']) . ($att?->is_extra_day ? ' (extra day)' : ''),
                 'hours_worked'   => number_format($stats['hours_worked'], 2),
                 'overtime_hours' => number_format($stats['overtime'], 2),
                 'notes'          => $att?->notes ?? '',
@@ -363,14 +392,16 @@ class AttendanceController extends Controller
         }
 
         $clockIn = now();
+        $extraDay = ! $staff->worksOn($date);   // clocked in on a day off
         $stats   = $this->calcStats(
             (clone $att)->fill(['clock_in' => $clockIn]),
             $staff->schedule_start,
-            $staff->schedule_end
+            $staff->schedule_end,
+            ! $extraDay
         );
 
         try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($att, $staff, $store, $request, $clockIn, $stats) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($att, $staff, $store, $request, $clockIn, $stats, $extraDay) {
                 if ($staff->isRider() && ($why = RiderLoadService::takeVehicle($att, $staff, $request->input('vehicle_id'), $store))) {
                     throw new \RuntimeException($why);
                 }
@@ -379,6 +410,7 @@ class AttendanceController extends Controller
                     'status'   => $stats['status'],
                     'is_late'  => $stats['is_late'],
                     'notes'    => 'Manual clock-in by owner/HR',
+                    'is_extra_day' => $extraDay,
                 ]);
             });
         } catch (\RuntimeException $e) {
@@ -427,7 +459,7 @@ class AttendanceController extends Controller
         $att->update(['clock_out' => $clockOut]);
         RiderLoadService::releaseVehicle($att->vehicle_id);
 
-        $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end);
+        $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end, ! $att->is_extra_day);
 
         $att->update([
             'status'         => $stats['status'],
@@ -484,7 +516,7 @@ class AttendanceController extends Controller
         $att->update(['clock_out' => $clockOutTime]);
         RiderLoadService::releaseVehicle($att->vehicle_id);
 
-        $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end);
+        $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end, ! $att->is_extra_day);
 
         $att->update([
             'status'         => $stats['status'],
@@ -502,7 +534,7 @@ class AttendanceController extends Controller
         $user = $request->user();
 
         // HR staff are managed by the Owner — they don't have a self-service attendance page
-        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+        if (self::isHr($user)) {
             abort(403, 'HR staff do not have a self-service attendance page.');
         }
 
@@ -512,7 +544,8 @@ class AttendanceController extends Controller
             ->where('date', $today)
             ->first();
 
-        $stats = $this->calcStats($att, $user->schedule_start, $user->schedule_end);
+        $workDay = $user->worksOn($today);
+        $stats = $this->calcStats($att, $user->schedule_start, $user->schedule_end, $workDay && ! $att?->is_extra_day);
 
         // Recalculate and persist values if changed
         if ($att && $att->status !== 'day_off') {
@@ -534,6 +567,7 @@ class AttendanceController extends Controller
                 'clock_in'  => $a->clock_in?->format('h:i A'),
                 'clock_out' => $a->clock_out?->format('h:i A'),
                 'status'    => $a->status,
+                'is_extra_day' => (bool) $a->is_extra_day,
             ])
             ->values();
 
@@ -562,7 +596,11 @@ class AttendanceController extends Controller
                 'is_late'       => $stats['is_late'],
                 'hours_worked'  => $stats['hours_worked'],
                 'overtime_hours'=> $stats['overtime'],
+                'is_extra_day'  => (bool) $att->is_extra_day,
             ] : null,
+            // Not a work day (Mon–Sat by default): "Day off"; clocking in is allowed and flagged "Extra day"
+            'day_off_today' => ! $workDay,
+            'work_days'     => $user->workDays(),
             'history' => $history,
             // Riders: vehicle for the shift (choose at clock-in, change when no active deliveries)
             'rider' => $user->isRider() && $store ? [
@@ -578,7 +616,7 @@ class AttendanceController extends Controller
         $user = $request->user();
 
         // HR staff are clocked in by the Owner — they cannot self-clock
-        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+        if (self::isHr($user)) {
             abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
         }
 
@@ -656,13 +694,16 @@ class AttendanceController extends Controller
                 }
 
                 $clockIn = now();
+                $extraDay = ! $user->worksOn($today);   // clocking in on a day off is allowed: "Extra day"
                 $stats   = $this->calcStats(
                     (clone $att)->fill(['clock_in' => $clockIn]),
                     $user->schedule_start,
-                    $user->schedule_end
+                    $user->schedule_end,
+                    ! $extraDay
                 );
 
                 $att->update([
+                    'is_extra_day'       => $extraDay,
                     'clock_in'           => $clockIn,
                     'clock_in_latitude'  => $request->input('latitude'),
                     'clock_in_longitude' => $request->input('longitude'),
@@ -715,7 +756,7 @@ class AttendanceController extends Controller
         $user = $request->user();
 
         // HR staff are clocked out by the Owner — they cannot self-clock
-        if ($user->role === 'seller_staff' && $user->sub_role === 'hr') {
+        if (self::isHr($user)) {
             abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
         }
 
@@ -777,7 +818,7 @@ class AttendanceController extends Controller
         ]);
         RiderLoadService::releaseVehicle($att->vehicle_id);   // the vehicle is free for the next rider
 
-        $stats = $this->calcStats($att->fresh(), $user->schedule_start, $user->schedule_end);
+        $stats = $this->calcStats($att->fresh(), $user->schedule_start, $user->schedule_end, ! $att->is_extra_day);
 
         $att->update([
             'status'         => $stats['status'],

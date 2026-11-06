@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import StaffDocumentsCard, { type StaffDocumentRow } from '@/components/staff-documents-card';
 import { fmtDate } from '@/lib/utils';
+import { fmtWorkDays } from '@/components/staff-roles';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -26,6 +27,10 @@ interface StaffMember {
     email: string;
     phone: string | null;
     sub_role: string;
+    role_names?: string[];
+    work_days?: number[];
+    schedule_start?: string | null;
+    schedule_end?: string | null;
     is_active: boolean;
     /** The store's only rider who can deliver */
     is_last_eligible_rider?: boolean;
@@ -148,15 +153,15 @@ function PermissionManager({
                 <div className="flex items-center justify-between flex-wrap gap-3">
                     <CardTitle className="text-base flex items-center gap-2">
                         <Shield className="h-4 w-4 text-blue-500" />
-                        Permission Manager
+                        Extra access for this person (optional)
                         <span className="text-xs font-normal text-muted-foreground ml-1">
-                            Role: <span className="capitalize font-medium">{SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role}</span>
+                            Roles: <span className="font-medium">{staff.role_names?.length ? staff.role_names.join(', ') : (SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role)}</span>
                         </span>
                     </CardTitle>
                     <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={handleReset} disabled={resetting || saving} className="text-gray-600">
                             <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                            {resetting ? 'Resetting…' : 'Reset to Role Defaults'}
+                            {resetting ? 'Resetting…' : 'Only the roles (remove extra access)'}
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={saving || resetting} className="bg-blue-600 hover:bg-blue-700 text-white">
                             <Save className="mr-1.5 h-3.5 w-3.5" />
@@ -271,9 +276,10 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                                         </span>
                                         {staff.paused_by_plan && <span className={PAUSED_BADGE}>Paused — over plan limit</span>}
                                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[staff.sub_role] ?? 'bg-gray-100 text-gray-600'}`}>
-                                            {SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role}
+                                            {staff.role_names?.length ? staff.role_names.join(', ') : (SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role)}
                                         </span>
                                     </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">Work days: {fmtWorkDays(staff.work_days)}</p>
                                     <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                         <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{staff.email}</span>
                                         {staff.phone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{staff.phone}</span>}

@@ -49,6 +49,16 @@ export type Auth = {
     seller_application: SellerApplication;
     /** Customers only: false = never verified and no orders yet (history pages locked too) */
     has_customer_history?: boolean | null;
+    /** The user's home page (User::homeUrl on the server) */
+    home_url?: string;
+    /** Store staff: names of their roles */
+    role_names?: string[];
+    /** Rider who also has a store-portal role: "Switch to Store Portal" / "Switch to Rider App" */
+    can_switch_portal?: boolean;
+    /** Store staff: first store-portal page they can open */
+    store_portal_url?: string | null;
+    /** Store staff who clock in themself (everyone except HR) */
+    self_clock?: boolean;
 };
 
 export type TwoFactorSetupData = {

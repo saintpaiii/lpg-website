@@ -47,7 +47,7 @@ function homeUrl(role: string, subRole: string | null | undefined, permissions: 
 export default function Forbidden() {
     const { auth } = usePage<SharedData>().props;
     const href = auth?.user
-        ? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions)
+        ? (auth.home_url ?? homeUrl(auth.user.role, auth.user.sub_role, auth.permissions))
         : '/';
 
     return (

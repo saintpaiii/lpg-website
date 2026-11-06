@@ -24,6 +24,7 @@ class Attendance extends Model
         'status',
         'overtime_hours',
         'is_late',
+        'is_extra_day',   // clocked in on a day off (paid normally)
         'notes',
         'vehicle_id',
     ];
@@ -36,6 +37,7 @@ class Attendance extends Model
             'clock_out'      => 'datetime',
             'overtime_hours'      => 'decimal:2',
             'is_late'             => 'boolean',
+            'is_extra_day'        => 'boolean',
             'clock_in_latitude'   => 'decimal:7',
             'clock_in_longitude'  => 'decimal:7',
             'clock_out_latitude'  => 'decimal:7',

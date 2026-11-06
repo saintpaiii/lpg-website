@@ -31,7 +31,7 @@ class EnsureIsAdmin
 
         // Store owners and store staff (incl. riders) never use the admin area — send them to their own home.
         if (in_array($user->role, ['seller', 'seller_staff'], true) && ! $user->isAdmin()) {
-            return redirect($user->sellerHomeUrl())->with('error', 'That page is for platform administrators only.');
+            return redirect($user->homeUrl())->with('error', 'That page is for platform administrators only.');
         }
 
         // Standard staff roles always have access (includes platform_admin; legacy manager / cashier / warehouse).

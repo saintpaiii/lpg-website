@@ -151,26 +151,7 @@ class OtpController extends Controller
 
     private function dashboardRoute($user): string
     {
-        return match (true) {
-            in_array($user->role, ['platform_admin', 'admin', 'manager'])
-                => route('admin.dashboard'),
-            $user->role === 'seller'
-                => route('seller.dashboard'),
-            $user->role === 'seller_staff' && $user->sub_role === 'rider'
-                => route('rider.deliveries'),
-            $user->role === 'seller_staff' && $user->sub_role === 'warehouse'
-                => route('seller.inventory'),
-            $user->role === 'seller_staff'
-                => route('seller.invoices'),
-            $user->role === 'cashier'
-                => route('admin.invoices'),
-            $user->role === 'warehouse'
-                => route('admin.dashboard'),
-            $user->role === 'rider'
-                => route('rider.deliveries'),
-            default
-                => route('customer.dashboard'),
-        };
+        return $user->homeUrl();
     }
 
     /**

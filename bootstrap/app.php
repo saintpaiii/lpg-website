@@ -49,6 +49,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'password.changed' => EnsurePasswordChanged::class,
             'id.verified'      => \App\Http\Middleware\EnsureIdVerified::class,
             'plan.feature'     => \App\Http\Middleware\RequirePlanFeature::class,
+            'module'           => \App\Http\Middleware\RequireModule::class,   // store-portal module access (Off / View only / Full)
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

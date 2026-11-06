@@ -17,40 +17,10 @@ class LandingController extends Controller
     {
         // Redirect already-authenticated users to their respective dashboards
         if ($user = $request->user()) {
-            $redirect = match (true) {
-                $user->role === 'platform_staff'
-                    => redirect($user->platformStaffHomeUrl()),
-
-                in_array($user->role, ['platform_admin', 'admin', 'manager'])
-                    => redirect()->route('admin.dashboard'),
-
-                $user->role === 'seller'
-                    => redirect()->route('seller.dashboard'),
-
-                $user->role === 'seller_staff' && $user->sub_role === 'rider'
-                    => redirect()->route('rider.deliveries'),
-
-                $user->role === 'seller_staff' && $user->sub_role === 'warehouse'
-                    => redirect()->route('seller.inventory'),
-
-                $user->role === 'seller_staff'
-                    => redirect()->route('seller.invoices'),
-
-                $user->role === 'cashier'
-                    => redirect()->route('admin.invoices'),
-
-                $user->role === 'warehouse'
-                    => redirect()->route('admin.dashboard'),
-
-                $user->role === 'rider'
-                    => redirect()->route('rider.deliveries'),
-
-                $user->role === 'customer'
-                    => redirect()->route('customer.dashboard'),
-
-                default => null,
-            };
-            if ($redirect) return $redirect;
+            $known = ['platform_staff', 'platform_admin', 'admin', 'manager', 'seller', 'seller_staff', 'cashier', 'warehouse', 'rider', 'customer'];
+            if (in_array($user->role, $known, true)) {
+                return redirect($user->homeUrl());
+            }
         }
 
         // Products of stores customers can see — Featured stores (Premium plan / trial) first

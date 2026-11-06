@@ -38,6 +38,8 @@ interface UserDetail {
     phone: string | null;
     role: string;
     sub_role: string | null;
+    /** Store staff: names of their store roles */
+    role_names?: string[] | null;
     is_active: boolean;
     id_verified: boolean;
     valid_id: string | null;
@@ -96,7 +98,7 @@ function RoleBadge({ user }: { user: UserDetail }) {
     } else if (user.role === 'seller') {
         parts.push({ label: 'Seller', cls: 'bg-emerald-100 text-emerald-700' });
     } else if (user.role === 'seller_staff') {
-        parts.push({ label: user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
+        parts.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
     } else if (user.role === 'platform_staff') {
         parts.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 text-violet-700' });
     } else if (PLATFORM_ROLES.includes(user.role)) {

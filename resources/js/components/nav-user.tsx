@@ -56,7 +56,8 @@ export function NavUser() {
             return { label: 'Owner', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' };
         }
         if (user.role === 'seller_staff') {
-            const label = sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff';
+            // The names of their store roles (e.g. "Delivery Boy, Counter")
+            const label = auth.role_names?.length ? auth.role_names.join(', ') : (sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff');
             return { label, className: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' };
         }
         if (user.role === 'rider') {

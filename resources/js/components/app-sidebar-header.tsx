@@ -49,7 +49,8 @@ export function AppSidebarHeader({ breadcrumbs = [] }: Props) {
             return { label: 'Owner', className: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300' };
         }
         if (user.role === 'seller_staff') {
-            const label = sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff';
+            // The names of their store roles (e.g. "Delivery Boy, Counter")
+            const label = auth.role_names?.length ? auth.role_names.join(', ') : (sub ? sub.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Staff');
             const colors: Record<string, string> = {
                 rider:     'bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-950 dark:text-orange-300',
                 cashier:   'bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-300',

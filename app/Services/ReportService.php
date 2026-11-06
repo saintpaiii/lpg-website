@@ -83,12 +83,12 @@ class ReportService
             && (in_array($r->route, ['store', 'both'], true) || in_array($r->reporter_side, ['store', 'rider'], true));
     }
 
-    /** Owner, or staff of that store (not riders) with customer_reports.manage. */
+    /** Owner, or staff of that store (not riders) who may see Customer Reports (view or manage). */
     public static function isStoreHandler(User $u, ?int $storeId): bool
     {
         return $storeId !== null
             && ChatService::storeIdFor($u) === $storeId
-            && ($u->role === 'seller' || $u->hasPermission('customer_reports.manage'));
+            && ($u->role === 'seller' || $u->hasPermission('customer_reports.view') || $u->hasPermission('customer_reports.manage'));
     }
 
     public static function canView(UserReport $r, User $u): bool

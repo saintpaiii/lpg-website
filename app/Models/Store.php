@@ -204,6 +204,9 @@ class Store extends Model
 
     protected static function booted(): void
     {
+        // Every new store starts with the 4 starter staff roles (Cashier, Warehouse, Rider, HR)
+        static::created(fn (Store $store) => \App\Services\StoreRoleService::seedStarters($store));
+
         // Newly approved stores start with the default chat quick replies
         static::saved(function (Store $store) {
             if ($store->status === 'approved' && ($store->wasRecentlyCreated || $store->wasChanged('status'))) {

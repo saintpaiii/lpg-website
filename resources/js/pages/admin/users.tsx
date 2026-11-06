@@ -19,6 +19,8 @@ interface UserRow {
     email: string;
     role: string;
     sub_role: string | null;
+    /** Store staff: names of their store roles */
+    role_names?: string[] | null;
     is_active: boolean;
     id_verified: boolean;
     created_at: string;
@@ -51,7 +53,7 @@ function RoleBadges({ user }: { user: UserRow }) {
     } else if (user.role === 'seller') {
         badges.push({ label: 'Seller', cls: 'bg-emerald-100 text-emerald-700' });
     } else if (user.role === 'seller_staff') {
-        badges.push({ label: user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
+        badges.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
     } else if (user.role === 'platform_staff') {
         badges.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 text-violet-700' });
     } else if (['platform_admin', 'admin', 'manager', 'cashier', 'warehouse', 'rider'].includes(user.role)) {

@@ -34,7 +34,7 @@ class RequirePlanFeature
         // Not back(): a bookmark has no referrer
         $home = $user->role === 'seller'
             ? '/seller/plan?choose=' . SubscriptionService::requiredPlanKey($feature)
-            : ($user->sellerHomeUrl() ?? '/');
+            : $user->homeUrl();
 
         return redirect($home)->with('error', $message);
     }

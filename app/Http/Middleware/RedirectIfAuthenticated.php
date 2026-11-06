@@ -30,21 +30,6 @@ class RedirectIfAuthenticated
             return '/';
         }
 
-        if ($user->role === 'seller_staff') {
-            return match ($user->sub_role) {
-                'rider'     => '/rider/deliveries',
-                'warehouse' => '/seller/inventory',
-                default     => '/seller/dashboard',
-            };
-        }
-
-        return match ($user->role) {
-            'platform_admin', 'admin', 'manager' => '/admin/dashboard',
-            'cashier'                             => '/admin/invoices',
-            'warehouse'                           => '/admin/dashboard',
-            'rider'                               => '/rider/deliveries',
-            'seller'                              => '/seller/dashboard',
-            default                               => '/customer/dashboard',
-        };
+        return $user->role === 'customer' ? '/customer/dashboard' : $user->homeUrl();
     }
 }

@@ -14,6 +14,7 @@ type StaffRate = {
     id: number;
     name: string;
     sub_role: string;
+    role_names?: string[];
     daily_rate_override: number;
 };
 
@@ -172,7 +173,7 @@ export default function PayrollSettingsPage({ settings, pay_rates, staff_rates }
                                         {staff_rates.map(s => (
                                             <tr key={s.id}>
                                                 <td className="px-4 py-2 font-medium text-gray-800">{s.name}</td>
-                                                <td className="px-4 py-2 capitalize text-gray-500">{s.sub_role}</td>
+                                                <td className="px-4 py-2 text-gray-500">{s.role_names?.length ? s.role_names.join(', ') : s.sub_role}</td>
                                                 <td className="px-4 py-2 text-right font-semibold text-blue-700">
                                                     ₱{Number(s.daily_rate_override).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                 </td>

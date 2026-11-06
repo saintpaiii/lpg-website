@@ -37,13 +37,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { ReasonPicker } from '@/components/reason-picker';
 import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
 import { toast } from 'sonner';
+import { DEFAULT_WORK_DAYS, fmtWorkDays, RolesChecklist, RolesTab, WorkDaysPicker, type ModuleDef, type StoreRoleRow } from '@/components/staff-roles';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -56,6 +56,11 @@ type StaffMember = {
     email: string;
     phone: string | null;
     sub_role: string;
+    /** Names / ids of their store roles */
+    role_names?: string[];
+    role_ids?: number[];
+    /** ISO weekdays 1=Mon…7=Sun */
+    work_days?: number[];
     schedule_start: string | null;
     schedule_end: string | null;
     is_active: boolean;
@@ -87,6 +92,11 @@ type Props = {
     filters: { search?: string };
     /** Only right after creating an account whose welcome email failed (shown once). */
     tempCredentials?: { name: string; email: string; password: string } | null;
+    /** The store's roles (Roles tab + the Add / Edit form) */
+    roles?: StoreRoleRow[];
+    /** Pro plan and up (or the trial): roles can be created / edited / deleted */
+    canEditRoles?: boolean;
+    modules?: ModuleDef[];
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -125,10 +135,20 @@ const SUB_ROLE_STYLES: Record<string, string> = {
 
 // ── Small components ───────────────────────────────────────────────────────────
 
-function RoleBadge({ role }: { role: string }) {
+/** "08:00" / "08:00 AM" → "8:00 AM" */
+function fmtTime(t: string): string {
+    const m = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?$/i);
+    if (!m) return t;
+    let h = parseInt(m[1], 10);
+    const ap = m[3]?.toUpperCase() ?? (h >= 12 ? 'PM' : 'AM');
+    if (!m[3]) h = h % 12 || 12;
+    return `${h}:${m[2]} ${ap}`;
+}
+
+function RoleBadge({ role, names }: { role: string; names?: string[] }) {
     return (
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-gray-100 text-gray-600'}`}>
-            {SUB_ROLE_LABELS[role] ?? role}
+            {names?.length ? names.join(', ') : (SUB_ROLE_LABELS[role] ?? role)}
         </span>
     );
 }
@@ -177,13 +197,20 @@ function StaffFormDialog({
     open,
     onClose,
     editTarget,
+    roles,
 }: {
     open: boolean;
     onClose: () => void;
     editTarget: StaffMember | null;
+    roles: StoreRoleRow[];
 }) {
     const isEdit = !!editTarget;
-    const [defaultRole] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === 'rider' ? 'rider' : 'cashier'));
+    // "Add a rider" (store hidden banner) pre-selects the Rider starter role, otherwise Cashier
+    const [defaultRoles] = useState<number[]>(() => {
+        const key = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === 'rider' ? 'rider' : 'cashier';
+        const r = roles.find((x) => x.starter_key === key);
+        return r ? [r.id] : [];
+    });
 
     // Normalise stored time to HH:MM (24-hour) for <input type="time">.
     // DB may store "05:30 AM" (12-hour); the time input only accepts "HH:MM".
@@ -205,7 +232,8 @@ function StaffFormDialog({
         last_name: string;
         email: string;
         phone: string;
-        sub_role: string;
+        role_ids: number[];
+        work_days: number[];
         schedule_start: string;
         schedule_end: string;
     }>({
@@ -214,7 +242,8 @@ function StaffFormDialog({
         last_name:      editTarget?.last_name      ?? '',
         email:          editTarget?.email          ?? '',
         phone:          editTarget?.phone          ?? '',
-        sub_role:       editTarget?.sub_role       ?? defaultRole,
+        role_ids:       editTarget?.role_ids       ?? defaultRoles,
+        work_days:      editTarget?.work_days      ?? DEFAULT_WORK_DAYS,
         schedule_start: toHHMM(editTarget?.schedule_start),
         schedule_end:   toHHMM(editTarget?.schedule_end),
     });
@@ -226,7 +255,8 @@ function StaffFormDialog({
             last_name:      editTarget.last_name      ?? '',
             email:          editTarget.email,
             phone:          editTarget.phone          ?? '',
-            sub_role:       editTarget.sub_role,
+            role_ids:       editTarget.role_ids ?? [],
+            work_days:      editTarget.work_days ?? DEFAULT_WORK_DAYS,
             schedule_start: toHHMM(editTarget.schedule_start),
             schedule_end:   toHHMM(editTarget.schedule_end),
         });
@@ -297,18 +327,12 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>Role <span className="text-red-500">*</span></Label>
-                        <Select value={data.sub_role} onValueChange={(v) => setData('sub_role', v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="cashier">Cashier</SelectItem>
-                                <SelectItem value="warehouse">Warehouse</SelectItem>
-                                <SelectItem value="rider">Rider</SelectItem>
-                                <SelectItem value="hr">HR</SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {errors.sub_role && <p className="text-xs text-red-500">{errors.sub_role}</p>}
-                        {isEdit && editTarget?.is_last_eligible_rider && data.sub_role !== 'rider' && <LastRiderWarning />}
+                        <Label>Roles <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(one or more)</span></Label>
+                        <RolesChecklist roles={roles} value={data.role_ids} onChange={(ids) => setData('role_ids', ids)} />
+                        {(errors.role_ids || (errors as Record<string, string>)['role_ids.0']) && (
+                            <p className="text-xs text-red-500">{errors.role_ids ?? (errors as Record<string, string>)['role_ids.0']}</p>
+                        )}
+                        {isEdit && editTarget?.is_last_eligible_rider && !roles.some((r) => r.is_rider && data.role_ids.includes(r.id)) && <LastRiderWarning />}
                     </div>
 
                     {/* Work schedule */}
@@ -335,9 +359,16 @@ function StaffFormDialog({
                         </div>
                     </div>
 
+                    <div className="grid gap-1.5">
+                        <Label>Work days</Label>
+                        <WorkDaysPicker value={data.work_days} onChange={(d) => setData('work_days', d)} />
+                        <p className="text-xs text-gray-400">Other days show as "Day off" (never absent). Clocking in on a day off is allowed and counted as an extra day.</p>
+                        {errors.work_days && <p className="text-xs text-red-500">{errors.work_days}</p>}
+                    </div>
+
                     {!isEdit && (
                         <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                            Password defaults to their last name (lowercase). They will be asked to change it on first login. Login credentials will be emailed to them.
+                            A random password is emailed to them. They will be asked to change it on first login.
                         </div>
                     )}
 
@@ -438,7 +469,7 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials }: Props) {
+export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials, roles = [], canEditRoles = false, modules = [] }: Props) {
     const [creds, setCreds] = useState(tempCredentials ?? null);
     useEffect(() => { if (tempCredentials) setCreds(tempCredentials); }, [tempCredentials]);
     const [formOpen, setFormOpen]               = useState(false);
@@ -593,7 +624,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 {/* Tabs */}
                 <div className="border-b border-gray-200">
                     <nav className="-mb-px flex gap-6">
-                        {['active', 'paused', 'archived'].map((t) => (
+                        {['active', 'paused', 'archived', 'roles'].map((t) => (
                             <button key={t} onClick={() => switchTab(t)}
                                 className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors capitalize flex items-center gap-1.5 ${
                                     tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -610,6 +641,9 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                     </nav>
                 </div>
 
+                {tab === 'roles' && <RolesTab roles={roles} modules={modules} canEdit={canEditRoles} />}
+
+                {tab !== 'roles' && (<>
                 {/* Search */}
                 <form onSubmit={applySearch} className="flex gap-2 max-w-sm">
                     <div className="relative flex-1">
@@ -661,8 +695,11 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <RoleBadge role={s.sub_role} />
+                                                    <RoleBadge role={s.sub_role} names={s.role_names} />
                                                     {s.license_status && <LicenseBadge status={s.license_status} />}
+                                                    <p className="mt-1 text-xs text-gray-400">
+                                                        {fmtWorkDays(s.work_days)}{s.schedule_start && s.schedule_end ? ` · ${fmtTime(s.schedule_start)}–${fmtTime(s.schedule_end)}` : ''}
+                                                    </p>
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-gray-500">{s.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">
@@ -726,9 +763,10 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                         <Pagination data={staff} onVisit={(url) => router.visit(url, { preserveState: true })} />
                     </CardContent>
                 </Card>
+                </>)}
             </div>
 
-            <StaffFormDialog open={formOpen} onClose={() => { setFormOpen(false); setEditTarget(null); }} editTarget={editTarget} />
+            <StaffFormDialog open={formOpen} onClose={() => { setFormOpen(false); setEditTarget(null); }} editTarget={editTarget} roles={roles} />
             <ArchiveDialog target={archiveTarget} onClose={() => setArchiveTarget(null)} />
             <ForceDeleteDialog target={forceTarget} onClose={() => setForceTarget(null)} />
 

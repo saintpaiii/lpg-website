@@ -49,6 +49,9 @@ type AttendanceRow = {
     missing_clock_out: boolean;
     clock_in_distance: number | null;
     clock_in_manual: boolean;
+    /** Clocked in on a day off (paid normally) */
+    is_extra_day?: boolean;
+    role_names?: string[];
 };
 
 type Summary = {
@@ -158,10 +161,10 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-function RoleBadge({ role }: { role: string }) {
+function RoleBadge({ role, names }: { role: string; names?: string[] }) {
     return (
         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-gray-100 text-gray-600'}`}>
-            {SUB_ROLE_LABELS[role] ?? role}
+            {names?.length ? names.join(', ') : (SUB_ROLE_LABELS[role] ?? role)}
         </span>
     );
 }
@@ -281,8 +284,8 @@ function SetClockOutDialog({ row, date, onClose }: { row: AttendanceRow; date: s
 
 export default function AttendancePage({ rows, date, summary, store_location, rider_vehicles = [] }: Props) {
     const { auth } = usePage<SharedData>().props;
-    const canManage = auth.user.role === 'seller'
-        || (auth.user.role === 'seller_staff' && (auth.user as any).sub_role === 'hr');
+    // Owner, or staff with Full access to "Attendance of other staff"
+    const canManage = auth.user.role === 'seller' || auth.permissions.includes('attendance.manage');
 
     const today   = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD in local time
     const isToday = date === today;
@@ -374,7 +377,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                 <td className="px-4 py-3">
                                                     <p className="font-medium text-gray-900">{row.name}</p>
                                                     <div className="mt-0.5">
-                                                        <RoleBadge role={row.sub_role} />
+                                                        <RoleBadge role={row.sub_role} names={row.role_names} />
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
@@ -416,6 +419,9 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                 <td className="px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center gap-0.5">
                                                         <StatusBadge status={row.status} />
+                                                        {row.is_extra_day && (
+                                                            <span title="Clocked in on a day off — paid like any worked day" className="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">Extra day</span>
+                                                        )}
                                                         {row.is_late && row.status !== 'late' && (
                                                             <span className="text-xs text-yellow-600 font-medium">Late arrival</span>
                                                         )}
