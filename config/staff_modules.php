@@ -12,6 +12,9 @@
  * 'actions' = route name → the permission a WRITE on that route needs (checked by the module middleware on top of
  * the module level), so a single extra permission (e.g. inventory.stock_in) allows exactly that action.
  * Write routes not listed here need any non-view permission of the module.
+ *
+ * 'feature' = the plan feature (config/plans.php) the module needs. Without it a role can't be given the module
+ * (StoreRoleController refuses raising it above the level the role already had).
  */
 return [
     'modules' => [
@@ -95,6 +98,7 @@ return [
             'label'       => 'DSS Insights',
             'description' => 'Demand forecasts and restock suggestions (Premium plan).',
             'permissions' => ['dss.view', 'dss.manage'],
+            'feature'     => 'dss',
         ],
         'settings' => [
             'label'       => 'Store Settings',
@@ -110,12 +114,14 @@ return [
             'label'       => 'Payroll',
             'description' => 'Payslips (Pro plan). Full access can generate payroll; releasing, paying and settings stay with the owner.',
             'permissions' => ['payroll.view', 'payroll.manage'],
+            'feature'     => 'payroll',
         ],
         'loyalty_customers' => [
             'label'       => 'Loyal customers list',
             'description' => 'Loyalty tiers and trust scores of customers (Pro plan).',
             'permissions' => ['loyalty_customers.view'],
             'view_only'   => true,
+            'feature'     => 'loyalty',
         ],
     ],
 

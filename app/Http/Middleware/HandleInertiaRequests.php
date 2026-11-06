@@ -133,6 +133,8 @@ class HandleInertiaRequests extends Middleware
                 'warning'              => fn () => $request->session()->get('warning'),
 'deactivation_info'    => fn () => $request->session()->get('deactivation_info'),
                 'store_suspension_info'=> fn () => $request->session()->get('store_suspension_info'),
+                // Id of a role just created from the Add / Edit Staff form (ticked there automatically)
+                'created_role_id'      => fn () => $request->session()->get('created_role_id'),
             ],
             // Sellers can also use the customer portal (they can shop too)
             'cart_count' => $user && in_array($user->role, ['customer', 'seller'])

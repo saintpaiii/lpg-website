@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\Controller;
+use App\Models\Store;
 use App\Models\StoreRole;
 use App\Services\StaffAccess;
 use App\Services\StoreRoleService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,18 +21,19 @@ class StoreRoleController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $store = $request->attributes->get('seller_store');
-        $data  = $this->validated($request, $store->id);
+        $data  = $this->validated($request, $store);
 
         $role = StoreRoleService::save(new StoreRole(['store_id' => $store->id]), $data['name'], (bool) ($data['is_rider'] ?? false), $data['modules'] ?? []);
 
-        return back()->with('success', "Role \"{$role->name}\" created.");
+        // The Add / Edit Staff form ticks the new role right away
+        return back()->with('success', "Role \"{$role->name}\" created.")->with('created_role_id', $role->id);
     }
 
     public function update(Request $request, StoreRole $role): RedirectResponse
     {
         $store = $request->attributes->get('seller_store');
         abort_unless($role->store_id === $store->id, 403);
-        $data = $this->validated($request, $store->id, $role->id);
+        $data = $this->validated($request, $store, $role->id, $role->levels());
 
         StoreRoleService::save($role, $data['name'], (bool) ($data['is_rider'] ?? false), $data['modules'] ?? []);
 
@@ -57,8 +60,12 @@ class StoreRoleController extends Controller
         return back()->with('success', "Role \"{$name}\" deleted.");
     }
 
-    private function validated(Request $request, int $storeId, ?int $ignoreId = null): array
+    /**
+     * @param  array<string, string>  $savedLevels  module => level the role already has (update only)
+     */
+    private function validated(Request $request, Store $store, ?int $ignoreId = null, array $savedLevels = []): array
     {
+        $storeId = $store->id;
         $data = $request->validate([
             'name'      => ['required', 'string', 'max:40'],
             'is_rider'  => ['boolean'],
@@ -85,6 +92,23 @@ class StoreRoleController extends Controller
 
         $data['name']    = $name;
         $data['modules'] = array_filter($data['modules'] ?? [], fn ($l) => in_array($l, StaffAccess::LEVELS, true));
+
+        // Modules the plan doesn't have (e.g. DSS on Pro): keeping or lowering the saved level is fine, raising is not
+        $rank = ['off' => 0, 'view' => 1, 'full' => 2];
+        foreach (StaffAccess::modules() as $key => $def) {
+            $feature = $def['feature'] ?? null;
+            if (! $feature || SubscriptionService::hasFeature($store, $feature)) {
+                continue;
+            }
+            $wanted = $rank[$data['modules'][$key] ?? 'off'];
+            $saved  = $rank[$savedLevels[$key] ?? 'off'] ?? 0;
+            if ($wanted > $saved) {
+                $plan = in_array($feature, config('plans.features.pro', []), true) ? 'Pro' : 'Premium';
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'modules' => "{$def['label']} needs the {$plan} plan.",
+                ]);
+            }
+        }
 
         return $data;
     }

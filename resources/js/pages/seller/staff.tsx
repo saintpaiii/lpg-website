@@ -6,7 +6,9 @@ import {
     Pencil,
     Plus,
     RotateCcw,
+    Lock,
     Search,
+    ShieldCheck,
     Trash2,
     Truck,
     UserCheck,
@@ -43,7 +45,8 @@ import type { BreadcrumbItem } from '@/types';
 import { ReasonPicker } from '@/components/reason-picker';
 import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
 import { toast } from 'sonner';
-import { DEFAULT_WORK_DAYS, fmtWorkDays, RolesChecklist, RolesTab, WorkDaysPicker, type ModuleDef, type StoreRoleRow } from '@/components/staff-roles';
+import { DEFAULT_WORK_DAYS, fmtWorkDays, RoleEditor, RolesChecklist, RolesTab, WorkDaysPicker, type ModuleDef, type RoleTemplate, type StoreRoleRow } from '@/components/staff-roles';
+import { openUpgrade } from '@/lib/plans';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -97,6 +100,8 @@ type Props = {
     /** Pro plan and up (or the trial): roles can be created / edited / deleted */
     canEditRoles?: boolean;
     modules?: ModuleDef[];
+    /** Starter role definitions — "Start from" when creating a role */
+    templates?: RoleTemplate[];
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -198,13 +203,21 @@ function StaffFormDialog({
     onClose,
     editTarget,
     roles,
+    modules,
+    canEditRoles,
+    templates,
 }: {
     open: boolean;
     onClose: () => void;
     editTarget: StaffMember | null;
     roles: StoreRoleRow[];
+    modules: ModuleDef[];
+    canEditRoles: boolean;
+    templates: RoleTemplate[];
 }) {
     const isEdit = !!editTarget;
+    // "+ Create a new role" — RoleEditor opened on top of this dialog
+    const [creatingRole, setCreatingRole] = useState(false);
     // "Add a rider" (store hidden banner) pre-selects the Rider starter role, otherwise Cashier
     const [defaultRoles] = useState<number[]>(() => {
         const key = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === 'rider' ? 'rider' : 'cashier';
@@ -275,9 +288,18 @@ function StaffFormDialog({
         }
     }
 
-    function handleClose() { reset(); onClose(); }
+    function handleClose() { setCreatingRole(false); reset(); onClose(); }
+
+    function createRole() {
+        if (!canEditRoles) {
+            openUpgrade('custom_roles');
+            return;
+        }
+        setCreatingRole(true);
+    }
 
     return (
+        <>
         <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
             <DialogContent className="max-w-lg">
                 <DialogHeader>
@@ -329,6 +351,11 @@ function StaffFormDialog({
                     <div className="grid gap-1.5">
                         <Label>Roles <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(one or more)</span></Label>
                         <RolesChecklist roles={roles} value={data.role_ids} onChange={(ids) => setData('role_ids', ids)} />
+                        <button type="button" onClick={createRole}
+                            className="inline-flex items-center gap-1 justify-self-start text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+                            {canEditRoles ? <Plus className="h-3.5 w-3.5" /> : <Lock className="h-3 w-3" />} Create a new role
+                            {!canEditRoles && <span className="rounded bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800">Pro</span>}
+                        </button>
                         {(errors.role_ids || (errors as Record<string, string>)['role_ids.0']) && (
                             <p className="text-xs text-red-500">{errors.role_ids ?? (errors as Record<string, string>)['role_ids.0']}</p>
                         )}
@@ -382,6 +409,15 @@ function StaffFormDialog({
                 </form>
             </DialogContent>
         </Dialog>
+
+        {/* Outside the staff <form> (and its Dialog) so "Create role" can't submit the staff form */}
+        {creatingRole && (
+            <RoleEditor key="staff-form-new-role" role={null} modules={modules} canEdit={canEditRoles} open
+                templates={templates} roles={roles}
+                onCreated={(id) => setData((prev) => ({ ...prev, role_ids: prev.role_ids.includes(id) ? prev.role_ids : [...prev.role_ids, id] }))}
+                onClose={() => setCreatingRole(false)} />
+        )}
+        </>
     );
 }
 
@@ -469,7 +505,7 @@ function ForceDeleteDialog({ target, onClose }: { target: StaffMember | null; on
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials, roles = [], canEditRoles = false, modules = [] }: Props) {
+export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0, planLimit, filters, tempCredentials, roles = [], canEditRoles = false, modules = [], templates = [] }: Props) {
     const [creds, setCreds] = useState(tempCredentials ?? null);
     useEffect(() => { if (tempCredentials) setCreds(tempCredentials); }, [tempCredentials]);
     const [formOpen, setFormOpen]               = useState(false);
@@ -566,19 +602,27 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 )}
 
                 {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
                         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <Users className="h-6 w-6 text-blue-600" />
                             Staff Management
                         </h1>
                         <p className="mt-0.5 text-sm text-gray-500">Manage your store's staff accounts and permissions.</p>
+                        <p className="mt-0.5 text-xs text-gray-400">
+                            Create roles like “Delivery Boy” or “Counter + Stock” in Manage Roles, then give them to your staff.
+                        </p>
                     </div>
-                    {!isArchived && (
-                        <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            <Plus className="mr-1.5 h-4 w-4" /> Add Staff
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => switchTab('roles')}>
+                            <ShieldCheck className="mr-1.5 h-4 w-4 text-blue-600" /> Manage Roles ({roles.length})
                         </Button>
-                    )}
+                        {!isArchived && (
+                            <Button onClick={openAdd} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                <Plus className="mr-1.5 h-4 w-4" /> Add Staff
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <PlanLimitBar label="Staff accounts" planLimit={planLimit} />
@@ -629,7 +673,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                 className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors capitalize flex items-center gap-1.5 ${
                                     tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
                                 }`}>
-                                {t === 'paused' ? 'Paused (plan)' : t}
+                                {t === 'paused' ? 'Paused (plan)' : t === 'roles' ? `Roles (${roles.length})` : t}
                                 {t === 'archived' && archivedCount > 0 && (
                                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{archivedCount}</span>
                                 )}
@@ -641,7 +685,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                     </nav>
                 </div>
 
-                {tab === 'roles' && <RolesTab roles={roles} modules={modules} canEdit={canEditRoles} />}
+                {tab === 'roles' && <RolesTab roles={roles} modules={modules} canEdit={canEditRoles} templates={templates} />}
 
                 {tab !== 'roles' && (<>
                 {/* Search */}
@@ -766,7 +810,8 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 </>)}
             </div>
 
-            <StaffFormDialog open={formOpen} onClose={() => { setFormOpen(false); setEditTarget(null); }} editTarget={editTarget} roles={roles} />
+            <StaffFormDialog open={formOpen} onClose={() => { setFormOpen(false); setEditTarget(null); }} editTarget={editTarget} roles={roles}
+                modules={modules} canEditRoles={canEditRoles} templates={templates} />
             <ArchiveDialog target={archiveTarget} onClose={() => setArchiveTarget(null)} />
             <ForceDeleteDialog target={forceTarget} onClose={() => setForceTarget(null)} />
 

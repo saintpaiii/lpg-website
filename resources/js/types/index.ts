@@ -40,6 +40,8 @@ export type SharedData = {
         cart_conflict?: CartConflict | null;
         deactivation_info?: { reason: string | null; notes: string | null } | null;
         store_suspension_info?: { reason: string | null; notes: string | null } | null;
+        /** Id of a role just created (StoreRoleController::store) */
+        created_role_id?: number | null;
     };
     cart_count: number;
     unreadNotifications: number;

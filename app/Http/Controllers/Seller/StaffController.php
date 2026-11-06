@@ -97,7 +97,14 @@ class StaffController extends Controller
             // Staff roles (Roles tab + the Add / Edit form); creating / editing is a Pro feature
             'roles'          => StoreRoleService::listFor($store),
             'canEditRoles'   => StoreRoleService::canEdit($store),
-            'modules'        => collect(StaffAccess::modules())->map(fn ($m, $k) => ['key' => $k, 'label' => $m['label'], 'description' => $m['description'], 'view_only' => (bool) ($m['view_only'] ?? false)])->values(),
+            'modules'        => collect(StaffAccess::modules())->map(fn ($m, $k) => [
+                'key' => $k, 'label' => $m['label'], 'description' => $m['description'],
+                'view_only' => (bool) ($m['view_only'] ?? false), 'feature' => $m['feature'] ?? null,
+            ])->values(),
+            // "Start from" choices of a new role = the starter role definitions
+            'templates'      => collect(config('staff_modules.starters'))->map(fn ($t, $k) => [
+                'key' => $k, 'name' => $t['name'], 'is_rider' => (bool) $t['is_rider'], 'modules' => (object) $t['modules'],
+            ])->values(),
         ]);
     }
 
