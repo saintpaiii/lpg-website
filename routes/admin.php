@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\RefundController;
 use App\Http\Controllers\Admin\SubscriptionController;
 use App\Http\Controllers\Admin\UserReportController;
+use App\Http\Controllers\Admin\ReviewController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -135,6 +136,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     Route::get('refunds', [RefundController::class, 'index'])->name('refunds');
     Route::patch('refunds/{refund}/decide', [RefundController::class, 'decide'])->name('refunds.decide');
 
+    // Reviews moderation (platform admin only — checked in the controller)
+    Route::get('reviews', [ReviewController::class, 'index'])->name('reviews');
+    Route::post('reviews/{rating}/photos/{index}/remove', [ReviewController::class, 'removePhoto'])->whereNumber('index')->name('reviews.remove-photo');
+    Route::delete('reviews/{rating}', [ReviewController::class, 'destroy'])->name('reviews.destroy');
     // User Reports — every action also checks isAdmin() (this group lets sellers/staff in)
     Route::get('user-reports', [UserReportController::class, 'index'])->name('user-reports');
     Route::get('user-reports/export', [UserReportController::class, 'export'])->name('user-reports.export');   // before {userReport}

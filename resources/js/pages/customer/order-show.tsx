@@ -25,6 +25,8 @@ import StoreLocationMap from '@/components/store-location-map';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
 import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
+import { PhotoPicker, PhotoThumbs, ReviewEditDialog, ReviewOwnerActions, photoError, type MyReview } from '@/components/review-photos';
+import { PHOTO_ACCEPT, preparePhotos } from '@/lib/resize-image';
 
 type Payment = {
     id: number;
@@ -83,6 +85,13 @@ type Order = {
     delivered_at: string | null;
     created_at: string;
     rated_product_ids: number[];
+    /** The customer's own reviews on this order (Edit within 7 days, Delete any time) */
+    my_reviews: MyReview[];
+    /** Refund window chosen by the store (days after delivery) */
+    refund_window_days: number;
+    refund_deadline: string | null;
+    refund_window_open: boolean;
+    store_phone: string | null;
     items: {
         id: number;
         product_id: number | null;
@@ -327,7 +336,11 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
         (e) => toast.info(`Order updated: ${statusLabel(e.status, (e as { fulfillment?: string }).fulfillment)}`));
     const canCancel = ['pending', 'confirmed'].includes(order.status) && order.payment_status !== 'paid';
     const hasActiveRefund = !!order.refund_request && ['pending', 'approved', 'processed'].includes(order.refund_request.status);
-    const canRefund = order.status === 'delivered' && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund;
+    // Refund window (set by the store): normal refund while open; a leaking tank can always be reported — even
+    // unpaid (safety; the server doesn't check payment). The server is the source of truth, the UI only hides.
+    const isDelivered = order.status === 'delivered';
+    const canRefund = isDelivered && ['paid', 'partial'].includes(order.payment_status) && !hasActiveRefund && order.refund_window_open;
+    const canReportLeak = isDelivered && !hasActiveRefund && !canRefund;
     const grandTotal = order.total_amount + (order.shipping_fee ?? 0);
     const [cancelOpen,     setCancelOpen]      = useState(false);
     const [cancelReason,   setCancelReason]    = useState('');
@@ -400,7 +413,10 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
     // Rating state
     const [rateOpen, setRateOpen] = useState(false);
     const [ratingSubmitting, setRatingSubmitting] = useState(false);
-    const [ratings, setRatings] = useState<Record<number, { rating: number; review: string }>>({});
+    const [ratings, setRatings] = useState<Record<number, { rating: number; review: string; photos: File[] }>>({});
+    const [ratingErrors, setRatingErrors] = useState<Record<number, string>>({});
+    const [editing, setEditing] = useState<MyReview | null>(null);
+    const myReviewByProduct = new Map((order.my_reviews ?? []).map((r) => [r.product_id, r]));
 
     const unratedItems = order.items.filter(
         (i) => i.product_id !== null && !order.rated_product_ids.includes(i.product_id!)
@@ -408,22 +424,23 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
     const canRate = order.status === 'delivered' && unratedItems.length > 0;
 
     function openRateDialog() {
-        const initial: Record<number, { rating: number; review: string }> = {};
+        const initial: Record<number, { rating: number; review: string; photos: File[] }> = {};
         unratedItems.forEach((item) => {
-            if (item.product_id) initial[item.product_id] = { rating: 0, review: '' };
+            if (item.product_id) initial[item.product_id] = { rating: 0, review: '', photos: [] };
         });
         setRatings(initial);
+        setRatingErrors({});
         setRateOpen(true);
     }
 
     function submitRatings() {
-        const payload = Object.entries(ratings)
-            .filter(([, v]) => v.rating > 0)
-            .map(([productId, v]) => ({
-                product_id: parseInt(productId),
-                rating: v.rating,
-                review: v.review || undefined,
-            }));
+        const rows = Object.entries(ratings).filter(([, v]) => v.rating > 0);
+        const payload = rows.map(([productId, v]) => ({
+            product_id: parseInt(productId),
+            rating: v.rating,
+            review: v.review || '',
+            photos: v.photos,
+        }));
 
         if (payload.length === 0) {
             toast.error('Please rate at least one product.');
@@ -431,9 +448,22 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
         }
 
         setRatingSubmitting(true);
+        setRatingErrors({});
+        // Multipart (photos); errors come back as ratings.{i}.photos.{j} → map {i} to the product row
         router.post(`/customer/orders/${order.id}/rate`, { ratings: payload }, {
-            onSuccess: () => { setRateOpen(false); setRatingSubmitting(false); },
-            onError:   () => { setRatingSubmitting(false); },
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => { setRateOpen(false); },
+            onError: (errs) => {
+                const byProduct: Record<number, string> = {};
+                payload.forEach((p, i) => {
+                    const msg = photoError(errs, `ratings.${i}.photos`) ?? errs[`ratings.${i}.review`] ?? errs[`ratings.${i}.rating`];
+                    if (msg) byProduct[p.product_id] = msg;
+                });
+                setRatingErrors(byProduct);
+                toast.error(errs.general ?? Object.values(byProduct)[0] ?? 'Could not post your review.');
+            },
+            onFinish: () => setRatingSubmitting(false),
         });
     }
 
@@ -445,7 +475,36 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
     const [refundDesc,       setRefundDesc]       = useState('');
     const [refundFiles,      setRefundFiles]      = useState<File[]>([]);
     const [refundSubmitting, setRefundSubmitting] = useState(false);
+    const [refundPreparing,  setRefundPreparing]  = useState(false);
+    const [refundFileNote,   setRefundFileNote]   = useState<string | null>(null);
+    // Refund period ended → only "Leaking tank" can be reported (reason fixed)
+    const [leakOnly,         setLeakOnly]         = useState(false);
     const refundFileRef = useRef<HTMLInputElement>(null);
+
+    function openRefund(onlyLeak: boolean) {
+        setLeakOnly(onlyLeak);
+        setRefundAmount(String(grandTotal));
+        setRefundReason(onlyLeak ? 'leaking' : '');
+        setRefundResolution(onlyLeak ? 'replacement' : '');
+        setRefundDesc(onlyLeak ? 'Smell of gas' : '');
+        setRefundFiles([]);
+        setRefundFileNote(null);
+        setRefundOpen(true);
+    }
+
+    // Evidence photos: same browser resize as review photos (keeps uploads under the PHP limits)
+    async function pickRefundFiles(list: FileList | null) {
+        const picked = Array.from(list ?? []);
+        if (refundFileRef.current) refundFileRef.current.value = '';
+        if (picked.length === 0) return;
+        setRefundPreparing(true);
+        const { files, problems } = await preparePhotos(picked);
+        setRefundPreparing(false);
+        const merged = [...refundFiles, ...files];
+        if (merged.length > 5) problems.push(`Up to 5 photos — ${merged.length - 5} not added.`);
+        setRefundFileNote(problems.length ? problems.join(' ') : null);
+        setRefundFiles(merged.slice(0, 5));
+    }
 
     function submitRefund() {
         if (!refundReason || !refundResolution || !refundDesc.trim() || !refundAmount) return;
@@ -490,7 +549,8 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
     useEffect(() => {
         const url = new URL(window.location.href);
         if (url.searchParams.get('refund') !== '1') return;
-        if (canRefund) { setRefundAmount(String(grandTotal)); setRefundOpen(true); }
+        if (canRefund) openRefund(false);
+        else if (canReportLeak) openRefund(true);
         url.searchParams.delete('refund');
         window.history.replaceState({}, '', url.toString());
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -562,10 +622,21 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 size="sm"
                                 variant="outline"
                                 className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
-                                onClick={() => { setRefundAmount(String(grandTotal)); setRefundOpen(true); }}
+                                onClick={() => openRefund(false)}
                             >
                                 <RefreshCcw className="h-4 w-4" />
                                 Request Refund
+                            </Button>
+                        )}
+                        {canReportLeak && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+                                onClick={() => openRefund(true)}
+                            >
+                                <AlertTriangle className="h-4 w-4" />
+                                Report a leaking tank
                             </Button>
                         )}
                         {order.refund_request && (
@@ -592,6 +663,25 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         )}
                     </div>
                 </div>
+
+                {/* Refund window (days after delivery, set by the store) */}
+                {isDelivered && (
+                    hasActiveRefund ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            You already have an open request — message the store{order.store_phone ? <> or call <a href={`tel:${order.store_phone}`} className="font-medium text-blue-600 hover:underline">{order.store_phone}</a></> : ''}.
+                        </p>
+                    ) : order.refund_window_open ? (
+                        order.refund_deadline && (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                You can request a refund until {order.refund_deadline}.
+                            </p>
+                        )
+                    ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                            The refund period ended on {order.refund_deadline ?? '—'}. A leaking tank can still be reported.
+                        </p>
+                    )
+                )}
 
                 {awaitingPayment && (
                     <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center dark:border-amber-800 dark:bg-amber-950/40">
@@ -716,6 +806,22 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                                     {item.product?.brand && (
                                                         <p className="text-xs text-gray-400">{item.product.brand}</p>
                                                     )}
+                                                    {(() => {
+                                                        const mine = item.product_id ? myReviewByProduct.get(item.product_id) : undefined;
+                                                        if (!mine) return null;
+                                                        return (
+                                                            <div className="mt-2 space-y-1.5 rounded-md border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-900 dark:bg-amber-950/20">
+                                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                                                                    <span className="font-semibold text-gray-700 dark:text-gray-200">Your review</span>
+                                                                    <span className="text-amber-400">{'★'.repeat(mine.rating)}<span className="text-gray-300">{'★'.repeat(5 - mine.rating)}</span></span>
+                                                                    <span className="text-gray-400">{mine.created_at}{mine.edited ? ' (edited)' : ''}</span>
+                                                                </div>
+                                                                {mine.review && <p className="text-xs text-gray-600 dark:text-gray-300">{mine.review}</p>}
+                                                                <PhotoThumbs urls={mine.photo_urls} />
+                                                                <ReviewOwnerActions review={mine} onEdit={() => setEditing(mine)} />
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">{item.quantity}</td>
                                                 <td className="px-4 py-3 text-right tabular-nums">
@@ -1002,7 +1108,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                     <div className="space-y-5 py-2">
                         {unratedItems.map((item) => {
                             const pid = item.product_id!;
-                            const state = ratings[pid] ?? { rating: 0, review: '' };
+                            const state = ratings[pid] ?? { rating: 0, review: '', photos: [] as File[] };
                             return (
                                 <div key={item.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
                                     <div>
@@ -1025,6 +1131,11 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                         placeholder="Write a review (optional)…"
                                         textareaClassName="w-full rounded-md border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
                                     />
+                                    <PhotoPicker
+                                        files={state.photos}
+                                        onFiles={(photos) => setRatings((prev) => ({ ...prev, [pid]: { ...prev[pid], photos } }))}
+                                        error={ratingErrors[pid]}
+                                    />
                                 </div>
                             );
                         })}
@@ -1044,14 +1155,29 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
 
             {/* Request Refund dialog */}
             <Dialog open={refundOpen} onOpenChange={(o) => { setRefundOpen(o); if (!o) { setRefundReason(''); setRefundResolution(''); setRefundDesc(''); setRefundFiles([]); } }}>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-h-[92vh] max-w-lg overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <RefreshCcw className="h-4 w-4 text-blue-500" />
-                            Request Refund — {order.order_number}
+                            {leakOnly
+                                ? <><AlertTriangle className="h-4 w-4 text-red-500" /> Report a leaking tank — {order.order_number}</>
+                                : <><RefreshCcw className="h-4 w-4 text-blue-500" /> Request Refund — {order.order_number}</>}
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 text-sm">
+                        {/* Safety first: shown before the form whenever "Leaking tank" is chosen */}
+                        {refundReason === 'leaking' && (
+                            <div role="alert" className="rounded-lg border-2 border-red-300 bg-red-50 px-3 py-2.5 text-red-800 dark:border-red-800 dark:bg-red-950/40 dark:text-red-200">
+                                <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" /> If you smell gas</p>
+                                <p className="mt-1 text-xs leading-relaxed">
+                                    Close the tank valve, don&apos;t switch lights or use fire, open doors and windows, move outside.
+                                    Call the store now{order.store_phone ? <> — <a href={`tel:${order.store_phone}`} className="font-semibold underline">{order.store_phone}</a></> : ''} or the BFP (911) if it is serious.
+                                </p>
+                                <p className="mt-1 text-xs font-medium">Report it below so the store can replace it.</p>
+                            </div>
+                        )}
+                        {leakOnly && (
+                            <p className="text-xs text-gray-500">The refund period for this order has ended, but a leaking tank can always be reported.</p>
+                        )}
                         <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2">
                             <p className="text-xs text-blue-700 dark:text-blue-400">
                                 Your request goes directly to <strong>{order.store_name}</strong>. The seller can send a replacement,
@@ -1080,20 +1206,34 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             reasonLabel="What's wrong?"
                             reason={refundReason}
                             notes={refundDesc}
-                            onChange={(next) => { setRefundReason(next.reason); setRefundDesc(next.notes); }}
+                            onChange={(next) => {
+                                // Period ended → the reason stays "Leaking tank" (details can still change)
+                                if (leakOnly && next.reason !== 'leaking') return;
+                                setRefundReason(next.reason); setRefundDesc(next.notes);
+                            }}
                             rows={3}
                         />
                         <div className="grid gap-1.5">
                             <label className="text-xs font-medium">Evidence Photos (optional, max 5)</label>
-                            <input ref={refundFileRef} type="file" multiple accept="image/*"
+                            <input ref={refundFileRef} type="file" multiple accept={PHOTO_ACCEPT}
                                 className="hidden"
-                                onChange={(e) => setRefundFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
-                            <Button type="button" variant="outline" size="sm" onClick={() => refundFileRef.current?.click()}>
-                                Attach Photos
+                                onChange={(e) => pickRefundFiles(e.target.files)} />
+                            <Button type="button" variant="outline" size="sm" disabled={refundPreparing || refundFiles.length >= 5} onClick={() => refundFileRef.current?.click()}>
+                                {refundPreparing ? <><Loader2 className="h-4 w-4 animate-spin" /> Resizing…</> : 'Attach Photos'}
                             </Button>
                             {refundFiles.length > 0 && (
-                                <p className="text-xs text-muted-foreground">{refundFiles.map((f) => f.name).join(', ')}</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {refundFiles.map((f, i) => (
+                                        <span key={i} className="inline-flex max-w-full items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                            <span className="truncate">{f.name}</span>
+                                            <button type="button" aria-label="Remove photo" onClick={() => setRefundFiles((fs) => fs.filter((_, j) => j !== i))}>
+                                                <XCircle className="h-3.5 w-3.5" />
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
                             )}
+                            {refundFileNote && <p className="text-xs text-red-600">{refundFileNote}</p>}
                         </div>
                     </div>
                     <DialogFooter>
@@ -1103,11 +1243,18 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             disabled={refundSubmitting || !refundReason || !refundResolution || !refundDesc.trim() || !refundAmount}
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                         >
-                            {refundSubmitting ? 'Submitting…' : 'Submit Request'}
+                            {refundSubmitting ? 'Submitting…' : leakOnly ? 'Send report' : 'Submit Request'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Edit own review (within 7 days) */}
+            <ReviewEditDialog
+                review={editing}
+                productName={editing ? order.items.find((i) => i.product_id === editing.product_id)?.product?.name : undefined}
+                onClose={() => setEditing(null)}
+            />
 
             {/* Report a problem */}
             <ReportFormDialog

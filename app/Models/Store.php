@@ -64,6 +64,7 @@ class Store extends Model
         'lto_permit_expires_at',
         'documents_suspended',
         'documents_suspended_at',
+        'refund_window_days',
     ];
 
     protected function casts(): array
@@ -91,6 +92,7 @@ class Store extends Model
             'allow_pickup'             => 'boolean',
             'min_down_payment_percent' => 'integer',
             'consignment_due_days'     => 'integer',
+            'refund_window_days'       => 'integer',
         ];
     }
 

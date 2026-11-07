@@ -325,6 +325,7 @@ class OrderController extends Controller
 
             $order = Order::create([
                 'store_id'         => $store->id,
+                'refund_window_days' => (int) ($store->refund_window_days ?? 7),
                 'order_number'     => $this->generateOrderNumber(),
                 'customer_id'      => $data['customer_id'],
                 'transaction_type' => $data['transaction_type'],

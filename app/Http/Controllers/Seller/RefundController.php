@@ -29,6 +29,8 @@ class RefundController extends Controller
 
         $query = (clone $base)->with(['order.items.product', 'customer', 'coupon', 'replacementOrder', 'replacementDelivery.rider'])
             ->when($search, fn ($q) => $q->whereHas('order', fn ($o) => $o->where('order_number', 'like', "%{$search}%")))
+            // Pending leaking-tank reports first (safety), then newest
+            ->orderByRaw("CASE WHEN status = 'pending' AND reason = 'leaking_tank' THEN 0 ELSE 1 END")
             ->latest();
 
         match ($tab) {
@@ -65,7 +67,11 @@ class RefundController extends Controller
             ->all();
 
         return Inertia::render('seller/refunds', [
-            'items'  => $query->paginate(20)->withQueryString()->through(fn (RefundRequest $r) => static::format($r) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $r)]),
+            'items'  => $query->paginate(20)->withQueryString()->through(fn (RefundRequest $r) => static::format($r) + [
+                'seen'   => \App\Services\SectionVisitService::flagsFor($request, $r),
+                // Seller list only (format() is shared with the customer list)
+                'urgent' => $r->status === 'pending' && $r->reason === 'leaking_tank',
+            ]),
             'since'  => \App\Services\SectionVisitService::sinceIso($request),
             'counts' => $counts,
             'tab'    => $tab,

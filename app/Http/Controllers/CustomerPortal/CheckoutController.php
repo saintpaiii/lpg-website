@@ -121,6 +121,7 @@ class CheckoutController extends Controller
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
                     // Pick up at the store (₱0 delivery fee, no rider)
                     'allow_pickup'           => (bool) $store->allow_pickup,
+                    'refund_window_days'     => (int) ($store->refund_window_days ?? 7),
                     'pickup_instructions'    => $store->pickup_instructions,
                     'store_address'          => ['address' => $store->address, 'barangay' => $store->barangay, 'city' => $store->city],
                     // Consignment is a loyalty benefit: store must allow it, run a loyalty
@@ -629,6 +630,8 @@ class CheckoutController extends Controller
                         'order_number'               => $this->generateOrderNumber(),
                         'customer_id'                => $customer->id,
                         'store_id'                   => $store->id,
+                        // Refund window snapshot: later changes by the store don't affect this order
+                        'refund_window_days'         => (int) ($store->refund_window_days ?? 7),
                         'transaction_type'           => $p['txTypeFinal'],
                         'status'                     => 'pending',
                         'total_amount'               => $totalAmount,

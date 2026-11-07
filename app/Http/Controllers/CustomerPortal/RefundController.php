@@ -86,6 +86,14 @@ class RefundController extends Controller
             'evidence.*'           => 'file|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
+        // Refund window set by the store (snapshot on the order). A leaking tank can always be reported (safety).
+        $leaking = $data['reason'] === 'leaking_tank';
+        if (! $leaking && ! $order->refundWindowOpen()) {
+            $ended = $order->refundDeadline()?->format('M d, Y') ?? 'its delivery date';
+
+            return back()->with('error', "The refund period for this order ended on {$ended}. You can still report a leaking tank.");
+        }
+
         $evidencePaths = [];
         if ($request->hasFile('evidence')) {
             foreach ($request->file('evidence') as $file) {
@@ -106,7 +114,18 @@ class RefundController extends Controller
         ]);
 
         // The seller handles the request directly
-        if ($order->store_id) {
+        if ($order->store_id && $leaking) {
+            $phone = $customer->phone ?: $request->user()->phone;
+            NotificationService::sendToStore(
+                $order->store_id,
+                'refund_request',
+                'URGENT: Leaking tank reported',
+                "A customer reported a LEAKING TANK on order #{$order->order_number}"
+                    . ($phone ? " — call them now: {$phone}" : '')
+                    . '. Replace the tank as soon as possible.',
+                ['order_id' => $order->id, 'refund_id' => $refund->id, 'link' => '/seller/refunds', 'urgent' => true]
+            );
+        } elseif ($order->store_id) {
             NotificationService::sendToStore(
                 $order->store_id,
                 'refund_request',

@@ -58,6 +58,8 @@ type StoreGroup = {
     /** Store offers "Pick up at the store" (₱0 delivery fee, no rider) */
     allow_pickup?: boolean;
     pickup_instructions?: string | null;
+    /** Days after delivery a refund can be requested (set by the store) */
+    refund_window_days?: number;
     store_address?: { address: string | null; barangay: string | null; city: string | null };
     min_down_payment_percent: number;
     consignment_due_days: number;
@@ -661,6 +663,9 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     <Store className="h-4 w-4 text-blue-600" />
                                     {sg.store_name}
                                 </CardTitle>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Refunds: within {sg.refund_window_days ?? 7} day{(sg.refund_window_days ?? 7) === 1 ? '' : 's'} after delivery.
+                                </p>
                             </CardHeader>
                             <CardContent>
                                 {/* Deliver to me / Pick up at the store */}

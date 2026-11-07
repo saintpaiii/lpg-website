@@ -54,6 +54,7 @@ class Order extends Model
         'empty_tanks_required',
         'empty_tanks_collected_at',
         'empty_tanks_collected_by',
+        'refund_window_days',
     ];
 
     protected function casts(): array
@@ -78,6 +79,7 @@ class Order extends Model
             'estimated_delivery_minutes'  => 'integer',
             'empty_tanks_required'        => 'integer',
             'empty_tanks_collected_at'    => 'datetime',
+            'refund_window_days'          => 'integer',
         ];
     }
 
@@ -237,6 +239,40 @@ class Order extends Model
     public function refundRequests(): HasMany
     {
         return $this->hasMany(RefundRequest::class);
+    }
+
+    /** Days after delivery a refund can be requested: the order's snapshot, else the store's current window, else 7. */
+    public function refundWindowDays(): int
+    {
+        return (int) ($this->refund_window_days ?? $this->store?->refund_window_days ?? 7);
+    }
+
+    /**
+     * Last moment (end of day, Asia/Manila) a refund can be requested. Null when the order isn't delivered.
+     * Base = delivered_at, else the delivery's delivered_at, else created_at (not updated_at — it moves on later payment updates).
+     */
+    public function refundDeadline(): ?\Illuminate\Support\Carbon
+    {
+        if ($this->status !== 'delivered') {
+            return null;
+        }
+
+        $base = $this->delivered_at ?? $this->delivery?->delivered_at ?? $this->created_at;
+        if (! $base) {
+            return null;
+        }
+
+        return \Illuminate\Support\Carbon::parse($base)->timezone('Asia/Manila')
+            ->addDays($this->refundWindowDays())
+            ->endOfDay();
+    }
+
+    /** A normal refund can still be requested (a leaking tank can always be reported). */
+    public function refundWindowOpen(): bool
+    {
+        $deadline = $this->refundDeadline();
+
+        return $deadline !== null && now()->lte($deadline);
     }
 
     /** Amount the customer owes in total (items after discount + delivery fee). */

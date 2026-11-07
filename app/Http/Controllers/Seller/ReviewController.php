@@ -35,6 +35,8 @@ class ReviewController extends Controller
             'id'            => $r->id,
             'rating'        => $r->rating,
             'review'        => $r->review,
+            'photo_urls'    => $r->photo_urls,
+            'edited'        => $r->edited_at !== null,
             'customer_name' => $r->user?->name ?? 'Customer',
             'product_name'  => $r->product?->name ?? '—',
             'product_brand' => $r->product?->brand ?? '',

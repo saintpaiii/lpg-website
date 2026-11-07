@@ -277,5 +277,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
             Route::put('settings', [SettingsController::class, 'update'])->name('settings.put');
             // Tax & Invoice (VAT status, TIN, invoice code) — the owner only; staff see it read-only
             Route::put('settings/tax', [SettingsController::class, 'updateTax'])->middleware('seller_owner')->name('settings.tax');
+            // Refund window (days after delivery) — owner or staff with Full access to Settings
+            Route::put('settings/refunds', [SettingsController::class, 'updateRefunds'])->name('settings.refunds');
         });
     });

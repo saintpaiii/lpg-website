@@ -66,6 +66,9 @@ Route::middleware(['auth', 'verified', 'customer'])
         Route::post('orders/{order}/verify-payment', [OrderController::class, 'verifyPayment'])->middleware('id.verified:history')->name('orders.verify-payment');
         Route::post('orders/{order}/cancel', [OrderController::class, 'cancel'])->middleware('id.verified:history')->name('orders.cancel');
         Route::post('orders/{order}/rate', [RatingController::class, 'store'])->middleware('id.verified:history')->name('orders.rate');
+        // Edit is sent as POST + _method=PUT (PHP can't read multipart files on a real PUT)
+        Route::put('ratings/{rating}', [RatingController::class, 'update'])->middleware('id.verified:history')->name('ratings.update');
+        Route::delete('ratings/{rating}', [RatingController::class, 'destroy'])->middleware('id.verified:history')->name('ratings.destroy');
         Route::get('orders/{order}/rider-location', [RiderLocationController::class, 'showForOrder'])->middleware('id.verified:history')->name('orders.rider-location');
         Route::get('orders/{order}/tracking', [OrderController::class, 'getTracking'])->middleware('id.verified:history')->name('orders.tracking');
 

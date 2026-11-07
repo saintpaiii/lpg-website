@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { PhotoThumbs } from '@/components/review-photos';
 import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -21,6 +22,8 @@ type Review = {
     customer_name: string;
     product_name: string;
     product_brand: string;
+    photo_urls: string[];
+    edited: boolean;
     created_at: string;
 };
 
@@ -181,8 +184,9 @@ export default function SellerReviews({ reviews, avg, total, breakdown, filters 
                                                     ) : (
                                                         <span className="text-gray-300 text-xs">—</span>
                                                     )}
+                                                    <PhotoThumbs urls={r.photo_urls} className="mt-1.5" />
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-muted-foreground hidden md:table-cell">{r.created_at}</td>
+                                                <td className="px-4 py-3 text-right text-muted-foreground hidden md:table-cell">{r.created_at}{r.edited ? <span className="block text-xs">(edited)</span> : null}</td>
                                             </tr>
                                         ))}
                                     </tbody>

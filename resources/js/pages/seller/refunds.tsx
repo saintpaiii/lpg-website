@@ -27,7 +27,8 @@ import { NotePicker, ReasonTextPicker } from '@/components/reason-picker';
 type Counts = { pending: number; approved: number; processed: number; rejected: number; escalated: number; all: number };
 
 type Props = {
-    items: { data: RefundItem[]; current_page: number; last_page: number; total: number };
+    /** urgent = pending leaking-tank report (seller list only; sorted on top by the server) */
+    items: { data: (RefundItem & { urgent?: boolean })[]; current_page: number; last_page: number; total: number };
     counts: Counts;
     tab: string;
     search: string;
@@ -187,10 +188,15 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                     <div className="space-y-3">
                         <SeenNote counts={seen.counts} onClear={seen.clear} />
                         {items.data.map((r) => (
-                            <div key={r.id} className={`rounded-xl border bg-card p-4 space-y-3 ${seenRowClass(seen.get(r.id))}`}>
+                            <div key={r.id} className={`rounded-xl border bg-card p-4 space-y-3 ${r.urgent ? 'border-2 border-red-400 dark:border-red-700' : ''} ${seenRowClass(seen.get(r.id))}`}>
                                 <div className="flex items-start justify-between gap-3 flex-wrap">
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
+                                            {r.urgent && (
+                                                <span className="inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                                                    URGENT · Leaking tank
+                                                </span>
+                                            )}
                                             <Link href={`/seller/orders/${r.order_id}`} className="font-mono font-semibold text-blue-600 hover:underline">
                                                 {r.order_number ?? '—'}
                                             </Link>

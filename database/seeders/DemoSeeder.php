@@ -715,6 +715,45 @@ class DemoSeeder extends Seeder
             $consumed
         );
 
+        // Demo reviews (text only, 3–5 stars) on delivered orders so the review pages aren't empty
+        $reviewTexts = [
+            [5, 'Fast delivery and the tank was sealed properly. Will order again.'],
+            [4, 'Good price, rider was polite. Arrived a bit later than estimated.'],
+            [5, 'Full tank, no leaks, and they took my empty one. Very convenient.'],
+            [3, 'Tank is fine but the delivery took almost two hours.'],
+            [4, 'Easy to order and pay with GCash. Recommended.'],
+        ];
+        $rated = DB::table('orders')
+            ->join('customers', 'customers.id', '=', 'orders.customer_id')
+            ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->where('orders.status', 'delivered')
+            ->whereNotNull('customers.user_id')
+            ->orderBy('orders.id')
+            ->get(['orders.id as order_id', 'orders.store_id', 'orders.delivered_at', 'customers.user_id', 'order_items.product_id']);
+        $seen = [];
+        foreach ($rated as $row) {
+            if (count($seen) >= count($reviewTexts)) {
+                break;
+            }
+            $key = $row->user_id . '-' . $row->product_id;
+            if (isset($seen[$key])) {
+                continue; // one demo review per customer + product
+            }
+            [$stars, $text] = $reviewTexts[count($seen)];
+            $at = Carbon::parse($row->delivered_at ?? $this->now)->addDay();
+            DB::table('ratings')->insert([
+                'user_id'    => $row->user_id,
+                'product_id' => $row->product_id,
+                'store_id'   => $row->store_id,
+                'order_id'   => $row->order_id,
+                'rating'     => $stars,
+                'review'     => $text,
+                'created_at' => $at,
+                'updated_at' => $at,
+            ]);
+            $seen[$key] = true;
+        }
+
         // ══════════════════════════════════════════════════════════════════════
         // 10. FINALIZE INVENTORY — opening stock + restocks → final stock
         // ══════════════════════════════════════════════════════════════════════

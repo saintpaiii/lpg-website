@@ -14,6 +14,7 @@ import StoreAvatar from '@/components/store-avatar';
 import ProductCardImage from '@/components/product-card-image';
 import ProductGallery, { type GalleryMedia } from '@/components/product-gallery';
 import { NotePicker } from '@/components/reason-picker';
+import { PhotoPicker, PhotoThumbs, ReviewEditDialog, ReviewOwnerActions, photoError, type MyReview } from '@/components/review-photos';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -44,6 +45,8 @@ type Product = {
     store_barangay: string;
     delivery_from: number | null;
     allow_pickup?: boolean;
+    /** Days after delivery a refund can be requested (set by the store) */
+    refund_window_days?: number;
     avg_rating: number;
     review_count: number;
 };
@@ -53,6 +56,11 @@ type Review = {
     rating: number;
     review: string | null;
     user_name: string;
+    photo_urls: string[];
+    photo_paths: string[];
+    edited: boolean;
+    is_mine: boolean;
+    can_edit: boolean;
     created_at: string;
 };
 
@@ -86,6 +94,8 @@ type Paginated<T> = {
 type Props = {
     product:       Product;
     reviews:       Paginated<Review>;
+    withPhotos?:   boolean;
+    reviewsWithPhotos?: number;
     canRate:       boolean;
     ratingOrderId: number | null;
     fromStore:     RelatedProduct[];
@@ -143,7 +153,7 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function ProductShowPage({ product, reviews, canRate, ratingOrderId, fromStore, similar }: Props) {
+export default function ProductShowPage({ product, reviews, withPhotos = false, reviewsWithPhotos = 0, canRate, ratingOrderId, fromStore, similar }: Props) {
     const [qty, setQty]     = useState(1);
     // What can still be added on top of what is already in the cart
     // Capped by the seller's max per customer (per order / day / week, earlier orders of the period count)
@@ -155,6 +165,16 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
 
     // Rating form
     const ratingForm = useForm({ rating: 0, review: '' });
+    const [ratingPhotos, setRatingPhotos] = useState<File[]>([]);
+    const [ratingErr, setRatingErr]       = useState<Record<string, string>>({});
+    const [ratingBusy, setRatingBusy]     = useState(false);
+    const [editing, setEditing]           = useState<MyReview | null>(null);
+
+    function toggleWithPhotos() {
+        router.get(`/customer/products/${product.id}`, withPhotos ? {} : { with_photos: 1 }, {
+            preserveScroll: true, preserveState: true, only: ['reviews', 'withPhotos'],
+        });
+    }
 
     function addToCart() {
         if (adding) return;
@@ -172,17 +192,26 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
 
     function submitRating(e: React.FormEvent) {
         e.preventDefault();
-        if (!ratingOrderId || ratingForm.data.rating === 0) return;
-        ratingForm.post(`/customer/orders/${ratingOrderId}/rate`, {
-            data: {
-                ratings: [{
-                    product_id: product.id,
-                    rating:     ratingForm.data.rating,
-                    review:     ratingForm.data.review || null,
-                }],
-            },
+        if (!ratingOrderId || ratingForm.data.rating === 0 || ratingBusy) return;
+        setRatingBusy(true);
+        setRatingErr({});
+        // Multipart (photos); errors come back as ratings.0.*
+        router.post(`/customer/orders/${ratingOrderId}/rate`, {
+            ratings: [{
+                product_id: product.id,
+                rating:     ratingForm.data.rating,
+                review:     ratingForm.data.review || '',
+                photos:     ratingPhotos,
+            }],
+        }, {
+            forceFormData: true,
             preserveScroll: true,
-            onError:   () => { toast.error('Failed to submit review. Please try again.'); },
+            onSuccess: () => { ratingForm.reset(); setRatingPhotos([]); },
+            onError: (errs) => {
+                setRatingErr(errs);
+                toast.error(errs.general ?? photoError(errs, 'ratings.0.photos') ?? Object.values(errs)[0] ?? 'Failed to submit review. Please try again.');
+            },
+            onFinish: () => setRatingBusy(false),
         });
     }
 
@@ -272,6 +301,9 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                         : 'Pick-up only'}
                                 </p>
                             )}
+                            <p className="text-gray-500 pl-6">
+                                Refunds: within {product.refund_window_days ?? 7} day{(product.refund_window_days ?? 7) === 1 ? '' : 's'} after delivery.
+                            </p>
                         </div>
 
                         {product.description && (
@@ -344,8 +376,22 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                         <div className="flex items-center justify-between flex-wrap gap-2">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Star className="h-4 w-4 text-amber-400" />
-                                Reviews ({reviews.total})
+                                Reviews ({withPhotos ? product.review_count : reviews.total})
                             </CardTitle>
+                            {(reviewsWithPhotos > 0 || withPhotos) && (
+                                <button
+                                    type="button"
+                                    onClick={toggleWithPhotos}
+                                    aria-pressed={withPhotos}
+                                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                                        withPhotos
+                                            ? 'border-blue-600 bg-blue-600 text-white'
+                                            : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300'
+                                    }`}
+                                >
+                                    With photos ({reviewsWithPhotos})
+                                </button>
+                            )}
                             {product.review_count > 0 && (
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-sm text-gray-500">Average:</span>
@@ -356,22 +402,31 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                     </CardHeader>
                     <CardContent>
                         {reviews.data.length === 0 ? (
-                            <p className="text-sm text-gray-400 italic py-4 text-center">No reviews yet. Be the first to review this product!</p>
+                            <p className="text-sm text-gray-400 italic py-4 text-center">
+                                {withPhotos ? 'No reviews with photos yet.' : 'No reviews yet. Be the first to review this product!'}
+                            </p>
                         ) : (
                             <div className="space-y-4">
                                 {reviews.data.map(r => (
-                                    <div key={r.id} className="border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0 last:pb-0">
-                                        <div className="flex items-center gap-2 mb-1">
+                                    <div key={r.id} className={`border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0 last:pb-0 ${r.is_mine ? 'rounded-md bg-amber-50/50 px-2 pt-2 dark:bg-amber-950/10' : ''}`}>
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
                                             <span className="flex">
                                                 {[1,2,3,4,5].map(i => (
                                                     <span key={i} className={`text-sm ${i <= r.rating ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
                                                 ))}
                                             </span>
                                             <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.user_name}</span>
-                                            <span className="text-xs text-gray-400">— {fmtDate(r.created_at)}</span>
+                                            {r.is_mine && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Your review</span>}
+                                            <span className="text-xs text-gray-400">— {fmtDate(r.created_at)}{r.edited ? ' (edited)' : ''}</span>
                                         </div>
                                         {r.review && (
                                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed ml-0.5">"{r.review}"</p>
+                                        )}
+                                        <PhotoThumbs urls={r.photo_urls} className="mt-2" />
+                                        {r.is_mine && (
+                                            <div className="mt-1">
+                                                <ReviewOwnerActions review={r} onEdit={() => setEditing({ ...r, review: r.review })} />
+                                            </div>
                                         )}
                                     </div>
                                 ))}
@@ -416,7 +471,7 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                 <div>
                                     <p className="text-xs font-medium text-gray-500 mb-1.5">Your rating</p>
                                     <StarPicker value={ratingForm.data.rating} onChange={v => ratingForm.setData('rating', v)} />
-                                    {ratingForm.errors.rating && <p className="text-xs text-red-500 mt-1">{ratingForm.errors.rating}</p>}
+                                    {ratingErr['ratings.0.rating'] && <p className="text-xs text-red-500 mt-1">{ratingErr['ratings.0.rating']}</p>}
                                 </div>
                                 <div>
                                     <NotePicker
@@ -428,9 +483,10 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                                         textareaClassName="w-full rounded-lg border border-gray-300 dark:border-gray-700 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 dark:bg-gray-800 dark:text-white"
                                     />
                                 </div>
+                                <PhotoPicker files={ratingPhotos} onFiles={setRatingPhotos} error={photoError(ratingErr, 'ratings.0.photos')} />
                                 <Button
                                     type="submit"
-                                    disabled={ratingForm.data.rating === 0 || ratingForm.processing}
+                                    disabled={ratingForm.data.rating === 0 || ratingBusy}
                                     className="bg-amber-500 hover:bg-amber-600 text-white"
                                 >
                                     Submit Review
@@ -459,6 +515,9 @@ export default function ProductShowPage({ product, reviews, canRate, ratingOrder
                     </div>
                 )}
             </div>
+
+            {/* Edit own review (within 7 days) */}
+            <ReviewEditDialog review={editing} productName={product.name} onClose={() => setEditing(null)} />
         </CustomerLayout>
     );
 }

@@ -51,7 +51,27 @@ class SettingsController extends Controller
                 'store_address'      => InvoiceService::storeAddress($store),
             ],
             'can_edit_tax' => auth()->user()->role === 'seller',
+            'refund_window_days' => (int) ($store->refund_window_days ?? 7),
         ]);
+    }
+
+    /** Settings → Refunds: days after delivery a customer can request a refund (new orders snapshot it). */
+    public function updateRefunds(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+
+        $data = $request->validate([
+            'refund_window_days' => 'required|integer|min:1|max:90',
+        ], [
+            'refund_window_days.required' => 'Between 1 and 90 days.',
+            'refund_window_days.integer'  => 'Between 1 and 90 days.',
+            'refund_window_days.min'      => 'Between 1 and 90 days.',
+            'refund_window_days.max'      => 'Between 1 and 90 days.',
+        ]);
+
+        $store->update(['refund_window_days' => (int) $data['refund_window_days']]);
+
+        return back()->with('success', "Refund window saved: {$data['refund_window_days']} day" . ((int) $data['refund_window_days'] === 1 ? '' : 's') . ' after delivery.');
     }
 
     /** Settings → Tax & Invoice (owner only — route middleware seller_owner). */

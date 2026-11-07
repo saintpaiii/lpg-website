@@ -176,17 +176,25 @@ class ProductBrowseController extends Controller
         }
 
         // Paginated reviews with reviewer name
+        // ?with_photos=1 → only reviews with photos (server side: the list is paginated)
+        $withPhotos = $request->boolean('with_photos');
+        $viewerId   = $request->user()?->id;
         $reviews = Rating::with('user:id,name')
             ->where('product_id', $product->id)
+            ->when($withPhotos, fn ($q) => $q->whereNotNull('photo_paths')->where('photo_paths', '!=', '[]'))
             ->orderByDesc('created_at')
             ->paginate(10)
-            ->through(fn ($r) => [
-                'id'         => $r->id,
-                'rating'     => $r->rating,
-                'review'     => $r->review,
-                'user_name'  => $r->user?->name ?? 'Anonymous',
-                'created_at' => $r->created_at->format('M d, Y'),
+            ->withQueryString()
+            ->through(fn (Rating $r) => [
+                ...$r->publicPayload(),
+                'user_name'   => $r->user?->name ?? 'Anonymous',
+                'created_at'  => $r->created_at->format('M d, Y'),
+                'is_mine'     => $viewerId !== null && $r->user_id === $viewerId,
+                'can_edit'    => $viewerId !== null && $r->user_id === $viewerId && $r->canEdit(),
+                // Only the author needs the stored paths (Edit sends back the ones to keep)
+                'photo_paths' => $viewerId !== null && $r->user_id === $viewerId ? ($r->photo_paths ?? []) : [],
             ]);
+        $reviewsWithPhotos = Rating::where('product_id', $product->id)->whereNotNull('photo_paths')->where('photo_paths', '!=', '[]')->count();
 
         // Can the current user rate this product?
         $canRate      = false;
@@ -264,12 +272,15 @@ class ProductBrowseController extends Controller
                 'store_barangay' => $product->store?->barangay ?? '',
                 'delivery_from'  => $product->store ? DeliveryFeeService::fromFee($product->store) : null,
                 'allow_pickup'   => (bool) $product->store?->allow_pickup,
+                'refund_window_days' => (int) ($product->store?->refund_window_days ?? 7),
                 'avg_rating'     => round((float) ($product->ratings_avg_rating ?? 0), 1),
                 'review_count'   => (int) ($product->ratings_count ?? 0),
                 // Max per customer (per order / day / week): what is left for this customer
                 ...PurchaseLimitService::payload($request->user()?->id, $product),
             ],
             'reviews'        => $reviews,
+            'withPhotos'     => $withPhotos,
+            'reviewsWithPhotos' => $reviewsWithPhotos,
             'canRate'        => $canRate,
             'ratingOrderId'  => $ratingOrderId,
             'fromStore'      => $fromStore->values()->all(),

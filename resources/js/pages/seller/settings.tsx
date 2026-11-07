@@ -28,6 +28,7 @@ import type { LeafletMouseEvent, Marker as LeafletMarker } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Spinner } from '@/components/ui/spinner';
 import { TaxInvoiceCard, type TaxSettings } from '@/components/tax-invoice-card';
+import { RefundWindowCard } from '@/components/refund-window-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -64,6 +65,8 @@ interface Props {
     tax: TaxSettings;
     /** Owner — staff with Settings see the Tax & Invoice card read-only */
     can_edit_tax: boolean;
+    /** Settings → Refunds: days after delivery a refund can be requested */
+    refund_window_days: number;
 }
 
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -101,7 +104,7 @@ function MapClickHandler({ onPickRef }: { onPickRef: React.RefObject<((lat: numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SellerSettings({ store, tax, can_edit_tax }: Props) {
+export default function SellerSettings({ store, tax, can_edit_tax, refund_window_days }: Props) {
     // The Loyalty Program page is owner-only; staff with settings.view see plain text
     const isOwner = usePage<SharedData>().props.auth.user?.role === 'seller';
     const { has } = usePlan();
@@ -683,6 +686,9 @@ export default function SellerSettings({ store, tax, can_edit_tax }: Props) {
 
                 {/* Own form + endpoint (owner only) */}
                 <TaxInvoiceCard tax={tax} canEdit={can_edit_tax} storeName={store.store_name} />
+
+                {/* Own form + endpoint (PUT seller/settings/refunds) */}
+                <RefundWindowCard days={refund_window_days} />
             </div>
         </AppLayout>
     );

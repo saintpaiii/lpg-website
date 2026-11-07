@@ -392,6 +392,22 @@ class OrderController extends Controller
                     ->where('user_id', $request->user()->id)
                     ->pluck('product_id')
                     ->toArray(),
+                // The customer's own reviews on this order (Edit within 7 days / Delete any time)
+                'my_reviews' => Rating::where('order_id', $order->id)
+                    ->where('user_id', $request->user()->id)
+                    ->get()
+                    ->map(fn (Rating $r) => [
+                        ...$r->publicPayload(),
+                        'product_id'  => $r->product_id,
+                        'photo_paths' => $r->photo_paths ?? [],
+                        'created_at'  => $r->created_at->format('M d, Y'),
+                        'can_edit'    => $r->canEdit(),
+                    ])->values()->all(),
+                // Refund window (days after delivery, chosen by the store; snapshot at checkout)
+                'refund_window_days' => $order->refundWindowDays(),
+                'refund_deadline'    => $order->refundDeadline()?->format('M d, Y'),
+                'refund_window_open' => $order->refundWindowOpen(),
+                'store_phone'        => $order->store?->phone,
                 'delivery' => $order->delivery ? [
                     'id'          => $order->delivery->id,
                     'status'      => $order->delivery->status,

@@ -119,6 +119,7 @@ class RefundService
 
         $replacement = Order::create([
             'store_id'         => $original->store_id,
+            'refund_window_days' => $original->refund_window_days, // same window as the original order
             'order_number'     => static::generateOrderNumber(),
             'customer_id'      => $original->customer_id,
             'transaction_type' => $original->transaction_type,

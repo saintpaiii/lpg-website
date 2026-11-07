@@ -18,6 +18,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import CustomerLayout from '@/layouts/customer-layout';
 import { formatAddress } from '@/data/cavite-locations';
 import StoreAvatar from '@/components/store-avatar';
+import { PhotoThumbs } from '@/components/review-photos';
 import ProductCardImage from '@/components/product-card-image';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -73,6 +74,8 @@ type Review = {
     review: string | null;
     customer_name: string;
     product_name: string;
+    photo_urls: string[];
+    edited: boolean;
     created_at: string;
 };
 
@@ -335,13 +338,14 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     <div className="flex items-start justify-between gap-3 flex-wrap">
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{r.customer_name}</p>
-                                            <p className="text-xs text-gray-400">{r.product_name} · {r.created_at}</p>
+                                            <p className="text-xs text-gray-400">{r.product_name} · {r.created_at}{r.edited ? ' (edited)' : ''}</p>
                                         </div>
                                         <StarsDisplay value={r.rating} size="xs" />
                                     </div>
                                     {r.review && (
                                         <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400 italic">"{r.review}"</p>
                                     )}
+                                    <PhotoThumbs urls={r.photo_urls} className="mt-2" />
                                 </div>
                             ))}
                         </CardContent>
