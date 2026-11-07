@@ -8,9 +8,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /** A renewed permit or an extra document a seller uploaded for admin review. */
 class StoreDocumentSubmission extends Model
 {
+    /** Auto-read (OCR) result — admin only */
+    protected $hidden = ['ocr'];
+
     protected $fillable = [
         'store_id', 'doc_type', 'label', 'file_path', 'expires_at', 'status', 'rejection_reason',
-        'submitted_by', 'reviewed_by', 'reviewed_at',
+        'submitted_by', 'reviewed_by', 'reviewed_at', 'ocr',
     ];
 
     protected function casts(): array
@@ -18,6 +21,7 @@ class StoreDocumentSubmission extends Model
         return [
             'expires_at'  => 'date',
             'reviewed_at' => 'datetime',
+            'ocr'         => 'array',
         ];
     }
 

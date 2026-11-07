@@ -9,6 +9,8 @@ use App\Models\VerificationRequest;
 use App\Services\LegalService;
 use App\Support\PrivateDocument;
 use App\Support\StoreDocuments;
+use App\Services\DuplicateStoreService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -67,7 +69,24 @@ class BecomeSellerController extends Controller
             ];
         }
 
+        // Extra documents sent with an earlier application (shown read-only; new ones can be added)
+        $ownStore     = Store::where('user_id', $user->id)->first();
+        $previousOther = $ownStore
+            ? \App\Models\StoreDocumentSubmission::where('store_id', $ownStore->id)->where('doc_type', 'other')->latest()->get()
+                ->map(fn ($d) => [
+                    'id'         => $d->id,
+                    'label'      => $d->label ?? 'Other document',
+                    'status'     => $d->status,
+                    'expires_on' => $d->expires_at?->format('M d, Y'),
+                    'url'        => PrivateDocument::url('store-document', $d->id, 'file_path'),
+                ])->values()->all()
+            : [];
+
         return Inertia::render('customer/become-seller', [
+            'previous_other_docs' => $previousOther,
+            // How many extra documents can still be added now (max 5 per form, 10 per store incl. earlier ones)
+            'other_slots' => min(StoreDocuments::MAX_OTHER_AT_REGISTRATION,
+                StoreDocuments::MAX_OTHER_TOTAL - ($ownStore ? StoreDocuments::otherCount($ownStore->id) : 0)),
             'application' => $application ? [
                 'status'           => $application->status,
                 'rejection_reason' => $application->rejection_reason,
@@ -105,7 +124,7 @@ class BecomeSellerController extends Controller
             ->first();
 
         $isResubmission = $existingApp !== null;
-        $fileRule       = fn () => File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024);
+        $fileRule       = fn () => File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024);
         // On resubmission, each doc is optional — fallback to existing path below
         $docRule        = fn () => $isResubmission ? ['nullable', $fileRule()] : ['required', $fileRule()];
 
@@ -123,13 +142,38 @@ class BecomeSellerController extends Controller
             'fsic_permit'       => $docRule(),
             'doe_lpg_license'   => $docRule(),
             'lto_permit'        => $docRule(),
-            'logo'              => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'logo'              => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             // Store pin (required — delivery fees and staff clock-in use it)
             'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
             'longitude'             => ['required', 'numeric', 'between:-180,180'],
             ...StoreDocuments::expiryRules(),
+            // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
+            ...StoreDocuments::otherDocumentRules(),
             'terms_agreed'      => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit']) + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+
+        // The user's existing store (resubmission) — never compared with itself
+        $ownStore  = Store::where('user_id', $user->id)->first();
+        $otherRows = StoreDocuments::filledOtherRows($request);
+        StoreDocuments::assertOtherRowsAllowed($otherRows, $ownStore?->id);
+
+        // Duplicate store? A true duplicate is refused; anything else is a warning (seller + admin).
+        // Hashes: new uploads, plus the kept files' hashes from the earlier application.
+        $newHashes = DuplicateStoreService::hashUploads($request);
+        $hashes    = array_merge((array) ($ownStore?->document_hashes ?? []), $newHashes);
+        $duplicate = DuplicateStoreService::check([
+            'store_name' => $request->store_name,
+            'address'    => $request->store_address,
+            'barangay'   => $request->store_barangay,
+            'city'       => $request->store_city,
+            'latitude'   => $request->latitude,
+            'longitude'  => $request->longitude,
+            'phones'     => array_filter([$request->store_phone, $user->phone]),
+            'hashes'     => $hashes,
+        ], $ownStore?->id);
+        if ($duplicate['block']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([$duplicate['block']['field'] => $duplicate['block']['message']]);
+        }
 
         // Use new upload or fall back to existing path from rejected application
         $birPermitPath      = $request->hasFile('bir_permit')
@@ -158,60 +202,86 @@ class BecomeSellerController extends Controller
             ? $request->file('logo')->store('store-logos', 'public')
             : Store::where('user_id', $user->id)->value('logo');
 
-        // Create or reset store for this user
-        $store = Store::updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'store_name'      => $request->store_name,
-                'description'     => $request->store_description,
-                'address'         => $request->store_address,
-                'city'            => $request->store_city,
-                'barangay'        => $request->store_barangay,
-                'province'        => $request->store_province,
-                'phone'           => $request->store_phone,
-                'bir_permit'      => $birPermitPath,
-                'business_permit' => $businessPermitPath,
-                'fsic_permit'     => $fsicPermitPath,
-                'doe_lpg_license' => $doeLicensePath,
-                'lto_permit'      => $ltoPermitPath,
-                'logo'            => $logoPath,
-                'latitude'        => $request->latitude,
-                'longitude'       => $request->longitude,
-                'business_permit_expires_at' => $request->business_permit_expires_at,
-                'fsic_permit_expires_at'     => $request->fsic_permit_expires_at,
-                'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,
-                'lto_permit_expires_at'      => $request->lto_permit_expires_at,
-                'status'          => 'pending',
-            ]
-        );
+        // Re-uploaded documents: their earlier auto-read result no longer applies
+        $ocr = (array) ($ownStore?->document_ocr ?? []);
+        foreach (array_keys($newHashes) as $type) {
+            unset($ocr[$type]);
+        }
+        if ($request->hasFile('valid_id')) {
+            unset($ocr['valid_id']);
+        }
 
-        // Link user to store
-        $user->update(['store_id' => $store->id]);
+        $store = DB::transaction(function () use ($request, $user, $existingApp, $birPermitPath, $businessPermitPath, $fsicPermitPath,
+            $doeLicensePath, $ltoPermitPath, $validIdPath, $logoPath, $hashes, $duplicate, $ocr, $otherRows) {
+            // Create or reset store for this user
+            $store = Store::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'store_name'      => $request->store_name,
+                    'description'     => $request->store_description,
+                    'address'         => $request->store_address,
+                    'city'            => $request->store_city,
+                    'barangay'        => $request->store_barangay,
+                    'province'        => $request->store_province,
+                    'phone'           => $request->store_phone,
+                    'bir_permit'      => $birPermitPath,
+                    'business_permit' => $businessPermitPath,
+                    'fsic_permit'     => $fsicPermitPath,
+                    'doe_lpg_license' => $doeLicensePath,
+                    'lto_permit'      => $ltoPermitPath,
+                    'logo'            => $logoPath,
+                    'latitude'        => $request->latitude,
+                    'longitude'       => $request->longitude,
+                    'business_permit_expires_at' => $request->business_permit_expires_at,
+                    'fsic_permit_expires_at'     => $request->fsic_permit_expires_at,
+                    'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,
+                    'lto_permit_expires_at'      => $request->lto_permit_expires_at,
+                    'status'          => 'pending',
+                    'document_hashes' => $hashes ?: null,
+                    'duplicate_flags' => DuplicateStoreService::flags($duplicate),
+                    'document_ocr'    => $ocr ?: null,
+                ]
+            );
 
-        // Soft-delete any prior rejected application, then create a fresh one
-        VerificationRequest::where('user_id', $user->id)
-            ->where('type', 'seller_application')
-            ->where('status', 'rejected')
-            ->delete();
+            // Link user to store
+            $user->update(['store_id' => $store->id]);
 
-        VerificationRequest::create([
-            'user_id'              => $user->id,
-            'type'                 => 'seller_application',
-            'valid_id_path'        => $validIdPath,
-            'bir_permit_path'      => $birPermitPath,
-            'business_permit_path' => $businessPermitPath,
-            'fsic_permit_path'     => $fsicPermitPath,
-            'doe_lpg_license_path' => $doeLicensePath,
-            'lto_permit_path'      => $ltoPermitPath,
-            'status'               => 'pending',
-            'terms_agreed_at'      => now(),
-        ]);
+            // Soft-delete any prior rejected application, then create a fresh one
+            VerificationRequest::where('user_id', $user->id)
+                ->where('type', 'seller_application')
+                ->where('status', 'rejected')
+                ->delete();
 
-        // Proof of agreement to the current Seller Terms + Privacy Policy
-        LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
+            VerificationRequest::create([
+                'user_id'              => $user->id,
+                'type'                 => 'seller_application',
+                'valid_id_path'        => $validIdPath,
+                'bir_permit_path'      => $birPermitPath,
+                'business_permit_path' => $businessPermitPath,
+                'fsic_permit_path'     => $fsicPermitPath,
+                'doe_lpg_license_path' => $doeLicensePath,
+                'lto_permit_path'      => $ltoPermitPath,
+                'status'               => 'pending',
+                'terms_agreed_at'      => now(),
+            ]);
 
-        return redirect('/customer/become-seller')
+            // Proof of agreement to the current Seller Terms + Privacy Policy
+            LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
+
+            StoreDocuments::saveOtherDocuments($request, $store, $otherRows, $user->id);
+
+            return $store;
+        });
+
+        \App\Services\NotificationService::sendToRole('admin', 'system', 'New seller application',
+            "{$user->name} submitted a seller application for \"{$store->store_name}\"."
+                . ($duplicate['matches'] ? ' Possible duplicate — check the store page.' : ''),
+            ['link' => "/admin/stores/{$store->id}", 'store_id' => $store->id]);
+
+        $redirect = redirect('/customer/become-seller')
             ->with('success', 'Your seller application has been submitted. We will review it within 1–3 business days.');
+
+        return ($warning = DuplicateStoreService::sellerWarning($duplicate)) ? $redirect->with('warning', $warning) : $redirect;
     }
 
     /** Dates of this user's seller applications rejected in the last 30 days, newest first (soft-deleted ones included). */

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import type { BreadcrumbItem } from '@/types';
 
 type Permit = {
@@ -38,6 +39,7 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
     // One upload dialog for renewals and extra documents
     const [target, setTarget] = useState<{ doc_type: string; title: string; needsDate: boolean } | null>(null);
     const form = useForm<{ doc_type: string; label: string; file: File | null; expires_at: string }>({ doc_type: '', label: '', file: null, expires_at: '' });
+    const [fileProblem, setFileProblem] = useState<string | null>(null);
 
     function open(doc_type: string, title: string, needsDate: boolean) {
         form.reset();
@@ -155,9 +157,17 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                             </div>
                         )}
                         <div className="grid gap-1.5">
-                            <Label htmlFor="doc_file">File (JPG, PNG or PDF, up to 5 MB)</Label>
-                            <Input id="doc_file" type="file" accept=".jpg,.jpeg,.png,.pdf" onChange={(e) => form.setData('file', e.target.files?.[0] ?? null)} />
-                            <InputError message={form.errors.file} />
+                            <Label htmlFor="doc_file">File (JPG, PNG, WEBP or PDF, up to 5 MB)</Label>
+                            <Input id="doc_file" type="file" accept={DOCUMENT_ACCEPT} onChange={async (e) => {
+                                const picked = e.target.files?.[0] ?? null;
+                                if (!picked) { form.setData('file', null); return; }
+                                // Any photo → real JPEG (a ".jpg" saved from Google is often a WEBP); PDFs unchanged
+                                const { file: ready, problem } = await prepareDocumentFile(picked);
+                                setFileProblem(problem ?? null);
+                                form.setData('file', ready ?? null);
+                                if (!ready) e.target.value = '';
+                            }} />
+                            <InputError message={fileProblem ?? form.errors.file} />
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="doc_expires">Valid until{target?.needsDate ? '' : ' (optional)'}</Label>

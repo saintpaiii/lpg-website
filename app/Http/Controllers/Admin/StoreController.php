@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AccountAction;
 use App\Models\Store;
 use App\Models\VerificationRequest;
+use App\Services\DocumentOcrService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -60,6 +61,8 @@ class StoreController extends Controller
                 'deleted_at'     => $s->deleted_at?->format('M d, Y'),
                 'owner_name'     => $s->owner?->name ?? '—',
                 'owner_email'    => $s->owner?->email ?? '—',
+                // Saved at registration / rename (DuplicateStoreService) — a warning, not a decision
+                'possible_duplicate' => ! empty($s->duplicate_flags['matches'] ?? []),
             ]),
             'counts' => $counts,
             'tab'    => $tab,
@@ -67,7 +70,7 @@ class StoreController extends Controller
         ]);
     }
 
-    public function show(Store $store): Response
+    public function show(Request $request, Store $store): Response
     {
         $store->loadMissing(['owner', 'approvedBy']);
 
@@ -182,17 +185,100 @@ class StoreController extends Controller
                     'reviewer'    => $d->reviewer?->name,
                     'reason'      => $d->rejection_reason,
                     'url'         => PrivateDocument::url('store-document', $d->id, 'file_path'),
+                    'is_other'    => $d->doc_type === 'other',
+                    'ocr_key'     => 'sub-' . $d->id,
+                    'ocr'         => DocumentOcrController::present($d->ocr),
                 ])->values(),
+
+            // ── Review aids ──────────────────────────────────────────────────
+            'checklist'       => collect(config('store_checklist'))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+            'approvalChecks'  => $this->approvalChecks($store),
+            'duplicates'      => array_values($store->duplicate_flags['matches'] ?? []),
+            'ocrEnabled'      => DocumentOcrService::enabled(),
+            // Auto-read results of the required documents + the owner's ID (null = not read yet; key missing = no file)
+            'documentOcr'     => $this->requiredOcr($store),
+            'canReviewDocuments' => (bool) $request->user()?->canReviewDocuments(),
+            'canApprove'      => $request->user()?->isAdmin() || $request->user()?->hasPermission('verifications.view'),
         ]);
     }
 
+    /** Saved checklist for the read-only view; null when nothing was saved. */
+    private function approvalChecks(Store $store): ?array
+    {
+        $c = $store->approval_checks;
+        if (! $c) {
+            return null;
+        }
+        $labels = config('store_checklist');
+
+        return [
+            'items'   => collect($c['items'] ?? [])->filter()->keys()->map(fn ($k) => $labels[$k] ?? $k)->values(),
+            'note'    => $c['note'] ?? null,
+            'by_name' => $c['by_name'] ?? null,
+            'at'      => isset($c['at']) ? \Illuminate\Support\Carbon::parse($c['at'])->timezone('Asia/Manila')->format('M j, Y g:i A') : null,
+        ];
+    }
+
+    private function requiredOcr(Store $store): array
+    {
+        $saved = (array) ($store->document_ocr ?? []);
+        $out   = [];
+        foreach (['valid_id', ...array_keys(StoreDocuments::TYPES)] as $key) {
+            [$path] = DocumentOcrController::requiredDocument($store, $key);
+            if ($path) {
+                $out[$key] = DocumentOcrController::present($saved[$key] ?? null);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Approve a seller application — only from the store page, with every item of the "Before you approve" checklist
+     * ticked (config/store_checklist.php). Same access as Verifications (route middleware permission:verifications.view).
+     */
     public function approve(Request $request, Store $store): RedirectResponse
     {
-        $store->update([
-            'status'      => 'approved',
-            'approved_at' => now(),
-            'approved_by' => $request->user()->id,
+        if ($store->status !== 'pending') {
+            return back()->with('error', 'This store is not waiting for approval.');
+        }
+
+        $keys = array_keys(config('store_checklist'));
+        $data = $request->validate([
+            'checks'   => ['required', 'array'],
+            ...collect($keys)->mapWithKeys(fn ($k) => ["checks.$k" => ['required', 'accepted']])->all(),
+            'note'     => ['nullable', 'string', 'max:500'],
+        ], [
+            'checks.required' => 'Tick every check before approving.',
+            ...collect($keys)->mapWithKeys(fn ($k) => ["checks.$k.required" => 'Tick every check before approving.', "checks.$k.accepted" => 'Tick every check before approving.'])->all(),
         ]);
+
+        $approved = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $request, $keys, $data) {
+            // Lock the row: two admins clicking Approve at once approve (and start the trial) only once
+            $row = Store::whereKey($store->id)->lockForUpdate()->first();
+            if (! $row || $row->status !== 'pending') {
+                return false;
+            }
+
+            $row->update([
+                'status'          => 'approved',
+                'approved_at'     => now(),
+                'approved_by'     => $request->user()->id,
+                'approval_checks' => [
+                    'items'   => collect($keys)->mapWithKeys(fn ($k) => [$k => true])->all(),
+                    'note'    => ($data['note'] ?? null) ?: null,
+                    'by_id'   => $request->user()->id,
+                    'by_name' => $request->user()->name,
+                    'at'      => now()->toIso8601String(),
+                ],
+            ]);
+
+            return true;
+        });
+        if (! $approved) {
+            return back()->with('error', 'This store is not waiting for approval.');
+        }
+        $store->refresh();
 
         // Mark owner's ID as verified
         $store->owner?->update([
@@ -214,7 +300,32 @@ class StoreController extends Controller
         // The one-time 30-day Premium trial (never a second time)
         \App\Services\SubscriptionService::startTrial($store->fresh());
 
+        $this->welcomeSeller($store);
+
         return back()->with('success', "{$store->store_name} has been approved.");
+    }
+
+    /** After approval: a customer who applied through "Become a seller" becomes a seller, and the owner is told. */
+    private function welcomeSeller(Store $store): void
+    {
+        $owner = $store->owner;
+        if (! $owner) {
+            return;
+        }
+        if ($owner->role === 'customer') {
+            $owner->update(['role' => 'seller']);
+        }
+        if (! $owner->store_id) {
+            $owner->update(['store_id' => $store->id]);
+        }
+
+        \App\Services\NotificationService::send(
+            $owner->id,
+            'system',
+            'Your store has been approved!',
+            'Congratulations! Your seller application has been approved. You can now access the Seller Portal.',
+            ['link' => '/seller/dashboard']
+        );
     }
 
     public function reject(Request $request, Store $store): RedirectResponse

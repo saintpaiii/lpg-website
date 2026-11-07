@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Admin → Reviews: moderate customer reviews (remove a photo, delete a review). Platform admin only.
+ * Admin → Reviews: moderate customer reviews (remove a photo, delete a review). Platform admin only (not platform staff).
  * Note: reviews removed by a database cascade (user / product / order deleted) leave their photo files on disk.
  */
 class ReviewController extends Controller
@@ -116,6 +116,7 @@ class ReviewController extends Controller
 
     private function ensureAdmin(Request $request): void
     {
-        abort_unless($request->user()?->isAdmin(), 403);
+        // Platform admin only — platform staff (role admin + is_platform_staff) are refused
+        abort_unless($request->user()?->isPlatformAdmin(), 403);
     }
 }

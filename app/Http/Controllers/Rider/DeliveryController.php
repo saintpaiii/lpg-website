@@ -289,12 +289,12 @@ class DeliveryController extends Controller
             'notes'             => 'nullable|string|max:500',
             ...Delivery::failureRules($request),
             'location_note'     => 'nullable|string|max:255',
-            'photo'             => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg|max:5120',
+            'photo'             => ($needsPhoto ? 'required' : 'nullable') . '|image|mimes:jpeg,png,jpg,webp|max:5120',
             'rider_latitude'    => 'nullable|numeric|between:-90,90',
             'rider_longitude'   => 'nullable|numeric|between:-180,180',
             'rider_accuracy'    => 'nullable|numeric|min:0',
             'empty_tanks_collected' => 'nullable|boolean',
-        ], Delivery::failureMessages());
+        ], Delivery::failureMessages() + \App\Support\UploadMessages::for(['photo'], false));
 
         $newStatus = $data['status'];
 

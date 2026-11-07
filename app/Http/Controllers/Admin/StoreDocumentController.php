@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\StoreDocumentSubmission;
 use App\Services\NotificationService;
 use App\Services\StoreDocumentService;
+use App\Services\DuplicateStoreService;
 use App\Support\PrivateDocument;
 use App\Support\StoreDocuments;
 use Illuminate\Http\RedirectResponse;
@@ -64,6 +65,9 @@ class StoreDocumentController extends Controller
                     'submitted_on'    => $d->created_at->timezone('Asia/Manila')->format('M d, Y g:i A'),
                     'submitted_by'    => $d->submitter?->name,
                     'url'             => PrivateDocument::url('store-document', $d->id, 'file_path'),
+                    // Auto-read (OCR) — read one by one by the page when null
+                    'ocr_key'         => 'sub-' . $d->id,
+                    'ocr'             => DocumentOcrController::present($d->ocr),
                 ];
             })->values();
 
@@ -76,6 +80,7 @@ class StoreDocumentController extends Controller
             'missing'  => $rows['missing'],
             'counts'   => ['pending' => $pending->count(), 'expiring' => count($rows['expiring']), 'expired' => count($rows['expired']), 'missing' => count($rows['missing'])],
             'max_date' => StoreDocuments::today()->addYears(5)->toDateString(),
+            'ocr_enabled' => \App\Services\DocumentOcrService::enabled(),
         ]);
     }
 
@@ -103,7 +108,21 @@ class StoreDocumentController extends Controller
                 if ($column) {
                     $updates[$column] = $submission->expires_at;
                 }
-                $submission->store->update($updates);
+                // Its auto-read result and file hash (duplicate check) now describe the store's current permit
+                $store  = Store::whereKey($submission->store_id)->lockForUpdate()->first();
+                $ocr    = (array) ($store->document_ocr ?? []);
+                $hashes = (array) ($store->document_hashes ?? []);
+                if ($submission->ocr) {
+                    $ocr[$submission->doc_type] = $submission->ocr;
+                } else {
+                    unset($ocr[$submission->doc_type]);
+                }
+                if ($h = DuplicateStoreService::hashStored($submission->file_path)) {
+                    $hashes[$submission->doc_type] = $h;
+                }
+                $updates['document_ocr']    = $ocr ?: null;
+                $updates['document_hashes'] = $hashes ?: null;
+                $store->update($updates);
             }
         });
 

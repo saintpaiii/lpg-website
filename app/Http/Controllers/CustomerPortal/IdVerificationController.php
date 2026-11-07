@@ -131,12 +131,12 @@ class IdVerificationController extends Controller
         }
 
         $request->validate([
-            'valid_id' => ['required', File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024)],
-            'selfie'   => ['required', File::types(['jpg', 'jpeg', 'png'])->max(5 * 1024)],
+            'valid_id' => ['required', File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024)],
+            'selfie'   => ['required', File::types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
         ], [
             'valid_id.required' => 'Please upload a photo of your valid ID.',
             'selfie.required'   => 'Please provide a selfie photo.',
-        ]);
+        ] + \App\Support\UploadMessages::for(['valid_id']) + \App\Support\UploadMessages::for(['selfie'], false));
 
         // Store uploaded files
         // Private ('local' disk) — only the customer and document reviewers can open them

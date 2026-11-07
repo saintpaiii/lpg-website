@@ -69,7 +69,7 @@ class StoreDocumentController extends Controller
         $data = $request->validate([
             'doc_type'   => ['required', Rule::in([...$types, 'other'])],
             'label'      => ['required_if:doc_type,other', 'nullable', 'string', 'max:100'],
-            'file'       => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'file'       => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
             'expires_at' => [
                 Rule::requiredIf(fn () => StoreDocuments::expiryColumn((string) $request->input('doc_type')) !== null),
                 'nullable', 'date', 'after:today', 'before_or_equal:' . StoreDocuments::today()->addYears(5)->toDateString(),
@@ -79,7 +79,7 @@ class StoreDocumentController extends Controller
             'expires_at.required' => 'Please enter the date this document is valid until.',
             'expires_at.after'    => 'The document must still be valid (date after today).',
             'file.max'            => 'The file must be 5 MB or smaller.',
-        ]);
+        ] + \App\Support\UploadMessages::for(['file']));
 
         $type  = $data['doc_type'];
         $label = $type === 'other' ? trim($data['label']) : null;

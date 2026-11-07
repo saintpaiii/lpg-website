@@ -9,6 +9,8 @@ use App\Models\VerificationRequest;
 use App\Services\LegalService;
 use App\Support\StoreDocuments;
 use App\Services\NotificationService;
+use App\Services\DuplicateStoreService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -31,10 +33,19 @@ class SellerRegistrationController extends Controller
         return Inertia::render('auth/seller-register', LegalService::sellerTermsProps());
     }
 
-    /** POST /seller/register */
-    public function store(Request $request): RedirectResponse
+    /** GET /seller/register/check-name?name= — only {exists, count, cities}; the caller's own store is never counted. */
+    public function checkName(Request $request): \Illuminate\Http\JsonResponse
     {
-        $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'pdf'])->max(5 * 1024);
+        $name = mb_substr(trim((string) $request->query('name', '')), 0, 255);
+        $own  = $request->user() ? Store::where('user_id', $request->user()->id)->value('id') : null;
+
+        return response()->json(DuplicateStoreService::nameSummary($name, $own));
+    }
+
+    /** POST /seller/register */
+    public function store(Request $request): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024);
 
         $validated = $request->validate([
             // Owner account
@@ -60,7 +71,7 @@ class SellerRegistrationController extends Controller
             'lto_permit'            => ['required', $fileRule()],
 
             // Optional store logo (same rule as Seller Settings)
-            'logo'                  => ['nullable', 'image', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'logo'                  => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
 
             // Store pin (required — delivery fees and staff clock-in use it)
             'latitude'              => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
@@ -69,11 +80,33 @@ class SellerRegistrationController extends Controller
             // Permit "Valid until" dates
             ...StoreDocuments::expiryRules(),
 
+            // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
+            ...StoreDocuments::otherDocumentRules(),
+
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit']) + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
-        DB::transaction(function () use ($request, $validated) {
+        $otherRows = StoreDocuments::filledOtherRows($request);
+        StoreDocuments::assertOtherRowsAllowed($otherRows);
+
+        // Duplicate store? A true duplicate is refused; anything else is a warning (seller + admin)
+        $hashes    = DuplicateStoreService::hashUploads($request);
+        $duplicate = DuplicateStoreService::check([
+            'store_name' => $validated['store_name'],
+            'address'    => $validated['store_address'],
+            'barangay'   => $validated['store_barangay'],
+            'city'       => $validated['store_city'],
+            'latitude'   => $validated['latitude'],
+            'longitude'  => $validated['longitude'],
+            'phones'     => [$validated['phone']],
+            'hashes'     => $hashes,
+        ]);
+        if ($duplicate['block']) {
+            throw ValidationException::withMessages([$duplicate['block']['field'] => $duplicate['block']['message']]);
+        }
+
+        $store = DB::transaction(function () use ($request, $validated, $otherRows, $hashes, $duplicate) {
             // Store uploaded documents — private ('local' disk, served only to the owner and reviewers)
             $validIdPath        = $request->file('valid_id')->store('valid_ids', 'local');
             $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'local');
@@ -122,7 +155,11 @@ class SellerRegistrationController extends Controller
                 'status'           => 'pending',
                 'subscription_plan'=> 'none',
                 'is_featured'      => false,
+                'document_hashes'  => $hashes ?: null,
+                'duplicate_flags'  => DuplicateStoreService::flags($duplicate),
             ]);
+
+            StoreDocuments::saveOtherDocuments($request, $store, $otherRows, $user->id);
 
             // Link seller user to their store
             $user->update(['store_id' => $store->id]);
@@ -145,15 +182,28 @@ class SellerRegistrationController extends Controller
             LegalService::accept($user, LegalService::currentIds(['seller_terms', 'privacy_policy']), 'seller_application', $request);
 
             // Email is verified with a 6-digit code on /verify-otp (no link email)
+
+            return $store;
         });
 
         NotificationService::sendToRole(
             'admin',
             'system',
             'New seller application',
-            "{$validated['name']} submitted a seller application for \"{$validated['store_name']}\".",
-            []
+            "{$validated['name']} submitted a seller application for \"{$validated['store_name']}\"."
+                . ($duplicate['matches'] ? ' Possible duplicate — check the store page.' : ''),
+            ['link' => "/admin/stores/{$store->id}", 'store_id' => $store->id]
         );
+
+        // Not blocking: "same name elsewhere" / "another store within 50 m" — shown on the pending page
+        if ($warning = DuplicateStoreService::sellerWarning($duplicate)) {
+            session()->flash('warning', $warning);
+        }
+
+        // The page posts with axios: answer with JSON so the flash survives until it opens /seller/pending
+        if ($request->wantsJson()) {
+            return response()->json(['redirect' => route('seller.pending', absolute: false), 'warning' => $warning]);
+        }
 
         return redirect()->route('seller.pending');
     }

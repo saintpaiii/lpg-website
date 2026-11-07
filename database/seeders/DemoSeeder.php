@@ -899,6 +899,86 @@ class DemoSeeder extends Seeder
         ]);
 
         // ══════════════════════════════════════════════════════════════════════
+        // 14. PENDING SELLER APPLICATION (defense demo: checklist, extra document, duplicate warning)
+        //     Same name as store 1 but in another city → "Possible duplicate" warning only (not blocked).
+        //     No OCR here — the admin page reads documents when it is opened (files below don't exist → "File not found").
+        // ══════════════════════════════════════════════════════════════════════
+        $seller3Id = DB::table('users')->insertGetId([
+            'name'              => 'Liza Mercado',
+            'email'             => 'seller3@lpg.com',
+            'password'          => Hash::make('Password@123'),
+            'phone'             => '09171000003',
+            'role'              => 'seller',
+            'is_admin'          => false,
+            'is_platform_staff' => false,
+            'is_active'         => true,
+            'id_verified'       => false,
+            'email_verified_at' => $this->now,
+            'created_at'        => $this->now->copy()->subDays(1),
+            'updated_at'        => $this->now,
+        ]);
+        $store3Id = DB::table('stores')->insertGetId([
+            'user_id'                    => $seller3Id,
+            'store_name'                 => 'Petron Gasul Cavite',
+            'description'                => 'Family-run LPG refilling station in Dasmariñas.',
+            'address'                    => '88 Aguinaldo Hwy., Salitran II',
+            'city'                       => 'Dasmariñas',
+            'barangay'                   => 'Salitran II',
+            'province'                   => 'Cavite',
+            'phone'                      => '09171000003',
+            'email'                      => 'seller3@lpg.com',
+            'bir_permit'                 => 'bir_permits/demo-store3-bir.pdf',
+            'business_permit'            => 'business_permits/demo-store3-bp.pdf',
+            'fsic_permit'                => 'fsic_permits/demo-store3-fsic.pdf',
+            'doe_lpg_license'            => 'doe_licenses/demo-store3-doe.pdf',
+            'lto_permit'                 => 'lto_permits/demo-store3-lto.pdf',
+            'business_permit_expires_at' => $this->now->copy()->addMonths(10)->toDateString(),
+            'fsic_permit_expires_at'     => $this->now->copy()->addMonths(8)->toDateString(),
+            'doe_lpg_license_expires_at' => $this->now->copy()->addMonths(14)->toDateString(),
+            'lto_permit_expires_at'      => $this->now->copy()->addMonths(6)->toDateString(),
+            'latitude'                   => 14.3294,
+            'longitude'                  => 120.9367,
+            'status'                     => 'pending',
+            'subscription_plan'          => 'none',
+            'is_featured'                => false,
+            'duplicate_flags'            => json_encode([
+                'checked_at' => $this->now->toIso8601String(),
+                'matches'    => [[
+                    'store_id' => $store1Id, 'store_name' => 'Petron Gasul Cavite', 'city' => 'Imus', 'status' => 'approved',
+                    'fields' => ['same_name'], 'documents' => [], 'distance_m' => null,
+                ]],
+            ]),
+            'created_at'                 => $this->now->copy()->subDays(1),
+            'updated_at'                 => $this->now,
+        ]);
+        DB::table('users')->where('id', $seller3Id)->update(['store_id' => $store3Id]);
+        DB::table('verification_requests')->insert([
+            'user_id'              => $seller3Id,
+            'type'                 => 'seller_application',
+            'valid_id_path'        => 'valid_ids/demo-seller3-id.jpg',
+            'bir_permit_path'      => 'bir_permits/demo-store3-bir.pdf',
+            'business_permit_path' => 'business_permits/demo-store3-bp.pdf',
+            'fsic_permit_path'     => 'fsic_permits/demo-store3-fsic.pdf',
+            'doe_lpg_license_path' => 'doe_licenses/demo-store3-doe.pdf',
+            'lto_permit_path'      => 'lto_permits/demo-store3-lto.pdf',
+            'status'               => 'pending',
+            'terms_agreed_at'      => $this->now->copy()->subDays(1),
+            'created_at'           => $this->now->copy()->subDays(1),
+            'updated_at'           => $this->now->copy()->subDays(1),
+        ]);
+        DB::table('store_document_submissions')->insert([
+            'store_id'     => $store3Id,
+            'doc_type'     => 'other',
+            'label'        => 'DTI Business Name',
+            'file_path'    => 'store_documents/demo-store3-dti.pdf',
+            'expires_at'   => $this->now->copy()->addYears(4)->toDateString(),
+            'status'       => 'pending',
+            'submitted_by' => $seller3Id,
+            'created_at'   => $this->now->copy()->subDays(1),
+            'updated_at'   => $this->now->copy()->subDays(1),
+        ]);
+
+        // ══════════════════════════════════════════════════════════════════════
         // Summary
         // ══════════════════════════════════════════════════════════════════════
         $this->command->info('');
@@ -913,6 +993,7 @@ class DemoSeeder extends Seeder
         $this->command->info('  SELLERS');
         $this->command->info('    seller1@lpg.com      / Password@123  — Petron Gasul Cavite [approved, premium]');
         $this->command->info('    seller2@lpg.com      / Password@123  — Solane Direct Bacoor [approved, free]');
+        $this->command->info('    seller3@lpg.com      / Password@123  — Petron Gasul Cavite (Dasmariñas) [PENDING — checklist + duplicate demo]');
         $this->command->info('');
         $this->command->info('  SELLER STAFF  (all: Password@123)');
         $this->command->info('    rider1@lpg.com       — Store 1 Rider     (Juan Garcia)');

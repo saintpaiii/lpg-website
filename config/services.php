@@ -35,6 +35,12 @@ return [
         ],
     ],
 
+    // Admin "Auto-read" of seller documents (warnings only). No key → skipped silently.
+    'ocr_space' => [
+        'key' => env('OCR_SPACE_API_KEY'),
+        'url' => 'https://api.ocr.space/parse/image',
+    ],
+
     'google' => [
         'client_id'     => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

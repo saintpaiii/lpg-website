@@ -1,0 +1,1 @@
+import{f as o}from"./map-fkX1XJ0d.js";import{c as a,d as n,e as i}from"./leaflet-zup3MK8i.js";import{u as l}from"./circle-CTTQ_XKB.js";const d=a(function({center:r,children:m,...t},c){const e=new o.Circle(r,t);return n(e,i(c,{overlayContainer:e}))},l);export{d as C};

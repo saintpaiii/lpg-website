@@ -66,7 +66,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // ── Seller Registration & Pending (accessible without seller middleware) ─────
 Route::get('/seller/register', [SellerRegistrationController::class, 'create'])->name('seller.register');
-Route::post('/seller/register', [SellerRegistrationController::class, 'store'])->name('seller.register.store');
+Route::post('/seller/register', [SellerRegistrationController::class, 'store'])->middleware('throttle:10,1')->name('seller.register.store');
+// "A store with this name already exists in …" while typing (guest page AND become-seller — no guest middleware).
+// Returns only {exists, count, cities}.
+Route::get('/seller/register/check-name', [SellerRegistrationController::class, 'checkName'])->middleware('throttle:20,1')->name('seller.register.check-name');
 Route::get('/seller/pending', fn () => inertia('auth/seller-pending'))->name('seller.pending');
 
 require __DIR__.'/settings.php';

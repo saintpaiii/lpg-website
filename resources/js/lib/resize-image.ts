@@ -58,6 +58,63 @@ export async function resizeImage(file: File, maxSide = MAX_SIDE, quality = QUAL
     }
 }
 
+// ── IDs, selfies, permits, documents, logos, proof photos ──────────────────
+
+/** File inputs for documents: images (any the browser opens are converted to JPEG) + PDF */
+export const DOCUMENT_ACCEPT = 'image/jpeg,image/png,image/webp,application/pdf';
+/** File inputs for photos only (no PDF) */
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+
+const HEIC_MESSAGE = "iPhone HEIC photos aren't supported — choose JPG or PNG";
+
+async function isPdf(file: File): Promise<boolean> {
+    if (file.type === 'application/pdf') return true;
+    try {
+        const head = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+        return String.fromCharCode(...head) === '%PDF-';
+    } catch {
+        return /\.pdf$/i.test(file.name);
+    }
+}
+
+/**
+ * Get a picked file ready for upload. Photos saved from Google / Facebook / Messenger are often WEBP even when
+ * named ".jpg" (the browser trusts the name), so EVERY image is re-encoded to a real JPEG here (longest side
+ * 2000 px, quality 0.9 so document text stays readable) and keeps its name with ".jpg". PDFs pass unchanged.
+ * Returns { file } or { problem } (HEIC, not an image, PDF where only photos are allowed).
+ */
+export async function prepareDocumentFile(
+    file: File,
+    { allowPdf = true, maxSide = 2000, quality = 0.9 }: { allowPdf?: boolean; maxSide?: number; quality?: number } = {},
+): Promise<{ file?: File; problem?: string }> {
+    if (await isPdf(file)) {
+        return allowPdf ? { file } : { problem: 'Use a JPG, PNG or WEBP photo.' };
+    }
+    if (isHeic(file)) return { problem: HEIC_MESSAGE };
+
+    let img: HTMLImageElement;
+    try {
+        img = await loadImage(file);
+    } catch {
+        return { problem: allowPdf ? "This file can't be opened as a photo — use a JPG, PNG, WEBP or PDF file." : "This file can't be opened as a photo — use a JPG, PNG or WEBP file." };
+    }
+
+    const scale  = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width  = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return { file };
+    ctx.fillStyle = '#fff';   // transparency → white
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', quality));
+    if (!blob) return { file };
+    const name = (file.name.replace(/\.[^.]+$/, '') || 'photo') + '.jpg';
+    return { file: new File([blob], name, { type: 'image/jpeg', lastModified: Date.now() }) };
+}
+
 /**
  * Check + resize a picked list. Returns the usable files and the problems (one message per rejected file).
  */

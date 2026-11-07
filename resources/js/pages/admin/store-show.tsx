@@ -16,6 +16,8 @@ import {
     PhilippinePeso,
     ShoppingCart,
     XCircle,
+    AlertTriangle,
+    ShieldCheck,
 } from 'lucide-react';
 import { useState } from 'react';
 import {
@@ -38,6 +40,8 @@ import StoreLocationLink from '@/components/store-location-link';
 import type { BreadcrumbItem } from '@/types';
 import { formatAddress } from '@/data/cavite-locations';
 import DocumentRow, { DocumentHeading } from '@/components/document-row';
+import { AUTO_READ_DISCLAIMER, AutoReadLine, useAutoRead, type OcrResult } from '@/components/document-auto-read';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ReasonPicker, ReasonTextPicker } from '@/components/reason-picker';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -80,6 +84,30 @@ type StoreDetail = {
 type DocumentHistoryRow = {
     id: number; label: string; date: string; expires_on: string | null;
     status: 'pending' | 'approved' | 'rejected'; reviewer: string | null; reason: string | null; url: string;
+    is_other?: boolean; ocr_key?: string; ocr?: OcrResult;
+};
+
+type DuplicateMatch = {
+    store_id: number; store_name: string; city: string | null; status: string;
+    fields: string[]; documents?: string[]; distance_m?: number | null;
+};
+
+type ApprovalChecks = { items: string[]; note: string | null; by_name: string | null; at: string | null } | null;
+
+const DUPLICATE_FIELD_LABEL: Record<string, string> = {
+    same_name:     'same name',
+    near_location: 'pinned within 50 m',
+    same_address:  'same address',
+    same_phone:    'same phone number',
+    same_files:    'same document file',
+};
+
+/** Which auto-read results to show next to each checklist item */
+const CHECK_SOURCES: Record<string, { keys: string[]; only?: RegExp }> = {
+    id_matches_owner:   { keys: ['valid_id'] },
+    bir_matches:        { keys: ['bir_permit'] },
+    permits_readable:   { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'] },
+    expiry_dates_match: { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'], only: /expiry|date/i },
 };
 
 type ActionHistory = {
@@ -128,6 +156,14 @@ type Props = {
     visibility?: { visible: boolean; reasons: { code: string; text: string }[] } | null;
     history: ActionHistory[];
     documentHistory: DocumentHistoryRow[];
+    checklist?: { key: string; label: string }[];
+    approvalChecks?: ApprovalChecks;
+    duplicates?: DuplicateMatch[];
+    ocrEnabled?: boolean;
+    /** valid_id + required doc types that have a file → saved result (null = not read yet) */
+    documentOcr?: Record<string, OcrResult>;
+    canReviewDocuments?: boolean;
+    canApprove?: boolean;
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -159,7 +195,10 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function StoreShow({ store, stats, subscription, visibility, history, documentHistory }: Props) {
+export default function StoreShow({
+    store, stats, subscription, visibility, history, documentHistory,
+    checklist = [], approvalChecks = null, duplicates = [], ocrEnabled = false, documentOcr = {}, canReviewDocuments = false, canApprove = false,
+}: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/admin/dashboard' },
         { title: 'Stores',    href: '/admin/stores' },
@@ -174,9 +213,38 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
     const suspendForm = useForm({ reason: '', notes: '' });
 
 
+    // "Before you approve": every item ticked + optional note (saved with the approval)
+    const approveForm = useForm<{ checks: Record<string, boolean>; note: string }>({ checks: {}, note: '' });
+    const allChecked = checklist.length > 0 && checklist.every((c) => approveForm.data.checks[c.key]);
+    const approveError = approveForm.errors.checks
+        ?? Object.entries(approveForm.errors).find(([k]) => k.startsWith('checks.'))?.[1]
+        ?? approveForm.errors.note;
+
     function approve() {
-        router.patch(`/admin/stores/${store.id}/approve`);
+        if (!allChecked) return;
+        approveForm.patch(`/admin/stores/${store.id}/approve`, { preserveScroll: true });
     }
+
+    // Auto-read (OCR): required documents + the owner's ID + documents uploaded later, read one by one
+    const ocrJobs: Record<string, number> = {};
+    const ocrInitial: Record<string, OcrResult> = {};
+    for (const [k, v] of Object.entries(documentOcr)) { ocrJobs[k] = store.id; ocrInitial[k] = v; }
+    for (const d of documentHistory) if (d.ocr_key) { ocrJobs[d.ocr_key] = store.id; ocrInitial[d.ocr_key] = d.ocr ?? null; }
+    const autoRead = useAutoRead(ocrJobs, ocrInitial, ocrEnabled && canReviewDocuments);
+    const ocrLine = (key: string) => key in ocrJobs ? (
+        <AutoReadLine
+            result={autoRead.results[key] ?? null} reading={autoRead.reading === key} enabled={ocrEnabled}
+            canRead={canReviewDocuments} onReadAgain={() => autoRead.readAgain(key)}
+        />
+    ) : null;
+    const checkHints = (key: string): string[] => {
+        if (key === 'no_duplicate_concern') {
+            return duplicates.length ? [`${duplicates.length} possible duplicate${duplicates.length > 1 ? 's' : ''} — see the red box`] : [];
+        }
+        const src = CHECK_SOURCES[key];
+        if (!src) return [];
+        return src.keys.flatMap((k) => (autoRead.results[k]?.warnings ?? []).filter((w) => !src.only || src.only.test(w)));
+    };
 
     function submitReject() {
         rejectForm.patch(`/admin/stores/${store.id}/reject`, {
@@ -254,9 +322,16 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                                 <Button onClick={() => setShowReject(true)} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
                                     <XCircle className="h-4 w-4 mr-1.5" /> Reject
                                 </Button>
-                                <Button onClick={approve} className="bg-green-600 hover:bg-green-700 text-white">
-                                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
-                                </Button>
+                                {canApprove && (
+                                    <Button
+                                        onClick={() => (allChecked ? approve() : document.getElementById('approve-checklist')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))}
+                                        disabled={approveForm.processing}
+                                        title={allChecked ? undefined : 'Tick every item in "Before you approve" first'}
+                                        className={`text-white ${allChecked ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600/50 hover:bg-green-600/60'}`}
+                                    >
+                                        <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
+                                    </Button>
+                                )}
                             </>
                         )}
                         {store.status === 'approved' && (
@@ -359,16 +434,25 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                             <div className="pt-2 border-t space-y-2">
                                 <DocumentHeading>Documents</DocumentHeading>
                                 <div className="space-y-2">
-                                    <DocumentRow label="Valid ID (Owner)">
-                                        <DocLink url={store.valid_id_url} label="View" />
-                                    </DocumentRow>
-                                    {store.permits.map((p) => (
-                                        <DocumentRow key={p.type} label={p.label}>
-                                            <PermitBadge p={p} />
-                                            <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
+                                    <div>
+                                        <DocumentRow label="Valid ID (Owner)">
+                                            <DocLink url={store.valid_id_url} label="View" />
                                         </DocumentRow>
+                                        {ocrLine('valid_id')}
+                                    </div>
+                                    {store.permits.map((p) => (
+                                        <div key={p.type}>
+                                            <DocumentRow label={p.label}>
+                                                <PermitBadge p={p} />
+                                                <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
+                                            </DocumentRow>
+                                            {ocrLine(p.type)}
+                                        </div>
                                     ))}
                                 </div>
+                                {Object.keys(documentOcr).length > 0 && (
+                                    <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+                                )}
                             </div>
 
                             <div className="pt-2 border-t">
@@ -386,6 +470,92 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Possible duplicates (saved at registration / rename) — a warning, the admin decides */}
+                {duplicates.length > 0 && (
+                    <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+                        <p className="flex items-center gap-1.5 font-semibold"><AlertTriangle className="h-4 w-4 shrink-0" /> Possible duplicate store</p>
+                        <ul className="mt-1.5 space-y-1">
+                            {duplicates.map((m) => (
+                                <li key={m.store_id} className="break-words">
+                                    <Link href={`/admin/stores/${m.store_id}`} className="font-medium underline">{m.store_name}</Link>
+                                    {m.city && ` (${m.city})`} · <span className="capitalize">{m.status}</span> — {m.fields.map((x) => DUPLICATE_FIELD_LABEL[x] ?? x).join(', ')}
+                                    {m.documents && m.documents.length > 0 && ` (${m.documents.join(', ')})`}
+                                    {m.distance_m != null && ` · ${m.distance_m} m away`}
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="mt-1.5 text-xs">Check these before approving (checklist: “Duplicate warnings checked”).</p>
+                    </div>
+                )}
+
+                {/* Before you approve — every item must be ticked */}
+                {store.status === 'pending' && canApprove && checklist.length > 0 && (
+                    <Card id="approve-checklist" className="scroll-mt-20 border-green-200 dark:border-green-900">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-green-600" /> Before you approve</CardTitle>
+                            <p className="text-xs text-muted-foreground">Tick each item after checking it yourself. {AUTO_READ_DISCLAIMER}</p>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {checklist.map((c) => {
+                                const hints = checkHints(c.key);
+                                return (
+                                    <label key={c.key} className="flex cursor-pointer items-start gap-2.5 text-sm">
+                                        <Checkbox
+                                            className="mt-0.5"
+                                            checked={!!approveForm.data.checks[c.key]}
+                                            onCheckedChange={(v) => approveForm.setData('checks', { ...approveForm.data.checks, [c.key]: v === true })}
+                                        />
+                                        <span className="min-w-0">
+                                            <span>{c.label}</span>
+                                            {hints.map((h, i) => (
+                                                <span key={i} className="mt-0.5 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
+                                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> <span className="break-words">{h}</span>
+                                                </span>
+                                            ))}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                            <div className="grid gap-1">
+                                <label htmlFor="approve-note" className="text-xs font-medium text-muted-foreground">Note (optional)</label>
+                                <textarea
+                                    id="approve-note" rows={2} maxLength={500} value={approveForm.data.note}
+                                    onChange={(e) => approveForm.setData('note', e.target.value)}
+                                    placeholder="e.g. Called the owner to confirm the address."
+                                    className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                />
+                            </div>
+                            {approveError && <p className="text-sm text-red-600">{approveError}</p>}
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                {!allChecked && <span className="text-xs text-muted-foreground">Tick every item to approve.</span>}
+                                <Button onClick={approve} disabled={!allChecked || approveForm.processing} className="bg-green-600 text-white hover:bg-green-700">
+                                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> {approveForm.processing ? 'Approving…' : 'Approve store'}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Saved checklist (read-only) */}
+                {store.status !== 'pending' && store.approved_at && (
+                    approvalChecks ? (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-green-600" /> Approval checklist</CardTitle>
+                                <p className="text-xs text-muted-foreground">Checked by {approvalChecks.by_name ?? '—'}{approvalChecks.at ? ` on ${approvalChecks.at}` : ''}</p>
+                            </CardHeader>
+                            <CardContent className="space-y-1.5 text-sm">
+                                {approvalChecks.items.map((i) => (
+                                    <p key={i} className="flex items-start gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" /> {i}</p>
+                                ))}
+                                {approvalChecks.note && <p className="mt-2 rounded bg-muted px-3 py-2 text-xs italic">“{approvalChecks.note}”</p>}
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">Approved before the checklist existed.</p>
+                    )
+                )}
 
                 {/* Hidden from customers? */}
                 {visibility && !visibility.visible && (
@@ -526,7 +696,13 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                 {/* Renewed permits / extra documents uploaded by the store */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Document history</CardTitle>
+                        <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                            <span>Document history</span>
+                            {documentHistory.some((d) => d.status === 'pending') && (
+                                <Link href="/admin/store-documents" className="text-sm font-normal text-blue-600 hover:underline">Review in Store Documents →</Link>
+                            )}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">Extra documents never block approval or hide the store.</p>
                     </CardHeader>
                     <CardContent>
                         {documentHistory.length === 0 ? (
@@ -547,7 +723,10 @@ export default function StoreShow({ store, stats, subscription, visibility, hist
                                     <tbody className="divide-y">
                                         {documentHistory.map((d) => (
                                             <tr key={d.id}>
-                                                <td className="py-2 pr-3">{d.label}</td>
+                                                <td className="min-w-[14rem] py-2 pr-3">
+                                                    {d.is_other ? `Other — ${d.label}` : d.label}
+                                                    {d.ocr_key && ocrLine(d.ocr_key)}
+                                                </td>
                                                 <td className="py-2 pr-3 whitespace-nowrap">{d.date}</td>
                                                 <td className="py-2 pr-3 whitespace-nowrap">{d.expires_on ?? '—'}</td>
                                                 <td className="py-2 pr-3">

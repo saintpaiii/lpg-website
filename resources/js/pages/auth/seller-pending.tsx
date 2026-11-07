@@ -55,6 +55,13 @@ export default function SellerPending() {
                             : "Thank you for applying to the LPG Marketplace Cavite. Here's what happens next:"}
                     </p>
 
+                    {/* Not blocking: same store name elsewhere / another store pinned within 50 m */}
+                    {flash?.warning && (
+                        <div className="mb-6 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            <p>{flash.warning}</p>
+                        </div>
+                    )}
                     {suspensionInfo && (
                         <div className="mb-6 rounded-xl bg-orange-50 border border-orange-200 p-4">
                             <div className="flex items-start gap-3">

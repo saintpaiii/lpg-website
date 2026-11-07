@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import IdDetailsStep, { type IdDetails } from '@/components/customer/id-details-step';
 import CustomerLayout from '@/layouts/customer-layout';
+import { DOCUMENT_ACCEPT, IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 
 type Props = {
     details: IdDetails;
@@ -116,8 +117,14 @@ export default function IdVerification({ details, details_complete, status, reje
     }, [cameraMode]);
 
     // ── ID file handler ───────────────────────────────────────────────────────
-    function handleIdFile(file: File | undefined) {
-        if (!file) return;
+    async function handleIdFile(picked: File | undefined) {
+        if (!picked) return;
+        // Any photo → real JPEG (a "validid.jpg" from Google is often a WEBP); PDFs unchanged
+        const { file, problem } = await prepareDocumentFile(picked);
+        if (!file) {
+            setErrors(p => ({ ...p, valid_id: problem ?? 'Use a JPG, PNG, WEBP or PDF file.' }));
+            return;
+        }
         if (file.size > 5 * 1024 * 1024) {
             setErrors(p => ({ ...p, valid_id: 'File must be 5 MB or smaller.' }));
             return;
@@ -132,8 +139,13 @@ export default function IdVerification({ details, details_complete, status, reje
     }
 
     // ── Selfie upload handler ─────────────────────────────────────────────────
-    function handleSelfieFile(file: File | undefined) {
-        if (!file) return;
+    async function handleSelfieFile(picked: File | undefined) {
+        if (!picked) return;
+        const { file, problem } = await prepareDocumentFile(picked, { allowPdf: false });
+        if (!file) {
+            setErrors(p => ({ ...p, selfie: problem ?? 'Use a JPG, PNG or WEBP file.' }));
+            return;
+        }
         if (file.size > 5 * 1024 * 1024) {
             setErrors(p => ({ ...p, selfie: 'File must be 5 MB or smaller.' }));
             return;
@@ -179,11 +191,13 @@ export default function IdVerification({ details, details_complete, status, reje
         canvas.getContext('2d')?.drawImage(video, 0, 0);
 
         canvas.toBlob(
-            (blob) => {
+            async (blob) => {
                 if (!blob) return;
-                const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+                // Same JPEG size limit as uploads (longest side 2000 px)
+                const { file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' }) } =
+                    await prepareDocumentFile(new File([blob], 'selfie.jpg', { type: 'image/jpeg' }), { allowPdf: false });
                 setSelfieFile(file);
-                setSelfiePreview(URL.createObjectURL(blob));
+                setSelfiePreview(URL.createObjectURL(file));
                 setSelfieSource('camera');
                 setErrors(p => ({ ...p, selfie: '' }));
                 setCameraMode('captured');
@@ -364,7 +378,7 @@ export default function IdVerification({ details, details_complete, status, reje
                                     <span className="mt-1 text-xs text-gray-400">JPG, PNG or PDF</span>
                                     <input
                                         type="file"
-                                        accept=".jpg,.jpeg,.png,.pdf"
+                                        accept={DOCUMENT_ACCEPT}
                                         className="hidden"
                                         onChange={(e) => handleIdFile(e.target.files?.[0])}
                                     />
@@ -454,7 +468,7 @@ export default function IdVerification({ details, details_complete, status, reje
                             <input
                                 ref={selfieInputRef}
                                 type="file"
-                                accept=".jpg,.jpeg,.png"
+                                accept={IMAGE_ACCEPT}
                                 className="hidden"
                                 onChange={(e) => handleSelfieFile(e.target.files?.[0])}
                             />

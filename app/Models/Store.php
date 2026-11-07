@@ -12,6 +12,9 @@ class Store extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /** Admin review data — never sent to customers (raw Store models reach some customer pages) */
+    protected $hidden = ['approval_checks', 'document_ocr', 'duplicate_flags', 'document_hashes'];
+
     protected $fillable = [
         'user_id',
         // Tax & invoice (Settings → Tax & Invoice); invoice_next_number is only changed by InvoiceService
@@ -65,6 +68,10 @@ class Store extends Model
         'documents_suspended',
         'documents_suspended_at',
         'refund_window_days',
+        'approval_checks',
+        'document_ocr',
+        'duplicate_flags',
+        'document_hashes',
     ];
 
     protected function casts(): array
@@ -93,6 +100,10 @@ class Store extends Model
             'min_down_payment_percent' => 'integer',
             'consignment_due_days'     => 'integer',
             'refund_window_days'       => 'integer',
+            'approval_checks'          => 'array',
+            'document_ocr'             => 'array',
+            'duplicate_flags'          => 'array',
+            'document_hashes'          => 'array',
         ];
     }
 

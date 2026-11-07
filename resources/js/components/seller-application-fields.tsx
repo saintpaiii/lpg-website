@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import InputError from '@/components/input-error';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 
 /** Permits that expire (BIR does not). The date field is "{key}_expires_at". */
 export const EXPIRING_DOCS = ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'] as const;
@@ -39,6 +40,7 @@ export function StoreLogoPicker({ file, currentUrl, error, onChange }: { file: F
     }, [file]);
 
     const shown = preview ?? currentUrl ?? null;
+    const [problem, setProblem] = useState<string | null>(null);
 
     return (
         <div className="grid gap-2">
@@ -60,11 +62,19 @@ export function StoreLogoPicker({ file, currentUrl, error, onChange }: { file: F
                             </button>
                         )}
                     </div>
-                    <p className="text-xs text-gray-500">JPG or PNG, up to 2 MB. A square image looks best. Customers see it next to your store name.</p>
+                    <p className="text-xs text-gray-500">JPG, PNG or WEBP. A square image looks best. Customers see it next to your store name.</p>
                 </div>
-                <input ref={ref} type="file" accept=".jpg,.jpeg,.png" className="hidden" onChange={(e) => onChange(e.target.files?.[0] ?? null)} />
+                <input ref={ref} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={async (e) => {
+                    const picked = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!picked) return;
+                    // Any photo (WEBP / GIF / a WEBP named .jpg…) → real JPEG, small enough for the 2 MB limit
+                    const { file: ready, problem: why } = await prepareDocumentFile(picked, { allowPdf: false, maxSide: 1000 });
+                    setProblem(why ?? null);
+                    if (ready) onChange(ready);
+                }} />
             </div>
-            <InputError message={error} />
+            <InputError message={problem ?? error} />
         </div>
     );
 }

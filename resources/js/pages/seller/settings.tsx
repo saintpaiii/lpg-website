@@ -29,6 +29,7 @@ import 'leaflet/dist/leaflet.css';
 import { Spinner } from '@/components/ui/spinner';
 import { TaxInvoiceCard, type TaxSettings } from '@/components/tax-invoice-card';
 import { RefundWindowCard } from '@/components/refund-window-card';
+import { IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -224,10 +225,16 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
     // Moving the store pin fills city / barangay (and the street when it wasn't typed)
     const autoFill = useAutoFillAddress({ street: data.address, apply: applyFoundAddress });
 
-    function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0] ?? null;
+    async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const picked = e.target.files?.[0] ?? null;
+        e.target.value = '';
+        if (!picked) return;
+        // Any photo (WEBP, GIF, a WEBP named .jpg…) → real JPEG, small enough for the 2 MB limit; the preview shows the result
+        const { file, problem } = await prepareDocumentFile(picked, { allowPdf: false, maxSide: 1000 });
+        setFormErrors((errs) => ({ ...errs, logo: problem ?? '' }));
+        if (!file) return;
         setData('logo', file);
-        if (file) setPreviewUrl(URL.createObjectURL(file));
+        setPreviewUrl(URL.createObjectURL(file));
     }
 
     function submit(e: React.SyntheticEvent<HTMLFormElement>) {
@@ -300,7 +307,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                 <Camera className="h-4 w-4 text-blue-600" />
                                 Store Logo
                             </CardTitle>
-                            <CardDescription>JPG or PNG, max 2MB. Displayed on your store profile.</CardDescription>
+                            <CardDescription>JPG, PNG or WEBP. Displayed on your store profile.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-6">
@@ -315,7 +322,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/jpeg,image/png"
+                                        accept={IMAGE_ACCEPT}
                                         className="hidden"
                                         onChange={handleLogoChange}
                                     />

@@ -12,6 +12,8 @@ import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import StorePinPicker from '@/components/store-pin-picker';
 import { EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker } from '@/components/seller-application-fields';
+import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
+import { appendOtherRows, OtherDocumentsFields, StoreNameWarning, useStoreNameCheck, type OtherDocRow } from '@/components/other-documents-fields';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,13 +26,15 @@ import { Spinner } from '@/components/ui/spinner';
 type DocKey = 'valid_id' | 'bir_permit' | 'business_permit' | 'fsic_permit' | 'doe_lpg_license' | 'lto_permit';
 
 const DOC_FIELDS: { key: DocKey; label: string; hint: string }[] = [
-    { key: 'valid_id',         label: 'Valid Government ID',                hint: "Owner's government-issued ID (JPG, PNG, PDF · max 5 MB)" },
-    { key: 'bir_permit',       label: 'BIR Certificate of Registration',   hint: 'Certificate of Registration from BIR (JPG, PNG, PDF · max 5 MB)' },
-    { key: 'business_permit',  label: "Business / Mayor's Permit",         hint: "Current Mayor's Permit or Business Permit (JPG, PNG, PDF · max 5 MB)" },
-    { key: 'fsic_permit',      label: 'FSIC (Fire Safety Inspection Certificate)', hint: 'Issued by the Bureau of Fire Protection — required for LPG businesses (JPG, PNG, PDF · max 5 MB)' },
-    { key: 'doe_lpg_license',  label: 'DOE LPG Retail License',            hint: 'Required license from the Department of Energy to sell LPG (JPG, PNG, PDF · max 5 MB)' },
-    { key: 'lto_permit',       label: 'LTO (License to Operate)',          hint: 'License to Operate issued by the relevant regulatory agency (JPG, PNG, PDF · max 5 MB)' },
+    { key: 'valid_id',         label: 'Valid Government ID',                hint: "Owner's government-issued ID (JPG, PNG, WEBP, PDF · max 5 MB)" },
+    { key: 'bir_permit',       label: 'BIR Certificate of Registration',   hint: 'Certificate of Registration from BIR (JPG, PNG, WEBP, PDF · max 5 MB)' },
+    { key: 'business_permit',  label: "Business / Mayor's Permit",         hint: "Current Mayor's Permit or Business Permit (JPG, PNG, WEBP, PDF · max 5 MB)" },
+    { key: 'fsic_permit',      label: 'FSIC (Fire Safety Inspection Certificate)', hint: 'Issued by the Bureau of Fire Protection — required for LPG businesses (JPG, PNG, WEBP, PDF · max 5 MB)' },
+    { key: 'doe_lpg_license',  label: 'DOE LPG Retail License',            hint: 'Required license from the Department of Energy to sell LPG (JPG, PNG, WEBP, PDF · max 5 MB)' },
+    { key: 'lto_permit',       label: 'LTO (License to Operate)',          hint: 'License to Operate issued by the relevant regulatory agency (JPG, PNG, WEBP, PDF · max 5 MB)' },
 ];
+
+const tomorrowIso = () => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // ── File upload sub-component ─────────────────────────────────────────────────
 
@@ -46,6 +50,7 @@ function FileUploadField({
     onClear: () => void;
 }) {
     const ref = useRef<HTMLInputElement>(null);
+    const [problem, setProblem] = useState<string | null>(null);
 
     return (
         <div className="grid gap-2">
@@ -75,7 +80,7 @@ function FileUploadField({
                 >
                     <Upload className="h-7 w-7 text-gray-400" />
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Click to upload</span>
-                    <span className="text-xs text-gray-500">JPG, PNG or PDF · max 5 MB</span>
+                    <span className="text-xs text-gray-500">JPG, PNG, WEBP or PDF · max 5 MB</span>
                 </button>
             )}
 
@@ -83,11 +88,19 @@ function FileUploadField({
                 ref={ref}
                 id={id}
                 type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
+                accept={DOCUMENT_ACCEPT}
                 className="hidden"
-                onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+                onChange={async (e) => {
+                    const picked = e.target.files?.[0] ?? null;
+                    e.target.value = '';
+                    if (!picked) return;
+                    // Any photo → real JPEG (a "validid.jpg" from Google is often a WEBP); PDFs unchanged
+                    const { file: ready, problem: why } = await prepareDocumentFile(picked);
+                    setProblem(why ?? (ready && ready.size > 5 * 1024 * 1024 ? 'The file must be 5 MB or smaller.' : null));
+                    if (ready && ready.size <= 5 * 1024 * 1024) onFileChange(ready);
+                }}
             />
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {(problem || error) && <p className="text-sm text-red-500">{problem ?? error}</p>}
         </div>
     );
 }
@@ -157,6 +170,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
     const [expiries, setExpiries] = useState<Record<string, string>>({});
     const [logo, setLogo] = useState<File | null>(null);
     const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
+    // Optional extra documents (DTI, barangay clearance, store photo…)
+    const [otherDocs, setOtherDocs] = useState<OtherDocRow[]>([]);
+    // "A store with this name already exists in …" (warning only)
+    const nameCheck = useStoreNameCheck(fields.store_name);
 
     const [agreeTerms, setAgreeTerms]           = useState(false);
     const [agreeAuthentic, setAgreeAuthentic]   = useState(false);
@@ -185,15 +202,16 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
         }
         for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
         if (logo) formData.append('logo', logo);
+        appendOtherRows(formData, otherDocs);
         formData.append('latitude', pin ? String(pin.lat) : '');
         formData.append('longitude', pin ? String(pin.lng) : '');
         formData.append('terms_agreed', '1');
 
         try {
-            await axios.post('/seller/register', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
+            const res = await axios.post<{ redirect?: string }>('/seller/register', formData, {
+                headers: { 'Content-Type': 'multipart/form-data', Accept: 'application/json' },
             });
-            window.location.href = '/seller/pending';
+            window.location.href = res.data?.redirect ?? '/seller/pending';
         } catch (err: any) {
             const responseErrors = err?.response?.data?.errors ?? {};
             const mapped: Record<string, string> = {};
@@ -206,7 +224,7 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo', 'latitude', 'longitude'];
             const step2Keys = [...DOC_FIELDS.map(d => d.key), ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
-            else if (step2Keys.some((k) => mapped[k])) setStep(2);
+            else if (step2Keys.some((k) => mapped[k]) || Object.keys(mapped).some((k) => k.startsWith('other_documents'))) setStep(2);
             else setStep(3);
             setProcessing(false);
         }
@@ -367,6 +385,7 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                         <Input type="text" required placeholder="e.g. Petron Gasul Cavite" className="h-11"
                                             value={fields.store_name} onChange={(e) => set('store_name', e.target.value)} />
                                         <InputError message={errors.store_name} />
+                                        <StoreNameWarning check={nameCheck} />
                                     </div>
 
                                     <div className="grid gap-2">
@@ -440,6 +459,8 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                             )}
                                         </div>
                                     ))}
+
+                                    <OtherDocumentsFields rows={otherDocs} onChange={setOtherDocs} errors={errors} minDate={tomorrowIso()} />
 
                                     <div className="flex gap-3 mt-2">
                                         <Button type="button" variant="outline" className="h-11 flex-1" onClick={() => setStep(1)}>

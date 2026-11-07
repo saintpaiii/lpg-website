@@ -11,10 +11,12 @@ import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { ReasonTextPicker } from '@/components/reason-picker';
+import { AUTO_READ_DISCLAIMER, AutoReadLine, useAutoRead, type OcrResult } from '@/components/document-auto-read';
 
 type Pending = {
     id: number; store_id: number; store_name: string | null; doc_type: string; label: string; is_other: boolean; has_expiry: boolean;
     current_expires: string | null; new_expires: string | null; new_expires_on: string | null; submitted_on: string; submitted_by: string | null; url: string;
+    ocr_key?: string; ocr?: OcrResult;
 };
 type PermitRow = { store_id: number; store_name: string; type: string; label: string; expires_on: string | null; days_left: number | null; documents_suspended: boolean };
 type Tab = 'pending' | 'expiring' | 'expired' | 'missing';
@@ -27,6 +29,7 @@ type Props = {
     missing: PermitRow[];
     counts: Record<Tab, number>;
     max_date: string;
+    ocr_enabled?: boolean;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Store Documents', href: '/admin/store-documents' }];
@@ -37,10 +40,15 @@ const TABS: { key: Tab; label: string }[] = [
     { key: 'missing', label: 'Missing dates' },
 ];
 
-export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date }: Props) {
+export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date, ocr_enabled = false }: Props) {
     // New / updated since the last visit (until the user leaves the page)
     const seen = useSeenRows(pending);
     const [tab, setTab] = useState<Tab>(initialTab);
+    // Auto-read the documents waiting for review, one by one (warnings only)
+    const ocrJobs: Record<string, number> = {};
+    const ocrInitial: Record<string, OcrResult> = {};
+    for (const p of pending) if (p.ocr_key) { ocrJobs[p.ocr_key] = p.store_id; ocrInitial[p.ocr_key] = p.ocr ?? null; }
+    const autoRead = useAutoRead(ocrJobs, ocrInitial, ocr_enabled);
     const [approving, setApproving] = useState<Pending | null>(null);
     const [rejecting, setRejecting] = useState<Pending | null>(null);
     const approveForm = useForm({ expires_at: '' });
@@ -95,6 +103,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                         <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">Nothing is waiting for review.</p>
                     ) : (
                         <ul className="space-y-2">
+                            <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                             <SeenNote counts={seen.counts} onClear={seen.clear} />
                             {pending.map((p) => (
                                 <li key={p.id} className={`flex flex-col gap-3 rounded-lg border bg-white px-4 py-3 sm:flex-row sm:items-center dark:bg-gray-950 ${seenRowClass(seen.get(p.id))}`}>
@@ -108,6 +117,12 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                             <p className="text-muted-foreground">
                                                 Valid until: {p.is_other ? '' : `${p.current_expires ?? 'no date'} → `}<span className="font-medium text-foreground">{p.new_expires_on ?? 'no date'}</span>
                                             </p>
+                                        )}
+                                        {p.ocr_key && (
+                                            <AutoReadLine
+                                                result={autoRead.results[p.ocr_key] ?? null} reading={autoRead.reading === p.ocr_key}
+                                                enabled={ocr_enabled} onReadAgain={() => autoRead.readAgain(p.ocr_key!)}
+                                            />
                                         )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">

@@ -107,7 +107,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('stores', [StoreController::class, 'index'])->name('stores');
         Route::get('stores/{store}', [StoreController::class, 'show'])->name('stores.show');
     });
-    Route::patch('stores/{store}/approve', [StoreController::class, 'approve'])->name('stores.approve');
+    // Approve with the checklist — same access as Verifications → approve
+    Route::patch('stores/{store}/approve', [StoreController::class, 'approve'])->middleware('permission:verifications.view')->name('stores.approve');
+    // Auto-read (OCR) one document: {key} = doc type, 'valid_id' or 'sub-{submissionId}'. canReviewDocuments() in the controller.
+    Route::post('stores/{store}/documents/{key}/ocr', [\App\Http\Controllers\Admin\DocumentOcrController::class, 'read'])
+        ->where('key', '[a-z_]+|sub-[0-9]+')->middleware('throttle:20,1')->name('stores.documents.ocr');
     Route::patch('stores/{store}/reject', [StoreController::class, 'reject'])->name('stores.reject');
     Route::patch('stores/{store}/suspend', [StoreController::class, 'suspend'])->name('stores.suspend');
     Route::patch('stores/{store}/unsuspend', [StoreController::class, 'unsuspend'])->name('stores.unsuspend');

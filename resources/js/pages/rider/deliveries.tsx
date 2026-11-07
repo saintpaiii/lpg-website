@@ -53,6 +53,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { NotePicker } from '@/components/reason-picker';
+import { IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { deliveryNoteContext } from '@/data/reason-catalog';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -284,6 +285,7 @@ function UpdateStatusDialog({
     useEffect(() => { setTanksCollected(false); }, [delivery?.id, targetStatus]);
     const needsTanks = targetStatus === 'delivered' && !!delivery?.order?.empty_tanks_required && !delivery.order.empty_tanks_collected;
     const [preview, setPreview]       = useState<string | null>(null);
+    const [photoProblem, setPhotoProblem] = useState<string | null>(null);
     const [gpsState, setGpsState]     = useState<GpsState>('idle');
     const [geocodeAddr, setGeocodeAddr] = useState<string | null>(null);
 
@@ -338,15 +340,15 @@ function UpdateStatusDialog({
         setData('status', targetStatus ?? '');
     }
 
-    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const file = e.target.files?.[0] ?? null;
+    async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const picked = e.target.files?.[0] ?? null;
+        if (!picked) { setData('photo', null); setPreview(null); return; }
+        // Any photo → real JPEG (longest side 2000 px) — the preview shows the converted image
+        const { file, problem } = await prepareDocumentFile(picked, { allowPdf: false });
+        setPhotoProblem(problem ?? null);
+        if (!file) { e.target.value = ''; return; }
         setData('photo', file);
-        if (file) {
-            const url = URL.createObjectURL(file);
-            setPreview(url);
-        } else {
-            setPreview(null);
-        }
+        setPreview(URL.createObjectURL(file));
     }
 
     function clearPhoto() {
@@ -480,13 +482,13 @@ function UpdateStatusDialog({
                                     <input
                                         ref={fileInputRef}
                                         type="file"
-                                        accept="image/jpeg,image/png,image/jpg"
+                                        accept={IMAGE_ACCEPT}
                                         className="hidden"
                                         onChange={handleFileChange}
                                     />
                                 </label>
                             )}
-                            {errors.photo && <p className="text-xs text-red-500">{errors.photo}</p>}
+                            {(photoProblem || errors.photo) && <p className="text-xs text-red-500">{photoProblem ?? errors.photo}</p>}
                         </div>
                     )}
 

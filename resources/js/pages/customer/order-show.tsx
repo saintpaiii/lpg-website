@@ -671,10 +671,15 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             You already have an open request — message the store{order.store_phone ? <> or call <a href={`tel:${order.store_phone}`} className="font-medium text-blue-600 hover:underline">{order.store_phone}</a></> : ''}.
                         </p>
                     ) : order.refund_window_open ? (
-                        order.refund_deadline && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                                You can request a refund until {order.refund_deadline}.
-                            </p>
+                        // The "until" date only next to the "Request refund" button; an unpaid order only has the leak report
+                        canRefund ? (
+                            order.refund_deadline && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    You can request a refund until {order.refund_deadline}.
+                                </p>
+                            )
+                        ) : (
+                            <p className="text-xs text-gray-500 dark:text-gray-400">You can report a leaking tank any time.</p>
                         )
                     ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400">

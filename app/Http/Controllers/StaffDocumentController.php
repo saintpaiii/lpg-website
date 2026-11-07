@@ -52,7 +52,7 @@ class StaffDocumentController extends Controller
             'doc_type'        => ['required', Rule::in(array_keys(StaffDocumentService::TYPES))],
             'label'           => ['required_if:doc_type,other', 'nullable', 'string', 'max:100'],
             'document_number' => [$isLicense ? 'required' : 'nullable', 'string', 'max:50'],
-            'file'            => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'file'            => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
             'expires_at'      => [$isLicense ? 'required' : 'nullable', 'date', 'after:today'],
         ], [
             'label.required_if'        => 'Please enter the name of the document.',
@@ -60,7 +60,7 @@ class StaffDocumentController extends Controller
             'expires_at.required'      => 'Please enter the date your license is valid until.',
             'expires_at.after'         => 'The document must still be valid (date after today).',
             'file.max'                 => 'The file must be 5 MB or smaller.',
-        ]);
+        ] + \App\Support\UploadMessages::for(['file']));
 
         $type  = $data['doc_type'];
         $label = $type === 'other' ? trim((string) $data['label']) : null;

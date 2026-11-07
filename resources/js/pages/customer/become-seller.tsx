@@ -15,6 +15,8 @@ import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { lookupBarangay } from '@/components/address-map';
 import { isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type ExpiringDoc } from '@/components/seller-application-fields';
+import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
+import { OtherDocumentsFields, otherRowsPayload, StoreNameWarning, useStoreNameCheck, type OtherDocRow, type PreviousOtherDoc } from '@/components/other-documents-fields';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,10 @@ type Props = {
     limit_message: string | null;
     attempt: number;
     max_attempts: number;
+    /** Extra documents sent with an earlier application (read-only) */
+    previous_other_docs?: PreviousOtherDoc[];
+    /** How many extra documents can be added now (max 5 per form, 10 per store) */
+    other_slots?: number;
 };
 
 // ── File field definitions ─────────────────────────────────────────────────────
@@ -104,7 +110,7 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -112,6 +118,8 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
     const [agreePlan, setAgreePlan] = useState(false);
     const allAgreed = agreeTerms && agreeAuthentic && agreePlan;
     const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
+    // Optional extra documents (sent as other_documents[i][label|file|expires_at])
+    const [otherDocs, setOtherDocs] = useState<OtherDocRow[]>([]);
 
     const { data, setData, post, processing, errors, progress, transform } = useForm<{
         store_name: string;
@@ -160,6 +168,9 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         terms_agreed:    false,
     });
 
+    // "A store with this name already exists in …" (warning only; the user's own store isn't counted)
+    const nameCheck = useStoreNameCheck(data.store_name);
+
     // Moving the store pin fills city / barangay (and the street when it wasn't typed) — one update, pin stays put
     const autoFill = useAutoFillAddress({
         street: data.store_address,
@@ -187,7 +198,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
     function submit(e: React.FormEvent) {
         e.preventDefault();
         if (!allAgreed) return;
-        transform(d => ({ ...d, terms_agreed: true }));
+        transform(d => ({ ...d, terms_agreed: true, other_documents: otherRowsPayload(otherDocs) }));
         post('/customer/become-seller', {
             forceFormData: true,
             // Go back to the step that has the problem (store info + pin on step 1, documents + dates on step 2)
@@ -326,6 +337,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                 placeholder="e.g. Santos LPG Supply"
                                             />
                                             {(errors.store_name || step1Errors.store_name) && <p className="mt-1 text-xs text-red-600">{errors.store_name || step1Errors.store_name}</p>}
+                                            <div className="mt-1.5"><StoreNameWarning check={nameCheck} /></div>
                                         </div>
 
                                         <div>
@@ -440,7 +452,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                             <FileField
                                                 label=""
                                                 required={!has_valid_id && !previous_docs?.valid_id_url}
-                                                hint="Owner's government-issued ID — JPG, PNG, or PDF, max 5 MB"
+                                                hint="Owner's government-issued ID — JPG, PNG, WEBP or PDF, max 5 MB"
                                                 file={data.valid_id}
                                                 error={errors.valid_id}
                                                 inputRef={idRef}
@@ -460,7 +472,7 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                         label={doc.label}
                                                         description={doc.description}
                                                         required={!existingUrl}
-                                                        hint="JPG, PNG, or PDF — max 5 MB"
+                                                        hint="JPG, PNG, WEBP or PDF — max 5 MB"
                                                         file={data[doc.key]}
                                                         error={errors[doc.key]}
                                                         inputRef={fileRefs[doc.key]}
@@ -477,6 +489,13 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         })}
                                     </CardContent>
                                 </Card>
+
+                                <OtherDocumentsFields
+                                    rows={otherDocs} onChange={setOtherDocs}
+                                    errors={errors as Record<string, string | undefined>}
+                                    max={Math.max(0, other_slots)} previous={previous_other_docs}
+                                    minDate={(() => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })()}
+                                />
 
                                 {/* Upload progress */}
                                 {progress && (
@@ -645,6 +664,7 @@ function FileField({
     onChange: (f: File | null) => void;
     hideLabel?: boolean;
 }) {
+    const [problem, setProblem] = useState<string | null>(null);
     return (
         <div>
             {!hideLabel && (
@@ -683,11 +703,20 @@ function FileField({
             <input
                 ref={inputRef}
                 type="file"
-                accept=".jpg,.jpeg,.png,.pdf"
+                accept={DOCUMENT_ACCEPT}
                 className="hidden"
-                onChange={e => onChange(e.target.files?.[0] ?? null)}
+                onChange={async (e) => {
+                    const picked = e.target.files?.[0] ?? null;
+                    e.target.value = '';
+                    if (!picked) return;
+                    // Any photo → real JPEG (a "validid.jpg" from Google is often a WEBP); PDFs unchanged
+                    const { file: ready, problem: why } = await prepareDocumentFile(picked);
+                    const tooBig = ready && ready.size > 5 * 1024 * 1024;
+                    setProblem(why ?? (tooBig ? 'The file must be 5 MB or smaller.' : null));
+                    if (ready && !tooBig) onChange(ready);
+                }}
             />
-            {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+            {(problem || error) && <p className="mt-1 text-xs text-red-600">{problem ?? error}</p>}
         </div>
     );
 }

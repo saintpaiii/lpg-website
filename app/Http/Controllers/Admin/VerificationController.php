@@ -158,42 +158,19 @@ class VerificationController extends Controller
 
     public function approve(Request $request, VerificationRequest $verification): RedirectResponse
     {
+        // Seller applications are approved only on the store page, where the checklist is required
+        if ($verification->type === 'seller_application') {
+            $storeId = Store::where('user_id', $verification->user_id)->value('id');
+
+            return ($storeId ? redirect("/admin/stores/{$storeId}") : back())
+                ->with('error', 'Approve sellers from the store page — the checklist is required.');
+        }
+
         $verification->update([
             'status'      => 'approved',
             'reviewed_by' => $request->user()->id,
             'reviewed_at' => now(),
         ]);
-
-        if ($verification->type === 'seller_application') {
-            // Promote customer to seller and approve their store
-            $verification->user?->update([
-                'role'                   => 'seller',
-                'id_verified'            => true,
-                'id_verification_status' => 'verified',
-                'id_verified_at'         => now(),
-            ]);
-
-            Store::where('user_id', $verification->user_id)->update([
-                'status'      => 'approved',
-                'approved_at' => now(),
-                'approved_by' => $request->user()->id,
-            ]);
-            // Newly approved stores get the one-time 30-day Premium trial
-            Store::where('user_id', $verification->user_id)->get()
-                ->each(fn (Store $store) => \App\Services\SubscriptionService::startTrial($store));
-
-            if ($verification->user_id) {
-                NotificationService::send(
-                    $verification->user_id,
-                    'system',
-                    'Your store has been approved!',
-                    'Congratulations! Your seller application has been approved. You can now access the Seller Portal.',
-                    ['link' => '/seller/dashboard']
-                );
-            }
-
-            return back()->with('success', "{$verification->user?->name} has been approved as a seller. They can now access the seller portal.");
-        }
 
         if ($verification->type === 'customer_id_verification') {
             $verification->user?->update([

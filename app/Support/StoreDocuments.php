@@ -30,6 +30,120 @@ class StoreDocuments
     /** Max rejected uploads per document (and seller applications) within 30 days. */
     public const MAX_REJECTIONS = 5;
 
+    /** Extra ("other") documents a seller may add on the application form. */
+    public const MAX_OTHER_AT_REGISTRATION = 5;
+
+    /** Cap on 'other' documents per store, counting pending + approved (registration / resubmission). */
+    public const MAX_OTHER_TOTAL = 10;
+
+    /** 'other' documents of a store that count toward MAX_OTHER_TOTAL (pending + approved). */
+    public static function otherCount(int $storeId): int
+    {
+        return \App\Models\StoreDocumentSubmission::where('store_id', $storeId)
+            ->where('doc_type', 'other')
+            ->whereIn('status', ['pending', 'approved'])
+            ->count();
+    }
+
+    /** Validation for "Other documents (optional)" on both application forms (rows with neither label nor file are dropped first). */
+    public static function otherDocumentRules(): array
+    {
+        return [
+            'other_documents'              => ['nullable', 'array', 'max:' . self::MAX_OTHER_AT_REGISTRATION],
+            'other_documents.*.label'      => ['required_with:other_documents.*.file', 'nullable', 'string', 'max:100'],
+            'other_documents.*.file'       => ['required_with:other_documents.*.label', 'nullable', \Illuminate\Validation\Rules\File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024)],
+            'other_documents.*.expires_at' => ['nullable', 'date', 'after:today'],
+        ];
+    }
+
+    public static function otherDocumentMessages(): array
+    {
+        return [
+            'other_documents.max'                    => 'You can add up to ' . self::MAX_OTHER_AT_REGISTRATION . ' extra documents.',
+            'other_documents.*.label.required_with'  => 'Enter the name of this document.',
+            'other_documents.*.label.max'            => 'Keep the name under 100 characters.',
+            'other_documents.*.label.distinct'       => 'Each extra document needs a different name.',
+            'other_documents.*.file.required_with'   => 'Choose a file for this document.',
+            'other_documents.*.file.mimes'           => 'Use a JPG, PNG, WEBP or PDF file.',
+            'other_documents.*.file.max'             => 'The file must be 5 MB or smaller.',
+            'other_documents.*.expires_at.after'     => 'The date must be in the future.',
+        ];
+    }
+
+    /** Keep only rows the seller actually filled in (an empty "+ Add another document" row is ignored). */
+    public static function filledOtherRows(\Illuminate\Http\Request $request): array
+    {
+        $rows = (array) $request->input('other_documents', []);
+        $out  = [];
+        foreach ($rows as $i => $row) {
+            $label = trim((string) ($row['label'] ?? ''));
+            if ($label === '' && ! $request->hasFile("other_documents.$i.file")) {
+                continue;
+            }
+            $out[$i] = $label;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Labels must be different within one submission (and from the store's earlier pending / approved extras);
+     * at most MAX_OTHER_TOTAL extras per store. Throws a ValidationException keyed to the row.
+     * @param array<int,string> $rows index => label
+     */
+    public static function assertOtherRowsAllowed(array $rows, ?int $storeId = null): void
+    {
+        $existing = $storeId
+            ? \App\Models\StoreDocumentSubmission::where('store_id', $storeId)->where('doc_type', 'other')
+                ->whereIn('status', ['pending', 'approved'])->pluck('label')->map(fn ($l) => mb_strtolower(trim((string) $l)))->all()
+            : [];
+
+        $seen = [];
+        foreach ($rows as $i => $label) {
+            $key = mb_strtolower($label);
+            if ($key !== '' && (isset($seen[$key]) || in_array($key, $existing, true))) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    "other_documents.$i.label" => 'Each extra document needs a different name.',
+                ]);
+            }
+            $seen[$key] = true;
+        }
+
+        if ($storeId && count($rows) > 0 && self::otherCount($storeId) + count($rows) > self::MAX_OTHER_TOTAL) {
+            $left = max(0, self::MAX_OTHER_TOTAL - self::otherCount($storeId));
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'other_documents' => "A store can have up to " . self::MAX_OTHER_TOTAL . " extra documents — you can add {$left} more.",
+            ]);
+        }
+    }
+
+    /**
+     * Save the filled extra documents as pending 'other' submissions (local disk). Call inside the caller's transaction.
+     * @param array<int,string> $rows index => label (from filledOtherRows)
+     */
+    public static function saveOtherDocuments(\Illuminate\Http\Request $request, Store $store, array $rows, int $userId): int
+    {
+        $n = 0;
+        foreach ($rows as $i => $label) {
+            $file = $request->file("other_documents.$i.file");
+            if (! $file) {
+                continue;
+            }
+            \App\Models\StoreDocumentSubmission::create([
+                'store_id'     => $store->id,
+                'doc_type'     => 'other',
+                'label'        => $label,
+                'file_path'    => $file->store('store_documents', 'local'),
+                'expires_at'   => $request->input("other_documents.$i.expires_at") ?: null,
+                'status'       => 'pending',
+                'submitted_by' => $userId,
+            ]);
+            $n++;
+        }
+
+        return $n;
+    }
+
     /** Validation for the "Valid until" dates on the seller application forms. */
     public static function expiryRules(): array
     {

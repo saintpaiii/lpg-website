@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Seller;
 use App\Rules\InServiceArea;
 use App\Http\Controllers\Controller;
 use App\Services\InvoiceService;
+use App\Services\DuplicateStoreService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -130,12 +131,13 @@ class SettingsController extends Controller
             'description'       => 'nullable|string|max:1000',
             'address'           => 'required|string|max:255',
             'city'              => 'required|string|max:100',
-            'barangay'          => 'nullable|string|max:100',
+            // NOT NULL columns → required (saving them empty used to give a 500)
+            'barangay'          => 'required|string|max:100',
             'province'          => 'required|string|max:100',
-            'phone'             => ['nullable', 'string', 'regex:/^09\d{9}$/'],
+            'phone'             => ['required', 'string', 'regex:/^09\d{9}$/'],
             'email'             => 'nullable|email|max:255',
             'max_delivery_radius_km'   => 'nullable|integer|min:1|max:200',
-            'logo'                     => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'logo'                     => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             // The store pin is required (delivery fees and staff clock-in use it); it can be moved, not removed
             'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
             'longitude'         => 'required|numeric|between:-180,180',
@@ -146,9 +148,36 @@ class SettingsController extends Controller
         ], [
             'latitude.required'  => "Please pin your store's location on the map.",
             'longitude.required' => "Please pin your store's location on the map.",
-        ]);
+            'barangay.required'  => "Enter the store's barangay.",
+            'phone.required'     => "Enter the store's phone number (09XXXXXXXXX).",
+            'phone.regex'        => "Enter the store's phone number (09XXXXXXXXX).",
+        ] + \App\Support\UploadMessages::for(['logo'], false));
+
+        // Renamed or pin moved → duplicate check again: a true duplicate is refused, otherwise the admin's
+        // "Possible duplicate" flags are refreshed
+        $renamed = DuplicateStoreService::normalizeName($data['store_name']) !== DuplicateStoreService::normalizeName($store->store_name);
+        $moved   = $store->latitude === null || $store->longitude === null
+            || DuplicateStoreService::distanceMeters((float) $data['latitude'], (float) $data['longitude'], (float) $store->latitude, (float) $store->longitude) > 1;
+        $duplicateFlags = $store->duplicate_flags;
+        if ($renamed || $moved) {
+            $dup = DuplicateStoreService::check([
+                'store_name' => $data['store_name'],
+                'address'    => $data['address'],
+                'barangay'   => $data['barangay'] ?? null,
+                'city'       => $data['city'],
+                'latitude'   => $data['latitude'],
+                'longitude'  => $data['longitude'],
+                'phones'     => array_filter([$data['phone'] ?? null, $store->owner?->phone]),
+                'hashes'     => (array) ($store->document_hashes ?? []),
+            ], $store->id);
+            if ($dup['block'] && $dup['block']['field'] === 'store_name') {
+                throw \Illuminate\Validation\ValidationException::withMessages(['store_name' => $dup['block']['message']]);
+            }
+            $duplicateFlags = DuplicateStoreService::flags($dup);
+        }
 
         $updates = [
+            'duplicate_flags'   => $duplicateFlags,
             'store_name'        => $data['store_name'],
             'description'       => $data['description'] ?? null,
             'address'           => $data['address'],

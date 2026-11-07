@@ -207,7 +207,8 @@ export function AppSidebar() {
         adminArea && can('invoices.view')   && { title: 'Invoices',           href: '/admin/invoices',                                     icon: Receipt         },
         adminArea && can('reports.view')    && { title: 'Reports',            href: '/admin/reports',                                      icon: BarChart3       },
         isPlatformAdmin        && { title: 'User Reports',       href: '/admin/user-reports',                                 icon: Flag, ...badgeProps(sb['admin.user_reports']) },
-        isPlatformAdmin        && { title: 'Reviews',            href: '/admin/reviews',                                      icon: MessageSquareQuote },
+        // Platform admin only — platform staff (role admin + is_platform_staff) get 403 there
+        isPlatformAdmin && !auth.user?.is_platform_staff && { title: 'Reviews',            href: '/admin/reviews',                                      icon: MessageSquareQuote },
         isPlatformAdmin        && { title: 'Refund Disputes',    href: '/admin/refunds',                                      icon: RefreshCcw, ...badgeProps(sb['admin.refunds']) },
         adminArea && can('dss.view')        && { title: 'DSS Insights',       href: '/admin/dss',                                          icon: Brain           },
         isPlatformAdmin        && { title: 'Subscriptions',      href: '/admin/subscriptions',                                icon: Crown           },
