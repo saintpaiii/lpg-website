@@ -52,8 +52,8 @@ class VerificationController extends Controller
             'bir_permit_path'      => 'BIR Certificate',
             'business_permit_path' => 'Business Permit',
             'fsic_permit_path'     => 'FSIC',
-            'doe_lpg_license_path' => 'DOE LPG License',
-            'lto_permit_path'      => 'LTO Permit',
+            'doe_lpg_license_path' => 'DOE License to Operate (LTO)',
+            'dti_sec_registration_path' => 'DTI/SEC Registration',
         ];
 
         $previousApps = VerificationRequest::withTrashed()
@@ -147,9 +147,15 @@ class VerificationController extends Controller
                     'business_permit_url'   => PrivateDocument::urlIf($v->business_permit_path, 'verification', $v->id, 'business_permit_path'),
                     'fsic_permit_url'       => PrivateDocument::urlIf($v->fsic_permit_path, 'verification', $v->id, 'fsic_permit_path'),
                     'doe_lpg_license_url'   => PrivateDocument::urlIf($v->doe_lpg_license_path, 'verification', $v->id, 'doe_lpg_license_path'),
-                    'lto_permit_url'        => PrivateDocument::urlIf($v->lto_permit_path, 'verification', $v->id, 'lto_permit_path'),
+                    'dti_sec_registration_url' => PrivateDocument::urlIf($v->dti_sec_registration_path, 'verification', $v->id, 'dti_sec_registration_path'),
+                    'dti_sec_kind'          => $stores[$v->user_id]->dti_sec_kind ?? null,
+                    // Older applications: the separate LTO upload (same document as the DOE license — no longer required)
+                    'old_lto_permit_url'    => PrivateDocument::urlIf($v->lto_permit_path, 'verification', $v->id, 'lto_permit_path'),
+                    // Auto-read of the valid ID (null = not read yet; the page reads it when the admin opens the request)
+                    'ocr'                   => DocumentOcrController::present($v->ocr),
                 ];
             }),
+            'ocr_enabled' => \App\Services\DocumentOcrService::enabled(),
             'counts' => $counts,
             'tab'    => $tab,
             'search' => $search,

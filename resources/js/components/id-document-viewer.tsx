@@ -67,6 +67,7 @@ export function IdCheckHints() {
             <li>The face matches the selfie</li>
             <li>The ID is not expired</li>
             <li>The photo is clear and not edited</li>
+            <li>Face vs selfie is always checked by you — auto-read can't compare faces.</li>
         </ul>
     );
 }

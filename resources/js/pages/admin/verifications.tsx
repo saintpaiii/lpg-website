@@ -28,6 +28,7 @@ import StoreAvatar from '@/components/store-avatar';
 import StoreLocationLink from '@/components/store-location-link';
 import DocumentRow, { DocumentLink } from '@/components/document-row';
 import { IdCheckHints, IdDocumentTile } from '@/components/id-document-viewer';
+import { AUTO_READ_DISCLAIMER, AutoReadLine, useAutoRead, type OcrResult } from '@/components/document-auto-read';
 import { ReasonTextPicker } from '@/components/reason-picker';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -74,11 +75,16 @@ type VerificationRow = {
     // Document URLs
     valid_id_url: string | null;
     selfie_url: string | null;
+    /** Auto-read of the valid ID (null = not read yet) */
+    ocr?: OcrResult;
     bir_permit_url: string | null;
     business_permit_url: string | null;
     fsic_permit_url: string | null;
     doe_lpg_license_url: string | null;
-    lto_permit_url: string | null;
+    dti_sec_registration_url?: string | null;
+    dti_sec_kind?: 'dti' | 'sec' | null;
+    /** Older applications only: the separate LTO upload (same as the DOE LTO) */
+    old_lto_permit_url?: string | null;
     store_logo_url?: string | null;
     store_latitude?: number | null;
     store_longitude?: number | null;
@@ -94,6 +100,7 @@ type Props = {
     tab: string;
     search: string;
     since?: string | null;
+    ocr_enabled?: boolean;
 };
 
 const TABS = [
@@ -127,9 +134,38 @@ function InfoLine({ label, children }: { label: string; children: React.ReactNod
     );
 }
 
+/**
+ * Auto-read of the VALID ID (never the selfie): read once when the admin opens the request and nothing is saved yet.
+ * Warnings only — the admin decides.
+ */
+function VerificationAutoRead({ v, enabled, cached, onResult }: {
+    v: VerificationRow;
+    enabled: boolean;
+    cached: OcrResult | undefined;
+    onResult: (id: number, r: OcrResult) => void;
+}) {
+    const key = String(v.id);
+    const { results, reading, readAgain } = useAutoRead(
+        { [key]: v.id },
+        { [key]: cached ?? v.ocr ?? null },
+        enabled && !!v.valid_id_url,
+        { urlFor: (_k, id) => `/admin/verifications/${id}/ocr`, onResult: (_k, r) => onResult(v.id, r) },
+    );
+    if (!v.valid_id_url) return null;
+    return (
+        <div className="mt-2">
+            <AutoReadLine result={results[key] ?? null} reading={reading === key} enabled={enabled} onReadAgain={() => readAgain(key)} />
+            <p className="mt-1 text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+        </div>
+    );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Verifications({ verifications, counts, tab, search }: Props) {
+export default function Verifications({ verifications, counts, tab, search, ocr_enabled = false }: Props) {
+    // Auto-read results read on this page (so reopening a request doesn't read it again)
+    const [ocrCache, setOcrCache] = useState<Record<number, OcrResult>>({});
+    const rememberOcr = (id: number, r: OcrResult) => setOcrCache((c) => ({ ...c, [id]: r }));
     // New / updated submissions since the last visit (until the admin leaves the page)
     const seen = useSeenRows(verifications.data);
     const [searchVal, setSearchVal]         = useState(search);
@@ -418,17 +454,22 @@ export default function Verifications({ verifications, counts, tab, search }: Pr
                                             <IdDocumentTile url={v.valid_id_url} label="Valid ID" />
                                             <IdDocumentTile url={v.selfie_url} label="Selfie" />
                                         </div>
+                                        <VerificationAutoRead key={v.id} v={v} enabled={ocr_enabled} cached={ocrCache[v.id]} onResult={rememberOcr} />
                                         <IdCheckHints />
                                     </div>
                                 ) : (
                                     <div className="rounded-md border px-3 divide-y">
-                                        <DocRow label="Valid ID" url={v.valid_id_url} />
+                                        <div className="pb-2">
+                                            <DocRow label="Valid ID" url={v.valid_id_url} />
+                                            <VerificationAutoRead key={v.id} v={v} enabled={ocr_enabled} cached={ocrCache[v.id]} onResult={rememberOcr} />
+                                        </div>
                                         {v.type === 'seller_application' && <>
                                             <DocRow label="BIR Certificate of Registration" url={v.bir_permit_url} />
                                             <DocRow label="Business Permit / Mayor's Permit" url={v.business_permit_url} />
                                             <DocRow label="FSIC (Fire Safety Inspection Certificate)" url={v.fsic_permit_url} />
-                                            <DocRow label="DOE LPG Retail License" url={v.doe_lpg_license_url} />
-                                            <DocRow label="LTO (License to Operate)" url={v.lto_permit_url} />
+                                            <DocRow label="DOE License to Operate (LTO)" url={v.doe_lpg_license_url} />
+                                            <DocRow label={`DTI/SEC Registration${v.dti_sec_kind ? ` (${v.dti_sec_kind.toUpperCase()})` : ''}`} url={v.dti_sec_registration_url ?? null} />
+                                            {v.old_lto_permit_url && <DocRow label="Older: LTO (same as the DOE LTO — no longer required)" url={v.old_lto_permit_url} />}
                                         </>}
                                     </div>
                                 )}

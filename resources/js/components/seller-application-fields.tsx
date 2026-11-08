@@ -5,8 +5,40 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 
-/** Permits that expire (BIR does not). The date field is "{key}_expires_at". */
-export const EXPIRING_DOCS = ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'] as const;
+/**
+ * Permits that expire (BIR and DTI/SEC do not). The date field is "{key}_expires_at".
+ * The DOE License to Operate IS the LTO (RA 11592) — there is no separate LTO upload any more.
+ */
+export const EXPIRING_DOCS = ['business_permit', 'fsic_permit', 'doe_lpg_license'] as const;
+
+export type DtiSecKind = 'dti' | 'sec';
+export const DTI_SEC_HELP = 'DTI Certificate of Business Name Registration, or SEC Certificate of Incorporation / Registration.';
+export const DOE_LTO_HELP = 'Issued by the Department of Energy under RA 11592 (valid 3–5 years).';
+
+/** Required DTI / SEC choice shown with the DTI/SEC upload */
+export function DtiSecKindToggle({ value, onChange, error }: { value: DtiSecKind | ''; onChange: (v: DtiSecKind) => void; error?: string }) {
+    const options: { v: DtiSecKind; label: string; hint: string }[] = [
+        { v: 'dti', label: 'DTI', hint: 'single owner' },
+        { v: 'sec', label: 'SEC', hint: 'corporation / partnership' },
+    ];
+    return (
+        <div className="grid gap-1">
+            <div role="radiogroup" aria-label="DTI or SEC" className="grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+                {options.map((o) => (
+                    <button
+                        key={o.v} type="button" role="radio" aria-checked={value === o.v} onClick={() => onChange(o.v)}
+                        className={`min-w-0 rounded-md px-2 py-1.5 text-center text-xs font-medium transition-colors ${
+                            value === o.v ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-300' : 'text-gray-600 hover:text-gray-900 dark:text-gray-300'
+                        }`}
+                    >
+                        <span className="font-semibold">{o.label}</span> <span className="whitespace-normal">— {o.hint}</span>
+                    </button>
+                ))}
+            </div>
+            <InputError message={error} />
+        </div>
+    );
+}
 export type ExpiringDoc = (typeof EXPIRING_DOCS)[number];
 export const isExpiringDoc = (key: string): key is ExpiringDoc => (EXPIRING_DOCS as readonly string[]).includes(key);
 

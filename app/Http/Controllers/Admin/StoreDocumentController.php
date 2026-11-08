@@ -56,7 +56,8 @@ class StoreDocumentController extends Controller
                     'store_id'        => $d->store_id,
                     'store_name'      => $d->store?->store_name,
                     'doc_type'        => $d->doc_type,
-                    'label'           => $isPermit ? StoreDocuments::label($d->doc_type) : ($d->label ?? 'Other document'),
+                    'label'           => $d->doc_type === 'dti_sec_registration' ? StoreDocuments::dtiSecLabel($d->dti_sec_kind)
+                        : ($isPermit ? StoreDocuments::label($d->doc_type) : ($d->label ?? 'Other document')),
                     'is_other'        => ! $isPermit,
                     'has_expiry'      => $isPermit ? StoreDocuments::expiryColumn($d->doc_type) !== null : true,
                     'current_expires' => $isPermit && $d->store ? StoreDocuments::expiry($d->store, $d->doc_type)?->format('M d, Y') : null,
@@ -105,6 +106,9 @@ class StoreDocumentController extends Controller
             if ($submission->doc_type !== 'other') {
                 // The renewed file and date become the store's current permit (old files are kept)
                 $updates = [$submission->doc_type => $submission->file_path];
+                if ($submission->doc_type === 'dti_sec_registration' && $submission->dti_sec_kind) {
+                    $updates['dti_sec_kind'] = $submission->dti_sec_kind;
+                }
                 if ($column) {
                     $updates[$column] = $submission->expires_at;
                 }

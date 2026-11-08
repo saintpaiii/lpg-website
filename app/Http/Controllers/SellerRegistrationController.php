@@ -68,7 +68,9 @@ class SellerRegistrationController extends Controller
             'business_permit'       => ['required', $fileRule()],
             'fsic_permit'           => ['required', $fileRule()],
             'doe_lpg_license'       => ['required', $fileRule()],
-            'lto_permit'            => ['required', $fileRule()],
+            // DTI Business Name or SEC Registration (+ which one) — replaces the old LTO upload (the DOE license IS the LTO)
+            'dti_sec_registration'  => ['required', $fileRule()],
+            'dti_sec_kind'          => ['required', 'in:dti,sec'],
 
             // Optional store logo (same rule as Seller Settings)
             'logo'                  => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
@@ -85,7 +87,7 @@ class SellerRegistrationController extends Controller
 
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit']) + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         $otherRows = StoreDocuments::filledOtherRows($request);
         StoreDocuments::assertOtherRowsAllowed($otherRows);
@@ -113,7 +115,7 @@ class SellerRegistrationController extends Controller
             $businessPermitPath = $request->file('business_permit')->store('business_permits', 'local');
             $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'local');
             $doeLicensePath     = $request->file('doe_lpg_license')->store('doe_licenses', 'local');
-            $ltoPermitPath      = $request->file('lto_permit')->store('lto_permits', 'local');
+            $dtiSecPath         = $request->file('dti_sec_registration')->store('dti_sec_registrations', 'local');
             // The logo is public (customers see it)
             $logoPath           = $request->hasFile('logo') ? $request->file('logo')->store('store-logos', 'public') : null;
 
@@ -144,14 +146,14 @@ class SellerRegistrationController extends Controller
                 'business_permit'  => $businessPermitPath,
                 'fsic_permit'      => $fsicPermitPath,
                 'doe_lpg_license'  => $doeLicensePath,
-                'lto_permit'       => $ltoPermitPath,
+                'dti_sec_registration' => $dtiSecPath,
+                'dti_sec_kind'     => $validated['dti_sec_kind'],
                 'logo'             => $logoPath,
                 'latitude'         => $validated['latitude'],
                 'longitude'        => $validated['longitude'],
                 'business_permit_expires_at' => $validated['business_permit_expires_at'],
                 'fsic_permit_expires_at'     => $validated['fsic_permit_expires_at'],
                 'doe_lpg_license_expires_at' => $validated['doe_lpg_license_expires_at'],
-                'lto_permit_expires_at'      => $validated['lto_permit_expires_at'],
                 'status'           => 'pending',
                 'subscription_plan'=> 'none',
                 'is_featured'      => false,
@@ -173,7 +175,7 @@ class SellerRegistrationController extends Controller
                 'business_permit_path' => $businessPermitPath,
                 'fsic_permit_path'     => $fsicPermitPath,
                 'doe_lpg_license_path' => $doeLicensePath,
-                'lto_permit_path'      => $ltoPermitPath,
+                'dti_sec_registration_path' => $dtiSecPath,
                 'status'               => 'pending',
                 'terms_agreed_at'      => now(),
             ]);

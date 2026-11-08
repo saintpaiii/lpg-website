@@ -10,7 +10,8 @@ export type OtherDocRow = { key: number; label: string; file: File | null; expir
 
 export type PreviousOtherDoc = { id: number; label: string; status: string; expires_on: string | null; url: string };
 
-export const OTHER_DOC_CHIPS = ['DTI Business Name', 'SEC Registration', 'Barangay Business Clearance', 'Store front photo', 'Other'];
+// (DTI / SEC is a required document now — not an extra)
+export const OTHER_DOC_CHIPS = ['Barangay Business Clearance', 'Store front photo', 'Lease contract', 'Other'];
 export const OTHER_DOC_ACCEPT = DOCUMENT_ACCEPT;
 
 let nextKey = 1;
@@ -67,7 +68,7 @@ export function OtherDocumentsFields({ rows, onChange, errors = {}, max = 5, pre
             <div>
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Other documents (optional)</p>
                 <p className="text-xs text-gray-500">
-                    Extra proof helps the review — e.g. DTI / SEC registration, barangay clearance, a photo of the store front.
+                    Extra proof helps the review — e.g. barangay clearance, a photo of the store front, the lease contract.
                     JPG, PNG, WEBP or PDF · max 5 MB each · up to {max}.
                 </p>
             </div>

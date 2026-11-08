@@ -13,7 +13,7 @@ class StoreDocumentSubmission extends Model
 
     protected $fillable = [
         'store_id', 'doc_type', 'label', 'file_path', 'expires_at', 'status', 'rejection_reason',
-        'submitted_by', 'reviewed_by', 'reviewed_at', 'ocr',
+        'submitted_by', 'reviewed_by', 'reviewed_at', 'ocr', 'dti_sec_kind',
     ];
 
     protected function casts(): array

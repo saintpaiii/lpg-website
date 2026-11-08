@@ -33,7 +33,8 @@ class DocumentOcrCheck
         }
 
         $dates  = static::findDates($text);
-        $expiry = $docType === 'valid_id' ? null : static::likelyExpiry($text, $dates);
+        // The ID and the DTI / SEC registration get no expiry check (name check only)
+        $expiry = in_array($docType, ['valid_id', 'dti_sec_registration'], true) ? null : static::likelyExpiry($text, $dates);
         $tin    = preg_match('/\b\d{3}-?\d{3}-?\d{3}(?:-?\d{3,5})?\b/', $text, $m) ? $m[0] : null;
 
         // Name check: the owner's name on the ID; the store (or owner) name on business documents
@@ -67,6 +68,58 @@ class DocumentOcrCheck
         }
 
         return static::result($text, $expiry, $tin, $nameMatch, $dates, $warnings);
+    }
+
+    /**
+     * A customer / seller valid ID: does the name match the account, and has the ID expired?
+     * IDs without an expiry date (e.g. PhilSys) give no expiry warning. Faces are never compared.
+     */
+    public static function analyzeId(\App\Models\User $user, string $text): array
+    {
+        $text = trim($text);
+        if (mb_strlen(preg_replace('/\s+/', '', $text)) < 15) {
+            return static::result($text, null, null, null, [], ['No text could be read (blurry photo?).']);
+        }
+
+        $warnings = [];
+        $full  = trim((string) $user->name);
+        $first = trim((string) ($user->first_name ?? ''));
+        $last  = trim((string) ($user->last_name ?? ''));
+
+        // Full account name, or BOTH first and last name (IDs print "DELA CRUZ, JUAN" — order and commas differ)
+        $nameMatch = ($full !== '' && static::nameFound($full, $text))
+            || ($first !== '' && $last !== '' && static::nameFound($first, $text) && static::nameFound($last, $text));
+        if (! $nameMatch) {
+            $warnings[] = "Name on the ID doesn't seem to match the account name ({$full}).";
+        }
+
+        $dates  = static::findDates($text);
+        $expiry = static::idExpiry($text, $dates);
+        if ($expiry && $expiry < StoreDocuments::today()->toDateString()) {
+            $warnings[] = 'This ID looks expired (' . Carbon::parse($expiry)->format('M j, Y') . ').';
+        }
+
+        return static::result($text, $expiry, null, $nameMatch, $dates, $warnings);
+    }
+
+    /** Expiry on an ID: only a date right after an expiry word ("Valid until", "Expiry Date"…) — birth dates are ignored. */
+    private static function idExpiry(string $text, array $dates): ?string
+    {
+        $lower = mb_strtolower($text);
+        foreach (['valid until', 'valid up to', 'valid till', 'expiry date', 'expiration date', 'date of expiry', 'expiry', 'expires', 'expiration', 'valid thru'] as $word) {
+            $offset = 0;
+            while (($p = strpos($lower, $word, $offset)) !== false) {
+                foreach ($dates as $d) {
+                    $gap = $d['pos'] - ($p + strlen($word));
+                    if ($gap >= 0 && $gap <= 40) {
+                        return $d['date'];
+                    }
+                }
+                $offset = $p + 1;
+            }
+        }
+
+        return null;
     }
 
     /** Result for a document that couldn't be read at all ('no_key', 'too_large', 'error', 'missing'). */

@@ -65,6 +65,9 @@ class Store extends Model
         'fsic_permit_expires_at',
         'doe_lpg_license_expires_at',
         'lto_permit_expires_at',
+        // DTI Business Name or SEC Registration (replaces the LTO upload — the DOE license IS the LTO)
+        'dti_sec_registration',
+        'dti_sec_kind',
         'documents_suspended',
         'documents_suspended_at',
         'refund_window_days',

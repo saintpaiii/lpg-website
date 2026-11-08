@@ -164,10 +164,19 @@ class StoreController extends Controller
                 // Private document links — the store's own file first (an approved renewal), else the application's
                 'valid_id_url' => $verification?->valid_id_path
                     ? PrivateDocument::url('verification', $verification->id, 'valid_id_path')
-                    : PrivateDocument::urlIf($store->owner?->valid_id, 'user', (int) $store->user_id, 'valid_id'),
+                    // No application file: the owner's verified ID (valid_id_path, else the old valid_id column)
+                    : ($store->owner?->valid_id_path
+                        ? PrivateDocument::url('user', (int) $store->user_id, 'valid_id_path')
+                        : PrivateDocument::urlIf($store->owner?->valid_id, 'user', (int) $store->user_id, 'valid_id')),
                 ...collect(StoreDocuments::TYPES)->mapWithKeys(fn ($t, $type) => ["{$type}_url" => $store->{$type}
                     ? PrivateDocument::url('store', $store->id, $type)
                     : PrivateDocument::urlIf($verification?->{"{$type}_path"}, 'verification', (int) $verification?->id, "{$type}_path")])->all(),
+                // DTI (single owner) or SEC (corporation / partnership); null on stores registered before it was required
+                'dti_sec_kind'   => $store->dti_sec_kind,
+                // Older documents: the separate LTO upload (the same document as the DOE License to Operate — no longer required)
+                'old_lto_permit_url' => $store->lto_permit
+                    ? PrivateDocument::url('store', $store->id, 'lto_permit')
+                    : PrivateDocument::urlIf($verification?->lto_permit_path, 'verification', (int) $verification?->id, 'lto_permit_path'),
                 // Expiry date + status of each permit
                 'permits' => collect(array_keys(StoreDocuments::TYPES))->map(fn ($t) => StoreDocuments::summary($store, $t))->values(),
                 'terms_agreed_at' => $verification?->terms_agreed_at?->format('M d, Y'),

@@ -20,8 +20,16 @@ export const AUTO_READ_DISCLAIMER = 'Auto-read can be wrong — always check the
  * Reads the documents that have no result yet, ONE BY ONE (POST admin/stores/{store}/documents/{key}/ocr), so the
  * page never waits on all of them and the next visit is instant. Stops quietly when throttled or offline.
  * jobs: key → store id (renewals on the Store Documents page belong to different stores).
+ * opts.urlFor: another endpoint (e.g. admin/verifications/{id}/ocr); opts.onResult: told about every new result.
  */
-export function useAutoRead(jobs: Record<string, number>, initial: Record<string, OcrResult>, enabled: boolean) {
+export function useAutoRead(
+    jobs: Record<string, number>,
+    initial: Record<string, OcrResult>,
+    enabled: boolean,
+    opts: { urlFor?: (key: string, id: number) => string; onResult?: (key: string, result: OcrResult) => void } = {},
+) {
+    const optsRef = useRef(opts);
+    optsRef.current = opts;
     const [results, setResults] = useState<Record<string, OcrResult>>(initial);
     const [reading, setReading] = useState<string | null>(null);
     const started = useRef(false);
@@ -44,8 +52,10 @@ export function useAutoRead(jobs: Record<string, number>, initial: Record<string
         if (!storeId) return false;
         setReading(key);
         try {
-            const res = await axios.post<{ key: string; ocr: OcrResult }>(`/admin/stores/${storeId}/documents/${key}/ocr`);
+            const url = optsRef.current.urlFor?.(key, storeId) ?? `/admin/stores/${storeId}/documents/${key}/ocr`;
+            const res = await axios.post<{ key: string; ocr: OcrResult }>(url);
             setResults((r) => ({ ...r, [key]: res.data.ocr }));
+            optsRef.current.onResult?.(key, res.data.ocr);
             return true;
         } catch (e) {
             if (axios.isAxiosError(e) && e.response?.status === 429) toast.warning('Auto-read paused — too many reads in a minute. Try "Read again" shortly.');

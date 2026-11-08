@@ -19,8 +19,8 @@ class MakeDocumentsPrivate extends Command
 
     private const COLUMNS = [
         User::class                => ['valid_id', 'valid_id_path', 'selfie_path'],
-        VerificationRequest::class => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path'],
-        Store::class               => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'],
+        VerificationRequest::class => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path', 'dti_sec_registration_path'],
+        Store::class               => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit', 'dti_sec_registration'],
     ];
 
     public function handle(): int

@@ -124,6 +124,9 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         Route::get('verifications', [VerificationController::class, 'index'])->name('verifications');
         Route::patch('verifications/{verification}/approve', [VerificationController::class, 'approve'])->name('verifications.approve');
         Route::patch('verifications/{verification}/reject', [VerificationController::class, 'reject'])->name('verifications.reject');
+        // Auto-read the valid ID (never the selfie) — warnings only
+        Route::post('verifications/{verification}/ocr', [\App\Http\Controllers\Admin\VerificationOcrController::class, 'read'])
+            ->middleware('throttle:20,1')->name('verifications.ocr');
     });
 
     // Store subscriptions (platform admin only — every action checks isAdmin())

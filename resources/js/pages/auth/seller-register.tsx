@@ -11,7 +11,7 @@ import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import StorePinPicker from '@/components/store-pin-picker';
-import { EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker } from '@/components/seller-application-fields';
+import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { appendOtherRows, OtherDocumentsFields, StoreNameWarning, useStoreNameCheck, type OtherDocRow } from '@/components/other-documents-fields';
 import { Button } from '@/components/ui/button';
@@ -23,15 +23,16 @@ import { Spinner } from '@/components/ui/spinner';
 
 // ── Document field config ──────────────────────────────────────────────────────
 
-type DocKey = 'valid_id' | 'bir_permit' | 'business_permit' | 'fsic_permit' | 'doe_lpg_license' | 'lto_permit';
+type DocKey = 'valid_id' | 'bir_permit' | 'business_permit' | 'fsic_permit' | 'doe_lpg_license' | 'dti_sec_registration';
 
 const DOC_FIELDS: { key: DocKey; label: string; hint: string }[] = [
     { key: 'valid_id',         label: 'Valid Government ID',                hint: "Owner's government-issued ID (JPG, PNG, WEBP, PDF · max 5 MB)" },
     { key: 'bir_permit',       label: 'BIR Certificate of Registration',   hint: 'Certificate of Registration from BIR (JPG, PNG, WEBP, PDF · max 5 MB)' },
     { key: 'business_permit',  label: "Business / Mayor's Permit",         hint: "Current Mayor's Permit or Business Permit (JPG, PNG, WEBP, PDF · max 5 MB)" },
     { key: 'fsic_permit',      label: 'FSIC (Fire Safety Inspection Certificate)', hint: 'Issued by the Bureau of Fire Protection — required for LPG businesses (JPG, PNG, WEBP, PDF · max 5 MB)' },
-    { key: 'doe_lpg_license',  label: 'DOE LPG Retail License',            hint: 'Required license from the Department of Energy to sell LPG (JPG, PNG, WEBP, PDF · max 5 MB)' },
-    { key: 'lto_permit',       label: 'LTO (License to Operate)',          hint: 'License to Operate issued by the relevant regulatory agency (JPG, PNG, WEBP, PDF · max 5 MB)' },
+    // RA 11592: the DOE License to Operate IS the LTO — one upload
+    { key: 'doe_lpg_license',  label: 'DOE License to Operate (LTO) — LPG Retail Outlet', hint: `${DOE_LTO_HELP} (JPG, PNG, WEBP, PDF · max 5 MB)` },
+    { key: 'dti_sec_registration', label: 'DTI Business Name or SEC Registration', hint: `${DTI_SEC_HELP} (JPG, PNG, WEBP, PDF · max 5 MB)` },
 ];
 
 const tomorrowIso = () => { const d = new Date(); d.setDate(d.getDate() + 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -149,8 +150,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
         business_permit: null,
         fsic_permit:     null,
         doe_lpg_license: null,
-        lto_permit:      null,
+        dti_sec_registration: null,
     });
+    // DTI (single owner) or SEC (corporation / partnership) — required with the DTI/SEC upload
+    const [dtiSecKind, setDtiSecKind] = useState<DtiSecKind | ''>('');
 
     const [fields, setFields] = useState({
         name:                  '',
@@ -201,6 +204,7 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
             if (file) formData.append(key, file);
         }
         for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
+        formData.append('dti_sec_kind', dtiSecKind);
         if (logo) formData.append('logo', logo);
         appendOtherRows(formData, otherDocs);
         formData.append('latitude', pin ? String(pin.lat) : '');
@@ -222,7 +226,7 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
             // Navigate back to offending step
             const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation',
                                'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo', 'latitude', 'longitude'];
-            const step2Keys = [...DOC_FIELDS.map(d => d.key), ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
+            const step2Keys = [...DOC_FIELDS.map(d => d.key), 'dti_sec_kind', ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
             else if (step2Keys.some((k) => mapped[k]) || Object.keys(mapped).some((k) => k.startsWith('other_documents'))) setStep(2);
             else setStep(3);
@@ -453,6 +457,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                                 onFileChange={(f) => setFile(doc.key, f)}
                                                 onClear={() => setFile(doc.key, null)}
                                             />
+                                            {doc.key === 'dti_sec_registration' && (
+                                                <DtiSecKindToggle value={dtiSecKind} error={errors.dti_sec_kind}
+                                                    onChange={(v) => { setDtiSecKind(v); setErrors((p) => ({ ...p, dti_sec_kind: '' })); }} />
+                                            )}
                                             {isExpiringDoc(doc.key) && (
                                                 <PermitExpiryInput id={`${doc.key}_expires_at`} value={expiries[doc.key] ?? ''} error={errors[`${doc.key}_expires_at`]}
                                                     onChange={(v) => setExpiries((e) => ({ ...e, [doc.key]: v }))} />

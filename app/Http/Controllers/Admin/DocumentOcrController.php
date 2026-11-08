@@ -56,7 +56,7 @@ class DocumentOcrController extends Controller
             ->where('type', 'seller_application')->latest()->first();
 
         if ($key === 'valid_id') {
-            return [$application?->valid_id_path ?? $store->owner?->valid_id, null];
+            return [$application?->valid_id_path ?? $store->owner?->verifiedIdPath(), null];
         }
 
         $col = StoreDocuments::expiryColumn($key);

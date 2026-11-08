@@ -69,7 +69,11 @@ type StoreDetail = {
     business_permit_url: string | null;
     fsic_permit_url: string | null;
     doe_lpg_license_url: string | null;
-    lto_permit_url: string | null;
+    dti_sec_registration_url: string | null;
+    /** 'dti' | 'sec'; null = registered before DTI/SEC was required */
+    dti_sec_kind?: 'dti' | 'sec' | null;
+    /** The old separate LTO upload (same as the DOE License to Operate — no longer required) */
+    old_lto_permit_url?: string | null;
     terms_agreed_at: string | null;
     suspension_reason: string | null;
     suspension_notes: string | null;
@@ -105,9 +109,9 @@ const DUPLICATE_FIELD_LABEL: Record<string, string> = {
 /** Which auto-read results to show next to each checklist item */
 const CHECK_SOURCES: Record<string, { keys: string[]; only?: RegExp }> = {
     id_matches_owner:   { keys: ['valid_id'] },
-    bir_matches:        { keys: ['bir_permit'] },
-    permits_readable:   { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'] },
-    expiry_dates_match: { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'], only: /expiry|date/i },
+    bir_matches:        { keys: ['bir_permit', 'dti_sec_registration'] },
+    permits_readable:   { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license'] },
+    expiry_dates_match: { keys: ['business_permit', 'fsic_permit', 'doe_lpg_license'], only: /expiry|date/i },
 };
 
 type ActionHistory = {
@@ -440,16 +444,34 @@ export default function StoreShow({
                                         </DocumentRow>
                                         {ocrLine('valid_id')}
                                     </div>
-                                    {store.permits.map((p) => (
-                                        <div key={p.type}>
-                                            <DocumentRow label={p.label}>
-                                                <PermitBadge p={p} />
-                                                <DocLink url={(store as unknown as Record<string, string | null>)[`${p.type}_url`]} label="View" />
-                                            </DocumentRow>
-                                            {ocrLine(p.type)}
-                                        </div>
-                                    ))}
+                                    {store.permits.map((p) => {
+                                        const url = (store as unknown as Record<string, string | null>)[`${p.type}_url`];
+                                        const isDtiSec = p.type === 'dti_sec_registration';
+                                        return (
+                                            <div key={p.type}>
+                                                <DocumentRow label={isDtiSec ? `DTI/SEC Registration${store.dti_sec_kind ? ` (${store.dti_sec_kind.toUpperCase()})` : ''}` : p.label}>
+                                                    {isDtiSec && !url ? (
+                                                        <span className="whitespace-normal text-right text-xs italic text-muted-foreground">Not provided (registered before this was required)</span>
+                                                    ) : (
+                                                        <>
+                                                            <PermitBadge p={p} />
+                                                            <DocLink url={url} label="View" />
+                                                        </>
+                                                    )}
+                                                </DocumentRow>
+                                                {ocrLine(p.type)}
+                                            </div>
+                                        );
+                                    })}
                                 </div>
+                                {store.old_lto_permit_url && (
+                                    <div className="space-y-1 pt-1">
+                                        <DocumentHeading>Older documents</DocumentHeading>
+                                        <DocumentRow label={<span>LTO (License to Operate) <span className="block text-xs text-muted-foreground">Same as the DOE LTO — no longer required</span></span>}>
+                                            <DocLink url={store.old_lto_permit_url} label="View" />
+                                        </DocumentRow>
+                                    </div>
+                                )}
                                 {Object.keys(documentOcr).length > 0 && (
                                     <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                                 )}

@@ -19,8 +19,8 @@ class DocumentFileController extends Controller
 {
     private const FIELDS = [
         'user'           => ['valid_id', 'valid_id_path', 'selfie_path'],
-        'verification'   => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path'],
-        'store'          => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit'],
+        'verification'   => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path', 'dti_sec_registration_path'],
+        'store'          => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration', 'lto_permit'],   // lto_permit: old files only
         'store-document' => ['file_path'],
         'staff-document' => ['file_path'],
     ];

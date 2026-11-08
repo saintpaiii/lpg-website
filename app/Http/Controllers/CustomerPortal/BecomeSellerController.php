@@ -57,15 +57,16 @@ class BecomeSellerController extends Controller
                     ])->all(),
                     'province'    => $store->province,
                     'phone'       => $store->phone,
+                    'dti_sec_kind' => $store->dti_sec_kind,
                 ];
             }
             $previousDocs = [
-                'valid_id_url'        => PrivateDocument::urlIf($application->valid_id_path, 'verification', $application->id, 'valid_id_path'),
+                // No valid_id_url: the application always uses the customer's verified ID (verified_id_url)
                 'bir_permit_url'      => PrivateDocument::urlIf($application->bir_permit_path, 'verification', $application->id, 'bir_permit_path'),
                 'business_permit_url' => PrivateDocument::urlIf($application->business_permit_path, 'verification', $application->id, 'business_permit_path'),
                 'fsic_permit_url'     => PrivateDocument::urlIf($application->fsic_permit_path, 'verification', $application->id, 'fsic_permit_path'),
                 'doe_lpg_license_url' => PrivateDocument::urlIf($application->doe_lpg_license_path, 'verification', $application->id, 'doe_lpg_license_path'),
-                'lto_permit_url'      => PrivateDocument::urlIf($application->lto_permit_path, 'verification', $application->id, 'lto_permit_path'),
+                'dti_sec_registration_url' => PrivateDocument::urlIf($application->dti_sec_registration_path, 'verification', $application->id, 'dti_sec_registration_path'),
             ];
         }
 
@@ -92,7 +93,11 @@ class BecomeSellerController extends Controller
                 'rejection_reason' => $application->rejection_reason,
                 'created_at'       => $application->created_at->format('M d, Y'),
             ] : null,
-            'has_valid_id'   => (bool) $user->valid_id,
+            // The customer's verified ID is reused — Start Selling never asks for it again
+            'has_valid_id'    => (bool) $user->verifiedIdPath(),
+            'verified_id_url' => $user->valid_id_path
+                ? PrivateDocument::url('user', $user->id, 'valid_id_path')
+                : PrivateDocument::urlIf($user->valid_id, 'user', $user->id, 'valid_id'),
             'previous_store' => $previousStore,
             'previous_docs'  => $previousDocs,
             ...LegalService::sellerTermsProps(),
@@ -114,6 +119,11 @@ class BecomeSellerController extends Controller
 
         if ($message = $this->limitMessage($user->id)) {
             return back()->with('error', $message);
+        }
+
+        // The application reuses the verified ID (the id.verified middleware normally guarantees one)
+        if (! $user->verifiedIdPath()) {
+            return redirect('/customer/id-verification')->with('error', 'Please verify your ID first.');
         }
 
         // Load existing rejected application for resubmission fallback
@@ -138,10 +148,11 @@ class BecomeSellerController extends Controller
             'store_phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
             'bir_permit'        => $docRule(),
             'business_permit'   => $docRule(),
-            'valid_id'          => ['nullable', $fileRule()],
             'fsic_permit'       => $docRule(),
             'doe_lpg_license'   => $docRule(),
-            'lto_permit'        => $docRule(),
+            // DTI / SEC replaces the old LTO upload — required unless the earlier application already has one
+            'dti_sec_registration' => $existingApp?->dti_sec_registration_path ? ['nullable', $fileRule()] : ['required', $fileRule()],
+            'dti_sec_kind'      => ['required', 'in:dti,sec'],
             'logo'              => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             // Store pin (required — delivery fees and staff clock-in use it)
             'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
@@ -150,7 +161,7 @@ class BecomeSellerController extends Controller
             // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
             ...StoreDocuments::otherDocumentRules(),
             'terms_agreed'      => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit']) + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         // The user's existing store (resubmission) — never compared with itself
         $ownStore  = Store::where('user_id', $user->id)->first();
@@ -188,14 +199,12 @@ class BecomeSellerController extends Controller
         $doeLicensePath     = $request->hasFile('doe_lpg_license')
             ? $request->file('doe_lpg_license')->store('doe_licenses', 'local')
             : $existingApp?->doe_lpg_license_path;
-        $ltoPermitPath      = $request->hasFile('lto_permit')
-            ? $request->file('lto_permit')->store('lto_permits', 'local')
-            : $existingApp?->lto_permit_path;
+        $dtiSecPath         = $request->hasFile('dti_sec_registration')
+            ? $request->file('dti_sec_registration')->store('dti_sec_registrations', 'local')
+            : $existingApp?->dti_sec_registration_path;
 
-        // Reuse existing valid_id if not re-uploading
-        $validIdPath = $request->hasFile('valid_id')
-            ? $request->file('valid_id')->store('valid_ids', 'local')
-            : $user->valid_id;
+        // Always the customer's verified ID (checked at the top of this method)
+        $validIdPath = $user->verifiedIdPath();
 
         // Logo is public; on resubmission the old one is kept unless a new one is uploaded
         $logoPath = $request->hasFile('logo')
@@ -207,12 +216,12 @@ class BecomeSellerController extends Controller
         foreach (array_keys($newHashes) as $type) {
             unset($ocr[$type]);
         }
-        if ($request->hasFile('valid_id')) {
-            unset($ocr['valid_id']);
+        if ($existingApp?->valid_id_path !== $validIdPath) {
+            unset($ocr['valid_id']);   // a different ID file than last time
         }
 
         $store = DB::transaction(function () use ($request, $user, $existingApp, $birPermitPath, $businessPermitPath, $fsicPermitPath,
-            $doeLicensePath, $ltoPermitPath, $validIdPath, $logoPath, $hashes, $duplicate, $ocr, $otherRows) {
+            $doeLicensePath, $dtiSecPath, $validIdPath, $logoPath, $hashes, $duplicate, $ocr, $otherRows) {
             // Create or reset store for this user
             $store = Store::updateOrCreate(
                 ['user_id' => $user->id],
@@ -228,14 +237,14 @@ class BecomeSellerController extends Controller
                     'business_permit' => $businessPermitPath,
                     'fsic_permit'     => $fsicPermitPath,
                     'doe_lpg_license' => $doeLicensePath,
-                    'lto_permit'      => $ltoPermitPath,
+                    'dti_sec_registration' => $dtiSecPath,
+                    'dti_sec_kind'    => $request->dti_sec_kind,
                     'logo'            => $logoPath,
                     'latitude'        => $request->latitude,
                     'longitude'       => $request->longitude,
                     'business_permit_expires_at' => $request->business_permit_expires_at,
                     'fsic_permit_expires_at'     => $request->fsic_permit_expires_at,
                     'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,
-                    'lto_permit_expires_at'      => $request->lto_permit_expires_at,
                     'status'          => 'pending',
                     'document_hashes' => $hashes ?: null,
                     'duplicate_flags' => DuplicateStoreService::flags($duplicate),
@@ -260,7 +269,7 @@ class BecomeSellerController extends Controller
                 'business_permit_path' => $businessPermitPath,
                 'fsic_permit_path'     => $fsicPermitPath,
                 'doe_lpg_license_path' => $doeLicensePath,
-                'lto_permit_path'      => $ltoPermitPath,
+                'dti_sec_registration_path' => $dtiSecPath,
                 'status'               => 'pending',
                 'terms_agreed_at'      => now(),
             ]);

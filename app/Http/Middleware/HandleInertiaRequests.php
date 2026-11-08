@@ -41,7 +41,7 @@ class HandleInertiaRequests extends Middleware
     private const STORE_COLUMNS = [
         'id', 'store_name', 'status', 'documents_suspended',
         'subscription_plan', 'subscription_expires_at', 'is_featured', 'trial_used_at',
-        'business_permit_expires_at', 'fsic_permit_expires_at', 'doe_lpg_license_expires_at', 'lto_permit_expires_at',
+        'business_permit_expires_at', 'fsic_permit_expires_at', 'doe_lpg_license_expires_at',
         'latitude', 'longitude',
     ];
 

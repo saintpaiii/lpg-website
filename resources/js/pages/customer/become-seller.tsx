@@ -14,7 +14,7 @@ import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box'
 import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { lookupBarangay } from '@/components/address-map';
-import { isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type ExpiringDoc } from '@/components/seller-application-fields';
+import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type DtiSecKind, type ExpiringDoc } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { OtherDocumentsFields, otherRowsPayload, StoreNameWarning, useStoreNameCheck, type OtherDocRow, type PreviousOtherDoc } from '@/components/other-documents-fields';
 
@@ -40,21 +40,22 @@ type PreviousStore = {
     business_permit_expires_at: string | null;
     fsic_permit_expires_at: string | null;
     doe_lpg_license_expires_at: string | null;
-    lto_permit_expires_at: string | null;
+    dti_sec_kind?: DtiSecKind | null;
 } | null;
 
 type PreviousDocs = {
-    valid_id_url: string | null;
     bir_permit_url: string | null;
     business_permit_url: string | null;
     fsic_permit_url: string | null;
     doe_lpg_license_url: string | null;
-    lto_permit_url: string | null;
+    dti_sec_registration_url?: string | null;
 } | null;
 
 type Props = {
     application: Application;
     has_valid_id: boolean;
+    /** Link to the customer's verified ID (reused for the application) */
+    verified_id_url?: string | null;
     previous_store: PreviousStore;
     previous_docs: PreviousDocs;
     seller_terms: SellerTerms;
@@ -93,14 +94,15 @@ const DOC_FIELDS = [
     {
         key: 'doe_lpg_license' as const,
         urlKey: 'doe_lpg_license_url' as const,
-        label: 'DOE LPG Retail License',
-        description: 'Required license from the Department of Energy to sell LPG',
+        // RA 11592: the DOE License to Operate IS the LTO — one upload
+        label: 'DOE License to Operate (LTO) — LPG Retail Outlet',
+        description: DOE_LTO_HELP,
     },
     {
-        key: 'lto_permit' as const,
-        urlKey: 'lto_permit_url' as const,
-        label: 'LTO (License to Operate)',
-        description: 'License to Operate issued by the relevant regulatory agency',
+        key: 'dti_sec_registration' as const,
+        urlKey: 'dti_sec_registration_url' as const,
+        label: 'DTI Business Name or SEC Registration',
+        description: DTI_SEC_HELP,
     },
 ] as const;
 
@@ -110,7 +112,7 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
+export default function BecomeSellerPage({ application, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -131,17 +133,16 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         store_phone: string;
         bir_permit: File | null;
         business_permit: File | null;
-        valid_id: File | null;
         fsic_permit: File | null;
         doe_lpg_license: File | null;
-        lto_permit: File | null;
+        dti_sec_registration: File | null;
+        dti_sec_kind: DtiSecKind | '';
         logo: File | null;
         latitude: number | null;
         longitude: number | null;
         business_permit_expires_at: string;
         fsic_permit_expires_at: string;
         doe_lpg_license_expires_at: string;
-        lto_permit_expires_at: string;
         terms_agreed: boolean;
     }>({
         store_name:        previous_store?.store_name    ?? '',
@@ -153,10 +154,10 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         store_phone:       previous_store?.phone         ?? '',
         bir_permit:      null,
         business_permit: null,
-        valid_id:        null,
         fsic_permit:     null,
         doe_lpg_license: null,
-        lto_permit:      null,
+        dti_sec_registration: null,
+        dti_sec_kind:    previous_store?.dti_sec_kind ?? '',
         logo:            null,
         latitude:        previous_store?.latitude ?? null,
         longitude:       previous_store?.longitude ?? null,
@@ -164,7 +165,6 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         business_permit_expires_at: previous_store?.business_permit_expires_at ?? '',
         fsic_permit_expires_at:     previous_store?.fsic_permit_expires_at ?? '',
         doe_lpg_license_expires_at: previous_store?.doe_lpg_license_expires_at ?? '',
-        lto_permit_expires_at:      previous_store?.lto_permit_expires_at ?? '',
         terms_agreed:    false,
     });
 
@@ -180,19 +180,18 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
         },
     });
 
-    const idRef             = useRef<HTMLInputElement>(null);
     const birPermitRef      = useRef<HTMLInputElement>(null);
     const businessPermitRef = useRef<HTMLInputElement>(null);
     const fsicPermitRef     = useRef<HTMLInputElement>(null);
     const doeLicenseRef     = useRef<HTMLInputElement>(null);
-    const ltoPermitRef      = useRef<HTMLInputElement>(null);
+    const dtiSecRef         = useRef<HTMLInputElement>(null);
 
     const fileRefs = {
         bir_permit:      birPermitRef,
         business_permit: businessPermitRef,
         fsic_permit:     fsicPermitRef,
         doe_lpg_license: doeLicenseRef,
-        lto_permit:      ltoPermitRef,
+        dti_sec_registration: dtiSecRef,
     };
 
     function submit(e: React.FormEvent) {
@@ -435,30 +434,13 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid gap-5">
-                                        {/* Valid ID — special case with "already on file" logic */}
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                                Valid Government ID <span className="text-red-500">{(has_valid_id || previous_docs?.valid_id_url) ? '' : '*'}</span>
-                                            </p>
-                                            {has_valid_id && !previous_docs?.valid_id_url && (
-                                                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-400 mb-2">
-                                                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                                                    Valid ID already on file. You may upload a new one to replace it.
-                                                </div>
+                                        {/* Valid ID — the customer's verified ID is reused (never asked again) */}
+                                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400">
+                                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                            <span className="min-w-0 flex-1">Your ID is already verified — we'll use it for your store application.</span>
+                                            {verified_id_url && (
+                                                <a href={verified_id_url} target="_blank" rel="noopener noreferrer" className="font-medium text-emerald-800 underline hover:text-emerald-900 dark:text-emerald-300">View</a>
                                             )}
-                                            {previous_docs?.valid_id_url && (
-                                                <PreviousDocBadge url={previous_docs.valid_id_url} />
-                                            )}
-                                            <FileField
-                                                label=""
-                                                required={!has_valid_id && !previous_docs?.valid_id_url}
-                                                hint="Owner's government-issued ID — JPG, PNG, WEBP or PDF, max 5 MB"
-                                                file={data.valid_id}
-                                                error={errors.valid_id}
-                                                inputRef={idRef}
-                                                onChange={f => setData('valid_id', f)}
-                                                hideLabel
-                                            />
                                         </div>
 
                                         {/* Other required docs */}
@@ -478,6 +460,11 @@ export default function BecomeSellerPage({ application, has_valid_id, previous_s
                                                         inputRef={fileRefs[doc.key]}
                                                         onChange={f => setData(doc.key, f)}
                                                     />
+                                                    {doc.key === 'dti_sec_registration' && (
+                                                        <div className="mt-2">
+                                                            <DtiSecKindToggle value={data.dti_sec_kind} error={errors.dti_sec_kind} onChange={(v) => setData('dti_sec_kind', v)} />
+                                                        </div>
+                                                    )}
                                                     {expiryKey && (
                                                         <div className="mt-2">
                                                             <PermitExpiryInput id={expiryKey} value={data[expiryKey]}

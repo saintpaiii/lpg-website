@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
+import { DtiSecKindToggle, type DtiSecKind } from '@/components/seller-application-fields';
 import type { BreadcrumbItem } from '@/types';
 
 type Permit = {
@@ -25,6 +26,11 @@ type Permit = {
     pending: boolean;
     pending_expires: string | null;
     rejected_reason: string | null;
+    /** No file yet (e.g. DTI / SEC on stores registered before it was required) */
+    missing?: boolean;
+    help?: string | null;
+    /** DTI / SEC registration only */
+    kind?: DtiSecKind | null;
 };
 
 type Other = { id: number; label: string; status: 'pending' | 'approved' | 'rejected'; expires_on: string | null; reason: string | null; date: string; url: string };
@@ -38,13 +44,14 @@ const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); retur
 export default function SellerDocuments({ permits, others, documents_suspended, max_other, max_date }: Props) {
     // One upload dialog for renewals and extra documents
     const [target, setTarget] = useState<{ doc_type: string; title: string; needsDate: boolean } | null>(null);
-    const form = useForm<{ doc_type: string; label: string; file: File | null; expires_at: string }>({ doc_type: '', label: '', file: null, expires_at: '' });
+    const form = useForm<{ doc_type: string; label: string; file: File | null; expires_at: string; dti_sec_kind: DtiSecKind | '' }>({ doc_type: '', label: '', file: null, expires_at: '', dti_sec_kind: '' });
     const [fileProblem, setFileProblem] = useState<string | null>(null);
 
-    function open(doc_type: string, title: string, needsDate: boolean) {
+    function open(doc_type: string, title: string, needsDate: boolean, kind: DtiSecKind | '' = '') {
         form.reset();
         form.clearErrors();
-        form.setData({ doc_type, label: '', file: null, expires_at: '' });
+        setFileProblem(null);
+        form.setData({ doc_type, label: '', file: null, expires_at: '', dti_sec_kind: kind });
         setTarget({ doc_type, title, needsDate });
     }
 
@@ -79,8 +86,12 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                                 <CardTitle className="flex items-start gap-2 text-base"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" /> {p.label}</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
+                                {p.help && <p className="text-xs text-muted-foreground">{p.help}</p>}
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <PermitBadge p={p} />
+                                    {p.missing ? (
+                                        <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Missing — please upload</span>
+                                    ) : <PermitBadge p={p} />}
+                                    {p.kind && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">{p.kind.toUpperCase()}</span>}
                                     {p.file_url && (
                                         <a href={p.file_url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
                                             View file <ExternalLink className="h-3.5 w-3.5" />
@@ -98,8 +109,8 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                                     </p>
                                 )}
                                 {!p.pending && (
-                                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => open(p.type, p.label, p.has_expiry)}>
-                                        <Upload className="h-3.5 w-3.5" /> {p.status === 'no_date' ? 'Add expiry date' : 'Upload renewed document'}
+                                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => open(p.type, p.label, p.has_expiry, p.kind ?? '')}>
+                                        <Upload className="h-3.5 w-3.5" /> {p.missing ? 'Upload document' : p.status === 'no_date' ? 'Add expiry date' : 'Upload renewed document'}
                                     </Button>
                                 )}
                             </CardContent>
@@ -110,7 +121,7 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base">Other documents</CardTitle>
-                        <p className="text-sm text-muted-foreground">Optional extra documents, e.g. DTI Registration. Up to {max_other} approved documents.</p>
+                        <p className="text-sm text-muted-foreground">Optional extra documents, e.g. Barangay Business Clearance. Up to {max_other} approved documents.</p>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {others.length === 0 ? (
@@ -152,7 +163,7 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                         {target?.doc_type === 'other' && (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="doc_label">Document name</Label>
-                                <Input id="doc_label" value={form.data.label} maxLength={100} placeholder="e.g. DTI Registration" onChange={(e) => form.setData('label', e.target.value)} />
+                                <Input id="doc_label" value={form.data.label} maxLength={100} placeholder="e.g. Barangay Business Clearance" onChange={(e) => form.setData('label', e.target.value)} />
                                 <InputError message={form.errors.label} />
                             </div>
                         )}
@@ -169,14 +180,20 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                             }} />
                             <InputError message={fileProblem ?? form.errors.file} />
                         </div>
-                        <div className="grid gap-1.5">
+                        {target?.doc_type === 'dti_sec_registration' && (
+                            <div className="grid gap-1.5">
+                                <Label>Type of registration</Label>
+                                <DtiSecKindToggle value={form.data.dti_sec_kind} error={form.errors.dti_sec_kind} onChange={(v) => form.setData('dti_sec_kind', v)} />
+                            </div>
+                        )}
+                        {target?.doc_type !== 'dti_sec_registration' && <div className="grid gap-1.5">
                             <Label htmlFor="doc_expires">Valid until{target?.needsDate ? '' : ' (optional)'}</Label>
                             <Input id="doc_expires" type="date" min={tomorrow()} max={max_date} value={form.data.expires_at} onChange={(e) => form.setData('expires_at', e.target.value)} />
                             <InputError message={form.errors.expires_at} />
-                        </div>
+                        </div>}
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setTarget(null)}>Cancel</Button>
-                            <Button type="submit" disabled={form.processing || !form.data.file || (target?.needsDate && !form.data.expires_at) || (target?.doc_type === 'other' && !form.data.label.trim())} className="gap-1.5">
+                            <Button type="submit" disabled={form.processing || !form.data.file || (target?.needsDate && !form.data.expires_at) || (target?.doc_type === 'other' && !form.data.label.trim()) || (target?.doc_type === 'dti_sec_registration' && !form.data.dti_sec_kind)} className="gap-1.5">
                                 {form.processing && <Loader2 className="h-4 w-4 animate-spin" />} Submit
                             </Button>
                         </div>

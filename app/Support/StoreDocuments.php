@@ -17,9 +17,36 @@ class StoreDocuments
         'bir_permit'      => ['label' => 'BIR Certificate of Registration',           'expiry' => null],
         'business_permit' => ['label' => "Business / Mayor's Permit",                 'expiry' => 'business_permit_expires_at'],
         'fsic_permit'     => ['label' => 'Fire Safety Inspection Certificate (FSIC)', 'expiry' => 'fsic_permit_expires_at'],
-        'doe_lpg_license' => ['label' => 'DOE LPG License',                           'expiry' => 'doe_lpg_license_expires_at'],
-        'lto_permit'      => ['label' => 'License to Operate (LTO)',                  'expiry' => 'lto_permit_expires_at'],
+        // RA 11592: the DOE issues the License to Operate — it IS the "LTO" (the old separate lto_permit is no longer asked)
+        'doe_lpg_license' => ['label' => 'DOE License to Operate (LTO) — LPG Retail Outlet', 'expiry' => 'doe_lpg_license_expires_at'],
+        // Business-name registration: DTI (single owner) or SEC (corporation / partnership). Never expires here, never hides a store.
+        'dti_sec_registration' => ['label' => 'DTI Business Name or SEC Registration',   'expiry' => null],
     ];
+
+    /** dti_sec_kind values */
+    public const DTI_SEC_KINDS = ['dti' => 'DTI', 'sec' => 'SEC'];
+
+    /** Help line for a document type (registration forms, Store Documents). */
+    public const HELP = [
+        'doe_lpg_license'      => 'Issued by the Department of Energy under RA 11592 (valid 3–5 years).',
+        'dti_sec_registration' => 'DTI Certificate of Business Name Registration, or SEC Certificate of Incorporation / Registration.',
+    ];
+
+    /** Messages for the DTI/SEC upload + its DTI / SEC choice (registration forms and Store Documents). */
+    public static function dtiSecMessages(): array
+    {
+        return [
+            'dti_sec_registration.required' => 'Please upload your DTI Business Name or SEC Registration.',
+            'dti_sec_kind.required'         => 'Choose DTI (single owner) or SEC (corporation / partnership).',
+            'dti_sec_kind.in'               => 'Choose DTI (single owner) or SEC (corporation / partnership).',
+        ];
+    }
+
+    /** "DTI/SEC Registration (DTI)" etc. — the label shown next to a store's file. */
+    public static function dtiSecLabel(?string $kind): string
+    {
+        return 'DTI/SEC Registration' . ($kind && isset(self::DTI_SEC_KINDS[$kind]) ? ' (' . self::DTI_SEC_KINDS[$kind] . ')' : '');
+    }
 
     /** A permit expired longer than this hides the store from customers. */
     public const GRACE_DAYS = 7;

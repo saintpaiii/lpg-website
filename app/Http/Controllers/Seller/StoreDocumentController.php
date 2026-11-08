@@ -39,6 +39,10 @@ class StoreDocumentController extends Controller
                 'pending'         => (bool) $mine->firstWhere('status', 'pending'),
                 'pending_expires' => $mine->firstWhere('status', 'pending')?->expires_at?->format('M d, Y'),
                 'rejected_reason' => $latest?->status === 'rejected' ? $latest->rejection_reason : null,
+                // No file yet (e.g. DTI / SEC on stores registered before it was required) → "Missing — please upload"
+                'missing'         => ! $store->{$type},
+                'help'            => StoreDocuments::HELP[$type] ?? null,
+                'kind'            => $type === 'dti_sec_registration' ? $store->dti_sec_kind : null,
             ];
         })->values();
 
@@ -70,6 +74,8 @@ class StoreDocumentController extends Controller
             'doc_type'   => ['required', Rule::in([...$types, 'other'])],
             'label'      => ['required_if:doc_type,other', 'nullable', 'string', 'max:100'],
             'file'       => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
+            // DTI (single owner) or SEC (corporation / partnership) — only for the DTI / SEC registration
+            'dti_sec_kind' => [Rule::requiredIf(fn () => $request->input('doc_type') === 'dti_sec_registration'), 'nullable', 'in:dti,sec'],
             'expires_at' => [
                 Rule::requiredIf(fn () => StoreDocuments::expiryColumn((string) $request->input('doc_type')) !== null),
                 'nullable', 'date', 'after:today', 'before_or_equal:' . StoreDocuments::today()->addYears(5)->toDateString(),
@@ -79,7 +85,7 @@ class StoreDocumentController extends Controller
             'expires_at.required' => 'Please enter the date this document is valid until.',
             'expires_at.after'    => 'The document must still be valid (date after today).',
             'file.max'            => 'The file must be 5 MB or smaller.',
-        ] + \App\Support\UploadMessages::for(['file']));
+        ] + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['file']));
 
         $type  = $data['doc_type'];
         $label = $type === 'other' ? trim($data['label']) : null;
@@ -105,6 +111,7 @@ class StoreDocumentController extends Controller
             'expires_at'   => $data['expires_at'] ?? null,
             'status'       => 'pending',
             'submitted_by' => $request->user()->id,
+            'dti_sec_kind' => $type === 'dti_sec_registration' ? ($data['dti_sec_kind'] ?? null) : null,
         ]);
 
         $name = $label ?? StoreDocuments::label($type);

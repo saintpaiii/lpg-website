@@ -94,6 +94,15 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public const PAUSED_BY_PLAN_MESSAGE = "Your account is paused because your store's current plan has reached its staff limit. Please contact your store owner.";
 
+    /**
+     * The user's verified-ID file: valid_id_path (ID verification, since 2026-04) or the old valid_id column.
+     * Start Selling reuses it instead of asking for the ID again.
+     */
+    public function verifiedIdPath(): ?string
+    {
+        return $this->valid_id_path ?: ($this->valid_id ?: null);
+    }
+
     public function isAdmin(): bool
     {
         return in_array($this->role, ['admin', 'platform_admin']) || (bool) $this->is_admin;

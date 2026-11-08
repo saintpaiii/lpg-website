@@ -6,7 +6,7 @@
  */
 return [
     'id_matches_owner'     => 'Valid ID is clear and the name matches the owner',
-    'bir_matches'          => 'BIR certificate: business name / TIN look right',
+    'bir_matches'          => 'BIR certificate and DTI/SEC registration: business name / TIN look right',
     'permits_readable'     => 'All permits are readable, belong to this business and are not expired',
     'expiry_dates_match'   => 'Expiry dates typed by the seller match the documents',
     'address_matches_pin'  => 'Store address matches the map pin',

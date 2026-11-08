@@ -11,6 +11,9 @@ class VerificationRequest extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /** Auto-read (OCR) result of the valid ID — admin only */
+    protected $hidden = ['ocr'];
+
     protected $fillable = [
         'user_id',
         'type',
@@ -21,11 +24,13 @@ class VerificationRequest extends Model
         'fsic_permit_path',
         'doe_lpg_license_path',
         'lto_permit_path',
+        'dti_sec_registration_path',
         'status',
         'reviewed_by',
         'reviewed_at',
         'rejection_reason',
         'terms_agreed_at',
+        'ocr',
     ];
 
     protected function casts(): array
@@ -33,6 +38,7 @@ class VerificationRequest extends Model
         return [
             'reviewed_at'    => 'datetime',
             'terms_agreed_at'=> 'datetime',
+            'ocr'            => 'array',
         ];
     }
 
