@@ -1,8 +1,8 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { PlansDialogLink } from '@/components/plans-dialog-link';
 import type { PlanCatalog } from '@/types/plans';
 import {
-    AlertCircle, CheckCircle2, CheckSquare, Clock, ExternalLink, FileText,
+    AlertCircle, AlertTriangle, CheckCircle2, CheckSquare, Clock, ExternalLink, FileText,
     ScrollText, Shield, ShieldCheck, Store, Upload, XCircle,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -112,7 +112,7 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -290,6 +290,17 @@ export default function BecomeSellerPage({ application, verified_id_url = null, 
                     </Card>
                 )}
 
+                {/* Verified, but no ID FILE on record (e.g. very old data) — the application reuses that file */}
+                {!isPending && !limit_message && !has_valid_id && (
+                    <div className="flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 sm:flex-row sm:items-center dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <AlertTriangle className="hidden h-5 w-5 shrink-0 sm:block" />
+                        <p className="flex-1">We need your verified ID file before you can apply. Please upload your ID again in Verify ID.</p>
+                        <Link href="/customer/id-verification" className="inline-flex items-center justify-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700">
+                            Go to Verify ID
+                        </Link>
+                    </div>
+                )}
+
                 {/* Application form */}
                 {!isPending && !limit_message && (
                     <form onSubmit={submit} className="space-y-6">
@@ -416,7 +427,8 @@ export default function BecomeSellerPage({ application, verified_id_url = null, 
                                     <Button
                                         type="button"
                                         onClick={validateStep1}
-                                        className="bg-blue-600 hover:bg-blue-700"
+                                        disabled={!has_valid_id}
+                                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         Next: Upload Documents →
                                     </Button>
@@ -498,7 +510,8 @@ export default function BecomeSellerPage({ application, verified_id_url = null, 
                                     <Button
                                         type="button"
                                         onClick={() => setStep(3)}
-                                        className="bg-blue-600 hover:bg-blue-700"
+                                        disabled={!has_valid_id}
+                                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         Next: Terms & Conditions →
                                     </Button>
@@ -566,7 +579,7 @@ export default function BecomeSellerPage({ application, verified_id_url = null, 
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={processing || !allAgreed}
+                                        disabled={processing || !allAgreed || !has_valid_id}
                                         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                                     >
                                         {processing ? 'Submitting…' : isRejected ? 'Resubmit Application' : 'Submit Application'}

@@ -20,7 +20,7 @@ import type { BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/admin/dashboard' },
-    { title: 'Auth Logs', href: '/admin/auth-logs' },
+    { title: 'Login History', href: '/admin/auth-logs' },
 ];
 
 // ── Types ───────────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Auth Logs" />
+            <Head title="Login History" />
 
             <div className="p-6 space-y-5">
                 {/* Header */}
@@ -138,7 +138,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <ShieldAlert className="h-6 w-6 text-blue-600" />
-                            Authentication Logs
+                            Login History
                         </h1>
                         <p className="text-muted-foreground text-sm mt-0.5">
                             All login, logout, and security events across the platform.

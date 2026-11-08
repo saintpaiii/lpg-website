@@ -308,6 +308,9 @@ class DemoSeeder extends Seeder
             $customerIds[] = $customerId;
         }
 
+        // Verified demo customers need an ID FILE too — Start Selling reuses it instead of asking again
+        $this->seedPlaceholderIds($customerUserIds);
+
         // ══════════════════════════════════════════════════════════════════════
         // 6. PERMISSIONS
         // ══════════════════════════════════════════════════════════════════════
@@ -1028,6 +1031,69 @@ class DemoSeeder extends Seeder
      * @param  int[]  $customerUserIds Customer user IDs (users table)
      * @param  array  &$consumed      Running consumed-units per product_id
      */
+    /**
+     * A placeholder "SAMPLE ID" image (private local disk, verifications/ids/demo-{user_id}.jpg) for every demo customer whose
+     * ID is verified, plus the approved customer_id_verification it would have come from. Drawn with GD when available
+     * (with the name), else database/seeders/assets/sample-id.jpg. An existing file is never overwritten.
+     */
+    private function seedPlaceholderIds(array $userIds): void
+    {
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+
+        foreach (DB::table('users')->whereIn('id', $userIds)->where('id_verified', true)->get(['id', 'name']) as $u) {
+            $path = "verifications/ids/demo-{$u->id}.jpg";
+            try {
+                if (! $disk->exists($path)) {
+                    $bytes = $this->sampleIdJpeg((string) $u->name);
+                    if ($bytes === null || ! $disk->put($path, $bytes)) {
+                        continue;
+                    }
+                }
+            } catch (\Throwable) {
+                continue;   // can't write → leave this customer without a file (Start Selling then asks to verify again)
+            }
+
+            DB::table('users')->where('id', $u->id)->update(['valid_id_path' => $path]);
+            DB::table('verification_requests')->insert([
+                'user_id'       => $u->id,
+                'type'          => 'customer_id_verification',
+                'valid_id_path' => $path,
+                'status'        => 'approved',
+                'reviewed_at'   => $this->now->copy()->subDays(29),
+                'created_at'    => $this->now->copy()->subDays(30),
+                'updated_at'    => $this->now->copy()->subDays(29),
+            ]);
+        }
+    }
+
+    /** JPEG bytes of a grey "SAMPLE ID — {name}" card, or the bundled sample when GD is not enabled. */
+    private function sampleIdJpeg(string $name): ?string
+    {
+        if (! function_exists('imagecreatetruecolor')) {
+            $file = database_path('seeders/assets/sample-id.jpg');
+
+            return is_file($file) ? file_get_contents($file) : null;
+        }
+
+        $im   = imagecreatetruecolor(480, 300);
+        $bg   = imagecolorallocate($im, 214, 219, 226);
+        $bar  = imagecolorallocate($im, 100, 116, 139);
+        $ink  = imagecolorallocate($im, 51, 65, 85);
+        $white = imagecolorallocate($im, 255, 255, 255);
+        imagefill($im, 0, 0, $bg);
+        imagefilledrectangle($im, 0, 0, 480, 46, $bar);
+        imagestring($im, 5, 16, 14, 'SAMPLE ID - DEMO ONLY, NOT A REAL ID', $white);
+        imagerectangle($im, 24, 70, 150, 230, $ink);
+        imagestring($im, 5, 170, 100, strtoupper(mb_substr($name, 0, 28)), $ink);
+        imagestring($im, 3, 170, 130, 'Republic of the Philippines (sample)', $ink);
+
+        ob_start();
+        imagejpeg($im, null, 70);
+        imagedestroy($im);
+
+        return ob_get_clean() ?: null;
+    }
+
     private function seedOrders(
         array  $specs,
         int    $storeId,

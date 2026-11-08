@@ -215,7 +215,7 @@ export function AppSidebar() {
         isPlatformAdmin        && { title: 'Loyalty',            href: '/admin/loyalty',                                      icon: Star            },
         adminArea && can('settings.view')   && { title: 'Settings',           href: '/admin/settings',                                     icon: Settings        },
         isPlatformAdmin        && { title: 'Terms & Policies',   href: '/admin/legal',                                        icon: ScrollText      },
-        isPlatformAdmin        && { title: 'Auth Logs',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },
+        isPlatformAdmin        && { title: 'Login History',           href: '/admin/auth-logs',                                    icon: ShieldAlert     },
         { title: 'Notifications', href: '/notifications', icon: Bell },
         { title: 'Profile', href: '/settings/profile', icon: User },
     ].filter(Boolean) as NavItem[];
