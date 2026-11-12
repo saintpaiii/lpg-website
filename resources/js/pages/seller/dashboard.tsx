@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useStoreAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
@@ -66,6 +67,10 @@ function fmt(n: number) {
 
 export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock }: Props) {
     const { auth, plan } = usePage<SharedData>().props;
+    // Staff without a module see its numbers but no links into it (they would get a 403 page)
+    const { canOpen } = useStoreAccess();
+    const canOrders = canOpen('/seller/orders');
+    const canInventory = canOpen('/seller/inventory');
     const statCards = [
         {
             label: 'Products',
@@ -74,7 +79,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
             icon:  Package,
             color: 'text-blue-600',
             bg:    'bg-blue-50 dark:bg-blue-900/20',
-            href:  '/seller/products',
+            href:  canOpen('/seller/products') ? '/seller/products' : null,
         },
         {
             label: 'Total Orders',
@@ -83,7 +88,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
             icon:  ShoppingCart,
             color: 'text-violet-600',
             bg:    'bg-violet-50 dark:bg-violet-900/20',
-            href:  '/seller/orders',
+            href:  canOrders ? '/seller/orders' : null,
         },
         {
             label: 'Revenue This Month',
@@ -101,7 +106,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
             icon:  AlertTriangle,
             color: lowStock.length > 0 ? 'text-amber-600' : 'text-emerald-600',
             bg:    lowStock.length > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20',
-            href:  '/seller/inventory',
+            href:  canInventory ? '/seller/inventory' : null,
         },
     ];
 
@@ -239,7 +244,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                                     <ShoppingCart className="h-4 w-4 text-violet-600" />
                                     Recent Orders
                                 </CardTitle>
-                                <Link href="/seller/orders" className="text-xs text-blue-600 hover:underline">View all</Link>
+                                {canOrders && <Link href="/seller/orders" className="text-xs text-blue-600 hover:underline">View all</Link>}
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
@@ -261,9 +266,13 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                                         ) : recentOrders.map((o) => (
                                             <tr key={o.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                                 <td className="px-4 py-2.5">
-                                                    <Link href={`/seller/orders/${o.id}`} className="font-mono text-xs text-blue-600 hover:underline font-medium">
-                                                        {o.order_number}
-                                                    </Link>
+                                                    {canOrders ? (
+                                                        <Link href={`/seller/orders/${o.id}`} className="font-mono text-xs text-blue-600 hover:underline font-medium">
+                                                            {o.order_number}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="font-mono text-xs font-medium">{o.order_number}</span>
+                                                    )}
                                                     <p className="text-xs text-muted-foreground">{fmtDate(o.created_at)}</p>
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm hidden sm:table-cell">{o.customer}</td>
@@ -289,7 +298,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                                     <AlertTriangle className="h-4 w-4 text-amber-600" />
                                     Low Stock
                                 </CardTitle>
-                                <Link href="/seller/inventory" className="text-xs text-blue-600 hover:underline">View inventory</Link>
+                                {canInventory && <Link href="/seller/inventory" className="text-xs text-blue-600 hover:underline">View inventory</Link>}
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">

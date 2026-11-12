@@ -396,7 +396,9 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                             </CardTitle>
                             <CardDescription>
                                 Delivery fees are set per vehicle type on the{' '}
-                                <Link href="/seller/vehicles" className="font-medium text-blue-600 hover:underline">Vehicles page</Link>.
+                                {isOwner
+                                    ? <Link href="/seller/vehicles" className="font-medium text-blue-600 hover:underline">Vehicles page</Link>
+                                    : <span className="font-medium">Vehicles page</span>}.
                                 At checkout the cheapest vehicle that can carry the order is chosen automatically.
                             </CardDescription>
                         </CardHeader>

@@ -11,6 +11,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { useStoreAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import { InvoiceDocument, InvoiceStatusBadge, type InvoiceDoc } from '@/components/invoice-document';
 import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
@@ -48,6 +49,8 @@ function fmt(n: number) {
 const COD_METHODS = ['cash', 'gcash', 'bank_transfer', 'maya'] as const;
 
 export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props) {
+    // Staff with Invoices but not Orders: no "View Order" (it would open a 403 page)
+    const { canOpen } = useStoreAccess();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/seller/dashboard' },
         { title: 'Invoices',  href: '/seller/invoices'  },
@@ -122,7 +125,7 @@ export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props
                                 Record Payment
                             </Button>
                         )}
-                        {invoice.order && (
+                        {invoice.order && canOpen('/seller/orders') && (
                             <Link href={`/seller/orders/${invoice.order.id}`}>
                                 <Button size="sm" variant="outline">View Order</Button>
                             </Link>

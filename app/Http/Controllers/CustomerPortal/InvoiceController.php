@@ -23,7 +23,8 @@ class InvoiceController extends Controller
         $dateFrom = $request->get('date_from');
         $dateTo   = $request->get('date_to');
 
-        $invoices = collect();
+        // No Customer row yet (e.g. a store owner in the Customer Portal): an empty paginator, same shape as below
+        $invoices = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 15, 1, ['path' => $request->url()]);
         if ($customer) {
             $invQuery = $customer->invoices()->with('order')->orderByDesc('created_at');
             if ($dateFrom) $invQuery->whereDate('created_at', '>=', $dateFrom);

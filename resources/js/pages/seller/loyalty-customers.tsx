@@ -39,7 +39,8 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Loyalty Customers', href: '/sel
 
 export default function LoyaltyCustomers({ enabled, settings, stats, customers, filters }: Props) {
     const { can } = usePermission();
-    const canMessage = usePage<SharedData>().props.auth.user.role === 'seller' || can('messages.view');
+    const isOwner = usePage<SharedData>().props.auth.user.role === 'seller';
+    const canMessage = isOwner || can('messages.view');
     const [search, setSearch] = useState(filters.search);
 
     function visit(params: Record<string, string | number>) {
@@ -62,7 +63,10 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                         <CardContent className="space-y-3 py-10 text-center">
                             <Award className="mx-auto h-10 w-10 text-amber-400" />
                             <p className="font-medium">Enable the Loyalty Program in settings to see customer data</p>
-                            <Link href="/seller/loyalty/settings"><Button>Go to Loyalty Settings</Button></Link>
+                            {/* Loyalty settings are owner-only */}
+                            {isOwner
+                                ? <Link href="/seller/loyalty/settings"><Button>Go to Loyalty Settings</Button></Link>
+                                : <p className="text-sm text-muted-foreground">Ask the store owner to turn it on.</p>}
                         </CardContent>
                     </Card>
                 </div>

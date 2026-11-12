@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAdminAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
@@ -41,6 +42,8 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date, ocr_enabled = false }: Props) {
+    // Platform staff with Verifications but not Stores: store names stay plain text (store page = 403)
+    const canStores = useAdminAccess().canOpen('/admin/stores');
     // New / updated since the last visit (until the user leaves the page)
     const seen = useSeenRows(pending);
     const [tab, setTab] = useState<Tab>(initialTab);
@@ -110,7 +113,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                     <div className="min-w-0 flex-1 space-y-0.5 text-sm">
                                         <p className="font-semibold"><SeenPill flags={seen.get(p.id)} className="mr-1.5" />{p.label}{p.is_other && <span className="ml-1.5 text-xs font-normal text-muted-foreground">(extra document)</span>}</p>
                                         <p>
-                                            <Link href={`/admin/stores/${p.store_id}`} className="text-blue-600 hover:underline">{p.store_name}</Link>
+                                            {canStores ? <Link href={`/admin/stores/${p.store_id}`} className="text-blue-600 hover:underline">{p.store_name}</Link> : <span className="font-medium">{p.store_name}</span>}
                                             <span className="text-muted-foreground"> · submitted {p.submitted_on}{p.submitted_by ? ` by ${p.submitted_by}` : ''}</span>
                                         </p>
                                         {p.has_expiry && (
@@ -150,7 +153,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                 {rows.map((r) => (
                                     <tr key={`${r.store_id}-${r.type}`}>
                                         <td className="px-4 py-2.5">
-                                            <Link href={`/admin/stores/${r.store_id}`} className="font-medium text-blue-600 hover:underline">{r.store_name}</Link>
+                                            {canStores ? <Link href={`/admin/stores/${r.store_id}`} className="font-medium text-blue-600 hover:underline">{r.store_name}</Link> : <span className="font-medium">{r.store_name}</span>}
                                             {tab === 'expired' && r.documents_suspended && (
                                                 <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">Hidden from customers</span>
                                             )}

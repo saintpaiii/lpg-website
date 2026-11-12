@@ -4,6 +4,7 @@ import { ArrowDown, ArrowLeft, Bike, ImagePlus, Info, Loader2, Navigation, Phone
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { useStoreAccess } from '@/hooks/use-store-access';
 import { useDebounced, useEchoPrivate, usePollInterval, useRealtimeStatus } from '@/lib/echo';
 import { cn } from '@/lib/utils';
 import type { SharedData } from '@/types';
@@ -54,6 +55,9 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
     composerTools?: (insert: (text: string) => void) => ReactNode;
 }) {
     const me = usePage<SharedData>().props.auth.user.id as number;
+    // Store staff without the Orders module: order numbers stay plain text (the order page would be a 403)
+    const { canOpen } = useStoreAccess();
+    const canOpenOrders = portal !== 'seller' || canOpen('/seller/orders');
     const viewerSide = portal === 'seller' ? 'store' : portal;
     const base = `/${portal}/messages/${conversationId}`;
     const pollMs = usePollInterval(5000);
@@ -288,7 +292,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
         );
     }
 
-    const orderUrl = ORDER_URL[portal];
+    const orderUrl = canOpenOrders ? ORDER_URL[portal] : null;
     let lastDay = '';
 
     return (

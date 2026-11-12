@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Bell, BellOff, Check, CheckCheck, Package, Settings, Truck } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useStoreAccess } from '@/hooks/use-store-access';
 import { useEchoPrivate, usePollInterval } from '@/lib/echo';
 import type { AppNotification, SharedData } from '@/types';
 
@@ -19,6 +20,8 @@ export function NotificationBell() {
     const notificationsHref = auth.user.role === 'customer' ? '/customer/notifications' : '/notifications';
 
     const [open, setOpen]             = useState(false);
+    // Store notifications go to every staff member; don't send staff to a page they can't open (403)
+    const { canOpen } = useStoreAccess();
     const [unread, setUnread]         = useState(initialUnread);
     const [shaking, setShaking]       = useState(false);
     const [recent, setRecent]         = useState<AppNotification[]>(recentNotifications);
@@ -86,7 +89,7 @@ export function NotificationBell() {
     function goToNotification(n: AppNotification) {
         markRead(n.id);
         const link = n.data?.link as string | undefined;
-        if (link) router.visit(link);
+        if (link && (!link.startsWith('/seller/') || canOpen(link))) router.visit(link);
         setOpen(false);
     }
 

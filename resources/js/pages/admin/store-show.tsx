@@ -33,6 +33,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ADMIN_PLAN_STATUS } from '@/lib/plans';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAdminAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import PermitBadge, { type PermitStatus } from '@/components/permit-badge';
 import StoreAvatar from '@/components/store-avatar';
@@ -203,6 +204,8 @@ export default function StoreShow({
     store, stats, subscription, visibility, history, documentHistory,
     checklist = [], approvalChecks = null, duplicates = [], ocrEnabled = false, documentOcr = {}, canReviewDocuments = false, canApprove = false,
 }: Props) {
+    // Platform staff with Stores but not Subscriptions: no links into Subscriptions (403)
+    const canSubscriptions = useAdminAccess().canOpen('/admin/subscriptions');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Dashboard', href: '/admin/dashboard' },
         { title: 'Stores',    href: '/admin/stores' },
@@ -593,14 +596,14 @@ export default function StoreShow({
                         <CardHeader className="pb-3">
                             <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
                                 <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Plan</span>
-                                <span className="flex gap-3 text-xs font-medium">
+                                {canSubscriptions && <span className="flex gap-3 text-xs font-medium">
                                     <Link href={`/admin/subscriptions?tab=stores&search=${encodeURIComponent(store.store_name)}`} className="text-blue-600 hover:underline">
                                         Give free days / record cash
                                     </Link>
                                     <Link href={`/admin/subscriptions?tab=payments&search=${encodeURIComponent(store.store_name)}`} className="text-blue-600 hover:underline">
                                         All payments
                                     </Link>
-                                </span>
+                                </span>}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
@@ -657,7 +660,7 @@ export default function StoreShow({
                                                     <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">{p.period}</td>
                                                     <td className="py-2 pr-4 text-right tabular-nums">₱{p.amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</td>
                                                     <td className="py-2 text-right">
-                                                        {p.receipt_number && (
+                                                        {p.receipt_number && canSubscriptions && (
                                                             <a href={`/admin/subscriptions/payments/${p.id}/pdf`} target="_blank" rel="noreferrer" className="text-xs font-medium text-blue-600 hover:underline">Receipt</a>
                                                         )}
                                                     </td>

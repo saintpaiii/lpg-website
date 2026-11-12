@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ExternalLink, MapPin } from 'lucide-react';
 import type { ChatMessage, ChatPortal } from '@/components/chat/types';
+import { useStoreAccess } from '@/hooks/use-store-access';
 
 type PickupCard = NonNullable<ChatMessage['pickup_card']>;
 
@@ -10,9 +11,11 @@ type PickupCard = NonNullable<ChatMessage['pickup_card']>;
  * Explicit colours: on the seller side store messages are blue "mine" bubbles with white text.
  */
 export default function PickupLocationCard({ card, orderId, portal }: { card: PickupCard; orderId: number; portal: ChatPortal }) {
+    // Store staff without the Orders module get no "Open order" button (403 page)
+    const { canOpen } = useStoreAccess();
     const inApp = portal === 'customer'
         ? { href: `/customer/orders/${orderId}${card.active ? '#pickup-map' : ''}`, label: card.active ? 'View map & route' : 'Open order' }
-        : portal === 'seller'
+        : portal === 'seller' && canOpen('/seller/orders')
             ? { href: `/seller/orders/${orderId}`, label: 'Open order' }
             : null;
 

@@ -32,7 +32,8 @@ class RefundController extends Controller
                 ->latest()
                 ->paginate(20)
                 ->through(fn (RefundRequest $r) => SellerRefundController::format($r) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $r)])
-            : collect([]);
+            // No Customer row yet (e.g. a store owner in the Customer Portal): an empty paginator, same shape
+            : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 20, 1, ['path' => $request->url()]);
 
         $coupons = $customer
             ? StoreCoupon::usable()->with('store')

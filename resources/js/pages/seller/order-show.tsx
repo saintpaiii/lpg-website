@@ -2,6 +2,7 @@ import ReportFormDialog from '@/components/reports/report-form-dialog';
 import { statusLabel, useLiveReload } from '@/lib/echo';
 import MessageButton from '@/components/chat/message-button';
 import { usePermission } from '@/hooks/use-permission';
+import { useStoreAccess } from '@/hooks/use-store-access';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Flag, Package, Truck, XCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -133,6 +134,8 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
     useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
         (e) => toast.info(`Order updated: ${statusLabel(e.status, (e as { fulfillment?: string }).fulfillment)}`));
     const { can } = usePermission();
+    // Staff with Orders but not Invoices: no "View Invoice" (it would open a 403 page)
+    const { canOpen } = useStoreAccess();
     const canMessage = (usePage<SharedData>().props.auth.user.role === 'seller') || can('messages.view');
     const canFileReport = usePage<SharedData>().props.auth.user.role === 'seller' || can('customer_reports.manage');
     const liveStoreName = (usePage<SharedData>().props.auth as { store?: { store_name: string } | null }).store?.store_name;
@@ -276,7 +279,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                 <XCircle className="h-3.5 w-3.5 mr-1" /> Cancel
                             </Button>
                         )}
-                        {order.has_invoice && order.invoice_id && (
+                        {order.has_invoice && order.invoice_id && canOpen('/seller/invoices') && (
                             <Link href={`/seller/invoices/${order.invoice_id}`}>
                                 <Button size="sm" variant="outline">View Invoice</Button>
                             </Link>

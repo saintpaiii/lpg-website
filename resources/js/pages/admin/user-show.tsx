@@ -23,6 +23,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useAdminAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import IdentityDocumentsCard, { type Identity } from '@/components/identity-documents-card';
 import { fmtDate, fmtStatus } from '@/lib/utils';
@@ -119,6 +120,8 @@ function RoleBadge({ user }: { user: UserDetail }) {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function UserShow({ user, store, orders, legalAcceptances, identity }: Props) {
+    // Platform staff with Users but not Stores: no "View Store" (403)
+    const canStores = useAdminAccess().canOpen('/admin/stores');
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Users', href: '/admin/users' },
         { title: user.name, href: `/admin/users/${user.id}` },
@@ -265,9 +268,11 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                     }`}>
                                         {fmtStatus(store.status)}
                                     </span>
-                                    <Link href={`/admin/stores/${store.id}`} className="text-xs text-primary hover:underline">
-                                        View Store →
-                                    </Link>
+                                    {canStores && (
+                                        <Link href={`/admin/stores/${store.id}`} className="text-xs text-primary hover:underline">
+                                            View Store →
+                                        </Link>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>

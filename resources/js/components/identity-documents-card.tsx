@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useAdminAccess } from '@/hooks/use-store-access';
 import { cn } from '@/lib/utils';
 import { ReasonTextPicker } from '@/components/reason-picker';
 
@@ -41,6 +42,8 @@ const statusText = (s: string) => ({ approved: 'Approved', rejected: 'Rejected',
 
 /** Admin user page: the person's identity, ID + selfie (private), verification history and documents. */
 export default function IdentityDocumentsCard({ userId, identity: id }: { userId: number; identity: Identity }) {
+    // Platform staff without Stores: no link to the store page (403)
+    const canStores = useAdminAccess().canOpen('/admin/stores');
     const [revoking, setRevoking] = useState(false);
     const form = useForm({ reason: '' });
 
@@ -88,7 +91,7 @@ export default function IdentityDocumentsCard({ userId, identity: id }: { userId
                     {(id.valid_id_url || id.selfie_url) && <IdCheckHints />}
                 </div>
 
-                {id.store_id && (
+                {id.store_id && canStores && (
                     <p className="text-sm">
                         Store permits are on the store page: <Link href={`/admin/stores/${id.store_id}`} className="font-medium text-blue-600 hover:underline">Store documents</Link>
                     </p>

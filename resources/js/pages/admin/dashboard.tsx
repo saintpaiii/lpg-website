@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
+import type { ReactNode } from 'react';
 import {
     Activity,
     AlertTriangle,
@@ -26,6 +27,7 @@ import {
     YAxis,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAdminAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -73,6 +75,11 @@ const ACTIVITY_CONFIG: Record<string, { icon: typeof Store; color: string; bg: s
     user_registered:   { icon: UserPlus, color: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/20'   },
 };
 
+/** A link only when the user can open the page; otherwise the same content without a link. */
+function MaybeLink({ href, can, children }: { href: string; can: boolean; children: ReactNode }) {
+    return can ? <Link href={href}>{children}</Link> : <div>{children}</div>;
+}
+
 export default function Dashboard({
     stats,
     salesChart,
@@ -82,6 +89,9 @@ export default function Dashboard({
     recentActivity,
     authStats,
 }: Props) {
+    // Platform staff with Dashboard access may not have Users / Stores / Subscriptions …: no links into those (403)
+    const { canOpen } = useAdminAccess();
+    const linkIf = (href: string): string | null => (canOpen(href) ? href : null);
     const statCards = [
         {
             label: 'Total Users',
@@ -90,7 +100,7 @@ export default function Dashboard({
             icon:  Users,
             color: 'text-blue-600',
             bg:    'bg-blue-50 dark:bg-blue-900/20',
-            href:  '/admin/users',
+            href:  linkIf('/admin/users'),
         },
         {
             label: 'Total Stores',
@@ -99,7 +109,7 @@ export default function Dashboard({
             icon:  Store,
             color: 'text-emerald-600',
             bg:    'bg-emerald-50 dark:bg-emerald-900/20',
-            href:  '/admin/stores',
+            href:  linkIf('/admin/stores'),
         },
         {
             label: 'Total Orders',
@@ -108,7 +118,7 @@ export default function Dashboard({
             icon:  ShoppingCart,
             color: 'text-violet-600',
             bg:    'bg-violet-50 dark:bg-violet-900/20',
-            href:  '/admin/reports?tab=sales',
+            href:  linkIf('/admin/reports?tab=sales'),
         },
         {
             label: 'Platform Sales (GMV)',
@@ -126,7 +136,7 @@ export default function Dashboard({
             icon:  Crown,
             color: 'text-emerald-600',
             bg:    'bg-emerald-50 dark:bg-emerald-900/20',
-            href:  '/admin/subscriptions?tab=payments' as string | null,
+            href:  linkIf('/admin/subscriptions?tab=payments'),
         },
     ];
 
@@ -145,20 +155,20 @@ export default function Dashboard({
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         {stats.pendingStores > 0 && (
-                            <Link href="/admin/stores?tab=pending">
+                            <MaybeLink href="/admin/stores?tab=pending" can={canOpen('/admin/stores?tab=pending')}>
                                 <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100 transition-colors dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
                                     <Store className="h-4 w-4" />
                                     {stats.pendingStores} store{stats.pendingStores !== 1 ? 's' : ''} pending
                                 </div>
-                            </Link>
+                            </MaybeLink>
                         )}
                         {stats.pendingVerifications > 0 && (
-                            <Link href="/admin/verifications">
+                            <MaybeLink href="/admin/verifications" can={canOpen('/admin/verifications')}>
                                 <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-800 hover:bg-blue-100 transition-colors dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
                                     <BadgeCheck className="h-4 w-4" />
                                     {stats.pendingVerifications} ID{stats.pendingVerifications !== 1 ? 's' : ''} to verify
                                 </div>
-                            </Link>
+                            </MaybeLink>
                         )}
                     </div>
                 </div>
@@ -186,7 +196,7 @@ export default function Dashboard({
 
                 {/* Quick action cards */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Link href="/admin/stores?tab=pending">
+                    <MaybeLink href="/admin/stores?tab=pending" can={canOpen('/admin/stores?tab=pending')}>
                         <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
                             <CardContent className="pt-5 pb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 dark:bg-amber-900/20">
@@ -198,8 +208,8 @@ export default function Dashboard({
                                 </div>
                             </CardContent>
                         </Card>
-                    </Link>
-                    <Link href="/admin/verifications">
+                    </MaybeLink>
+                    <MaybeLink href="/admin/verifications" can={canOpen('/admin/verifications')}>
                         <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
                             <CardContent className="pt-5 pb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-900/20">
@@ -211,8 +221,8 @@ export default function Dashboard({
                                 </div>
                             </CardContent>
                         </Card>
-                    </Link>
-                    <Link href="/admin/stores?tab=approved">
+                    </MaybeLink>
+                    <MaybeLink href="/admin/stores?tab=approved" can={canOpen('/admin/stores?tab=approved')}>
                         <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
                             <CardContent className="pt-5 pb-5 flex items-center gap-3">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
@@ -224,7 +234,7 @@ export default function Dashboard({
                                 </div>
                             </CardContent>
                         </Card>
-                    </Link>
+                    </MaybeLink>
                 </div>
 
                 {/* Stores by plan */}
@@ -232,7 +242,7 @@ export default function Dashboard({
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center justify-between text-base">
                             <span className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500" /> Stores by plan</span>
-                            <Link href="/admin/subscriptions" className="text-xs font-medium text-blue-600 hover:underline">Manage</Link>
+                            {canOpen('/admin/subscriptions') && <Link href="/admin/subscriptions" className="text-xs font-medium text-blue-600 hover:underline">Manage</Link>}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -336,9 +346,11 @@ export default function Dashboard({
                                 <ShieldAlert className="h-4 w-4 text-blue-600" />
                                 Recent Auth Activity
                             </span>
-                            <Link href="/admin/auth-logs" className="text-xs text-blue-600 hover:underline font-normal">
-                                View all
-                            </Link>
+                            {canOpen('/admin/auth-logs') && (
+                                <Link href="/admin/auth-logs" className="text-xs text-blue-600 hover:underline font-normal">
+                                    View all
+                                </Link>
+                            )}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -363,7 +375,7 @@ export default function Dashboard({
                                 <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0" />
                                 <p className="text-orange-800 text-xs">
                                     <span className="font-bold">{authStats.suspiciousCount} IP(s)</span> with 5+ failed attempts in the last hour.{' '}
-                                    <Link href="/admin/auth-logs" className="underline">Review now</Link>
+                                    {canOpen('/admin/auth-logs') && <Link href="/admin/auth-logs" className="underline">Review now</Link>}
                                 </p>
                             </div>
                         )}
