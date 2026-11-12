@@ -184,7 +184,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div data-tour="as-tabs" className="flex gap-1 border-b">
                     {TABS.map(({ key, label, count_key }) => (
                         <button
                             key={key}
@@ -210,7 +210,7 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                 <SeenNote counts={seen.counts} onClear={seen.clear} />
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="as-table">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">

@@ -500,7 +500,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
 
                 {!allPickup && (<>
                 {/* Delivery address */}
-                <Card>
+                <Card data-tour="checkout-address">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-blue-600" />
@@ -531,7 +531,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
 
                 {/* Delivery location — auto-pinned from the customer's barangay, draggable */}
                 {customer && (
-                    <Card>
+                    <Card data-tour="checkout-pin">
                         <CardHeader className="pb-3">
                             <div className="flex items-center justify-between gap-3 flex-wrap">
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -670,7 +670,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                             <CardContent>
                                 {/* Deliver to me / Pick up at the store */}
                                 {sg.allow_pickup && (
-                                    <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
+                                    <div data-tour="checkout-fulfillment" className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
                                         {([['delivery', 'Deliver to me', Truck], ['pickup', 'Pick up at the store', Store]] as const).map(([value, label, Icon]) => (
                                             <button key={value} type="button"
                                                 onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: value }))}
@@ -805,7 +805,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 )}
 
                                 {/* Payment option — per store */}
-                                <div className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+                                <div data-tour="checkout-payment" className="mt-4 border-t border-gray-200 pt-4 dark:border-gray-700">
                                     <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
                                         <CreditCard className="h-4 w-4 text-blue-600" /> Payment Option
                                     </p>
@@ -886,7 +886,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                 })}
 
                 {/* Apply coupon */}
-                <Card>
+                <Card data-tour="checkout-coupon">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
                             <TicketPercent className="h-4 w-4 text-blue-600" />
@@ -935,7 +935,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                 </Card>
 
                 {/* Grand total — shared across all stores */}
-                <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10">
+                <Card data-tour="checkout-total" className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-900/10">
                     <CardContent className="pt-5 pb-4">
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">

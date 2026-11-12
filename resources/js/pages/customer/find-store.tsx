@@ -204,7 +204,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                 </div>
 
                 {/* What do you need? */}
-                <Card>
+                <Card data-tour="find-need">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">What do you need?</CardTitle>
                     </CardHeader>
@@ -265,7 +265,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                         </div>
 
                         {/* Deliver to */}
-                        <div className="space-y-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+                        <div data-tour="find-deliver-to" className="space-y-2 rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
                             <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Deliver to</p>
                             {location ? (
                                 <p className="flex items-start gap-1.5 text-sm font-medium text-gray-900 dark:text-white">
@@ -307,7 +307,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
 
                 {/* Results */}
                 {(loading || results || error) && (
-                    <div className="space-y-3">
+                    <div data-tour="find-results" className="space-y-3">
                         {location && (
                             <p className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
                                 <MapPin className="h-4 w-4 text-red-600" /> Deliver to: <span className="font-medium">{location.label}</span>

@@ -211,7 +211,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
 
             <div className="space-y-4">
                 {/* Status tabs */}
-                <div className="overflow-x-auto -mx-1">
+                <div data-tour="orders-tabs" className="overflow-x-auto -mx-1">
                     <div className="flex gap-1 min-w-max px-1 pb-1">
                         {STATUS_TABS.map(tab => (
                             <button

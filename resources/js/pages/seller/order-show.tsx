@@ -205,7 +205,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
 
             <div className="p-6 space-y-6 max-w-4xl">
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div data-tour="sos-header" className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
                         <Link href="/seller/orders">
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -302,7 +302,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
 
                 {/* Progress stepper */}
                 {order.status !== 'cancelled' && (
-                    <div className="flex items-center gap-0">
+                    <div data-tour="sos-progress" className="flex items-center gap-0">
                         {STATUS_STEPS.map((step, idx) => (
                             <div key={step} className="flex items-center flex-1 last:flex-none">
                                 <div className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold shrink-0 ${idx <= stepIndex ? 'bg-blue-600 text-white' : 'bg-muted text-muted-foreground'}`}>
@@ -390,7 +390,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         )}
 
                         {/* Payment */}
-                        <Card>
+                        <Card data-tour="sos-payment">
                             <CardHeader className="pb-2"><CardTitle className="text-sm">Payment</CardTitle></CardHeader>
                             <CardContent className="space-y-2 text-sm">
                                 {/* Payment mode badge */}

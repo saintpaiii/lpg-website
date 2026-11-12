@@ -52,6 +52,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "concurrently": "^9.0.1",
+        "driver.js": "^1.12.1",
         "globals": "^15.14.0",
         "input-otp": "^1.4.2",
         "laravel-echo": "^2.5.0",

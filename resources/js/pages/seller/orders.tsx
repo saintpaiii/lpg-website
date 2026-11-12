@@ -235,7 +235,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
             <div className="p-6 space-y-5">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div data-tour="so-header" className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <ShoppingCart className="h-6 w-6 text-blue-600" />
@@ -276,7 +276,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div data-tour="so-tabs" className="flex gap-1 border-b">
                     {TABS.map(({ key, label }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -286,7 +286,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                 </div>
 
                 {/* Date + consignment balance filter */}
-                <div className="flex flex-wrap items-end gap-3">
+                <div data-tour="so-filters" className="flex flex-wrap items-end gap-3">
                     {/* Delivery / pick-up */}
                     <div className="flex items-center gap-1.5 mr-2">
                         {([['', 'All'], ['delivery', 'Delivery'], ['pickup', 'Pick-up']] as const).map(([key, label]) => (
@@ -331,7 +331,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                 <SeenNote counts={seen.counts} onClear={seen.clear} />
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="so-table">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">

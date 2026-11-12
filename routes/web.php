@@ -39,6 +39,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->whereIn('kind', ['user', 'verification', 'store', 'store-document', 'staff-document'])->whereNumber('id')
         ->middleware('throttle:120,1')->name('documents.show');
 
+    // First-time tutorials: progress saved on the account; the Help page lists them
+    Route::get('/help', [\App\Http\Controllers\HelpController::class, 'index'])->name('help');
+    Route::middleware('throttle:60,1')->group(function () {
+        Route::post('/tutorials/reset', [\App\Http\Controllers\TutorialController::class, 'reset'])->name('tutorials.reset');
+        Route::put('/tutorials/settings', [\App\Http\Controllers\TutorialController::class, 'settings'])->name('tutorials.settings');
+        Route::post('/tutorials/{key}/done', [\App\Http\Controllers\TutorialController::class, 'done'])->where('key', '[a-z0-9._-]{1,60}')->name('tutorials.done');
+        Route::post('/tutorials/{key}/skip', [\App\Http\Controllers\TutorialController::class, 'skip'])->where('key', '[a-z0-9._-]{1,60}')->name('tutorials.skip');
+    });
+
     // Accept updated Terms / Privacy Policy (the update popup)
     Route::post('/legal/accept', [\App\Http\Controllers\LegalAcceptController::class, 'store'])->middleware('throttle:30,1')->name('legal.accept');
 

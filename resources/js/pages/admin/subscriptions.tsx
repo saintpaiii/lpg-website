@@ -145,7 +145,7 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
 
                 {/* ── Stores ── */}
                 {tab === 'stores' && stores && (
-                    <Card>
+                    <Card data-tour="asub-stores">
                         <CardHeader className="pb-3">
                             <form onSubmit={(e) => { e.preventDefault(); visit({ page: 1 }); }} className="flex flex-wrap items-center gap-2">
                                 <div className="relative">
@@ -234,7 +234,7 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
 
                 {/* ── Payments ── */}
                 {tab === 'payments' && payments && (
-                    <Card>
+                    <Card data-tour="asub-payments">
                         <CardHeader className="pb-3">
                             <div className="flex flex-wrap items-end justify-between gap-3">
                                 <form onSubmit={(e) => { e.preventDefault(); visit({ page: 1 }); }} className="flex flex-wrap items-end gap-2">
@@ -321,7 +321,7 @@ export default function AdminSubscriptions({ tab, summary, stores, payments, pla
 
                 {/* ── Plans ── */}
                 {tab === 'plans' && (
-                    <div className="space-y-3">
+                    <div data-tour="asub-plans" className="space-y-3">
                         <p className="text-sm text-muted-foreground">Price changes apply to the next purchase only. Empty limit = unlimited.</p>
                         <div className="grid gap-4 md:grid-cols-3">
                             {plans.plans.map((p) => <PlanEditor key={p.key} plan={p} catalog={plans} />)}

@@ -2,6 +2,7 @@ import { router, usePage } from '@inertiajs/react';
 import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { NotificationBell } from '@/components/notification-bell';
+import { TutorialHelpButton } from '@/components/tutorials';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -85,13 +86,16 @@ export function AppSidebarHeader({ breadcrumbs = [] }: Props) {
             <div className="flex min-w-0 flex-1 items-center gap-3">
                 <SidebarTrigger className="-ml-1 shrink-0 text-muted-foreground hover:text-foreground" />
                 <Separator orientation="vertical" className="h-4 shrink-0" />
-                <h1 className="truncate text-sm font-semibold text-foreground">
+                <h1 data-tour="page-title" className="truncate text-sm font-semibold text-foreground">
                     {pageTitle}
                 </h1>
             </div>
 
             {/* Right: notifications + user + logout */}
             <div className="flex shrink-0 items-center gap-1">
+                {/* Replay this page's tutorial */}
+                <TutorialHelpButton />
+
                 {/* Notification bell */}
                 <NotificationBell />
 

@@ -320,7 +320,7 @@ export default function StoreShow({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-2">
+                    <div data-tour="ass-actions" className="flex items-center gap-2">
                         {store.status === 'pending' && (
                             <>
                                 <Button onClick={() => setShowReject(true)} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
@@ -402,7 +402,7 @@ export default function StoreShow({
                     </Card>
 
                     {/* Owner info */}
-                    <Card className="h-full">
+                    <Card data-tour="ass-documents" className="h-full">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <BadgeCheck className="h-4 w-4 text-emerald-600" /> Owner / Documents
@@ -513,7 +513,7 @@ export default function StoreShow({
 
                 {/* Before you approve — every item must be ticked */}
                 {store.status === 'pending' && canApprove && checklist.length > 0 && (
-                    <Card id="approve-checklist" className="scroll-mt-20 border-green-200 dark:border-green-900">
+                    <Card data-tour="ass-checklist" id="approve-checklist" className="scroll-mt-20 border-green-200 dark:border-green-900">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-green-600" /> Before you approve</CardTitle>
                             <p className="text-xs text-muted-foreground">Tick each item after checking it yourself. {AUTO_READ_DISCLAIMER}</p>

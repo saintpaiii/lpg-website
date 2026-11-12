@@ -164,7 +164,7 @@ export default function Dashboard({
                 </div>
 
                 {/* Stat cards */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div data-tour="ad-stats" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {statCards.map(({ label, value, sub, icon: Icon, color, bg, href }) => (
                         <Card key={label} className="relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                             <CardContent className="pt-6">
@@ -185,7 +185,7 @@ export default function Dashboard({
                 </div>
 
                 {/* Quick action cards */}
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div data-tour="ad-quick" className="grid gap-4 sm:grid-cols-3">
                     <Link href="/admin/stores?tab=pending">
                         <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
                             <CardContent className="pt-5 pb-5 flex items-center gap-3">
@@ -254,7 +254,7 @@ export default function Dashboard({
                 </Card>
 
                 {/* Charts */}
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div data-tour="ad-charts" className="grid gap-6 lg:grid-cols-2">
                     {/* Platform sales per week */}
                     <Card className="hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">

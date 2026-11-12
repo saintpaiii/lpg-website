@@ -562,7 +562,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
 
             <div className="space-y-6">
                 {/* Back + header */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div data-tour="order-actions" className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
                         <Link href="/customer/orders">
                             <Button variant="ghost" size="sm" className="gap-1.5">
@@ -707,7 +707,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                 )}
 
                 {/* Status tracker */}
-                <Card>
+                <Card data-tour="order-status">
                     <CardHeader>
                         <CardTitle className="text-base">{order.fulfillment === 'pickup' ? 'Pick-up Status' : 'Delivery Status'}</CardTitle>
                     </CardHeader>
@@ -882,7 +882,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         </Card>
 
                         {/* Payment info */}
-                        <Card>
+                        <Card data-tour="order-payment">
                             <CardHeader>
                                 <CardTitle className="text-sm">Payment</CardTitle>
                             </CardHeader>

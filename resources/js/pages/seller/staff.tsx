@@ -648,7 +648,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 )}
 
                 {/* Header */}
-                <div className="flex flex-wrap items-start justify-between gap-2">
+                <div data-tour="ss-header" className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
                             <Users className="h-6 w-6 text-blue-600" />
@@ -675,7 +675,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
 
                 {/* Summary cards */}
                 {!isArchived && (
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div data-tour="ss-summary" className="grid gap-4 sm:grid-cols-3">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
@@ -747,7 +747,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 </form>
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="ss-table">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                             <Users className="h-4 w-4 text-blue-600" />

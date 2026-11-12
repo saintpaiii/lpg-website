@@ -249,7 +249,7 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                 {cash_request && <CashRequestCard req={cash_request} />}
 
                 {/* Current plan */}
-                <div className="grid gap-4 lg:grid-cols-3">
+                <div data-tour="plan-current" className="grid gap-4 lg:grid-cols-3">
                     <Card className="lg:col-span-2">
                         <CardContent className="space-y-4 pt-6">
                             <div className="flex flex-wrap items-center gap-3">
@@ -292,7 +292,7 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                 </div>
 
                 {/* Plans */}
-                <div className="space-y-3 pt-2">
+                <div data-tour="plan-plans" className="space-y-3 pt-2">
                     <h2 className="text-lg font-semibold">Plans</h2>
                     <PlanCards
                         catalog={catalog}
@@ -306,7 +306,7 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                 </div>
 
                 {/* History */}
-                <Card>
+                <Card data-tour="plan-history">
                     <CardHeader className="pb-2"><CardTitle className="text-base">Payment history</CardTitle></CardHeader>
                     <CardContent className="p-0">
                         {payments.data.length === 0 ? (

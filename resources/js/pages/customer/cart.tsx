@@ -229,7 +229,7 @@ export default function CartPage({ cart }: Props) {
                                             </p>
                                         )}
                                         <div className="flex items-center gap-3">
-                                            <input
+                                            <input data-tour="cart-select"
                                                 type="checkbox"
                                                 disabled={!available}
                                                 checked={available && allStoreSelected}
@@ -380,7 +380,7 @@ export default function CartPage({ cart }: Props) {
                                     <span>Total (before delivery)</span>
                                     <span>₱{selectedTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <Button
+                                <Button data-tour="cart-checkout"
                                     onClick={proceedToCheckout}
                                     disabled={selectedCount === 0 || overMaxSelected}
                                     className={`w-full font-semibold py-2.5 disabled:opacity-50 text-white ${

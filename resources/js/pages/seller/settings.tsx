@@ -352,7 +352,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                     </Card>
 
                     {/* Store Info */}
-                    <Card>
+                    <Card data-tour="set-store-info">
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Building2 className="h-4 w-4 text-blue-600" />
@@ -388,7 +388,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                     </Card>
 
                     {/* Delivery */}
-                    <Card>
+                    <Card data-tour="set-delivery">
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Truck className="h-4 w-4 text-blue-600" />
@@ -421,7 +421,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                     </Card>
 
                     {/* Payment Options */}
-                    <Card>
+                    <Card data-tour="set-payment">
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <CreditCard className="h-4 w-4 text-blue-600" />
@@ -497,7 +497,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                     </Card>
 
                     {/* Contact & Location */}
-                    <Card>
+                    <Card data-tour="set-location">
                         <CardHeader>
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Phone className="h-4 w-4 text-blue-600" />

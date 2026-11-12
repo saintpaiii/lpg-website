@@ -11,6 +11,7 @@ import { StoreVisibilityBanner } from '@/components/store-visibility-banner';
 import { RiderLicenseBanner } from '@/components/rider-license-banner';
 import { InstallAppBanner } from '@/components/install-app-banner';
 import { useFlashToast } from '@/hooks/use-flash-toast';
+import { GettingStartedCard, TutorialRunner } from '@/components/tutorials';
 import type { AppLayoutProps } from '@/types';
 import { Toaster } from 'sonner';
 
@@ -30,12 +31,16 @@ export default function AppSidebarLayout({
                 <StoreVisibilityBanner />
                 <StoreLocationBanner />
                 <RiderLicenseBanner />
+                {/* Home page only (server decides): the role's getting-started checklist */}
+                <GettingStartedCard className="mx-4 mt-4 sm:mx-6" />
                 {children}
             </AppContent>
             <Toaster richColors position="top-right" toastOptions={{ duration: 3000 }} />
             <InstallAppBanner />
             <PlanExpiryDialog />
             <UpgradeDialog />
+            {/* First-time tutorials (core tour on the home page, then one per page) */}
+            <TutorialRunner layout="app" />
         </AppShell>
     );
 }

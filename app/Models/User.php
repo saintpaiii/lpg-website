@@ -64,6 +64,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'password'                => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'is_admin'                => 'boolean',
+            // First-time tutorials (TutorialController); arrays so they reach the page as objects, not JSON strings
+            'tutorials'               => 'array',
+            'tutorials_enabled'       => 'boolean',
             'is_platform_staff'       => 'boolean',
             'is_active'               => 'boolean',
             'paused_by_plan'          => 'boolean',

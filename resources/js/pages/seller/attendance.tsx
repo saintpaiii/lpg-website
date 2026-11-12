@@ -332,7 +332,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                 </div>
 
                 {/* Summary cards */}
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                <div data-tour="att-summary" className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
                     <SummaryCard label="Total Staff" value={summary.total}    color="text-gray-800" />
                     <SummaryCard label="Present"     value={summary.present}  color="text-emerald-600" />
                     <SummaryCard label="Late"        value={summary.late}     color="text-yellow-600" />
@@ -342,7 +342,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                 </div>
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="att-table">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
                             <Users className="h-4 w-4 text-blue-600" />

@@ -101,7 +101,7 @@ export default function SellerRevenue({ tax, summary, orders, filters }: Props) 
                 </div>
 
                 {/* Summary cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div data-tour="rev-summary" className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     {cards.map(({ title, value, sub, icon: Icon }) => (
                         <Card key={title}>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -117,7 +117,7 @@ export default function SellerRevenue({ tax, summary, orders, filters }: Props) 
                 </div>
 
                 {/* Tax reminder — estimate only */}
-                <Card>
+                <Card data-tour="rev-tax">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">
                             {tax.vat_status === 'vat' ? 'VAT this month' : 'Percentage tax this month'}

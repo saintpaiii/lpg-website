@@ -21,7 +21,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                     if (item.disabled) {
                         const reason = item.disabledReason ?? 'Not available';
                         return (
-                            <SidebarMenuItem key={item.title}>
+                            <SidebarMenuItem key={item.title} data-tour={`nav:${item.href}`}>
                                 <SidebarMenuButton
                                     asChild
                                     tooltip={{ children: reason }}
@@ -40,7 +40,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                     if (item.lockedPlan) {
                         // Not on this plan: same row with a lock + tag; opens the upgrade dialog instead of the page
                         return (
-                            <SidebarMenuItem key={item.title}>
+                            <SidebarMenuItem key={item.title} data-tour={`nav:${item.href}`}>
                                 <SidebarMenuButton
                                     tooltip={{ children: `${item.title} — ${item.lockedPlan} plan` }}
                                     onClick={() => openUpgrade(item.lockedFeature ?? '')}
@@ -63,7 +63,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
 
                     const active = item.isActive ?? isCurrentOrParentUrl(item.href);
                     return (
-                        <SidebarMenuItem key={item.title}>
+                        <SidebarMenuItem key={item.title} data-tour={`nav:${item.href}`}>
                             <SidebarMenuButton
                                 asChild
                                 isActive={active}

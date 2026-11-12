@@ -66,7 +66,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
             <div className="flex flex-1 flex-col gap-6 p-4 sm:p-6">
 
                 {/* Header */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
+                <div data-tour="pr-header" className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                         <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
                             <BadgeDollarSign className="h-6 w-6 text-blue-600" />
@@ -123,7 +123,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
 
                 {/* Summary */}
                 {payrolls.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div data-tour="pr-summary" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {[
                             { label: 'Staff Count', value: payrolls.length, cls: 'text-gray-800' },
                             { label: 'Total Net Pay', value: peso(totalNet), cls: 'text-blue-700' },
@@ -143,7 +143,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                 )}
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="pr-table">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <ClipboardList className="h-4 w-4 text-blue-600" />

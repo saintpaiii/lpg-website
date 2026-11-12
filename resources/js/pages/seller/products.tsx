@@ -230,7 +230,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
 
             <div className="p-6 space-y-5">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div data-tour="sp-header" className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Package className="h-6 w-6 text-blue-600" />
@@ -269,7 +269,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 overflow-x-auto border-b">
+                <div data-tour="sp-tabs" className="flex gap-1 overflow-x-auto border-b">
                     {TABS.map(({ key, label, count_key }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -284,7 +284,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                 </div>
 
                 {/* Table */}
-                <Card>
+                <Card data-tour="sp-table">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">

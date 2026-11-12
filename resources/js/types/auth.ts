@@ -20,6 +20,10 @@ export type User = {
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
+    /** First-time tutorials: { "<tourKey>": { done, skipped } } (ISO dates) */
+    tutorials?: Record<string, { done: string | null; skipped: string | null }> | null;
+    /** "Show tutorials automatically" */
+    tutorials_enabled?: boolean;
     created_at: string;
     updated_at: string;
     [key: string]: unknown;

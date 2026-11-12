@@ -232,7 +232,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                 </button>
 
                 {/* ── Main product info ───────────────────────────────────── */}
-                <div className="grid gap-6 lg:grid-cols-2">
+                <div data-tour="product-main" className="grid gap-6 lg:grid-cols-2">
                     {/* Photos & video */}
                     <ProductGallery media={product.media ?? []} name={product.name} outOfStock={product.stock === 0} />
 
@@ -301,7 +301,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                         : 'Pick-up only'}
                                 </p>
                             )}
-                            <p className="text-gray-500 pl-6">
+                            <p data-tour="product-refunds" className="text-gray-500 pl-6">
                                 Refunds: within {product.refund_window_days ?? 7} day{(product.refund_window_days ?? 7) === 1 ? '' : 's'} after delivery.
                             </p>
                         </div>
@@ -316,7 +316,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 {/* Transaction type */}
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map(t => (
-                                        <button
+                                        <button data-tour="product-price-types"
                                             key={t}
                                             onClick={() => setTxType(t)}
                                             className={`rounded-xl border-2 px-4 py-2.5 text-sm font-medium transition-colors ${
@@ -352,7 +352,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 </div>
 
                                 {/* Add to cart button */}
-                                <Button
+                                <Button data-tour="product-add-to-cart"
                                     onClick={addToCart}
                                     disabled={adding || maxAdd === 0}
                                     className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-base"
@@ -371,7 +371,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                 </div>
 
                 {/* ── Reviews ────────────────────────────────────────────── */}
-                <Card>
+                <Card data-tour="product-reviews">
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                             <CardTitle className="text-base flex items-center gap-2">

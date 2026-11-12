@@ -154,6 +154,9 @@ class HandleInertiaRequests extends Middleware
             'reportBadges'        => fn () => \App\Services\ReportService::badgesFor($user),
             // Per-menu-item "needs action" counts (-1 = "!"), cached 20 s per user
             'sidebarBadges'       => fn () => \App\Services\SidebarBadgeService::for($user),
+            // "Getting started" checklist — only on the user's HOME page (null elsewhere); tutorials progress itself is
+            // on auth.user.tutorials / tutorials_enabled
+            'getting_started'     => fn () => \App\Services\GettingStartedService::for($user, $request),
             // Riders only: may they make deliveries (approved, unexpired driver's license)?
             'rider_license'       => fn () => $user && $user->isRider() ? [
                 'can_deliver' => \App\Services\StaffDocumentService::canDeliver($user),

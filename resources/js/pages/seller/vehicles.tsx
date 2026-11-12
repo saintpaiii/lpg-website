@@ -226,7 +226,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
 
             <div className="p-6 space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div data-tour="sv-header" className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Car className="h-6 w-6 text-blue-600" />
@@ -248,7 +248,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                 <DeliveryRatesCard rates={rates} canEdit />
 
                 {/* Vehicle table */}
-                <Card>
+                <Card data-tour="sv-table">
                     <CardHeader className="pb-2">
                         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
                             {onlyPaused ? 'Paused (plan)' : 'Active Vehicles'}

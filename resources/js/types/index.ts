@@ -67,5 +67,7 @@ export type SharedData = {
     pendingLegal?: PendingLegal | null;
     /** Riders only: can they make deliveries (approved, unexpired driver's license)? */
     rider_license?: { can_deliver: boolean; message: string } | null;
+    /** "Getting started" checklist — only on the user's home page */
+    getting_started?: import('@/components/tutorials').GettingStarted;
     [key: string]: unknown;
 };

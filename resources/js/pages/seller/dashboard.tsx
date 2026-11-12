@@ -159,7 +159,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                 </div>
 
                 {/* Stat cards */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div data-tour="dash-stats" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {statCards.map(({ label, value, sub, icon: Icon, color, bg, href }) => (
                         <Card key={label} className="relative overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
                             <CardContent className="pt-6">
@@ -232,7 +232,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
 
                 <div className="grid gap-6 lg:grid-cols-5">
                     {/* Recent orders */}
-                    <Card className="lg:col-span-3 hover:shadow-md transition-shadow duration-200">
+                    <Card data-tour="dash-recent-orders" className="lg:col-span-3 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base flex items-center gap-2">
@@ -282,7 +282,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                     </Card>
 
                     {/* Low stock */}
-                    <Card className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
+                    <Card data-tour="dash-low-stock" className="lg:col-span-2 hover:shadow-md transition-shadow duration-200">
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-base flex items-center gap-2">

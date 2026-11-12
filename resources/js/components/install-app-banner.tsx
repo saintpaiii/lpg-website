@@ -48,7 +48,7 @@ export function InstallAppBanner() {
     if (!promptEvent || dismissed) return null;
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 md:hidden animate-in slide-in-from-bottom duration-300">
+        <div data-tour-blocker="install-banner" className="fixed bottom-0 left-0 right-0 z-50 md:hidden animate-in slide-in-from-bottom duration-300">
             <div className="mx-3 mb-3 rounded-2xl bg-gradient-to-r from-blue-600 to-blue-700 shadow-xl shadow-blue-900/30 p-4 text-white">
                 <div className="flex items-start gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20">

@@ -164,7 +164,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
 
                 <form onSubmit={submit} className="space-y-6">
                     {/* 1. Role rates */}
-                    <Card>
+                    <Card data-tour="prs-rates">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-blue-600" /> Hourly rate per role</CardTitle>
                             <p className="text-xs text-gray-500">Each role has its own pay. Someone with several roles gets the highest rate. A personal rate (below) beats the role rate.</p>
@@ -205,7 +205,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                     </Card>
 
                     {/* 3. Rules */}
-                    <Card>
+                    <Card data-tour="prs-rules">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base">Rules</CardTitle>
                         </CardHeader>
@@ -273,7 +273,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                 </form>
 
                 {/* 2. Personal rates (saved one by one) */}
-                <Card>
+                <Card data-tour="prs-personal">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
                             <CardTitle className="flex items-center gap-2 text-base"><UserRound className="h-4 w-4 text-blue-600" /> Personal rates</CardTitle>

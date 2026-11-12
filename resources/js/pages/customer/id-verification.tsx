@@ -358,7 +358,7 @@ export default function IdVerification({ details, details_complete, status, reje
                 {step === 2 && (
                 <form onSubmit={handleSubmit} className="space-y-5">
                     {/* ── Valid ID upload ── */}
-                    <Card>
+                    <Card data-tour="idv-valid-id">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <FileText className="h-4 w-4 text-blue-600" />
@@ -415,7 +415,7 @@ export default function IdVerification({ details, details_complete, status, reje
                     </Card>
 
                     {/* ── Selfie ── */}
-                    <Card>
+                    <Card data-tour="idv-selfie">
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Camera className="h-4 w-4 text-blue-600" />
@@ -543,7 +543,7 @@ export default function IdVerification({ details, details_complete, status, reje
                     </Card>
 
                     {/* Submit */}
-                    <div className="flex items-center justify-between gap-4">
+                    <div data-tour="idv-submit" className="flex items-center justify-between gap-4">
                         <p className="text-sm text-gray-500">
                             We'll notify you as soon as it's approved — usually within 24 hours.
                         </p>

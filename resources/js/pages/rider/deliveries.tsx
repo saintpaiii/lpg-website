@@ -681,7 +681,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
         <div className="mt-3 grid gap-3 rounded-lg border bg-gray-50 p-3 text-sm">
             {/* Customer info + action buttons */}
             {o.customer && (
-                <div>
+                <div data-tour="rd-actions">
                     <CustomerContactCard
                         customer={o.customer}
                         orderNumber={o.order_number}
@@ -763,7 +763,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 
             {/* Route map */}
             {showMap && (
-                <div>
+                <div data-tour="rd-map">
                     <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
                         Route Map
                         {riderPos && <span className="ml-1 text-emerald-600 normal-case font-normal">• Your location shown</span>}

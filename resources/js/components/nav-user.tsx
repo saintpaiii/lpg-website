@@ -79,7 +79,7 @@ export function NavUser() {
                 <SidebarMenuItem>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <SidebarMenuButton
+                            <SidebarMenuButton data-tour="nav-user"
                                 size="lg"
                                 className="group data-[state=open]:bg-sidebar-accent"
                                 data-test="sidebar-menu-button"

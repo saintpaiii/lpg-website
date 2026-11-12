@@ -307,7 +307,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div data-tour="sd-tabs" className="flex gap-1 border-b">
                     {TABS.map(({ key, label, count }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -320,7 +320,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                 </div>
 
                 {/* Date filter */}
-                <div className="flex flex-wrap items-end gap-3">
+                <div data-tour="sd-filters" className="flex flex-wrap items-end gap-3">
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-muted-foreground font-medium">From</label>
                         <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />

@@ -278,7 +278,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
 
                     {/* Search overlay (always shown at bottom of hero) */}
                     <div className="relative z-10 bg-white/10 backdrop-blur-sm border-t border-white/10 px-4 sm:px-6 py-3">
-                        <form onSubmit={handleSearch} className="max-w-lg mx-auto">
+                        <form data-tour="products-search" onSubmit={handleSearch} className="max-w-lg mx-auto">
                             <div className="flex rounded-xl overflow-hidden shadow-xl bg-white dark:bg-gray-800">
                                 <div className="relative flex-1">
                                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -318,7 +318,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                 </div>
 
                 {/* Filter toggle row */}
-                <div className="flex gap-2">
+                <div data-tour="products-filters" className="flex gap-2">
                     <Button
                         variant="outline"
                         onClick={() => setFilterOpen(v => !v)}
@@ -440,7 +440,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         </Button>
                     </div>
                 ) : (
-                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                    <div data-tour="products-grid" className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                         {products.data.map(p => (
                             <Card
                                 key={p.id}

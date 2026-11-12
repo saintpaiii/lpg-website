@@ -23,6 +23,7 @@ import {
     X,
     XCircle,
     MessageSquare,
+    LifeBuoy,
 } from 'lucide-react';
 import { useUnreadMessages } from '@/components/chat/use-unread-messages';
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -57,6 +58,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { useFlashToast } from '@/hooks/use-flash-toast';
+import { GettingStartedCard, TutorialHelpButton, TutorialRunner } from '@/components/tutorials';
 import { badgeProps, useSidebarBadges } from '@/hooks/use-sidebar-badges';
 import type { NavItem, SharedData } from '@/types';
 import { Toaster } from 'sonner';
@@ -132,6 +134,7 @@ export default function CustomerLayout({ children, title }: Props) {
         ...(shopLocked ? [] : [verifyNavItem]),
         { title: 'Profile', href: '/customer/profile', icon: User },
         { title: 'My Addresses', href: '/customer/addresses', icon: MapPinned },
+        { title: 'Help & Tutorials', href: '/help', icon: LifeBuoy },
     ];
 
     // Seller / become-seller link
@@ -156,6 +159,7 @@ export default function CustomerLayout({ children, title }: Props) {
         verifyNavItem,
         { title: 'Profile', href: '/customer/profile', icon: User },
         { title: 'My Addresses', href: '/customer/addresses', icon: MapPinned },
+        { title: 'Help & Tutorials', href: '/help', icon: LifeBuoy },
     ];
     const lockedNavItems: NavItem[] = [
         ...mainNavItems.filter((i) => i !== verifyNavItem),
@@ -246,7 +250,7 @@ export default function CustomerLayout({ children, title }: Props) {
                     <div className="flex min-w-0 flex-1 items-center gap-3">
                         <SidebarTrigger className="-ml-1 shrink-0 text-muted-foreground hover:text-foreground" />
                         <Separator orientation="vertical" className="h-4 shrink-0" />
-                        <h1 className="truncate text-sm font-semibold text-foreground">{pageTitle}</h1>
+                        <h1 data-tour="page-title" className="truncate text-sm font-semibold text-foreground">{pageTitle}</h1>
                     </div>
 
                     {/* Right: search, cart, notifications, logout */}
@@ -268,6 +272,9 @@ export default function CustomerLayout({ children, title }: Props) {
                             </Button>
                         )}
 
+                        {/* Replay this page's tutorial */}
+                        <TutorialHelpButton />
+
                         {/* Notification bell */}
                         <NotificationBell />
 
@@ -284,7 +291,7 @@ export default function CustomerLayout({ children, title }: Props) {
                         )}
                         {!isAdmin && !shopLocked && (
                             <Button variant="ghost" size="icon" className="relative h-8 w-8 text-muted-foreground hover:text-foreground" asChild>
-                                <Link href="/customer/cart" title="Cart">
+                                <Link href="/customer/cart" title="Cart" data-tour="nav:/customer/cart">
                                     <ShoppingCart className="size-4" />
                                     {cart_count > 0 && (
                                         <span className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full bg-blue-600 text-white text-[9px] font-bold flex items-center justify-center leading-none">
@@ -373,6 +380,8 @@ export default function CustomerLayout({ children, title }: Props) {
 
                 {/* Page content */}
                 <div className="flex flex-1 flex-col gap-4 p-6 pb-20 md:pb-6">
+                    {/* Home page only (server decides): getting-started checklist — customers only */}
+                    {auth.user.role === 'customer' && <GettingStartedCard />}
                     {children}
                 </div>
 
@@ -398,6 +407,7 @@ export default function CustomerLayout({ children, title }: Props) {
                                 return (
                                     <span
                                         key={href}
+                                        data-tour={`nav:${href}`}
                                         title={LOCK_REASON}
                                         aria-disabled="true"
                                         className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-muted-foreground opacity-40"
@@ -413,6 +423,7 @@ export default function CustomerLayout({ children, title }: Props) {
                             return (
                                 <Link
                                     key={href}
+                                    data-tour={`nav:${href}`}
                                     href={href}
                                     className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors ${
                                         active ? 'text-blue-600' : 'text-muted-foreground'
@@ -452,6 +463,9 @@ export default function CustomerLayout({ children, title }: Props) {
 
             {/* PWA install banner */}
             <InstallAppBanner />
+
+            {/* First-time tutorials (customers only — sellers / admins also shop here) */}
+            <TutorialRunner layout="customer" />
 
             {/* Logout dialog */}
             <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>

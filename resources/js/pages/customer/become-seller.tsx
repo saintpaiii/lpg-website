@@ -309,7 +309,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                         )}
 
                         {/* Step indicators */}
-                        <div className="flex gap-1">
+                        <div data-tour="become-steps" className="flex gap-1">
                             {STEP_LABELS.map((label, i) => {
                                 const s = (i + 1) as 1 | 2 | 3;
                                 const done = step > s;

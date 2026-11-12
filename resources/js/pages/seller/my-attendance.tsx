@@ -337,7 +337,7 @@ export default function MyAttendancePage({
 
                 {/* Location Status Card — always shown */}
                 {!isDone && (
-                    <Card>
+                    <Card data-tour="myatt-location">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Navigation className="h-4 w-4 text-blue-600" />
@@ -445,7 +445,7 @@ export default function MyAttendancePage({
                 )}
 
                 {/* Today's card */}
-                <Card>
+                <Card data-tour="myatt-today">
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base flex items-center gap-2">
                             <Clock className="h-4 w-4 text-blue-600" />
