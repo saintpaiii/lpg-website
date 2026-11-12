@@ -12,6 +12,8 @@ type Invoice = {
     id: number;
     invoice_number: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     payment_status: string;
     paid_amount: number;
     payment_method: string | null;
@@ -133,7 +135,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                             </td>
                                             <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(inv.created_at)}</td>
                                             <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                                                ₱{inv.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                ₱{inv.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>

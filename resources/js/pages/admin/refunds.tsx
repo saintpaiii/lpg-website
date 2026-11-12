@@ -203,7 +203,7 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                                 ['favor_seller', "Uphold the seller's decision", 'The dispute is closed as-is.'],
                             ] as [Decision, string, string][]).map(([key, label, hint]) => (
                                 <label key={key} className={`flex cursor-pointer items-start gap-2 rounded-lg border-2 p-3 ${decision === key ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'}`}>
-                                    <input type="radio" name="decision" checked={decision === key} onChange={() => setDecision(key)} className="mt-0.5" />
+                                    <input type="radio" name="decision" checked={decision === key} onChange={() => { if (key !== decision) { setDecision(key); setNotes(''); } }} className="mt-0.5" />
                                     <span>
                                         <span className="block font-semibold">{label}</span>
                                         <span className="block text-xs text-muted-foreground">{hint}</span>
@@ -212,8 +212,10 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                             ))}
                         </div>
                         <div className="grid gap-1.5">
+                            {/* Only the reasons that match the decision; switching the decision clears the chosen reason */}
                             <ReasonTextPicker
-                                context="refund_admin_decision"
+                                key={decision}
+                                context={decision === 'favor_customer' ? 'refund_admin_favor_customer' : 'refund_admin_favor_seller'}
                                 reasonLabel="Decision"
                                 value={notes}
                                 onChange={(v) => setNotes(v)}

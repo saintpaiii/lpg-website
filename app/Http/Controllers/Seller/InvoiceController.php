@@ -51,7 +51,7 @@ class InvoiceController extends Controller
                 'invoice_number'      => $i->invoice_number,
                 'total_amount'        => (float) $i->total_amount,
                 // What the customer pays the store: items + delivery fee
-                'grand_total'         => (float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0),
+                'grand_total'         => $i->displayTotal(),
                 'paid_amount'         => (float) $i->paid_amount,
                 'payment_status'      => $i->payment_status,
                 'payment_method'      => $i->payment_method,
@@ -123,11 +123,11 @@ class InvoiceController extends Controller
             'order_number'   => $i->order?->order_number ?? '—',
             'customer'       => $i->customer?->name ?? '—',
             'created_at'     => $i->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
-            'total_amount'   => $this->peso((float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0)),
+            'total_amount'   => $this->peso($i->displayTotal()),
             'status'         => $i->payment_status,
             'method'         => $i->payment_method ?? '—',
             // raw for totals
-            '_total'  => (float) $i->total_amount + (float) ($i->order?->shipping_fee ?? 0),
+            '_total'  => $i->displayTotal(),
         ])->values()->all();
 
         $grandTotal = collect($rows)->sum('_total');

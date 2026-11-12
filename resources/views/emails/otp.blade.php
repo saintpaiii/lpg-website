@@ -33,7 +33,7 @@
             </p>
             <div class="code-box">
                 <div class="code">{{ $code }}</div>
-                <p class="expiry">This code expires in <strong>10 minutes</strong>.</p>
+                <p class="expiry">This code expires in <strong>{{ \App\Models\OtpCode::TTL_MINUTES }} minutes</strong>.</p>
             </div>
             <p class="warning">
                 If you did not create an account, you can safely ignore this email.

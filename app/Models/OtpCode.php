@@ -37,6 +37,9 @@ class OtpCode extends Model
         return $this->locked_until !== null && $this->locked_until->isFuture();
     }
 
+    /** How long a code works. The email (emails/otp.blade.php) and the page countdown use the same value. */
+    public const TTL_MINUTES = 10;
+
     /**
      * Generate a new 6-digit OTP for the given user.
      * Marks any previous unused codes as used first.
@@ -51,7 +54,8 @@ class OtpCode extends Model
         return self::create([
             'user_id'    => $user->id,
             'code'       => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT),
-            'expires_at' => now()->addSeconds(60),
+            // Was 60 seconds while the email said 10 minutes — Gmail can take longer than a minute to arrive
+            'expires_at' => now()->addMinutes(self::TTL_MINUTES),
             'used'       => false,
             'attempts'   => 0,
         ]);

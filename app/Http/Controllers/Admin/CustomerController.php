@@ -110,7 +110,9 @@ class CustomerController extends Controller
         $orders = $customer->orders()
             ->with('items.product')
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            // What the customer pays (items + delivery fee) — shown in the list
+            ->through(fn ($o) => $o->setAttribute('grand_total', $o->grandTotal()));
 
         return Inertia::render('admin/customer-orders', [
             'customer' => $customer,

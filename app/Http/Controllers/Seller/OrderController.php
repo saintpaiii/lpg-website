@@ -226,10 +226,11 @@ class OrderController extends Controller
             'transaction_type' => $o->transaction_type ?? '—',
             'payment_method'   => $o->payment_method ?? '—',
             'payment_status'   => $o->payment_status,
-            'total_amount'     => $this->peso((float) $o->total_amount),
+            // Export shows what the customer pays (items + delivery fee), same as the list
+            'total_amount'     => $this->peso($o->grandTotal()),
         ])->values()->all();
 
-        $grandTotal = $orders->sum(fn ($o) => (float) $o->total_amount);
+        $grandTotal = $orders->sum(fn ($o) => $o->grandTotal());
 
         if ($format === 'pdf') {
             return $this->pdfResponse($filename, [

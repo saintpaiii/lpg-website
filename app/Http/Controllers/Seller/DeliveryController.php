@@ -59,6 +59,8 @@ class DeliveryController extends Controller
                     'customer'     => $d->order->customer?->name ?? '—',
                     'address'      => $d->order->deliveryAddressText() ?: '—',
                     'total_amount' => (float) $d->order->total_amount,
+                    // What the customer pays (items + delivery fee) — shown in the list
+                    'grand_total'  => $d->order->grandTotal(),
                     // Refill: empty tanks the rider must collect
                     'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
                     'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,

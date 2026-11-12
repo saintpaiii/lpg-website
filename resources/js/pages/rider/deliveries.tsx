@@ -87,6 +87,8 @@ type OrderRef = {
     order_number: string;
     status: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     shipping_fee: number | null;
     transaction_type: string;
     payment_method: string;
@@ -819,7 +821,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                     )}
                     <div className="flex justify-between font-semibold text-gray-900">
                         <span>Total</span>
-                        <span>₱{o.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                        <span>₱{o.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                     </div>
                 </div>
             </div>
@@ -1191,7 +1193,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                     {/* Amount + actions */}
                                     <div className="flex shrink-0 flex-col items-end gap-2">
                                         <span className="font-semibold tabular-nums text-gray-900">
-                                            ₱{(d.order?.total_amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </span>
 
                                         {/* Refill: empty tanks to collect */}

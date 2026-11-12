@@ -138,11 +138,13 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
         if (countdown > 0 || resending) return;
         setResending(true);
         router.post('/verify-otp/resend', {}, {
-            onSuccess: () => {
+            onSuccess: (page) => {
                 setResending(false);
                 setCodeSent(true);
-                setCountdown(60);
-                setOtpCountdown(60);
+                setCountdown(60); // resend cooldown stays 60 s
+                // The code itself works for 10 minutes — use the server's remaining time for the new code
+                const expiresIn = Number((page.props as unknown as Props).code_expires_in);
+                setOtpCountdown(expiresIn > 0 ? expiresIn : 600);
                 setDigits(['', '', '', '', '', '']);
             },
             onError: () => setResending(false),

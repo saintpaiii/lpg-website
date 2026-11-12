@@ -71,4 +71,21 @@ class Invoice extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    /**
+     * What the customer pays (items + delivery fee) — for DISPLAY in lists. grand_total is the snapshot taken when
+     * the invoice was made; older invoices without it fall back to the item total + the order's delivery fee.
+     * Load 'order' first in lists (N+1 otherwise). Stored values and revenue/report sums are not affected.
+     */
+    public function displayTotal(): float
+    {
+        if ($this->grand_total !== null) {
+            return round((float) $this->grand_total, 2);
+        }
+
+        return round((float) $this->total_amount + (float) ($this->order?->shipping_fee ?? 0), 2);
+    }
+
+    /** SQL for the same number (sums / sorting), for queries on the invoices table joined to nothing. */
+    public const DISPLAY_TOTAL_SQL = 'COALESCE(invoices.grand_total, invoices.total_amount + COALESCE((SELECT o.shipping_fee FROM orders o WHERE o.id = invoices.order_id), 0))';
 }

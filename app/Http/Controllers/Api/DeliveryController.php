@@ -30,6 +30,8 @@ class DeliveryController extends Controller
                 'order_number'     => $d->order->order_number,
                 'status'           => $d->order->status,
                 'total_amount'     => (float) $d->order->total_amount,
+                // What the customer pays (items + delivery fee)
+                'grand_total'      => $d->order->grandTotal(),
                 // Refill: send empty_tanks_collected=true with status=delivered
                 'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
                 'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,

@@ -73,6 +73,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'hourly_rate_override'    => 'decimal:2',
             'work_days'               => 'array',   // ISO weekdays 1=Mon…7=Sun; null = Mon–Sat
             'id_verified_at'          => 'datetime',
+            'deactivated_at'          => 'datetime',
         ];
     }
 

@@ -24,6 +24,8 @@ type InvoiceRow = {
     invoice_number: string;
     payment_status: PaymentStatus;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     paid_amount: number;
     balance: number;
     payment_method: string | null;
@@ -328,7 +330,7 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right tabular-nums font-semibold">
-                                                    {peso(inv.total_amount)}
+                                                    {peso(inv.grand_total)}
                                                 </td>
                                                 <td className="px-4 py-3 text-right tabular-nums text-emerald-600">
                                                     {peso(inv.paid_amount)}

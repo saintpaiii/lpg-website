@@ -24,7 +24,8 @@ export type ReasonContext =
     | 'refund_issue'
     | 'refund_escalate'
     | 'refund_seller_reject'
-    | 'refund_admin_decision'
+    | 'refund_admin_favor_customer'   // admin/refunds — "Rule in favor of the customer"
+    | 'refund_admin_favor_seller'     // admin/refunds — "Uphold the seller's decision"
     | 'verification_reject'
     | 'store_reject'
     | 'account_store_suspend'     // admin/store-show
@@ -148,9 +149,12 @@ export const REASON_CATALOG: Record<ReasonContext, ReasonOption[]> = {
         ['Not from our store',     ['Tank is not our brand or seal']],
     ]),
 
-    refund_admin_decision: byLabel([
-        ['Store is right',    ["Customer's proof is not enough", 'Damage happened after delivery']],
+    // One list per decision, so the reason always matches it (the server also rejects the other side's label)
+    refund_admin_favor_customer: byLabel([
         ['Customer is right', ['Proof shows the problem — full refund', 'Proof shows the problem — partial refund', 'Replacement instead of refund']],
+    ]),
+    refund_admin_favor_seller: byLabel([
+        ['Store is right',    ["Customer's proof is not enough", 'Damage happened after delivery']],
     ]),
 
     verification_reject: byLabel([

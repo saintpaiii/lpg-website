@@ -32,6 +32,8 @@ type Order = {
     status: string;
     payment_status: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee */
+    grand_total: number;
     created_at: string;
     items: OrderItem[];
 };
@@ -159,7 +161,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                         </div>
                                                     ))}
                                                 </td>
-                                                <td className="px-4 py-3 font-medium">{fmt(o.total_amount)}</td>
+                                                <td className="px-4 py-3 font-medium">{fmt(o.grand_total)}</td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge value={o.status} colors={STATUS_COLORS} />
                                                 </td>

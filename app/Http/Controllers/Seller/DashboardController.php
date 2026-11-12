@@ -62,6 +62,8 @@ class DashboardController extends Controller
                 'order_number' => $o->order_number,
                 'customer'     => $o->customer?->name ?? '—',
                 'total_amount' => (float) $o->total_amount,
+                // What the customer pays (items + delivery fee) — shown in the list
+                'grand_total'  => $o->grandTotal(),
                 'status'       => $o->status,
                 'created_at'   => $o->created_at->format('M d, Y'),
             ]);

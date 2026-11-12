@@ -43,7 +43,7 @@ type Delivery = {
     notes: string | null;
     fail_info: FailInfo | null;
     order: {
-        id: number; order_number: string; customer: string; address: string; total_amount: number;
+        id: number; order_number: string; customer: string; address: string; total_amount: number; grand_total: number;
         /** Refill: empty tanks the rider must collect */
         empty_tanks_required?: number; empty_tanks_collected?: boolean; empty_tank_summary?: string | null;
     } | null;
@@ -359,7 +359,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                     {d.order ? (
                                                         <>
                                                             <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs font-medium text-blue-600">{d.order.order_number}<SeenPill flags={seen.get(d.id)} className="font-sans" /></p>
-                                                            <p className="text-xs text-muted-foreground">₱{d.order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
+                                                            <p className="text-xs text-muted-foreground">₱{d.order.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
                                                         </>
                                                     ) : '—'}
                                                 </td>

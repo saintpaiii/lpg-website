@@ -82,6 +82,7 @@ class Store extends Model
         return [
             'is_featured'              => 'boolean',
             'approved_at'              => 'datetime',
+            'suspended_at'             => 'datetime',
             'subscription_started_at'  => 'datetime',
             'subscription_expires_at'  => 'datetime',
             'trial_used_at'            => 'datetime',

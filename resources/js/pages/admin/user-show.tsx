@@ -61,6 +61,8 @@ interface OrderRow {
     order_number: string;
     status: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     created_at: string;
 }
 
@@ -315,7 +317,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                                             {o.status.replace(/_/g, ' ')}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 text-right font-medium">{fmt(o.total_amount)}</td>
+                                                    <td className="py-2 text-right font-medium">{fmt(o.grand_total)}</td>
                                                     <td className="py-2 text-muted-foreground">{fmtDate(o.created_at)}</td>
                                                 </tr>
                                             ))}

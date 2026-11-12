@@ -39,6 +39,8 @@ type DeliveryRow = {
         id: number;
         order_number: string;
         total_amount: number;
+        /** What the customer pays: items + delivery fee */
+        grand_total: number;
         customer: {
             name: string;
             address: string | null;
@@ -295,7 +297,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                         {/* Amount + expand toggle */}
                                         <div className="flex shrink-0 flex-col items-end gap-2">
                                             <span className="font-semibold tabular-nums text-gray-900">
-                                                ₱{(d.order?.total_amount ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </span>
                                             {isExpanded
                                                 ? <ChevronUp className="h-4 w-4 text-muted-foreground" />

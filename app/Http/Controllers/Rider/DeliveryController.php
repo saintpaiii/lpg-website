@@ -62,6 +62,8 @@ class DeliveryController extends Controller
                 'order_number'       => $d->order->order_number,
                 'status'             => $d->order->status,
                 'total_amount'       => (float) $d->order->total_amount,
+                // What the customer pays (items + delivery fee) — shown in the list
+                'grand_total'        => $d->order->grandTotal(),
                 'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
                 'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,
                 'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,
@@ -135,14 +137,15 @@ class DeliveryController extends Controller
             ->withQueryString()
             ->through(fn ($d) => $this->formatDelivery($d) + ['seen' => \App\Services\SectionVisitService::flagsFor($request, $d)]);
 
-        // Summary counts
+        // Summary counts. "Today" = the app's date (Asia/Manila), not MySQL CURDATE() (server time, UTC on the host),
+        // which said "Delivered Today 0" from midnight to 8 AM.
         $counts = Delivery::where('rider_id', $user->id)
             ->selectRaw("
                 SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END) as assigned_count,
                 SUM(CASE WHEN status = 'picked_up' THEN 1 ELSE 0 END) as picked_up_count,
                 SUM(CASE WHEN status = 'in_transit' THEN 1 ELSE 0 END) as in_transit_count,
-                SUM(CASE WHEN status = 'delivered' AND DATE(delivered_at) = CURDATE() THEN 1 ELSE 0 END) as delivered_today_count
-            ")
+                SUM(CASE WHEN status = 'delivered' AND DATE(delivered_at) = ? THEN 1 ELSE 0 END) as delivered_today_count
+            ", [now()->toDateString()])
             ->first();
 
         return Inertia::render('rider/deliveries', [
@@ -235,6 +238,8 @@ class DeliveryController extends Controller
                     'id'           => $d->order->id,
                     'order_number' => $d->order->order_number,
                     'total_amount' => (float) $d->order->total_amount,
+                    // What the customer pays (items + delivery fee) — shown in the list
+                    'grand_total'  => $d->order->grandTotal(),
                     'customer'     => $d->order->customer ? [
                         'name'     => $d->order->customer->name,
                         'address'  => $d->order->deliveryAddressParts()['address'],

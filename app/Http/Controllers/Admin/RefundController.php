@@ -69,6 +69,16 @@ class RefundController extends Controller
             'admin_notes' => 'required|string|max:1000',
         ]);
 
+        // The reason must match the decision (reason lists in reason-catalog.ts start with these group labels)
+        $otherSide = $data['decision'] === 'favor_customer' ? 'Store is right' : 'Customer is right';
+        if (\Illuminate\Support\Str::startsWith(mb_strtolower(ltrim($data['admin_notes'])), mb_strtolower($otherSide))) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'admin_notes' => $data['decision'] === 'favor_customer'
+                    ? 'This reason says the store is right, but you ruled in favor of the customer. Pick a "Customer is right" reason.'
+                    : 'This reason says the customer is right, but you upheld the seller. Pick a "Store is right" reason.',
+            ]);
+        }
+
         $updates = [
             'admin_decision'   => $data['decision'],
             'admin_notes'      => $data['admin_notes'],

@@ -34,6 +34,8 @@ type RecentOrder = {
     order_number: string;
     customer: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     status: string;
     created_at: string;
 };
@@ -276,7 +278,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                                                     <p className="text-xs text-muted-foreground">{fmtDate(o.created_at)}</p>
                                                 </td>
                                                 <td className="px-4 py-2.5 text-sm hidden sm:table-cell">{o.customer}</td>
-                                                <td className="px-4 py-2.5 text-right font-medium text-sm">{fmt(o.total_amount)}</td>
+                                                <td className="px-4 py-2.5 text-right font-medium text-sm">{fmt(o.grand_total)}</td>
                                                 <td className="px-4 py-2.5 text-center">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
                                                         {o.status.replace('_', ' ')}

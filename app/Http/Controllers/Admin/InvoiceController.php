@@ -17,15 +17,18 @@ class InvoiceController extends Controller
 
     private function formatInvoice(Invoice $inv): array
     {
-        $total      = (float) $inv->total_amount;
-        $paid       = (float) $inv->paid_amount;
-        $balance    = max(0, $total - $paid);
+        // List amounts = what the customer pays (items + delivery fee). Invoices marked paid before delivery fees
+        // were included in paid_amount count as paid in full (same rule as the invoice page).
+        $total      = $inv->displayTotal();
+        $paid       = $inv->payment_status === 'paid' ? max($total, (float) $inv->paid_amount) : (float) $inv->paid_amount;
+        $balance    = $inv->payment_status === 'paid' ? 0.0 : max(0, round($total - $paid, 2));
 
         return [
             'id'                  => $inv->id,
             'invoice_number'      => $inv->invoice_number,
             'payment_status'      => $inv->payment_status,
-            'total_amount'        => $total,
+            'total_amount'        => (float) $inv->total_amount,
+            'grand_total'         => $total,
             'paid_amount'         => $paid,
             'balance'             => $balance,
             'payment_method' => $inv->payment_method,
@@ -100,11 +103,14 @@ class InvoiceController extends Controller
             ->withQueryString()
             ->through(fn ($inv) => $this->formatInvoice($inv));
 
+        // Same numbers as the list: items + delivery fee; "paid" = paid in full; nothing is outstanding on a paid or
+        // voided invoice (outstanding can no longer go negative)
+        $t   = Invoice::DISPLAY_TOTAL_SQL;
         $raw = Invoice::selectRaw("
             COUNT(*) as total_count,
-            SUM(total_amount) as total_billed,
-            SUM(paid_amount) as total_collected,
-            SUM(total_amount - paid_amount) as total_outstanding
+            SUM({$t}) as total_billed,
+            SUM(CASE WHEN payment_status = 'paid' THEN GREATEST({$t}, paid_amount) ELSE paid_amount END) as total_collected,
+            SUM(CASE WHEN payment_status IN ('paid', 'voided') THEN 0 ELSE GREATEST({$t} - paid_amount, 0) END) as total_outstanding
         ")->first();
 
         $summary = [
@@ -127,7 +133,7 @@ class InvoiceController extends Controller
     {
         $format = $request->get('format', 'csv');
 
-        $query = Invoice::with(['customer', 'order']);
+        $query = Invoice::with(['customer', 'order.items.product', 'order.store']);
 
         if ($payStatus = $request->input('payment_status')) {
             $query->where('payment_status', $payStatus);
@@ -165,24 +171,30 @@ class InvoiceController extends Controller
             ['key' => 'method',         'label' => 'Method'],
         ];
 
-        $rows = $invoices->map(fn ($i) => [
-            'invoice_number' => $i->invoice_number,
-            'order_number'   => $i->order?->order_number ?? '—',
-            'store_name'     => $i->order?->store?->store_name ?? '—',
-            'customer'       => $i->customer?->name ?? '—',
-            'created_at'     => $i->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
-            'total_amount'   => $this->peso((float) $i->total_amount),
-            'paid_amount'    => $this->peso((float) $i->paid_amount),
-            'outstanding'    => $this->peso(max(0, (float) $i->total_amount - (float) $i->paid_amount)),
-            'status'         => $i->payment_status,
-            'method'         => $i->payment_method ?? '—',
-            '_total'         => (float) $i->total_amount,
-            '_paid'          => (float) $i->paid_amount,
-        ])->values()->all();
+        // Same amounts as the list (formatInvoice): items + delivery fee
+        $rows = $invoices->map(function ($i) {
+            $f = $this->formatInvoice($i);
+
+            return [
+                'invoice_number' => $i->invoice_number,
+                'order_number'   => $i->order?->order_number ?? '—',
+                'store_name'     => $i->order?->store?->store_name ?? '—',
+                'customer'       => $i->customer?->name ?? '—',
+                'created_at'     => $i->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
+                'total_amount'   => $this->peso($f['grand_total']),
+                'paid_amount'    => $this->peso($f['paid_amount']),
+                'outstanding'    => $this->peso($i->payment_status === 'voided' ? 0 : $f['balance']),
+                'status'         => $i->payment_status,
+                'method'         => $i->payment_method ?? '—',
+                '_total'         => $f['grand_total'],
+                '_paid'          => $f['paid_amount'],
+                '_out'           => $i->payment_status === 'voided' ? 0 : $f['balance'],
+            ];
+        })->values()->all();
 
         $grandTotal = collect($rows)->sum('_total');
         $grandPaid  = collect($rows)->sum('_paid');
-        $grandOut   = max(0, $grandTotal - $grandPaid);
+        $grandOut   = collect($rows)->sum('_out');
 
         if ($format === 'pdf') {
             return $this->pdfResponse($filename, [

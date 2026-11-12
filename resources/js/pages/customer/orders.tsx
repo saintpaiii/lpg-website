@@ -29,6 +29,8 @@ type Order = {
     status: string;
     fulfillment?: string;
     total_amount: number;
+    /** What the customer pays: items + delivery fee (shown instead of total_amount) */
+    grand_total: number;
     payment_method: string;
     payment_status: string;
     payment_mode: 'full' | 'consignment' | 'cod';
@@ -303,7 +305,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     <p className="text-xs text-gray-400 truncate max-w-[160px]">{order.items_summary}</p>
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">
-                                                    ₱{order.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    ₱{order.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-gray-100 text-gray-600'}`}>

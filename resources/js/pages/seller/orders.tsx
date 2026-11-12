@@ -379,7 +379,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{o.customer?.name ?? '—'}</td>
                                             <td className="px-4 py-3 text-right font-medium">
-                                                ₱{o.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                ₱{o.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>

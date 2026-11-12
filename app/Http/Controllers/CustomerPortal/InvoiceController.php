@@ -38,6 +38,8 @@ class InvoiceController extends Controller
                     'seen'           => \App\Services\SectionVisitService::flagsFor($request, $inv),
                     'invoice_number' => $inv->invoice_number,
                     'total_amount'   => (float) $inv->total_amount,
+                    // What the customer pays (items + delivery fee) — shown in the list
+                    'grand_total'    => $inv->displayTotal(),
                     'payment_status' => $inv->payment_status,
                     'paid_amount'    => (float) $inv->paid_amount,
                     'payment_method' => $inv->payment_method,

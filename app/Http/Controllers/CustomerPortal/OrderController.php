@@ -69,6 +69,8 @@ class OrderController extends Controller
                     'status'            => $o->status,
                     'fulfillment'       => $o->fulfillment ?? 'delivery',
                     'total_amount'      => (float) $o->total_amount,
+                    // What the customer pays (items + delivery fee) — shown in the list
+                    'grand_total'       => $o->grandTotal(),
                     'payment_method'    => $o->payment_method,
                     'payment_status'    => $o->payment_status,
                     'payment_mode'      => $o->payment_mode ?? 'full',
