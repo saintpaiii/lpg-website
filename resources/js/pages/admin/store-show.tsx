@@ -66,6 +66,8 @@ type StoreDetail = {
     owner_id_verified: boolean;
     approved_by_name: string | null;
     valid_id_url: string | null;
+    /** Owner's live-camera selfie (registration / ID verification) */
+    owner_selfie_url?: string | null;
     bir_permit_url: string | null;
     business_permit_url: string | null;
     fsic_permit_url: string | null;
@@ -447,6 +449,14 @@ export default function StoreShow({
                                         </DocumentRow>
                                         {ocrLine('valid_id')}
                                     </div>
+                                    {/* Live-camera selfie taken at registration — compare it with the ID's photo */}
+                                    <DocumentRow label="Selfie (Owner)">
+                                        {store.owner_selfie_url ? (
+                                            <a href={store.owner_selfie_url} target="_blank" rel="noopener noreferrer" title="Open the selfie">
+                                                <img src={store.owner_selfie_url} alt="Owner selfie" className="h-14 w-14 rounded-md border object-cover hover:opacity-90" />
+                                            </a>
+                                        ) : <span className="text-sm text-muted-foreground">Not taken</span>}
+                                    </DocumentRow>
                                     {store.permits.map((p) => {
                                         const url = (store as unknown as Record<string, string | null>)[`${p.type}_url`];
                                         const isDtiSec = p.type === 'dti_sec_registration';

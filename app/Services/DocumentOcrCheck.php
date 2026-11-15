@@ -38,7 +38,8 @@ class DocumentOcrCheck
         $tin    = preg_match('/\b\d{3}-?\d{3}-?\d{3}(?:-?\d{3,5})?\b/', $text, $m) ? $m[0] : null;
 
         // Name check: the owner's name on the ID; the store (or owner) name on business documents
-        $owner = (string) ($store->owner?->name ?? '');
+        // Without the suffix (Jr., III …): an ID may or may not print it
+        $owner = (string) ($store->owner?->nameWithoutSuffix() ?? '');
         if ($docType === 'valid_id') {
             $nameMatch = $owner !== '' ? static::nameFound($owner, $text) : null;
             if ($nameMatch === false) {
@@ -82,7 +83,8 @@ class DocumentOcrCheck
         }
 
         $warnings = [];
-        $full  = trim((string) $user->name);
+        // Compared WITHOUT the suffix (Jr., III …): an ID may or may not print it
+        $full  = $user->nameWithoutSuffix();
         $first = trim((string) ($user->first_name ?? ''));
         $last  = trim((string) ($user->last_name ?? ''));
 

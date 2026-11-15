@@ -56,6 +56,9 @@ type VerificationRow = {
     user_first_name?: string | null;
     user_middle_name?: string | null;
     user_last_name?: string | null;
+    user_suffix?: string | null;
+    /** first + middle + last + suffix */
+    user_full_name?: string | null;
     user_joined?: string | null;
     email_verified?: boolean;
     customer_address?: string | null;
@@ -386,7 +389,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                 <div className="rounded-md border p-3 space-y-1.5">
                                     <InfoLine label="Full name">
                                         <span className="font-medium">
-                                            {[v.user_first_name, v.user_middle_name, v.user_last_name].filter(Boolean).join(' ') || v.user_name}
+                                            {v.user_full_name || v.user_name}
                                         </span>
                                     </InfoLine>
                                     <InfoLine label="Email">

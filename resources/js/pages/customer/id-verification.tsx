@@ -8,19 +8,19 @@ import {
     Clock,
     FileText,
     Flame,
-    RefreshCw,
     ShieldCheck,
     Upload,
     X,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { toast, Toaster } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import IdDetailsStep, { type IdDetails } from '@/components/customer/id-details-step';
+import CameraCapture from '@/components/camera-capture';
 import CustomerLayout from '@/layouts/customer-layout';
-import { DOCUMENT_ACCEPT, IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
+import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 
 type Props = {
     details: IdDetails;
@@ -87,34 +87,12 @@ export default function IdVerification({ details, details_complete, status, reje
     // ── File states ──────────────────────────────────────────────────────────
     const [idFile, setIdFile]         = useState<File | null>(null);
     const [idPreview, setIdPreview]   = useState<string | null>(null);
+    // Selfie: live camera photo only (CameraCapture) — no gallery / file upload
     const [selfieFile, setSelfieFile] = useState<File | null>(null);
-    const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
-
-    // ── Camera states ────────────────────────────────────────────────────────
-    const [cameraMode, setCameraMode]     = useState<'off' | 'active' | 'captured'>('off');
-    const [cameraError, setCameraError]   = useState<string | null>(null);
-    // Where the current selfie came from: decides "Retake" (camera) vs "Change Photo" (upload)
-    const [selfieSource, setSelfieSource] = useState<'camera' | 'upload' | null>(null);
-    const selfieInputRef = useRef<HTMLInputElement>(null);
-    const videoRef  = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const streamRef = useRef<MediaStream | null>(null);
 
     // ── Submit state ─────────────────────────────────────────────────────────
     const [processing, setProcessing]   = useState(false);
     const [errors, setErrors]           = useState<Record<string, string>>({});
-
-    // Cleanup camera on unmount
-    useEffect(() => {
-        return () => stopCamera();
-    }, []);
-
-    // The <video> element only exists once the camera is active, so attach the stream then
-    useEffect(() => {
-        if (cameraMode === 'active' && videoRef.current && streamRef.current) {
-            videoRef.current.srcObject = streamRef.current;
-        }
-    }, [cameraMode]);
 
     // ── ID file handler ───────────────────────────────────────────────────────
     async function handleIdFile(picked: File | undefined) {
@@ -138,94 +116,6 @@ export default function IdVerification({ details, details_complete, status, reje
         }
     }
 
-    // ── Selfie upload handler ─────────────────────────────────────────────────
-    async function handleSelfieFile(picked: File | undefined) {
-        if (!picked) return;
-        const { file, problem } = await prepareDocumentFile(picked, { allowPdf: false });
-        if (!file) {
-            setErrors(p => ({ ...p, selfie: problem ?? 'Use a JPG, PNG or WEBP file.' }));
-            return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-            setErrors(p => ({ ...p, selfie: 'File must be 5 MB or smaller.' }));
-            return;
-        }
-        stopCamera();
-        setSelfieFile(file);
-        setSelfiePreview(URL.createObjectURL(file));
-        setSelfieSource('upload');
-        setErrors(p => ({ ...p, selfie: '' }));
-        setCameraError(null); // an uploaded photo makes any earlier camera problem irrelevant
-        setCameraMode('off');
-    }
-
-    function openSelfiePicker() {
-        if (selfieInputRef.current) {
-            selfieInputRef.current.value = ''; // allow re-choosing the same file
-            selfieInputRef.current.click();
-        }
-    }
-
-    // ── Camera helpers ────────────────────────────────────────────────────────
-    async function startCamera() {
-        setCameraError(null);
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-            });
-            streamRef.current = stream;
-            setCameraMode('active'); // the stream is attached to <video> by the effect above
-        } catch {
-            setCameraMode('off');
-            setCameraError('Camera access denied or unavailable. Please upload a photo instead.');
-        }
-    }
-
-    function capturePhoto() {
-        const video  = videoRef.current;
-        const canvas = canvasRef.current;
-        if (!video || !canvas) return;
-
-        canvas.width  = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d')?.drawImage(video, 0, 0);
-
-        canvas.toBlob(
-            async (blob) => {
-                if (!blob) return;
-                // Same JPEG size limit as uploads (longest side 2000 px)
-                const { file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' }) } =
-                    await prepareDocumentFile(new File([blob], 'selfie.jpg', { type: 'image/jpeg' }), { allowPdf: false });
-                setSelfieFile(file);
-                setSelfiePreview(URL.createObjectURL(file));
-                setSelfieSource('camera');
-                setErrors(p => ({ ...p, selfie: '' }));
-                setCameraMode('captured');
-                stopCamera();
-            },
-            'image/jpeg',
-            0.85,
-        );
-    }
-
-    function stopCamera() {
-        streamRef.current?.getTracks().forEach(t => t.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-    }
-
-    function clearSelfie() {
-        setSelfieFile(null);
-        setSelfiePreview(null);
-        setSelfieSource(null);
-        setCameraMode('off');
-    }
-
-    /** Camera photo: discard it and reopen the camera. */
-    function retakePhoto() {
-        clearSelfie();
-        startCamera();
-    }
 
     // ── Submit ────────────────────────────────────────────────────────────────
     async function handleSubmit(e: React.FormEvent) {
@@ -414,131 +304,25 @@ export default function IdVerification({ details, details_complete, status, reje
                         </CardContent>
                     </Card>
 
-                    {/* ── Selfie ── */}
+                    {/* ── Selfie: live camera only (no gallery / file upload) ── */}
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Camera className="h-4 w-4 text-blue-600" />
-                                Take or Upload a Selfie
+                                Take a Selfie
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-xs text-gray-500">
-                                Hold your valid ID next to your face for the best result.
+                                Hold your valid ID next to your face. The selfie must be taken now with your camera — uploading a picture is not allowed.
                             </p>
-                            <p className="text-xs text-gray-400">File types: JPG, PNG · Max 5 MB</p>
-
-                            {/* Preview captured/uploaded selfie */}
-                            {selfiePreview && (
-                                <div className="relative">
-                                    <img src={selfiePreview} alt="Selfie preview" className="w-full rounded-lg border object-cover max-h-64" />
-                                    <div className="absolute right-2 top-2 flex gap-1.5">
-                                        {selfieSource === 'camera' ? (
-                                            <button
-                                                type="button"
-                                                onClick={retakePhoto}
-                                                className="flex items-center gap-1 rounded-full bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-                                            >
-                                                <RefreshCw className="h-3 w-3" /> Retake
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={openSelfiePicker}
-                                                className="flex items-center gap-1 rounded-full bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
-                                            >
-                                                <Upload className="h-3 w-3" /> Change Photo
-                                            </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={clearSelfie}
-                                            className="flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                        >
-                                            <X className="h-3 w-3" /> Remove
-                                        </button>
-                                    </div>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        {selfieSource === 'camera' ? 'Photo taken with your camera.' : 'Photo uploaded from your device.'}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* One file input, reused by Upload from Gallery, Change Photo and Upload a photo instead */}
-                            <input
-                                ref={selfieInputRef}
-                                type="file"
-                                accept={IMAGE_ACCEPT}
-                                className="hidden"
-                                onChange={(e) => handleSelfieFile(e.target.files?.[0])}
+                            <CameraCapture
+                                value={selfieFile}
+                                onChange={(f) => { setSelfieFile(f); if (f) setErrors((p) => ({ ...p, selfie: '' })); }}
+                                fileName="selfie.jpg"
+                                startLabel="Open camera"
+                                error={errors.selfie || null}
                             />
-
-                            {/* Camera view */}
-                            {cameraMode === 'active' && (
-                                <div className="space-y-2">
-                                    <video
-                                        ref={videoRef}
-                                        autoPlay
-                                        playsInline
-                                        muted
-                                        className="w-full rounded-lg border bg-black"
-                                    />
-                                    <canvas ref={canvasRef} className="hidden" />
-                                    <div className="flex gap-2">
-                                        <Button
-                                            type="button"
-                                            onClick={capturePhoto}
-                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                                        >
-                                            <Camera className="h-4 w-4 mr-1.5" />
-                                            Capture Photo
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => { stopCamera(); setCameraMode('off'); }}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Action buttons when no selfie yet */}
-                            {!selfiePreview && cameraMode !== 'active' && (
-                                <div className="flex flex-col gap-2 sm:flex-row">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="flex-1"
-                                        onClick={startCamera}
-                                    >
-                                        <Camera className="h-4 w-4 mr-1.5" />
-                                        Use Camera
-                                    </Button>
-
-                                    <Button type="button" variant="outline" className="flex-1" onClick={openSelfiePicker}>
-                                        <Upload className="h-4 w-4 mr-1.5" />
-                                        Upload from Gallery
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Only after "Use Camera" fails, and only while there is no photo yet */}
-                            {cameraError && !selfiePreview && (
-                                <div className="flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                    <span className="flex-1">{cameraError}</span>
-                                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={openSelfiePicker}>
-                                        <Upload className="h-3 w-3 mr-1" /> Upload a photo instead
-                                    </Button>
-                                </div>
-                            )}
-                            {errors.selfie && (
-                                <p className="flex items-center gap-1 text-xs text-red-500">
-                                    <AlertCircle className="h-3.5 w-3.5" /> {errors.selfie}
-                                </p>
-                            )}
                         </CardContent>
                     </Card>
 

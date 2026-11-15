@@ -48,8 +48,11 @@ class SellerRegistrationController extends Controller
         $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024);
 
         $validated = $request->validate([
-            // Owner account
-            'name'                  => ['required', 'string', 'max:255'],
+            // Owner account — name parts (the full name is built with User::composeName)
+            'first_name'            => ['required', 'string', 'max:255'],
+            'middle_name'           => ['nullable', 'string', 'max:255'],
+            'last_name'             => ['required', 'string', 'max:255'],
+            'suffix'                => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
             'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
             'phone'                 => ['required', 'string', 'regex:/^09\d{9}$/'],
             'password'              => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
@@ -64,7 +67,9 @@ class SellerRegistrationController extends Controller
 
             // Document uploads
             'valid_id'              => ['required', $fileRule()],
-            'bir_permit'            => ['required', $fileRule()],
+            // Owner's live-camera selfie (JPEG from the camera; the page has no file upload for it)
+            'selfie'                => ['required', File::types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
+            'bir_permit'          => ['required', $fileRule()],
             'business_permit'       => ['required', $fileRule()],
             'fsic_permit'           => ['required', $fileRule()],
             'doe_lpg_license'       => ['required', $fileRule()],
@@ -87,7 +92,10 @@ class SellerRegistrationController extends Controller
 
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + \App\Support\UploadMessages::for(['selfie'], false) + ['selfie.required' => 'Please take a selfie with your camera.'] + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+
+        $validated['suffix'] = ($validated['suffix'] ?? null) ?: null;
+        $validated['name']   = User::composeName($validated['first_name'], $validated['middle_name'] ?? null, $validated['last_name'], $validated['suffix']);
 
         $otherRows = StoreDocuments::filledOtherRows($request);
         StoreDocuments::assertOtherRowsAllowed($otherRows);
@@ -111,6 +119,7 @@ class SellerRegistrationController extends Controller
         $store = DB::transaction(function () use ($request, $validated, $otherRows, $hashes, $duplicate) {
             // Store uploaded documents — private ('local' disk, served only to the owner and reviewers)
             $validIdPath        = $request->file('valid_id')->store('valid_ids', 'local');
+            $selfiePath         = $request->file('selfie')->store('verifications/selfies', 'local');   // same folder as customer selfies
             $birPermitPath      = $request->file('bir_permit')->store('bir_permits', 'local');
             $businessPermitPath = $request->file('business_permit')->store('business_permits', 'local');
             $fsicPermitPath     = $request->file('fsic_permit')->store('fsic_permits', 'local');
@@ -120,14 +129,21 @@ class SellerRegistrationController extends Controller
             $logoPath           = $request->hasFile('logo') ? $request->file('logo')->store('store-logos', 'public') : null;
 
             // Create seller user account (email unverified)
+            // Seller-only account: can_shop = false (no Customer Portal / orders). "Start Selling" keeps true.
             $user = User::create([
                 'name'        => $validated['name'],
+                'first_name'  => $validated['first_name'],
+                'middle_name' => $validated['middle_name'] ?? null,
+                'last_name'   => $validated['last_name'],
+                'suffix'      => $validated['suffix'] ?? null,
                 'email'       => $validated['email'],
                 'password'    => Hash::make($validated['password']),
                 'phone'       => $validated['phone'],
                 'role'        => 'seller',
+                'can_shop'    => false,
                 'is_active'   => true,
                 'valid_id'    => $validIdPath,
+                'selfie_path' => $selfiePath,
                 'id_verified' => false,
             ]);
 
@@ -171,6 +187,7 @@ class SellerRegistrationController extends Controller
                 'user_id'              => $user->id,
                 'type'                 => 'seller_application',
                 'valid_id_path'        => $validIdPath,
+                'selfie_path'          => $selfiePath,
                 'bir_permit_path'      => $birPermitPath,
                 'business_permit_path' => $businessPermitPath,
                 'fsic_permit_path'     => $fsicPermitPath,

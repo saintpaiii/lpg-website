@@ -25,7 +25,8 @@ use App\Http\Controllers\LoyaltyController;
 use Illuminate\Support\Facades\Route;
 
 // ── Seller Portal (authenticated, verified, approved seller or seller_staff) ─
-Route::middleware(['auth', 'verified', 'seller', 'password.changed'])
+// 'clocked.in': store staff must clock in before working (owner never stopped; allow-list in EnsureClockedIn)
+Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in'])
     ->prefix('seller')
     ->name('seller.')
     ->group(function () {

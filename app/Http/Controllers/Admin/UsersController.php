@@ -111,7 +111,7 @@ class UsersController extends Controller
             'verified_at'     => $user->id_verified_at?->timezone('Asia/Manila')->format('M d, Y'),
             'verified_by'     => $latestId?->status === 'approved' ? $latestId->reviewer?->name : null,
             'rejection_reason'=> $user->id_rejection_reason,
-            'full_name'       => trim(implode(' ', array_filter([$user->first_name, $user->middle_name, $user->last_name]))) ?: $user->name,
+            'full_name'       => User::composeName($user->first_name, $user->middle_name, $user->last_name, $user->suffix) ?: $user->name,
             'phone'           => $user->phone ?: $customerRow?->phone,
             'email'           => $user->email,
             'email_verified'  => (bool) $user->email_verified_at,

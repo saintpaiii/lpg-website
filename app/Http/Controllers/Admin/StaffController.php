@@ -48,6 +48,7 @@ class StaffController extends Controller
                 'first_name'       => $u->first_name,
                 'middle_name'      => $u->middle_name,
                 'last_name'        => $u->last_name,
+                'suffix'           => $u->suffix,
                 'email'            => $u->email,
                 'phone'            => $u->phone,
                 'sub_role'         => $u->sub_role,
@@ -78,18 +79,21 @@ class StaffController extends Controller
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name'   => 'required|string|max:255',
-            'email'       => 'required|email|unique:users,email',
+            'suffix'      => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
+            'email'       =>'required|email|unique:users,email',
             'password'    => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
             'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'sub_role'    => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
-        $fullName = trim($data['first_name'] . ' ' . ($data['middle_name'] ? $data['middle_name'] . ' ' : '') . $data['last_name']);
+        $data['suffix'] = ($data['suffix'] ?? null) ?: null;
+        $fullName = User::composeName($data['first_name'], $data['middle_name'] ?? null, $data['last_name'], $data['suffix']);
 
         $user = User::create([
             'first_name'        => $data['first_name'],
             'middle_name'       => $data['middle_name'] ?? null,
             'last_name'         => $data['last_name'],
+            'suffix'            => $data['suffix'],
             'name'              => $fullName,
             'email'             => $data['email'],
             'password'          => Hash::make($data['password']),
@@ -161,6 +165,7 @@ class StaffController extends Controller
                 'first_name'          => $user->first_name,
                 'middle_name'         => $user->middle_name,
                 'last_name'           => $user->last_name,
+                'suffix'              => $user->suffix,
                 'email'               => $user->email,
                 'phone'               => $user->phone,
                 'sub_role'            => $user->sub_role,
@@ -185,18 +190,21 @@ class StaffController extends Controller
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name'   => 'required|string|max:255',
-            'email'       => "required|email|unique:users,email,{$user->id}",
+            'suffix'      => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
+            'email'       =>"required|email|unique:users,email,{$user->id}",
             'password'    => ['nullable', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
             'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'sub_role'    => 'required|in:manager,moderator,support_staff,accountant',
         ]);
 
-        $fullName = trim($data['first_name'] . ' ' . ($data['middle_name'] ? $data['middle_name'] . ' ' : '') . $data['last_name']);
+        $data['suffix'] = ($data['suffix'] ?? null) ?: null;
+        $fullName = User::composeName($data['first_name'], $data['middle_name'] ?? null, $data['last_name'], $data['suffix']);
 
         $updates = [
             'first_name'  => $data['first_name'],
             'middle_name' => $data['middle_name'] ?? null,
             'last_name'   => $data['last_name'],
+            'suffix'      => $data['suffix'],
             'name'        => $fullName,
             'email'       => $data['email'],
             'phone'       => $data['phone'] ?? null,

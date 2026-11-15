@@ -166,8 +166,8 @@ export function AppSidebar() {
                 <SidebarFooter>
                     <SidebarSeparator />
                     <WebsiteProblemSidebar portal="store" myReportsHref="/seller/website-reports" />
-                    {/* Switch back to customer portal — store owner only */}
-                    {isActualSeller && (
+                    {/* Switch back to customer portal — store owner only, not for seller-only accounts (can_shop = false) */}
+                    {isActualSeller && auth.user.can_shop !== false && (
                         <SidebarMenu>
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild tooltip="Switch to Customer Portal">

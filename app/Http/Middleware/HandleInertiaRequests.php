@@ -88,8 +88,8 @@ class HandleInertiaRequests extends Middleware
                 // A rider who also has a store-portal role: "Switch to Store Portal" / "Switch to Rider App"
                 'can_switch_portal'  => fn () => $user && $user->role === 'seller_staff' && $user->sub_role === 'rider'
                     && \App\Services\StaffAccess::hasStorePortalRoles($user),
-                // HR (starter role) manages attendance instead of clocking in themself — no "My Attendance"
-                'self_clock'         => fn () => $user && $user->role === 'seller_staff' && ! \App\Services\StaffAccess::hasStarter($user, 'hr'),
+                // J1: every store staff clocks in themself (HR too — they still manage others' attendance)
+                'self_clock'         => fn () => $user && $user->role === 'seller_staff',
                 'store_portal_url'   => fn () => $user && $user->role === 'seller_staff' ? \App\Services\StaffAccess::homeUrl($user, true) : null,
                 'store'              => $store ? [
                     'id'                   => $store->id,
@@ -142,7 +142,8 @@ class HandleInertiaRequests extends Middleware
                 'created_role_id'      => fn () => $request->session()->get('created_role_id'),
             ],
             // Sellers can also use the customer portal (they can shop too)
-            'cart_count' => $user && in_array($user->role, ['customer', 'seller'])
+            // (seller-only accounts — can_shop = false — have no cart)
+            'cart_count' => $user && in_array($user->role, ['customer', 'seller']) && ! $user->isSellerOnly()
                 ? CartItem::where('user_id', $user->id)->count()
                 : 0,
             'unreadNotifications' => fn () => $user ? NotificationService::getUnreadCount($user->id) : 0,

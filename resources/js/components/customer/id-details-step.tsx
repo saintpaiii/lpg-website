@@ -11,11 +11,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { SuffixSelect } from '@/components/suffix-select';
 
 export type IdDetails = {
     first_name: string;
     middle_name: string;
     last_name: string;
+    /** Jr., Sr., II … ('' = none) */
+    suffix: string;
     phone: string;
     address: string;
     city: string;
@@ -87,7 +90,7 @@ export default function IdDetailsStep({ details, onSaved }: { details: IdDetails
             </CardHeader>
             <CardContent>
                 <form onSubmit={submit} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr_6.5rem]">
                         <div className="grid gap-1.5">
                             <Label htmlFor="d-first" className="text-sm font-medium">First name <span className="text-red-500">*</span></Label>
                             <Input id="d-first" autoComplete="given-name" className="h-11" value={form.data.first_name}
@@ -105,6 +108,11 @@ export default function IdDetailsStep({ details, onSaved }: { details: IdDetails
                             <Input id="d-last" autoComplete="family-name" className="h-11" value={form.data.last_name}
                                 onChange={(e) => form.setData('last_name', e.target.value)} />
                             {err.last_name && <p className="text-xs text-red-500">{err.last_name}</p>}
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="d-suffix" className="text-sm font-medium">Suffix <span className="font-normal text-gray-400">(optional)</span></Label>
+                            <SuffixSelect id="d-suffix" className="h-11" value={form.data.suffix} onChange={(v) => form.setData('suffix', v)} />
+                            {err.suffix && <p className="text-xs text-red-500">{err.suffix}</p>}
                         </div>
                     </div>
 

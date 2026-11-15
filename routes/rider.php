@@ -8,7 +8,8 @@ use App\Http\Controllers\Seller\AttendanceController;
 use App\Http\Controllers\Seller\PayrollController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'verified', 'rider', 'password.changed'])->prefix('rider')->name('rider.')->group(function () {
+// 'clocked.in': riders must clock in before working (My Attendance + Documents stay open — EnsureClockedIn)
+Route::middleware(['auth', 'verified', 'rider', 'password.changed', 'clocked.in'])->prefix('rider')->name('rider.')->group(function () {
     Route::get('deliveries', [RiderDeliveryController::class, 'index'])->name('deliveries');
     Route::patch('deliveries/{delivery}/status', [RiderDeliveryController::class, 'updateStatus'])->name('deliveries.status');
     Route::patch('deliveries/{delivery}/collect-payment', [RiderDeliveryController::class, 'collectPayment'])->name('deliveries.collect-payment');

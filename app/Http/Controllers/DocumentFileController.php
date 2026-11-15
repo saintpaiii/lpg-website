@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attendance;
 use App\Models\StaffDocument;
 use App\Models\Store;
 use App\Models\StoreDocumentSubmission;
@@ -23,6 +24,8 @@ class DocumentFileController extends Controller
         'store'          => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration', 'lto_permit'],   // lto_permit: old files only
         'store-document' => ['file_path'],
         'staff-document' => ['file_path'],
+        // Live-camera clock-in / clock-out photos
+        'attendance'     => ['clock_in_photo_path', 'clock_out_photo_path'],
     ];
 
     public function show(Request $request, string $kind, int $id, string $field): StreamedResponse
@@ -37,11 +40,17 @@ class DocumentFileController extends Controller
             'store-document' => [$d = StoreDocumentSubmission::with(['store' => fn ($q) => $q->withTrashed()])->find($id), $d?->store?->user_id],
             // Two people may open a staff document: the staff member and the owner of their store
             'staff-document' => [$sd = StaffDocument::with(['store' => fn ($q) => $q->withTrashed()])->find($id), [$sd?->user_id, $sd?->store?->user_id]],
+            // The staff member and their store's owner (store staff with the Attendance module: checked below)
+            'attendance'     => [$at = Attendance::with(['store' => fn ($q) => $q->withTrashed()])->find($id), [$at?->user_id, $at?->store?->user_id]],
         };
         abort_unless($record, 404);
 
         $user = $request->user();
-        abort_unless(in_array($user->id, array_filter((array) $ownerId), true) || $user->canReviewDocuments(), 403);
+        $allowed = in_array($user->id, array_filter((array) $ownerId), true) || $user->canReviewDocuments()
+            // Attendance photos: also staff of the same store who see everyone's attendance (owner / HR pages)
+            || ($kind === 'attendance' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->store_id
+                && ($user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage')));
+        abort_unless($allowed, 403);
 
         $path = $record->{$field};
         abort_unless($path, 404);

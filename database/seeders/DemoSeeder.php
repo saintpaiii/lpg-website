@@ -115,6 +115,9 @@ class DemoSeeder extends Seeder
             'city'                    => 'Imus',
             'barangay'                => 'Alapan II-A',
             'province'                => 'Cavite',
+            // Store pin (barangay centre, database/data/barangay_coordinates.json): staff clock in within its radius
+            'latitude'                => 14.408475,
+            'longitude'               => 120.89651,
             'phone'                   => '046-471-2345',
             'email'                   => 'petrongasulcavite@gmail.com',
             'logo'                    => null,
@@ -142,6 +145,8 @@ class DemoSeeder extends Seeder
             'city'                    => 'Bacoor',
             'barangay'                => 'Molino III',
             'province'                => 'Cavite',
+            'latitude'                => 14.398236,
+            'longitude'               => 120.977795,
             'phone'                   => '046-483-5678',
             'email'                   => 'solanedirect.bacoor@gmail.com',
             'logo'                    => null,

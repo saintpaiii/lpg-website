@@ -20,6 +20,8 @@ import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
 import { Spinner } from '@/components/ui/spinner';
+import CameraCapture from '@/components/camera-capture';
+import { SuffixSelect } from '@/components/suffix-select';
 
 // ── Document field config ──────────────────────────────────────────────────────
 
@@ -156,7 +158,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
     const [dtiSecKind, setDtiSecKind] = useState<DtiSecKind | ''>('');
 
     const [fields, setFields] = useState({
-        name:                  '',
+        first_name:            '',
+        middle_name:           '',
+        last_name:             '',
+        suffix:                '',
         email:                 '',
         phone:                 '',
         password:              '',
@@ -172,6 +177,8 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
     // "Valid until" dates of the expiring permits, and the optional logo
     const [expiries, setExpiries] = useState<Record<string, string>>({});
     const [logo, setLogo] = useState<File | null>(null);
+    // Owner's live-camera selfie (required, next to the valid ID) — no file upload
+    const [selfie, setSelfie] = useState<File | null>(null);
     const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
     // Optional extra documents (DTI, barangay clearance, store photo…)
     const [otherDocs, setOtherDocs] = useState<OtherDocRow[]>([]);
@@ -206,6 +213,7 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
         for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
         formData.append('dti_sec_kind', dtiSecKind);
         if (logo) formData.append('logo', logo);
+        if (selfie) formData.append('selfie', selfie);
         appendOtherRows(formData, otherDocs);
         formData.append('latitude', pin ? String(pin.lat) : '');
         formData.append('longitude', pin ? String(pin.lng) : '');
@@ -224,9 +232,9 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
             }
             setErrors(mapped);
             // Navigate back to offending step
-            const step1Keys = ['name', 'email', 'phone', 'password', 'password_confirmation',
+            const step1Keys = ['first_name', 'middle_name', 'last_name', 'suffix', 'email', 'phone', 'password', 'password_confirmation',
                                'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo', 'latitude', 'longitude'];
-            const step2Keys = [...DOC_FIELDS.map(d => d.key), 'dti_sec_kind', ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
+            const step2Keys = [...DOC_FIELDS.map(d => d.key), 'selfie', 'dti_sec_kind', ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
             else if (step2Keys.some((k) => mapped[k]) || Object.keys(mapped).some((k) => k.startsWith('other_documents'))) setStep(2);
             else setStep(3);
@@ -305,6 +313,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                                 Register your LPG distribution business on our platform
                             </p>
+                            <p className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+                                This makes a <strong>seller-only</strong> account — it can't place orders. If you also want to buy LPG,{' '}
+                                <Link href="/register" className="font-semibold underline">register as a customer</Link> and use <strong>Start Selling</strong> later.
+                            </p>
                         </div>
 
                         {/* Step indicators */}
@@ -331,15 +343,44 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                 <>
                                     <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1 of 3 — Account & Store Details</p>
 
+                                    {/* Owner name: first / middle / last / suffix (the full name is built on the server) */}
                                     <div className="grid gap-5 sm:grid-cols-2">
                                         <div className="grid gap-2">
-                                            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Owner full name <span className="text-red-500">*</span>
+                                            <Label htmlFor="first_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Owner first name <span className="text-red-500">*</span>
                                             </Label>
-                                            <Input type="text" required autoFocus placeholder="Juan dela Cruz" className="h-11"
-                                                value={fields.name} onChange={(e) => set('name', e.target.value)} />
-                                            <InputError message={errors.name} />
+                                            <Input id="first_name" type="text" required autoFocus autoComplete="given-name" placeholder="Juan" className="h-11"
+                                                value={fields.first_name} onChange={(e) => set('first_name', e.target.value)} />
+                                            <InputError message={errors.first_name} />
                                         </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="middle_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Middle name <span className="font-normal text-gray-400">(optional)</span>
+                                            </Label>
+                                            <Input id="middle_name" type="text" autoComplete="additional-name" placeholder="Santos" className="h-11"
+                                                value={fields.middle_name} onChange={(e) => set('middle_name', e.target.value)} />
+                                            <InputError message={errors.middle_name} />
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-5 grid-cols-[1fr_6.5rem]">
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="last_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Last name <span className="text-red-500">*</span>
+                                            </Label>
+                                            <Input id="last_name" type="text" required autoComplete="family-name" placeholder="Dela Cruz" className="h-11"
+                                                value={fields.last_name} onChange={(e) => set('last_name', e.target.value)} />
+                                            <InputError message={errors.last_name} />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="suffix" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                Suffix <span className="font-normal text-gray-400">(optional)</span>
+                                            </Label>
+                                            <SuffixSelect value={fields.suffix} onChange={(v) => set('suffix', v)} className="h-11" />
+                                            <InputError message={errors.suffix} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid gap-5 sm:grid-cols-2">
                                         <div className="grid gap-2">
                                             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                                 Phone number <span className="text-red-500">*</span>
@@ -457,6 +498,20 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                                 onFileChange={(f) => setFile(doc.key, f)}
                                                 onClear={() => setFile(doc.key, null)}
                                             />
+                                            {doc.key === 'valid_id' && (
+                                                <div className="space-y-1.5 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
+                                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                        Owner selfie <span className="text-red-500">*</span>
+                                                    </Label>
+                                                    <CameraCapture
+                                                        value={selfie}
+                                                        onChange={(f) => { setSelfie(f); if (f) setErrors((p) => ({ ...p, selfie: '' })); }}
+                                                        fileName="selfie.jpg"
+                                                        hint="Take it now with your camera, holding the same ID next to your face. Uploading a picture is not allowed."
+                                                        error={errors.selfie || null}
+                                                    />
+                                                </div>
+                                            )}
                                             {doc.key === 'dti_sec_registration' && (
                                                 <DtiSecKindToggle value={dtiSecKind} error={errors.dti_sec_kind}
                                                     onChange={(v) => { setDtiSecKind(v); setErrors((p) => ({ ...p, dti_sec_kind: '' })); }} />
@@ -477,7 +532,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                         <Button
                                             type="button"
                                             className="h-11 flex-1 bg-blue-600 font-semibold text-white hover:bg-blue-700"
-                                            onClick={() => setStep(3)}
+                                            onClick={() => {
+                                                if (!selfie) { setErrors((e) => ({ ...e, selfie: 'Please take a selfie with your camera.' })); return; }
+                                                setStep(3);
+                                            }}
                                         >
                                             Next: Terms & Conditions →
                                         </Button>

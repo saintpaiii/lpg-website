@@ -70,6 +70,7 @@ class StaffController extends Controller
                 'first_name'     => $u->first_name,
                 'middle_name'    => $u->middle_name,
                 'last_name'      => $u->last_name,
+                'suffix'         => $u->suffix,
                 'email'          => $u->email,
                 'phone'          => $u->phone,
                 'sub_role'       => $u->sub_role,
@@ -122,7 +123,8 @@ class StaffController extends Controller
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
-            'email'          => 'required|email|unique:users,email',
+            'suffix'         => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
+            'email'          =>'required|email|unique:users,email',
             'phone'          => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'role_ids'       => 'required|array|min:1',
             'role_ids.*'     => ['integer', \Illuminate\Validation\Rule::exists('store_roles', 'id')->where('store_id', $store->id)],
@@ -140,7 +142,8 @@ class StaffController extends Controller
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
         $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
 
-        $fullName     = trim("{$data['first_name']} {$data['last_name']}");
+        $data['suffix'] = ($data['suffix'] ?? null) ?: null;
+        $fullName     = User::composeName($data['first_name'], $data['middle_name'] ?? null, $data['last_name'], $data['suffix']);
         $tempPassword = self::randomPassword();   // emailed; they must change it at first login
 
         [$user, $rateNote] = DB::transaction(function () use ($store, $data, $fullName, $tempPassword) {   // account + role rates + roles together
@@ -149,6 +152,7 @@ class StaffController extends Controller
                 'first_name'          => $data['first_name'],
                 'middle_name'         => $data['middle_name'] ?? null,
                 'last_name'           => $data['last_name'],
+                'suffix'              => $data['suffix'],
                 'email'               => $data['email'],
                 'phone'               => $data['phone'] ?? null,
                 'role'                => 'seller_staff',
@@ -338,6 +342,7 @@ class StaffController extends Controller
                 'first_name'     => $user->first_name,
                 'middle_name'    => $user->middle_name,
                 'last_name'      => $user->last_name,
+                'suffix'         => $user->suffix,
                 'email'          => $user->email,
                 'phone'          => $user->phone,
                 'sub_role'       => $user->sub_role,
@@ -357,6 +362,17 @@ class StaffController extends Controller
             'allPermissions' => (object) $allPermissions,
             'roleDefaults'   => $roleDefaults,
             'userOverrides'  => $userOverrides,
+            // Last 7 attendance days with the live-camera clock-in / clock-out photos
+            'recentAttendance' => \App\Models\Attendance::with(['clockInRecorder:id,name', 'clockOutRecorder:id,name'])
+                ->where('user_id', $user->id)->whereNotNull('clock_in')
+                ->orderByDesc('date')->limit(7)->get()
+                ->map(fn ($a) => [
+                    'id'        => $a->id,
+                    'date'      => $a->date?->format('D, M d'),
+                    'clock_in'  => $a->clock_in?->format('h:i A'),
+                    'clock_out' => $a->clock_out?->format('h:i A'),
+                    'status'    => $a->status,
+                ] + \App\Http\Controllers\Seller\AttendanceController::photoFields($a))->values(),
             // Documents this staff member uploaded (the owner approves / rejects them here)
             'documents'      => \App\Models\StaffDocument::where('user_id', $user->id)->with('reviewer:id,name')->latest()->get()
                 ->map(fn ($d) => [
@@ -388,7 +404,8 @@ class StaffController extends Controller
             'first_name'     => 'required|string|max:100',
             'middle_name'    => 'nullable|string|max:100',
             'last_name'      => 'required|string|max:100',
-            'email'          => "required|email|unique:users,email,{$user->id}",
+            'suffix'         => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
+            'email'          =>"required|email|unique:users,email,{$user->id}",
             'phone'          => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'role_ids'       => 'required|array|min:1',
             'role_ids.*'     => ['integer', \Illuminate\Validation\Rule::exists('store_roles', 'id')->where('store_id', $store->id)],
@@ -401,13 +418,15 @@ class StaffController extends Controller
         $data['schedule_start'] = $this->parseTime($data['schedule_start'] ?? null);
         $data['schedule_end']   = $this->parseTime($data['schedule_end']   ?? null);
 
-        $fullName = trim("{$data['first_name']} {$data['last_name']}");
+        $data['suffix'] = ($data['suffix'] ?? null) ?: null;
+        $fullName = User::composeName($data['first_name'], $data['middle_name'] ?? null, $data['last_name'], $data['suffix']);
 
         $updates = [
             'name'           => $fullName,
             'first_name'     => $data['first_name'],
             'middle_name'    => $data['middle_name'] ?? null,
             'last_name'      => $data['last_name'],
+            'suffix'         => $data['suffix'],
             'email'          => $data['email'],
             'phone'          => $data['phone'] ?? null,
             'schedule_start' => $data['schedule_start'] ?? null,

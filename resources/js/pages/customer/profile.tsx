@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
+import { SuffixSelect } from '@/components/suffix-select';
 import CustomerLayout from '@/layouts/customer-layout';
 import { useEffect, useState, type FormEvent } from 'react';
 
@@ -18,6 +19,7 @@ type Profile = {
     first_name: string;
     middle_name: string;
     last_name: string;
+    suffix: string;
     email: string;
     phone: string;
     address: string;
@@ -41,7 +43,8 @@ export default function CustomerProfile({ profile }: Props) {
         first_name:  profile.first_name,
         middle_name: profile.middle_name,
         last_name:   profile.last_name,
-        phone:   profile.phone,
+        suffix:      profile.suffix ?? '',
+        phone:  profile.phone,
         address: profile.address,
         city:    profile.city,
         barangay: profile.barangay,
@@ -132,8 +135,8 @@ export default function CustomerProfile({ profile }: Props) {
                                 <p className="text-xs text-gray-400">Email cannot be changed. Contact support if needed.</p>
                             </div>
 
-                            {/* Name fields — 3 columns */}
-                            <div className="grid gap-4 sm:grid-cols-3">
+                            {/* Name fields — first / middle / last / suffix */}
+                            <div className="grid gap-4 sm:grid-cols-[1fr_1fr_1fr_6.5rem]">
                                 <div className="grid gap-1.5">
                                     <Label htmlFor="first_name" className="text-sm font-medium">First name <span className="text-red-500">*</span></Label>
                                     <Input
@@ -169,6 +172,13 @@ export default function CustomerProfile({ profile }: Props) {
                                     />
                                     {profileForm.errors.last_name && (
                                         <p className="text-xs text-red-500">{profileForm.errors.last_name}</p>
+                                    )}
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="suffix" className="text-sm font-medium">Suffix <span className="font-normal text-gray-400">(optional)</span></Label>
+                                    <SuffixSelect value={profileForm.data.suffix} onChange={(v) => profileForm.setData('suffix', v)} />
+                                    {profileForm.errors.suffix && (
+                                        <p className="text-xs text-red-500">{profileForm.errors.suffix}</p>
                                     )}
                                 </div>
                             </div>

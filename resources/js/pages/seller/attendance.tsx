@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { AttendancePhoto, RecordedBy } from '@/components/attendance-photo';
 import type { BreadcrumbItem, SharedData } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -49,6 +50,12 @@ type AttendanceRow = {
     missing_clock_out: boolean;
     clock_in_distance: number | null;
     clock_in_manual: boolean;
+    /** Live-camera photos (private links) */
+    clock_in_photo_url?: string | null;
+    clock_out_photo_url?: string | null;
+    /** Owner/HR who recorded a manual clock-in / clock-out */
+    clock_in_recorded_by?: string | null;
+    clock_out_recorded_by?: string | null;
     /** Clocked in on a day off (paid normally) */
     is_extra_day?: boolean;
     role_names?: string[];
@@ -388,10 +395,12 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                         <div className="flex flex-col items-center gap-0.5">
                                                             <span className="text-emerald-700 font-medium">{row.clock_in}</span>
                                                             {row.clock_in_manual && (
-                                                                <span title="Manual clock-in by owner" className="flex items-center gap-0.5 text-xs text-amber-600 font-normal font-sans">
+                                                                <span title="Manual clock-in (no photo)" className="flex items-center gap-0.5 text-xs text-amber-600 font-normal font-sans">
                                                                     <MapPin className="h-3 w-3" /> Manual
                                                                 </span>
                                                             )}
+                                                            <RecordedBy name={row.clock_in_recorded_by} />
+                                                            <AttendancePhoto url={row.clock_in_photo_url} label="Clock-in" />
                                                             {!row.clock_in_manual && row.clock_in_distance !== null && store_location && (
                                                                 <span
                                                                     title={`Clocked in ${row.clock_in_distance}m from store`}
@@ -411,7 +420,11 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm font-mono">
                                                     {row.clock_out ? (
-                                                        <span className="text-blue-700 font-medium">{row.clock_out}</span>
+                                                        <div className="flex flex-col items-center gap-0.5">
+                                                            <span className="text-blue-700 font-medium">{row.clock_out}</span>
+                                                            <RecordedBy name={row.clock_out_recorded_by} />
+                                                            <AttendancePhoto url={row.clock_out_photo_url} label="Clock-out" />
+                                                        </div>
                                                     ) : (
                                                         <span className="text-gray-300">—</span>
                                                     )}

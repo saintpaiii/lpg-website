@@ -338,6 +338,12 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                                 Register here
                             </Link>
                         </p>
+                        <p className="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                            Own an LPG store?{' '}
+                            <Link href="/seller/register" className="font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+                                Register your store
+                            </Link>
+                        </p>
 
                         <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
                             LPG Distribution Cavite &bull; Marketplace Platform

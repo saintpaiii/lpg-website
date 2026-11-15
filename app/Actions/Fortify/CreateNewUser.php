@@ -27,6 +27,7 @@ class CreateNewUser implements CreatesNewUsers
             'first_name'  => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
             'last_name'   => ['required', 'string', 'max:255'],
+            'suffix'      => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
             'email'       => $this->emailRules(),
             'phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
             'address'     => ['required', 'string', 'max:500'],
@@ -39,13 +40,15 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         return DB::transaction(function () use ($input) {
-            $fullName = trim($input['first_name'] . ' ' . ($input['middle_name'] ? $input['middle_name'] . ' ' : '') . $input['last_name']);
+            $suffix   = ($input['suffix'] ?? null) ?: null;
+            $fullName = User::composeName($input['first_name'], $input['middle_name'] ?? null, $input['last_name'], $suffix);
 
             $user = User::create([
                 'name'        => $fullName,
                 'first_name'  => $input['first_name'],
                 'middle_name' => $input['middle_name'] ?? null,
                 'last_name'   => $input['last_name'],
+                'suffix'      => $suffix,
                 'email'       => $input['email'],
                 'password'    => $input['password'],
                 'phone'       => $input['phone'],

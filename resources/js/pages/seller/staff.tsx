@@ -49,6 +49,7 @@ import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-li
 import { toast } from 'sonner';
 import { DEFAULT_WORK_DAYS, fmtWorkDays, RoleEditor, RolesChecklist, RolesTab, WorkDaysPicker, type ModuleDef, type RoleTemplate, type StoreRoleRow } from '@/components/staff-roles';
 import { openUpgrade } from '@/lib/plans';
+import { SuffixSelect } from '@/components/suffix-select';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,7 @@ type StaffMember = {
     first_name: string | null;
     middle_name: string | null;
     last_name: string | null;
+    suffix?: string | null;
     email: string;
     phone: string | null;
     sub_role: string;
@@ -247,6 +249,7 @@ function StaffFormDialog({
         first_name: string;
         middle_name: string;
         last_name: string;
+        suffix: string;
         email: string;
         phone: string;
         role_ids: number[];
@@ -259,6 +262,7 @@ function StaffFormDialog({
         first_name:     editTarget?.first_name     ?? '',
         middle_name:    editTarget?.middle_name    ?? '',
         last_name:      editTarget?.last_name      ?? '',
+        suffix:         editTarget?.suffix         ?? '',
         email:          editTarget?.email          ?? '',
         phone:          editTarget?.phone          ?? '',
         role_ids:       editTarget?.role_ids       ?? defaultRoles,
@@ -276,6 +280,7 @@ function StaffFormDialog({
             first_name:     editTarget.first_name     ?? '',
             middle_name:    editTarget.middle_name    ?? '',
             last_name:      editTarget.last_name      ?? '',
+            suffix:         editTarget.suffix         ?? '',
             email:          editTarget.email,
             phone:          editTarget.phone          ?? '',
             role_ids:       editTarget.role_ids ?? [],
@@ -347,16 +352,23 @@ function StaffFormDialog({
                             {errors.first_name && <p className="text-xs text-red-500">{errors.first_name}</p>}
                         </div>
                         <div className="grid gap-1.5">
+                            <Label>Middle Name <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Input value={data.middle_name} onChange={(e) => setData('middle_name', e.target.value)} placeholder="Santos" />
+                            {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+                        <div className="grid gap-1.5">
                             <Label>Last Name <span className="text-red-500">*</span></Label>
                             <Input value={data.last_name} onChange={(e) => setData('last_name', e.target.value)} placeholder="Dela Cruz" />
                             {errors.last_name && <p className="text-xs text-red-500">{errors.last_name}</p>}
                         </div>
-                    </div>
-
-                    <div className="grid gap-1.5">
-                        <Label>Middle Name <span className="text-xs text-gray-400">(optional)</span></Label>
-                        <Input value={data.middle_name} onChange={(e) => setData('middle_name', e.target.value)} placeholder="Santos" />
-                        {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="staff-suffix">Suffix <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <SuffixSelect id="staff-suffix" value={data.suffix} onChange={(v) => setData('suffix', v)} />
+                            {formErrors.suffix && <p className="text-xs text-red-500">{formErrors.suffix}</p>}
+                        </div>
                     </div>
 
                     <div className="grid gap-1.5">

@@ -1,6 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowLeft, CheckSquare, Flame } from 'lucide-react';
+import { ArrowLeft, CheckSquare, Flame, ShoppingCart, Store } from 'lucide-react';
 import React, { useState } from 'react';
 import { AddressFields } from '@/components/address-fields';
 import InputError from '@/components/input-error';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PasswordInput } from '@/components/ui/password-input';
 import { PasswordStrengthIndicator } from '@/components/ui/password-strength';
+import { SuffixSelect } from '@/components/suffix-select';
 import { Spinner } from '@/components/ui/spinner';
 
 export default function Register() {
@@ -19,7 +20,8 @@ export default function Register() {
         first_name:            '',
         middle_name:           '',
         last_name:             '',
-        email:                 '',
+        suffix:                '',
+        email:                '',
         phone:                 '',
         address:               '',
         city:                  '',
@@ -119,6 +121,28 @@ export default function Register() {
                             </h1>
                         </div>
 
+                        {/* Two kinds of account: buyer (this form) or seller-only (store registration) */}
+                        <div className="mb-8 grid gap-3 sm:grid-cols-2" role="group" aria-label="Choose an account type">
+                            <div className="rounded-xl border-2 border-blue-600 bg-blue-50 p-4 dark:bg-blue-950/30" aria-current="true">
+                                <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                                    <ShoppingCart className="h-5 w-5 text-blue-600" /> I want to buy LPG
+                                </div>
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                    Order from stores near you. You can still open your own store later with <strong>Start Selling</strong>.
+                                </p>
+                            </div>
+                            <Link href="/seller/register"
+                                className="rounded-xl border-2 border-gray-200 bg-white p-4 transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800">
+                                <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                                    <Store className="h-5 w-5 text-emerald-600" /> I only want to sell LPG
+                                    <span className="text-xs font-normal text-gray-500">(store owner)</span>
+                                </div>
+                                <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                    Seller-only accounts can't place orders. If you also want to buy, register as a customer and use Start Selling later.
+                                </p>
+                            </Link>
+                        </div>
+
                         <div className="mb-8">
                             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                                 Create your account
@@ -130,7 +154,7 @@ export default function Register() {
 
                         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                             {/* First / Middle / Last Name */}
-                            <div className="grid gap-5 sm:grid-cols-3">
+                            <div className="grid gap-5 sm:grid-cols-[1fr_1fr_1fr_6.5rem]">
                                 <div className="grid gap-2">
                                     <Label htmlFor="first_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                         First name <span className="text-red-500">*</span>
@@ -159,6 +183,14 @@ export default function Register() {
                                         placeholder="dela Cruz" className="h-11"
                                         value={fields.last_name} onChange={(e) => set('last_name', e.target.value)} />
                                     <InputError message={errors.last_name} />
+                                </div>
+
+                                <div className="grid gap-2">
+                                    <Label htmlFor="suffix" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Suffix <span className="font-normal text-gray-400">(optional)</span>
+                                    </Label>
+                                    <SuffixSelect value={fields.suffix} onChange={(v) => set('suffix', v)} className="h-11" />
+                                    <InputError message={errors.suffix} />
                                 </div>
                             </div>
 

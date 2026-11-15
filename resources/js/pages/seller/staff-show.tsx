@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import StaffDocumentsCard, { type StaffDocumentRow } from '@/components/staff-documents-card';
+import { AttendancePhoto, RecordedBy } from '@/components/attendance-photo';
 import { fmtDate } from '@/lib/utils';
 import { fmtWorkDays } from '@/components/staff-roles';
 import { Button } from '@/components/ui/button';
@@ -59,7 +60,21 @@ interface Props {
     documents: StaffDocumentRow[];
     license: { status: string; message: string } | null;
     planLimit?: PlanLimit;
+    /** Last 7 clocked-in days with the live-camera photos */
+    recentAttendance?: RecentAttendanceRow[];
 }
+
+type RecentAttendanceRow = {
+    id: number;
+    date: string | null;
+    clock_in: string | null;
+    clock_out: string | null;
+    status: string;
+    clock_in_photo_url: string | null;
+    clock_out_photo_url: string | null;
+    clock_in_recorded_by: string | null;
+    clock_out_recorded_by: string | null;
+};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -230,7 +245,7 @@ function PermissionManager({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
-export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides, documents, license, planLimit }: Props) {
+export default function SellerStaffShow({ staff, allPermissions, roleDefaults, userOverrides, documents, license, planLimit, recentAttendance = [] }: Props) {
     // Plan limit: pause this account / activate it again (the server checks the limit)
     function togglePlanPause() {
         if (staff.paused_by_plan && staff.is_active && planLimit && !planLimit.can_add) {
@@ -301,6 +316,57 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
 
                 {/* Documents (driver's license etc.) — the owner approves or rejects them */}
                 <StaffDocumentsCard documents={documents} license={license} />
+
+                {/* Recent attendance with the clock-in / clock-out camera photos */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Recent attendance</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {recentAttendance.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No clock-ins yet.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-xs text-muted-foreground">
+                                            <th className="py-2 pr-3 font-medium">Date</th>
+                                            <th className="py-2 pr-3 font-medium">Clock in</th>
+                                            <th className="py-2 pr-3 font-medium">Clock out</th>
+                                            <th className="py-2 font-medium">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {recentAttendance.map((a) => (
+                                            <tr key={a.id} className="border-b last:border-0 align-top">
+                                                <td className="py-2 pr-3 whitespace-nowrap">{a.date}</td>
+                                                <td className="py-2 pr-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <AttendancePhoto url={a.clock_in_photo_url} label="Clock-in" />
+                                                        <div className="flex flex-col">
+                                                            <span className="font-mono">{a.clock_in ?? '—'}</span>
+                                                            <RecordedBy name={a.clock_in_recorded_by} />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 pr-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <AttendancePhoto url={a.clock_out_photo_url} label="Clock-out" />
+                                                        <div className="flex flex-col">
+                                                            <span className="font-mono">{a.clock_out ?? '—'}</span>
+                                                            <RecordedBy name={a.clock_out_recorded_by} />
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2 capitalize">{a.status.replace('_', ' ')}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Permission Manager */}
                 <PermissionManager

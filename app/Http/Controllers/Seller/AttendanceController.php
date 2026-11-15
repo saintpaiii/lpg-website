@@ -69,6 +69,22 @@ class AttendanceController extends Controller
         return $user->role === 'seller' || $user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage');
     }
 
+    /**
+     * Clock-in / clock-out photo links (private) and "Recorded by {name}" for manual clock-ins / outs — the owner/HR
+     * Attendance list and the staff detail page.
+     */
+    public static function photoFields(?Attendance $att): array
+    {
+        $manualIn = $att && ($att->clock_in_recorded_by || str_contains($att->notes ?? '', 'Manual clock-in'));
+
+        return [
+            'clock_in_photo_url'    => $att ? \App\Support\PrivateDocument::urlIf($att->clock_in_photo_path, 'attendance', $att->id, 'clock_in_photo_path') : null,
+            'clock_out_photo_url'   => $att ? \App\Support\PrivateDocument::urlIf($att->clock_out_photo_path, 'attendance', $att->id, 'clock_out_photo_path') : null,
+            'clock_in_recorded_by'  => $manualIn ? ($att->clockInRecorder?->name ?? 'owner/HR') : null,
+            'clock_out_recorded_by' => $att?->clock_out_recorded_by ? ($att->clockOutRecorder?->name ?? 'owner/HR') : null,
+        ];
+    }
+
     /** HR (starter role) keeps managing attendance instead of clocking in themself. */
     private static function isHr(User $user): bool
     {
@@ -190,7 +206,8 @@ class AttendanceController extends Controller
             ->get();
 
         // Attendance records for that date (keyed by user_id)
-        $records = Attendance::where('store_id', $store->id)
+        $records = Attendance::with(['clockInRecorder:id,name', 'clockOutRecorder:id,name'])
+            ->where('store_id', $store->id)
             ->where('date', $targetDate)
             ->get()
             ->keyBy('user_id');
@@ -243,6 +260,8 @@ class AttendanceController extends Controller
                 'missing_clock_out' => $isMissingClockOut,
                 'clock_in_distance' => $clockInDistance,
                 'clock_in_manual'   => str_contains($att?->notes ?? '', 'Manual clock-in'),
+                // Live-camera photos (thumbnail → open) and who recorded a manual clock-in / out
+                ...self::photoFields($att),
                 'is_extra_day'      => (bool) $att?->is_extra_day,
                 'role_names'        => $roleNames[$staff->id] ?? [],
                 'work_days'         => $staff->workDays(),
@@ -410,6 +429,8 @@ class AttendanceController extends Controller
                     'status'   => $stats['status'],
                     'is_late'  => $stats['is_late'],
                     'notes'    => 'Manual clock-in by owner/HR',
+                    // No photo for a manual clock-in; the list shows "Recorded by {name}"
+                    'clock_in_recorded_by' => $request->user()->id,
                     'is_extra_day' => $extraDay,
                 ]);
             });
@@ -456,7 +477,7 @@ class AttendanceController extends Controller
         }
 
         $clockOut = now();
-        $att->update(['clock_out' => $clockOut]);
+        $att->update(['clock_out' => $clockOut, 'clock_out_recorded_by' => $request->user()->id]);
         RiderLoadService::releaseVehicle($att->vehicle_id);
 
         $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end, ! $att->is_extra_day);
@@ -513,7 +534,7 @@ class AttendanceController extends Controller
             return back()->with('error', 'Clock-out time must be after clock-in time.');
         }
 
-        $att->update(['clock_out' => $clockOutTime]);
+        $att->update(['clock_out' => $clockOutTime, 'clock_out_recorded_by' => $request->user()->id]);
         RiderLoadService::releaseVehicle($att->vehicle_id);
 
         $stats = $this->calcStats($att->fresh(), $staff->schedule_start, $staff->schedule_end, ! $att->is_extra_day);
@@ -533,10 +554,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        // HR staff are managed by the Owner — they don't have a self-service attendance page
-        if (self::isHr($user)) {
-            abort(403, 'HR staff do not have a self-service attendance page.');
-        }
+        // J1: every store staff (HR too) clocks in themself before working (EnsureClockedIn)
 
         $today = now()->toDateString();
 
@@ -615,10 +633,7 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        // HR staff are clocked in by the Owner — they cannot self-clock
-        if (self::isHr($user)) {
-            abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
-        }
+        // J1: every store staff (HR too) clocks in themself before working (EnsureClockedIn)
 
         // Block clock-in if no schedule assigned
         if (! $user->schedule_start || ! $user->schedule_end) {
@@ -639,7 +654,11 @@ class AttendanceController extends Controller
             'latitude'   => ['nullable', 'numeric', 'between:-90,90'],
             'longitude'  => ['nullable', 'numeric', 'between:-180,180'],
             'vehicle_id' => ['nullable', 'integer'],
-        ]);
+            // Live-camera photo taken on the spot (the page has no file upload for it)
+            'photo'      => ['required', \Illuminate\Validation\Rules\File::types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
+        ], [
+            'photo.required' => 'Take a photo with your camera to clock in.',
+        ] + \App\Support\UploadMessages::for(['photo'], false));
 
         // Riders clock in WITH a vehicle (held until clock-out)
         if ($user->isRider() && ! $request->input('vehicle_id')) {
@@ -676,9 +695,11 @@ class AttendanceController extends Controller
         }
 
         $today = now()->toDateString();
+        // Private disk (served only through DocumentFileController: the staff member, the owner, attendance managers)
+        $photoPath = $request->file('photo')->store('attendance-photos', 'local');
 
         try {
-            $clockIn = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $today, $storeId, $store, $request) {
+            $clockIn = \Illuminate\Support\Facades\DB::transaction(function () use ($user, $today, $storeId, $store, $request, $photoPath) {
                 $att = Attendance::firstOrCreate(
                     ['user_id' => $user->id, 'date' => $today],
                     ['store_id' => $storeId, 'status' => 'absent']
@@ -707,6 +728,7 @@ class AttendanceController extends Controller
                     'clock_in'           => $clockIn,
                     'clock_in_latitude'  => $request->input('latitude'),
                     'clock_in_longitude' => $request->input('longitude'),
+                    'clock_in_photo_path' => $photoPath,
                     'status'             => $stats['status'],
                     'is_late'            => $stats['is_late'],
                 ]);
@@ -714,6 +736,8 @@ class AttendanceController extends Controller
                 return $clockIn;
             });
         } catch (\RuntimeException $e) {
+            \Illuminate\Support\Facades\Storage::disk('local')->delete($photoPath);   // not clocked in → drop the photo
+
             return back()->with('error', $e->getMessage());
         }
 
@@ -755,15 +779,16 @@ class AttendanceController extends Controller
     {
         $user = $request->user();
 
-        // HR staff are clocked out by the Owner — they cannot self-clock
-        if (self::isHr($user)) {
-            abort(403, 'HR staff cannot self-clock. Please contact the store owner.');
-        }
+        // J1: every store staff (HR too) clocks in themself before working (EnsureClockedIn)
 
         $request->validate([
             'latitude'  => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-        ]);
+            // Live-camera photo taken on the spot (the page has no file upload for it)
+            'photo'     => ['required', \Illuminate\Validation\Rules\File::types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
+        ], [
+            'photo.required' => 'Take a photo with your camera to clock out.',
+        ] + \App\Support\UploadMessages::for(['photo'], false));
 
         $store = $request->attributes->get('seller_store') ?? \App\Models\Store::find($user->store_id);
 
@@ -815,6 +840,7 @@ class AttendanceController extends Controller
             'clock_out'           => $clockOut,
             'clock_out_latitude'  => $request->input('latitude'),
             'clock_out_longitude' => $request->input('longitude'),
+            'clock_out_photo_path' => $request->file('photo')->store('attendance-photos', 'local'),
         ]);
         RiderLoadService::releaseVehicle($att->vehicle_id);   // the vehicle is free for the next rider
 

@@ -33,6 +33,16 @@ class EnsureIsCustomer
                 ->with('deactivation_info', ['reason' => $reason, 'notes' => $notes]);
         }
 
+        // Seller-only account (registered on /seller/register): no Customer Portal, no cart, no orders
+        if ($user->isSellerOnly()) {
+            $message = "This is a seller-only account — it can't place orders.";
+            if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+                return response()->json(['message' => $message], 403);
+            }
+
+            return redirect()->route('seller.dashboard')->with('error', $message);
+        }
+
         return $next($request);
     }
 }

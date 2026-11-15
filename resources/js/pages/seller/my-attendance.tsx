@@ -30,6 +30,8 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import AppLayout from '@/layouts/app-layout';
+import CameraCapture from '@/components/camera-capture';
+import { toast } from 'sonner';
 import type { BreadcrumbItem, SharedData } from '@/types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -254,25 +256,39 @@ export default function MyAttendancePage({
     const [showClockInConfirm,  setShowClockInConfirm]  = useState(false);
     const [showClockOutConfirm, setShowClockOutConfirm] = useState(false);
 
+    // Live-camera photos for clock-in / clock-out (required; no file upload)
+    const [clockInPhoto, setClockInPhoto]   = useState<File | null>(null);
+    const [clockOutPhoto, setClockOutPhoto] = useState<File | null>(null);
+
     function submitClockIn() {
+        if (!clockInPhoto) return;
         setSubmitting('in');
         router.post(`${clockBase}/clock-in`, {
             latitude:  myCoords?.lat ?? null,
             longitude: myCoords?.lng ?? null,
             vehicle_id: rider ? vehicleId : null,
+            photo: clockInPhoto,
         }, {
             preserveScroll: true,
+            forceFormData: true,
+            onError: (errs) => toast.error(Object.values(errs)[0] ?? 'Something went wrong. Please try again.'),
+            onSuccess: () => setClockInPhoto(null),
             onFinish: () => setSubmitting(null),
         });
     }
 
     function submitClockOut() {
+        if (!clockOutPhoto) return;
         setSubmitting('out');
         router.post(`${clockBase}/clock-out`, {
             latitude:  myCoords?.lat ?? null,
             longitude: myCoords?.lng ?? null,
+            photo: clockOutPhoto,
         }, {
             preserveScroll: true,
+            forceFormData: true,
+            onError: (errs) => toast.error(Object.values(errs)[0] ?? 'Something went wrong. Please try again.'),
+            onSuccess: () => setClockOutPhoto(null),
             onFinish: () => setSubmitting(null),
         });
     }
@@ -668,12 +684,18 @@ export default function MyAttendancePage({
                             <VehicleChoice vehicles={rider.vehicles} value={vehicleId} onChange={setVehicleId} />
                         </div>
                     )}
+                    {/* Live camera photo, taken now (required) */}
+                    <div className="space-y-1.5">
+                        <p className="text-sm font-semibold">Take a photo to clock in</p>
+                        <CameraCapture value={clockInPhoto} onChange={setClockInPhoto} fileName="clock-in.jpg" compact
+                            startLabel="Open camera" hint="A quick photo of yourself at the store, taken now with your camera." />
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-emerald-600 hover:bg-emerald-700 text-white"
                             onClick={() => { setShowClockInConfirm(false); submitClockIn(); }}
-                            disabled={submitting !== null || (!!rider && !vehicleId)}
+                            disabled={submitting !== null || (!!rider && !vehicleId) || !clockInPhoto}
                         >
                             Clock In
                         </AlertDialogAction>
@@ -700,12 +722,17 @@ export default function MyAttendancePage({
                             })()}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
+                    {/* Live camera photo, taken now (required) */}
+                    <div className="space-y-1.5">
+                        <p className="text-sm font-semibold">Take a photo to clock out</p>
+                        <CameraCapture value={clockOutPhoto} onChange={setClockOutPhoto} fileName="clock-out.jpg" compact startLabel="Open camera" />
+                    </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             className="bg-blue-600 hover:bg-blue-700 text-white"
                             onClick={() => { setShowClockOutConfirm(false); submitClockOut(); }}
-                            disabled={submitting !== null}
+                            disabled={submitting !== null || !clockOutPhoto}
                         >
                             Clock Out
                         </AlertDialogAction>

@@ -106,6 +106,9 @@ class VerificationController extends Controller
                     'user_first_name'  => $v->user?->first_name,
                     'user_middle_name' => $v->user?->middle_name,
                     'user_last_name'   => $v->user?->last_name,
+                    'user_suffix'      => $v->user?->suffix,
+                    // first + middle + last + suffix (the page shows this)
+                    'user_full_name'   => $v->user ? (\App\Models\User::composeName($v->user->first_name, $v->user->middle_name, $v->user->last_name, $v->user->suffix) ?: $v->user->name) : null,
                     'user_joined'      => $v->user?->created_at?->format('M d, Y'),
                     'email_verified'   => (bool) $v->user?->email_verified_at,
                     'customer_address' => ($c = $customers->get($v->user_id))

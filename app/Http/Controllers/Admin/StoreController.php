@@ -162,6 +162,10 @@ class StoreController extends Controller
                 'longitude'              => $store->longitude !== null ? (float) $store->longitude : null,
                 'documents_suspended'    => (bool) $store->documents_suspended,
                 // Private document links — the store's own file first (an approved renewal), else the application's
+                // Owner's live-camera selfie: from the application (seller registration), else the owner's ID-verification selfie
+                'owner_selfie_url' => $verification?->selfie_path
+                    ? PrivateDocument::url('verification', $verification->id, 'selfie_path')
+                    : PrivateDocument::urlIf($store->owner?->selfie_path, 'user', (int) $store->user_id, 'selfie_path'),
                 'valid_id_url' => $verification?->valid_id_path
                     ? PrivateDocument::url('verification', $verification->id, 'valid_id_path')
                     // No application file: the owner's verified ID (valid_id_path, else the old valid_id column)

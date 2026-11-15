@@ -30,10 +30,9 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponseCont
             : $user->homeUrl();
 
         // ── Attendance reminder redirect ────────────────────────────────────────
-        // Non-HR seller_staff who haven't clocked in today are sent to My Attendance (not on their day off).
+        // Store staff (HR too) who haven't clocked in today are sent to My Attendance (not on their day off).
         if (
             $user->role === 'seller_staff'
-            && ! \App\Services\StaffAccess::hasStarter($user, 'hr')
             && $user->worksOn(now())
             && ! Attendance::where('user_id', $user->id)
                 ->where('date', now()->toDateString())
@@ -84,7 +83,7 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponseCont
             $in('/seller')   => in_array($user->role, ['seller', 'seller_staff'], true),
             $in('/rider')    => $isRider,
             // Store owners can switch to the customer portal
-            $in('/customer') => in_array($user->role, ['customer', 'seller'], true),
+            $in('/customer') => in_array($user->role, ['customer', 'seller'], true) && ! $user->isSellerOnly(),
             default          => false,
         };
     }

@@ -20,6 +20,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'first_name',
         'middle_name',
         'last_name',
+        'suffix',
+        'can_shop',
         'email',
         'password',
         'email_verified_at',
@@ -74,7 +76,42 @@ class User extends Authenticatable implements MustVerifyEmail
             'work_days'               => 'array',   // ISO weekdays 1=Mon…7=Sun; null = Mon–Sat
             'id_verified_at'          => 'datetime',
             'deactivated_at'          => 'datetime',
+            'can_shop'                => 'boolean',
         ];
+    }
+
+    /** Name suffixes offered after the last name (the dropdown and validation use this list) */
+    public const SUFFIXES = ['Jr.', 'Sr.', 'II', 'III', 'IV', 'V'];
+
+    /**
+     * Full display name: first + middle + last + suffix, e.g. "Juan Santos Dela Cruz Jr.".
+     * Every place that builds `name` from the name parts uses this.
+     */
+    public static function composeName(?string $first, ?string $middle, ?string $last, ?string $suffix = null): string
+    {
+        return trim(preg_replace('/\s+/', ' ', implode(' ', array_filter(
+            [trim((string) $first), trim((string) $middle), trim((string) $last), trim((string) $suffix)],
+            fn ($p) => $p !== ''
+        ))));
+    }
+
+    /** The name without the suffix — the ID name check uses it (an ID may or may not print "JR"). */
+    public function nameWithoutSuffix(): string
+    {
+        $parts = static::composeName($this->first_name, $this->middle_name, $this->last_name);
+        if ($parts !== '') {
+            return $parts;
+        }
+        // Older accounts with only `name`: drop a trailing suffix
+        $pattern = '/[\s,]+(' . implode('|', array_map(fn ($s) => preg_quote(rtrim($s, '.'), '/'), static::SUFFIXES)) . ')\.?$/i';
+
+        return trim(preg_replace($pattern, '', (string) $this->name));
+    }
+
+    /** Seller-only account (registered on /seller/register): no Customer Portal, no cart, no orders. */
+    public function isSellerOnly(): bool
+    {
+        return $this->role === 'seller' && $this->can_shop === false;
     }
 
     protected static function booted(): void

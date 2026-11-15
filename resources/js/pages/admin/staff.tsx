@@ -40,6 +40,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
+import { SuffixSelect } from '@/components/suffix-select';
 import type { BreadcrumbItem } from '@/types';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ type StaffMember = {
     first_name: string;
     middle_name: string | null;
     last_name: string;
+    suffix?: string | null;
     email: string;
     phone: string | null;
     sub_role: string | null;
@@ -164,6 +166,7 @@ function StaffFormDialog({
         first_name: string;
         middle_name: string;
         last_name: string;
+        suffix: string;
         email: string;
         password: string;
         password_confirmation: string;
@@ -173,6 +176,7 @@ function StaffFormDialog({
         first_name:            editTarget?.first_name  ?? '',
         middle_name:           editTarget?.middle_name ?? '',
         last_name:             editTarget?.last_name   ?? '',
+        suffix:                editTarget?.suffix      ?? '',
         email:                 editTarget?.email       ?? '',
         password:              '',
         password_confirmation: '',
@@ -181,7 +185,7 @@ function StaffFormDialog({
     });
 
     if (isEdit && data.first_name !== editTarget.first_name && data.email !== editTarget.email) {
-        setData({ first_name: editTarget.first_name, middle_name: editTarget.middle_name ?? '', last_name: editTarget.last_name, email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
+        setData({ first_name: editTarget.first_name, middle_name: editTarget.middle_name ?? '', last_name: editTarget.last_name, suffix: editTarget.suffix ?? '', email: editTarget.email, password: '', password_confirmation: '', phone: editTarget.phone ?? '', sub_role: editTarget.sub_role ?? '' });
     }
 
     function handleSubmit(e: { preventDefault(): void }) {
@@ -224,6 +228,17 @@ function StaffFormDialog({
                             {errors.first_name && <p className="text-xs text-red-500">{errors.first_name}</p>}
                         </div>
                         <div className="grid gap-1.5">
+                            <Label>Middle Name <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                            <Input
+                                value={data.middle_name}
+                                onChange={(e) => setData('middle_name', e.target.value)}
+                                placeholder="Santos"
+                            />
+                            {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-[1fr_6.5rem] gap-3">
+                        <div className="grid gap-1.5">
                             <Label>Last Name <span className="text-red-500">*</span></Label>
                             <Input
                                 value={data.last_name}
@@ -232,15 +247,11 @@ function StaffFormDialog({
                             />
                             {errors.last_name && <p className="text-xs text-red-500">{errors.last_name}</p>}
                         </div>
-                    </div>
-                    <div className="grid gap-1.5">
-                        <Label>Middle Name <span className="text-xs text-muted-foreground">(optional)</span></Label>
-                        <Input
-                            value={data.middle_name}
-                            onChange={(e) => setData('middle_name', e.target.value)}
-                            placeholder="Santos"
-                        />
-                        {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="pstaff-suffix">Suffix <span className="text-xs text-muted-foreground">(optional)</span></Label>
+                            <SuffixSelect id="pstaff-suffix" value={data.suffix} onChange={(v) => setData('suffix', v)} />
+                            {errors.suffix && <p className="text-xs text-red-500">{errors.suffix}</p>}
+                        </div>
                     </div>
 
                     <div className="grid gap-1.5">

@@ -45,6 +45,7 @@ class IdVerificationController extends Controller
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name'   => 'required|string|max:255',
+            'suffix'      => ['nullable', 'in:' . implode(',', \App\Models\User::SUFFIXES)],
             'phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
             'address'     => 'required|string|max:500',
             'city'        => 'required|string|max:100',
@@ -60,6 +61,7 @@ class IdVerificationController extends Controller
             'barangay.required' => 'Please choose your barangay.',
         ]);
         $data['middle_name'] ??= null;
+        $data['suffix']      ??= null;
 
         ProfileController::saveDetails($user, $data);
         // The default saved address checkout pre-selects (no-op when saveDetails already made "Home")
@@ -93,6 +95,7 @@ class IdVerificationController extends Controller
                 'first_name'  => $user->first_name ?? '',
                 'middle_name' => $user->middle_name ?? '',
                 'last_name'   => $user->last_name ?? '',
+                'suffix'      => $user->suffix ?? '',
                 'phone'       => $customer?->phone ?: ($user->phone ?? ''),
                 'address'     => $customer?->address ?? '',
                 'city'        => $customer?->city ?? '',

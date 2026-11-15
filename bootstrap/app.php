@@ -47,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'guest'            => RedirectIfAuthenticated::class,
             'permission'       => RequirePermission::class,
             'password.changed' => EnsurePasswordChanged::class,
+            'clocked.in'       => \App\Http\Middleware\EnsureClockedIn::class,   // store staff must be clocked in to work (J1)
             'id.verified'      => \App\Http\Middleware\EnsureIdVerified::class,
             'plan.feature'     => \App\Http\Middleware\RequirePlanFeature::class,
             'module'           => \App\Http\Middleware\RequireModule::class,   // store-portal module access (Off / View only / Full)

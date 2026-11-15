@@ -15,6 +15,10 @@ export type User = {
     first_name?: string | null;
     middle_name?: string | null;
     last_name?: string | null;
+    /** Jr., Sr., II … (already part of `name`) */
+    suffix?: string | null;
+    /** false = seller-only account (no Customer Portal, no orders) */
+    can_shop?: boolean;
     store_id?: number | null;
     sub_role?: string | null;
     avatar?: string;

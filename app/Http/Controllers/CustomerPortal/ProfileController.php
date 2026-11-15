@@ -33,6 +33,7 @@ class ProfileController extends Controller
                 'first_name'  => $user->first_name ?? '',
                 'middle_name' => $user->middle_name ?? '',
                 'last_name'   => $user->last_name ?? '',
+                'suffix'      => $user->suffix ?? '',
                 'email'       => $user->email,
                 'phone'       => $customer?->phone ?? $user->phone,
                 'address'     => $customer?->address ?? '',
@@ -50,6 +51,7 @@ class ProfileController extends Controller
             'first_name'  => 'required|string|max:255',
             'middle_name' => 'nullable|string|max:255',
             'last_name'   => 'required|string|max:255',
+            'suffix'      => ['nullable', 'in:' . implode(',', \App\Models\User::SUFFIXES)],
             'phone'       => ['nullable', 'string', 'regex:/^09\d{9}$/'],
             'address'     => 'required|string|max:500',
             'city'        => 'required|string|max:100',
@@ -75,17 +77,16 @@ class ProfileController extends Controller
             ? [(float) $data['latitude'], (float) $data['longitude']]
             : BarangayCoordinateController::addressPoint($data['city'], $data['barangay'] ?? null);
 
-        $fullName = trim(
-            $data['first_name']
-            . ($data['middle_name'] ? ' ' . $data['middle_name'] : '')
-            . ' ' . $data['last_name']
-        );
+        // Suffix (Jr., Sr., II …): kept as is when the form doesn't send it
+        $suffix   = array_key_exists('suffix', $data) ? ($data['suffix'] ?: null) : $user->suffix;
+        $fullName = \App\Models\User::composeName($data['first_name'], $data['middle_name'] ?? null, $data['last_name'], $suffix);
 
         $user->update([
             'name'        => $fullName,
             'first_name'  => $data['first_name'],
             'middle_name' => $data['middle_name'] ?? null,
             'last_name'   => $data['last_name'],
+            'suffix'      => $suffix,
             'phone'       => $data['phone'] ?? null,
         ]);
 

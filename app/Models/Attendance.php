@@ -18,9 +18,13 @@ class Attendance extends Model
         'clock_in',
         'clock_in_latitude',
         'clock_in_longitude',
+        'clock_in_photo_path',      // live-camera photo taken at clock-in (private disk)
+        'clock_in_recorded_by',     // owner/HR who clocked the staff in manually (no photo)
         'clock_out',
         'clock_out_latitude',
         'clock_out_longitude',
+        'clock_out_photo_path',
+        'clock_out_recorded_by',
         'status',
         'overtime_hours',
         'is_late',
@@ -54,6 +58,18 @@ class Attendance extends Model
     public function vehicle(): BelongsTo
     {
         return $this->belongsTo(Vehicle::class);
+    }
+
+    /** Owner / HR who clocked the staff in manually (no photo) */
+    public function clockInRecorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'clock_in_recorded_by')->withTrashed();
+    }
+
+    /** Owner / HR who clocked the staff out manually */
+    public function clockOutRecorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'clock_out_recorded_by')->withTrashed();
     }
 
     public function store(): BelongsTo
