@@ -8,11 +8,16 @@ use App\Models\CustomerAddress;
 use App\Models\User;
 use App\Models\VerificationRequest;
 use App\Rules\InServiceArea;
+use App\Services\DocumentOcrCheck;
+use App\Services\DocumentOcrService;
+use App\Services\FaceMatchService;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Rules\File;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -80,10 +85,11 @@ class IdVerificationController extends Controller
                 ->with('success', 'Your identity is already verified.');
         }
 
-        $hasPending = VerificationRequest::where('user_id', $user->id)
+        $pending = VerificationRequest::where('user_id', $user->id)
             ->where('type', 'customer_id_verification')
             ->where('status', 'pending')
-            ->exists();
+            ->latest()->first();
+        $hasPending = $pending !== null;
 
         $customer = Customer::where('user_id', $user->id)->first();
         $home = CustomerAddress::where('user_id', $user->id)->where('label', 'Home')
@@ -107,6 +113,8 @@ class IdVerificationController extends Controller
             'status'           => $user->id_verification_status,
             'rejection_reason' => $user->id_rejection_reason,
             'has_pending'      => $hasPending,
+            // "We couldn't confirm your photo automatically ({reason})" — null when nothing is pending
+            'pending_reason'   => $pending ? static::pendingReason($pending) : null,
             'valid_id_url'     => \App\Support\PrivateDocument::urlIf($user->valid_id_path, 'user', $user->id, 'valid_id_path'),
             'selfie_url'       => \App\Support\PrivateDocument::urlIf($user->selfie_path, 'user', $user->id, 'selfie_path'),
         ]);
@@ -141,6 +149,14 @@ class IdVerificationController extends Controller
             'selfie.required'   => 'Please provide a selfie photo.',
         ] + \App\Support\UploadMessages::for(['valid_id']) + \App\Support\UploadMessages::for(['selfie'], false));
 
+        // Each submission runs a face check (an API call): max 5 per hour
+        $key = "face-check:id:{$user->id}";
+        if (RateLimiter::tooManyAttempts($key, self::TRIES_PER_HOUR)) {
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($key) / 60));
+            throw ValidationException::withMessages(['selfie' => "Too many tries. Please wait {$minutes} minute(s) and try again."]);
+        }
+        RateLimiter::hit($key, 3600);
+
         // Store uploaded files
         // Private ('local' disk) — only the customer and document reviewers can open them
         $validIdPath = $request->file('valid_id')->store('verifications/ids', 'local');
@@ -160,13 +176,26 @@ class IdVerificationController extends Controller
             ->whereIn('status', ['pending', 'rejected'])
             ->delete();
 
-        VerificationRequest::create([
+        // Face match (ID vs live selfie); when it passes, the ID name check must not say the name is different
+        $face = FaceMatchService::compare(Storage::disk('local')->path($validIdPath), Storage::disk('local')->path($selfiePath), 'ID');
+        $ocr  = $face['status'] === 'passed' ? static::readIdName($user, $validIdPath) : null;
+        $auto = $face['status'] === 'passed' && ($ocr['name_match'] ?? null) !== false;
+
+        $verification = VerificationRequest::create([
             'user_id'       => $user->id,
             'type'          => 'customer_id_verification',
             'valid_id_path' => $validIdPath,
             'selfie_path'   => $selfiePath,
             'status'        => 'pending',
-        ]);
+            'ocr'           => $ocr,
+        ] + FaceMatchService::columns($face));
+
+        if ($auto) {
+            // Same code path as the admin's Approve (reviewed_by stays null, auto_approved = true)
+            \App\Http\Controllers\Admin\VerificationController::approveCustomer($verification->load('user'), null, $face);
+
+            return $this->done($request, '/customer/products', 'success', 'Your identity is verified — your selfie matched your ID. You can now place orders.');
+        }
 
         // Notify platform admins
         foreach (['platform_admin', 'admin'] as $role) {
@@ -179,7 +208,45 @@ class IdVerificationController extends Controller
             );
         }
 
-        return redirect('/customer/id-verification')
-            ->with('success', "Your identity documents have been submitted. We'll notify you as soon as it's approved — usually within 24 hours.");
+        return $this->done($request, '/customer/id-verification', 'warning',
+            "We couldn't confirm your photo automatically (" . static::pendingReason($verification) . '). An admin will review it — usually within 24 hours.');
+    }
+
+    /** The page posts with axios: JSON {redirect} with the message flashed for the next page; otherwise a redirect. */
+    private function done(Request $request, string $to, string $kind, string $message): RedirectResponse|JsonResponse
+    {
+        session()->flash($kind, $message);
+
+        return $request->expectsJson() && ! $request->header('X-Inertia')
+            ? response()->json(['redirect' => $to, 'verified' => $kind === 'success'])
+            : redirect($to);
+    }
+
+    private const TRIES_PER_HOUR = 5;
+
+    /** Plain words: why a pending request was not approved automatically. */
+    public static function pendingReason(VerificationRequest $v): string
+    {
+        if ($v->face_match_status === 'passed' && ($v->ocr['name_match'] ?? null) === false) {
+            return "the name on your ID doesn't seem to match your account name";
+        }
+        if ($v->face_match_status === null) {
+            return 'it was sent before the automatic check existed';
+        }
+
+        return FaceMatchService::reasonForUser($v->face_match_status, 'ID');
+    }
+
+    /** ID name check (OCR) — null when auto-read is off or the ID couldn't be read (that's fine: no mismatch found). */
+    private static function readIdName(User $user, string $path): ?array
+    {
+        if (! DocumentOcrService::enabled()) {
+            return null;
+        }
+        $text = DocumentOcrService::read(Storage::disk('local')->path($path));
+
+        return $text === null
+            ? DocumentOcrCheck::unavailable(DocumentOcrService::$lastProblem ?? 'error')
+            : DocumentOcrCheck::analyzeId($user->fresh(), $text);
     }
 }

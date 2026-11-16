@@ -234,7 +234,7 @@ class Store extends Model
         }
         $license = \App\Services\StaffDocumentService::forRiders($active);
         foreach ([
-            'pending'  => "Your rider's driver's license is waiting for your approval",
+            'pending'  => "Your rider's driver's license is waiting for the platform admin's review",
             'expired'  => "Your rider's license expired",
             'rejected' => "Your rider's license was rejected",
             'missing'  => "Your rider hasn't uploaded a driver's license",

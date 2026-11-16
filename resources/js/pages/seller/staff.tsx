@@ -121,10 +121,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 function LicenseBadge({ status }: { status: string }) {
     const [cls, text] = ({
         valid:    ['bg-green-100 text-green-700', 'License OK'],
-        expiring: ['bg-amber-100 text-amber-700', 'License OK'],
-        pending:  ['bg-blue-100 text-blue-700', 'Waiting approval'],
+        expiring: ['bg-amber-100 text-amber-700', 'License expires soon'],
+        pending:  ['bg-blue-100 text-blue-700', 'License: waiting for admin'],
         expired:  ['bg-red-100 text-red-700', 'Expired'],
-        rejected: ['bg-red-100 text-red-700', 'License missing'],
+        rejected: ['bg-red-100 text-red-700', 'License rejected'],
         missing:  ['bg-red-100 text-red-700', 'License missing'],
     } as Record<string, [string, string]>)[status] ?? ['bg-gray-100 text-gray-600', status];
     return <span className={`ml-1.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{text}</span>;

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\VerificationRequest;
 use App\Services\LegalService;
 use App\Support\StoreDocuments;
+use App\Services\FaceMatchService;
 use App\Services\NotificationService;
 use App\Services\DuplicateStoreService;
 use Illuminate\Validation\ValidationException;
@@ -204,6 +205,13 @@ class SellerRegistrationController extends Controller
 
             return $store;
         });
+
+        // Owner's ID vs live selfie (outside the transaction — up to ~15 s). The store still needs the admin's
+        // approval; a pass ticks "Valid ID is clear and the name matches the owner" on the admin store page.
+        if ($application = VerificationRequest::where('user_id', $store->user_id)->where('type', 'seller_application')->latest('id')->first()) {
+            $face = FaceMatchService::compare(Storage::disk('local')->path($application->valid_id_path), Storage::disk('local')->path($application->selfie_path), 'ID');
+            $application->update(FaceMatchService::columns($face));
+        }
 
         NotificationService::sendToRole(
             'admin',

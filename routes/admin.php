@@ -127,6 +127,9 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
         // Auto-read the valid ID (never the selfie) — warnings only
         Route::post('verifications/{verification}/ocr', [\App\Http\Controllers\Admin\VerificationOcrController::class, 'read'])
             ->middleware('throttle:20,1')->name('verifications.ocr');
+        // Riders' driver's licenses the face match didn't approve automatically (also: revoke an approved one)
+        Route::patch('rider-licenses/{document}/approve', [\App\Http\Controllers\Admin\RiderLicenseReviewController::class, 'approve'])->name('rider-licenses.approve');
+        Route::patch('rider-licenses/{document}/reject', [\App\Http\Controllers\Admin\RiderLicenseReviewController::class, 'reject'])->name('rider-licenses.reject');
     });
 
     // Store subscriptions (platform admin only — every action checks isAdmin())

@@ -23,7 +23,7 @@ class DocumentFileController extends Controller
         'verification'   => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path', 'dti_sec_registration_path'],
         'store'          => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration', 'lto_permit'],   // lto_permit: old files only
         'store-document' => ['file_path'],
-        'staff-document' => ['file_path'],
+        'staff-document' => ['file_path', 'selfie_path'],   // selfie_path: the rider's live selfie for the license face check
         // Live-camera clock-in / clock-out photos
         'attendance'     => ['clock_in_photo_path', 'clock_out_photo_path'],
     ];

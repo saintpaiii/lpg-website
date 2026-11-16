@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import StaffDocumentsCard, { type StaffDocumentRow } from '@/components/staff-documents-card';
+import StaffDocumentsCard, { type OwnerLicense, type StaffDocumentRow } from '@/components/staff-documents-card';
 import { AttendancePhoto, RecordedBy } from '@/components/attendance-photo';
 import { fmtDate } from '@/lib/utils';
 import { fmtWorkDays } from '@/components/staff-roles';
@@ -58,7 +58,7 @@ interface Props {
     roleDefaults: string[];
     userOverrides: UserOverride[];
     documents: StaffDocumentRow[];
-    license: { status: string; message: string } | null;
+    license: OwnerLicense | null;
     planLimit?: PlanLimit;
     /** Last 7 clocked-in days with the live-camera photos */
     recentAttendance?: RecentAttendanceRow[];
@@ -314,7 +314,7 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                     </CardContent>
                 </Card>
 
-                {/* Documents (driver's license etc.) — the owner approves or rejects them */}
+                {/* Documents — the owner approves or rejects them, except the driver's license (view only: face match / platform admin) */}
                 <StaffDocumentsCard documents={documents} license={license} />
 
                 {/* Recent attendance with the clock-in / clock-out camera photos */}

@@ -13,17 +13,32 @@ import { ReasonTextPicker } from '@/components/reason-picker';
 export type StaffDocumentRow = {
     id: number; doc_type: string; label: string; document_number: string | null; expires: string | null; expires_on: string | null;
     status: 'pending' | 'approved' | 'rejected'; reason: string | null; reviewer: string | null; date: string; url: string;
+    auto_approved?: boolean; replaced?: boolean;
 };
 
-/** The rider's license status, worded for the store owner. */
+/** The rider's current license (Seller\StaffController::show). */
+export type OwnerLicense = {
+    status: string; message: string; number?: string | null; expires_on?: string | null; days_left?: number | null;
+    auto?: boolean; reason?: string | null;
+};
+
+/** The rider's license status, worded for the store owner (who only monitors it — J2). */
 const OWNER_LICENSE_TEXT: Record<string, string> = {
-    valid:    'valid — this rider can make deliveries.',
+    valid:    'valid — this rider can make deliveries (after clocking in).',
     expiring: 'expires within 30 days — ask the rider to upload the renewed license.',
-    pending:  'waiting for your approval below.',
+    pending:  "waiting for the platform admin's review (the selfie didn't match automatically).",
     rejected: 'rejected — the rider needs to upload it again before making deliveries.',
     expired:  'expired — this rider cannot make deliveries until a renewed license is approved.',
     missing:  'not uploaded yet — this rider cannot make deliveries.',
 };
+
+/** Short status for a license row, e.g. "Approved automatically" / "Waiting for admin". */
+function licenseRowStatus(d: StaffDocumentRow): [string, string] {
+    if (d.replaced) return ['bg-gray-100 text-gray-700', 'Replaced by a newer upload'];
+    if (d.status === 'approved') return ['bg-green-100 text-green-800', d.auto_approved ? 'Approved automatically' : 'Approved'];
+    if (d.status === 'pending') return ['bg-blue-100 text-blue-800', 'Waiting for admin'];
+    return STATUS[d.status];
+}
 
 const STATUS: Record<StaffDocumentRow['status'], [string, string]> = {
     pending:  ['bg-blue-100 text-blue-800', 'Waiting for approval'],
@@ -31,10 +46,13 @@ const STATUS: Record<StaffDocumentRow['status'], [string, string]> = {
     rejected: ['bg-red-100 text-red-800', 'Rejected'],
 };
 
-/** Store owner: documents a staff member / rider uploaded, with Approve / Reject for pending ones. */
+/**
+ * Store owner: documents a staff member / rider uploaded, with Approve / Reject for pending ones — except the
+ * driver's license: approved automatically (face match) or by the platform admin; the owner only sees it.
+ */
 export default function StaffDocumentsCard({ documents, license }: {
     documents: StaffDocumentRow[];
-    license: { status: string; message: string } | null;
+    license: OwnerLicense | null;
 }) {
     const [approving, setApproving] = useState<StaffDocumentRow | null>(null);
     const [rejecting, setRejecting] = useState<StaffDocumentRow | null>(null);
@@ -55,9 +73,24 @@ export default function StaffDocumentsCard({ documents, license }: {
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-blue-600" /> Documents</CardTitle>
                 {license && (
-                    <p className={cn('text-sm', ['valid', 'expiring'].includes(license.status) ? 'text-green-700' : 'text-red-600')}>
-                        Driver's license: {OWNER_LICENSE_TEXT[license.status] ?? license.status}
-                    </p>
+                    <div className="space-y-0.5 text-sm">
+                        <p className={cn(['valid', 'expiring'].includes(license.status) ? 'text-green-700' : license.status === 'pending' ? 'text-blue-700' : 'text-red-600')}>
+                            Driver's license: {license.status === 'rejected' && license.reason
+                                ? `rejected — ${license.reason} The rider needs to upload it again.`
+                                : (OWNER_LICENSE_TEXT[license.status] ?? license.status)}
+                            {license.auto && ['valid', 'expiring'].includes(license.status) && <span className="ml-1 text-xs font-medium">(approved automatically)</span>}
+                        </p>
+                        {(license.number || license.expires_on) && (
+                            <p className="text-xs text-muted-foreground">
+                                {license.number ? `No. ${license.number}` : ''}{license.number && license.expires_on ? ' · ' : ''}
+                                {license.expires_on ? `valid until ${license.expires_on}` : ''}
+                                {license.days_left != null && license.days_left >= 0 && license.days_left <= 30 && (
+                                    <span className="ml-1 font-semibold text-amber-700">— expires in {license.days_left} day{license.days_left === 1 ? '' : 's'}</span>
+                                )}
+                            </p>
+                        )}
+                        <p className="text-xs text-muted-foreground">Licenses are checked automatically with the rider's selfie, or by the platform admin.</p>
+                    </div>
                 )}
             </CardHeader>
             <CardContent>
@@ -65,12 +98,15 @@ export default function StaffDocumentsCard({ documents, license }: {
                     <p className="py-3 text-sm text-muted-foreground">No documents uploaded yet.</p>
                 ) : (
                     <ul className="divide-y text-sm">
-                        {documents.map((d) => (
+                        {documents.map((d) => {
+                            const isLicense = d.doc_type === 'drivers_license';
+                            const [tone, text] = isLicense ? licenseRowStatus(d) : STATUS[d.status];
+                            return (
                             <li key={d.id} className="flex flex-col gap-2 py-2.5 sm:flex-row sm:items-center">
                                 <div className="min-w-0 flex-1">
                                     <p className="font-medium">
                                         {d.label}
-                                        <span className={cn('ml-2 rounded-full px-2 py-0.5 text-xs font-semibold', STATUS[d.status][0])}>{STATUS[d.status][1]}</span>
+                                        <span className={cn('ml-2 rounded-full px-2 py-0.5 text-xs font-semibold', tone)}>{text}</span>
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                         Uploaded {d.date}
@@ -78,11 +114,11 @@ export default function StaffDocumentsCard({ documents, license }: {
                                         {d.expires_on ? ` · valid until ${d.expires_on}` : ''}
                                         {d.reviewer ? ` · reviewed by ${d.reviewer}` : ''}
                                     </p>
-                                    {d.status === 'rejected' && d.reason && <p className="text-xs text-red-600">Reason: {d.reason}</p>}
+                                    {d.status === 'rejected' && d.reason && !d.replaced && <p className="text-xs text-red-600">Reason: {d.reason}</p>}
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
                                     <a href={d.url} target="_blank" rel="noopener"><Button size="sm" variant="outline" className="gap-1"><ExternalLink className="h-3.5 w-3.5" /> View</Button></a>
-                                    {d.status === 'pending' && (
+                                    {d.status === 'pending' && !isLicense && (
                                         <>
                                             <Button size="sm" className="gap-1 bg-green-600 text-white hover:bg-green-700"
                                                 onClick={() => { approveForm.clearErrors(); approveForm.setData('expires_at', d.expires ?? ''); setApproving(d); }}>
@@ -96,7 +132,8 @@ export default function StaffDocumentsCard({ documents, license }: {
                                     )}
                                 </div>
                             </li>
-                        ))}
+                            );
+                        })}
                     </ul>
                 )}
             </CardContent>
@@ -109,7 +146,7 @@ export default function StaffDocumentsCard({ documents, license }: {
                     </DialogHeader>
                     <form onSubmit={submitApprove} className="space-y-4">
                         <div className="grid gap-1.5">
-                            <Label htmlFor="sd_approve_date">Valid until{approving?.doc_type === 'drivers_license' ? '' : ' (optional)'} — correct it if it doesn't match</Label>
+                            <Label htmlFor="sd_approve_date">Valid until (optional) — correct it if it doesn't match</Label>
                             <Input id="sd_approve_date" type="date" value={approveForm.data.expires_at} onChange={(e) => approveForm.setData('expires_at', e.target.value)} />
                             <InputError message={approveForm.errors.expires_at} />
                         </div>

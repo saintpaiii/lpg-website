@@ -510,6 +510,10 @@ export default function SellerRegister({ seller_terms, plan_catalog }: { seller_
                                                         hint="Take it now with your camera, holding the same ID next to your face. Uploading a picture is not allowed."
                                                         error={errors.selfie || null}
                                                     />
+                                                    <p className="mt-1.5 text-xs text-muted-foreground">
+                                                        Your ID photo and selfie are compared by our face-matching provider (Face++) only to confirm it's you.
+                                                        See our <a href="/privacy" target="_blank" rel="noopener" className="underline">Privacy Policy</a>.
+                                                    </p>
                                                 </div>
                                             )}
                                             {doc.key === 'dti_sec_registration' && (

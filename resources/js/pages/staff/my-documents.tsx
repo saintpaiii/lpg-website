@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { ExternalLink, IdCard, Loader2, Plus, Upload } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import CameraCapture from '@/components/camera-capture';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +16,12 @@ import type { BreadcrumbItem } from '@/types';
 type Doc = {
     id: number; doc_type: string; label: string; document_number: string | null; expires_on: string | null;
     status: 'pending' | 'approved' | 'rejected'; reason: string | null; date: string; url: string;
+    // Driver's license (J2): live selfie + face match
+    selfie_url?: string | null; auto_approved?: boolean; face_status?: string | null;
+    /** Pending: why it wasn't approved automatically */
+    face_reason?: string | null;
+    /** A pending upload replaced by a newer one (history only) */
+    replaced?: boolean;
 };
 type LicenseStatus = 'valid' | 'expiring' | 'pending' | 'rejected' | 'expired' | 'missing';
 
@@ -30,7 +37,7 @@ type Props = {
 const LICENSE_BADGE: Record<LicenseStatus, [string, string]> = {
     valid:    ['bg-green-100 text-green-800', 'Valid'],
     expiring: ['bg-amber-100 text-amber-800', 'Expiring soon'],
-    pending:  ['bg-blue-100 text-blue-800', 'Waiting for approval'],
+    pending:  ['bg-blue-100 text-blue-800', 'Waiting for admin review'],
     rejected: ['bg-red-100 text-red-800', 'Rejected'],
     expired:  ['bg-red-100 text-red-800', 'Expired'],
     missing:  ['bg-gray-100 text-gray-700', 'Not uploaded'],
@@ -44,33 +51,43 @@ const STATUS_BADGE: Record<Doc['status'], [string, string]> = {
 
 const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
 
-/** My Documents (riders and store staff). The store owner reviews uploads. */
+/**
+ * My Documents (riders and store staff). The store owner reviews uploads — except the driver's license: it comes with a
+ * live selfie and is approved automatically when the faces match, otherwise the platform admin reviews it.
+ */
 export default function MyDocuments({ is_rider, has_store, post_url, license, documents, types }: Props) {
     const base = is_rider ? '/rider/documents' : '/seller/my-documents';
     const breadcrumbs: BreadcrumbItem[] = [{ title: 'My Documents', href: base }];
     const [mode, setMode] = useState<'license' | 'other' | null>(null);
-    const form = useForm<{ doc_type: string; label: string; document_number: string; file: File | null; expires_at: string }>({
-        doc_type: '', label: '', document_number: '', file: null, expires_at: '',
+    const form = useForm<{ doc_type: string; label: string; document_number: string; file: File | null; expires_at: string; selfie: File | null }>({
+        doc_type: '', label: '', document_number: '', file: null, expires_at: '', selfie: null,
     });
     const [fileProblem, setFileProblem] = useState<string | null>(null);
+    // License photo taken with the camera (instead of a file)
+    const [licenseShot, setLicenseShot] = useState<File | null>(null);
 
     function open(which: 'license' | 'other') {
         form.reset();
         form.clearErrors();
-        form.setData({ doc_type: which === 'license' ? 'drivers_license' : (types[0]?.key ?? 'other'), label: '', document_number: '', file: null, expires_at: '' });
+        setLicenseShot(null);
+        setFileProblem(null);
+        form.setData({ doc_type: which === 'license' ? 'drivers_license' : (types[0]?.key ?? 'other'), label: '', document_number: '', file: null, expires_at: '', selfie: null });
         setMode(which);
     }
 
     function submit(e: FormEvent) {
         e.preventDefault();
+        // Only the license sends a selfie
+        form.transform((d) => (isLicense ? d : { ...d, selfie: undefined }));
         form.post(post_url, { forceFormData: true, preserveScroll: true, onSuccess: () => setMode(null) });
     }
 
     const others = documents.filter((d) => d.doc_type !== 'drivers_license');
     const licenseHistory = documents.filter((d) => d.doc_type === 'drivers_license');
     const isLicense = mode === 'license';
-    const canSubmit = !!form.data.file && (!isLicense || (!!form.data.document_number.trim() && !!form.data.expires_at))
+    const canSubmit = !!form.data.file && (!isLicense || (!!form.data.document_number.trim() && !!form.data.expires_at && !!form.data.selfie))
         && (form.data.doc_type !== 'other' || !!form.data.label.trim());
+    const pendingLicense = license?.status === 'pending' ? license.current : null;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -78,7 +95,9 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
             <div className="space-y-5 p-3 sm:p-6">
                 <div>
                     <h1 className="text-xl font-bold tracking-tight">My Documents</h1>
-                    <p className="text-sm text-muted-foreground">Your store owner reviews the documents you upload. Files are private.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Your store owner reviews the documents you upload{is_rider ? " — your driver's license is checked automatically with a selfie, or by the platform admin" : ''}. Files are private.
+                    </p>
                 </div>
 
                 {!has_store && (
@@ -97,6 +116,15 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <p>{license.message}</p>
+                            {pendingLicense && (
+                                <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                                    We couldn't confirm your photo automatically ({pendingLicense.face_reason ?? 'the automatic check is not available'}).
+                                    An admin will review it — usually within 24 hours. You can wait, or retake your selfie / upload a clearer license now.
+                                </p>
+                            )}
+                            {license.current?.auto_approved && license.current.status === 'approved' && (
+                                <p className="text-xs font-medium text-green-700">Approved automatically — your selfie matched your license.</p>
+                            )}
                             {license.current && (
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
                                     {license.current.document_number && <span>License no. <span className="font-mono text-foreground">{license.current.document_number}</span></span>}
@@ -106,17 +134,18 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                                     </a>
                                 </div>
                             )}
-                            {license.status !== 'pending' && (
-                                <Button size="sm" className="gap-1.5" onClick={() => open('license')} disabled={!has_store}>
-                                    <Upload className="h-3.5 w-3.5" /> {license.status === 'missing' ? 'Upload' : 'Upload renewed license'}
-                                </Button>
-                            )}
+                            <Button size="sm" className="gap-1.5" onClick={() => open('license')} disabled={!has_store}>
+                                <Upload className="h-3.5 w-3.5" />
+                                {license.status === 'missing' ? 'Upload' : license.status === 'pending' ? 'Retake / re-upload' : 'Upload renewed license'}
+                            </Button>
                             {licenseHistory.length > 1 && (
                                 <ul className="divide-y border-t pt-1 text-xs text-muted-foreground">
                                     {licenseHistory.map((d) => (
                                         <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
-                                            <span>Uploaded {d.date}{d.expires_on ? ` · valid until ${d.expires_on}` : ''}{d.reason ? ` · rejected: ${d.reason}` : ''}</span>
-                                            <span className={cn('rounded-full px-2 py-0.5 font-semibold', STATUS_BADGE[d.status][0])}>{STATUS_BADGE[d.status][1]}</span>
+                                            <span>Uploaded {d.date}{d.expires_on ? ` · valid until ${d.expires_on}` : ''}{d.reason && !d.replaced ? ` · rejected: ${d.reason}` : ''}</span>
+                                            {d.replaced
+                                                ? <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700">Replaced by a newer upload</span>
+                                                : <span className={cn('rounded-full px-2 py-0.5 font-semibold', STATUS_BADGE[d.status][0])}>{d.status === 'approved' && d.auto_approved ? 'Approved automatically' : d.status === 'pending' ? 'Waiting for admin review' : STATUS_BADGE[d.status][1]}</span>}
                                         </li>
                                     ))}
                                 </ul>
@@ -161,7 +190,11 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle>{isLicense ? "Upload driver's license" : 'Add a document'}</DialogTitle>
-                        <DialogDescription>Your store owner will review it.</DialogDescription>
+                        <DialogDescription>
+                            {isLicense
+                                ? "Take a selfie too — it is compared with the photo on your license. When it matches, the license is approved right away; otherwise the platform admin reviews it."
+                                : 'Your store owner will review it.'}
+                        </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         {!isLicense && (
@@ -196,20 +229,53 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                                 // Any photo → real JPEG (a ".jpg" saved from Google is often a WEBP); PDFs unchanged
                                 const { file: ready, problem } = await prepareDocumentFile(picked);
                                 setFileProblem(problem ?? null);
+                                setLicenseShot(null);
                                 form.setData('file', ready ?? null);
                                 if (!ready) e.target.value = '';
                             }} />
                             <InputError message={fileProblem ?? form.errors.file} />
                         </div>
+                        {isLicense && (
+                            <div className="grid gap-1.5">
+                                <Label>Or take a photo of the license</Label>
+                                <CameraCapture
+                                    compact facing="environment" fileName="license.jpg" startLabel="Open camera"
+                                    value={licenseShot}
+                                    onChange={(f) => {
+                                        setLicenseShot(f);
+                                        if (f) { setFileProblem(null); form.setData('file', f); }
+                                        else if (form.data.file === licenseShot) form.setData('file', null);
+                                    }}
+                                />
+                                {licenseShot && <p className="text-xs text-green-700">Using the camera photo as the license file.</p>}
+                            </div>
+                        )}
                         <div className="grid gap-1.5">
                             <Label htmlFor="sd_expires">Valid until{isLicense ? '' : ' (optional)'}</Label>
                             <Input id="sd_expires" type="date" min={tomorrow()} value={form.data.expires_at} onChange={(e) => form.setData('expires_at', e.target.value)} />
                             <InputError message={form.errors.expires_at} />
                         </div>
-                        <div className="flex justify-end gap-2">
+                        {isLicense && (
+                            <div className="grid gap-1.5">
+                                <Label>Selfie (live camera, required)</Label>
+                                <CameraCapture
+                                    compact fileName="selfie.jpg" startLabel="Open camera for a selfie"
+                                    hint="Face the camera in good light. Uploading a picture is not allowed."
+                                    value={form.data.selfie}
+                                    onChange={(f) => form.setData('selfie', f)}
+                                    error={form.errors.selfie || null}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Your license photo and selfie are compared by our face-matching provider (Face++) only to confirm it's you.
+                                    See our <a href="/privacy" target="_blank" rel="noopener" className="underline">Privacy Policy</a>.
+                                </p>
+                            </div>
+                        )}
+                        <div className="flex items-center justify-end gap-2">
+                            {form.processing && isLicense && <span className="mr-auto text-xs text-muted-foreground" aria-live="polite">Checking your photo…</span>}
                             <Button type="button" variant="outline" onClick={() => setMode(null)}>Cancel</Button>
                             <Button type="submit" disabled={form.processing || !canSubmit} className="gap-1.5">
-                                {form.processing && <Loader2 className="h-4 w-4 animate-spin" />} Submit
+                                {form.processing && <Loader2 className="h-4 w-4 animate-spin" />} {form.processing && isLicense ? 'Checking…' : 'Submit'}
                             </Button>
                         </div>
                     </form>

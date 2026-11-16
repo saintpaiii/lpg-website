@@ -4,11 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Models\StaffDocument;
 use App\Models\Store;
+use App\Services\FaceMatchService;
 use App\Services\NotificationService;
 use App\Services\StaffDocumentService;
 use App\Support\PrivateDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -16,7 +20,8 @@ use Inertia\Response;
 
 /**
  * My Documents for store staff and riders (/rider/documents, /seller/my-documents).
- * Riders must upload a driver's license; the store owner reviews everything.
+ * Riders must upload a driver's license WITH a live selfie: when the faces match it is approved automatically,
+ * otherwise the platform admin reviews it (the store owner only monitors licenses). The owner reviews the other documents.
  */
 class StaffDocumentController extends Controller
 {
@@ -54,7 +59,10 @@ class StaffDocumentController extends Controller
             'document_number' => [$isLicense ? 'required' : 'nullable', 'string', 'max:50'],
             'file'            => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
             'expires_at'      => [$isLicense ? 'required' : 'nullable', 'date', 'after:today'],
+            // Driver's license: a live camera selfie, compared with the license photo
+            'selfie'          => [$isLicense ? 'required' : 'nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ], [
+            'selfie.required'          => 'Take a selfie with your camera — it is compared with the photo on your license.',
             'label.required_if'        => 'Please enter the name of the document.',
             'document_number.required' => 'Please enter your license number.',
             'expires_at.required'      => 'Please enter the date your license is valid until.',
@@ -67,11 +75,17 @@ class StaffDocumentController extends Controller
         $same  = fn () => StaffDocument::where('user_id', $user->id)->where('doc_type', $type)
             ->when($type === 'other', fn ($q) => $q->where('label', $label));
 
-        if ($same()->where('status', 'pending')->exists()) {
+        // A license waiting for the admin can be replaced any time (new selfie / clearer photo); other documents wait for the owner
+        if (! $isLicense && $same()->where('status', 'pending')->exists()) {
             throw ValidationException::withMessages(['file' => 'This document is already waiting for review.']);
         }
-        if ($same()->where('status', 'rejected')->where('reviewed_at', '>=', now()->subDays(30))->count() >= StaffDocumentService::MAX_REJECTIONS) {
+        // Rejections by a person only (a replaced upload has reviewed_by null)
+        if ($same()->where('status', 'rejected')->whereNotNull('reviewed_by')->where('reviewed_at', '>=', now()->subDays(30))->count() >= StaffDocumentService::MAX_REJECTIONS) {
             throw ValidationException::withMessages(['file' => "You've reached 5 attempts. Please talk to your store owner."]);
+        }
+
+        if ($isLicense) {
+            return $this->storeLicense($request, $user, $data);
         }
 
         StaffDocument::create([
@@ -94,6 +108,55 @@ class StaffDocumentController extends Controller
         return back()->with('success', "{$name} uploaded. Your store owner will review it.");
     }
 
+    /** Max face checks per rider per hour (each one is an API call). */
+    private const LICENSE_TRIES_PER_HOUR = 5;
+
+    /** Driver's license + live selfie → face match → approved automatically, or waiting for the platform admin. */
+    private function storeLicense(Request $request, $user, array $data): RedirectResponse
+    {
+        $key = "face-check:license:{$user->id}";
+        if (RateLimiter::tooManyAttempts($key, self::LICENSE_TRIES_PER_HOUR)) {
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($key) / 60));
+            throw ValidationException::withMessages(['selfie' => "Too many tries. Please wait {$minutes} minute(s) and try again."]);
+        }
+        RateLimiter::hit($key, 3600);
+
+        $filePath   = $request->file('file')->store('staff_documents', 'local');
+        $selfiePath = $request->file('selfie')->store('staff_documents/selfies', 'local');
+        $face = FaceMatchService::compare(Storage::disk('local')->path($filePath), Storage::disk('local')->path($selfiePath), 'license');
+
+        $doc = DB::transaction(function () use ($user, $data, $filePath, $selfiePath, $face) {
+            // The upload waiting for the admin is replaced (kept for history, files kept)
+            StaffDocument::where('user_id', $user->id)->where('doc_type', 'drivers_license')->where('status', 'pending')
+                ->update(['status' => 'rejected', 'rejection_reason' => StaffDocument::REPLACED_REASON, 'reviewed_by' => null, 'reviewed_at' => null]);
+
+            return StaffDocument::create([
+                'user_id'         => $user->id,
+                'store_id'        => $user->store_id,
+                'doc_type'        => 'drivers_license',
+                'document_number' => $data['document_number'],
+                'file_path'       => $filePath,
+                'selfie_path'     => $selfiePath,
+                'expires_at'      => $data['expires_at'],
+                'status'          => 'pending',
+            ] + FaceMatchService::columns($face));
+        });
+
+        if ($face['status'] === 'passed') {
+            StaffDocumentService::approveLicense($doc->load(['user', 'store']), null);
+
+            return back()->with('success', "Driver's license approved automatically — your selfie matched (" . FaceMatchService::pct($face['score']) . '). You can make deliveries after you clock in.');
+        }
+
+        foreach (['platform_admin', 'admin'] as $role) {
+            NotificationService::sendToRole($role, 'system', "Rider's license to review",
+                "{$user->name}'s driver's license needs a review ({$face['message']}).", ['link' => '/admin/verifications?type=rider_license']);
+        }
+
+        return back()->with('warning', "We couldn't confirm your photo automatically (" . FaceMatchService::reasonForUser($face['status'], 'license')
+            . '). An admin will review it — usually within 24 hours. You can wait, or retake your selfie / upload a clearer license now.');
+    }
+
     private function present(StaffDocument $d): array
     {
         return [
@@ -106,6 +169,12 @@ class StaffDocumentController extends Controller
             'reason'          => $d->rejection_reason,
             'date'            => $d->created_at->timezone('Asia/Manila')->format('M j, Y'),
             'url'             => PrivateDocument::url('staff-document', $d->id, 'file_path'),
+            'selfie_url'      => PrivateDocument::urlIf($d->selfie_path, 'staff-document', $d->id, 'selfie_path'),
+            'auto_approved'   => (bool) $d->auto_approved,
+            'face_status'     => $d->face_match_status,
+            // Pending: why it wasn't approved automatically (plain words)
+            'face_reason'     => $d->status === 'pending' ? ($d->selfie_path ? FaceMatchService::reasonForUser($d->face_match_status, 'license') : 'it was uploaded before the selfie check') : null,
+            'replaced'        => $d->rejection_reason === StaffDocument::REPLACED_REASON,
         ];
     }
 

@@ -4,9 +4,14 @@ namespace App\Http\Controllers\Admin;
 
 use App\Support\PrivateDocument;
 use App\Http\Controllers\Controller;
+use App\Models\StaffDocument;
 use App\Models\Store;
+use App\Models\User;
 use App\Models\VerificationRequest;
+use App\Services\FaceMatchService;
 use App\Services\NotificationService;
+use App\Services\StaffDocumentService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -17,33 +22,46 @@ class VerificationController extends Controller
 {
     public function index(Request $request): Response
     {
-        $tab    = $request->get('tab', 'pending');
-        $search = $request->get('search', '');
+        $tab    = in_array($request->get('tab'), ['approved', 'rejected'], true) ? $request->get('tab') : 'pending';
+        $search = (string) $request->get('search', '');
+        // Type chip: '' = all, a verification type, or 'rider_license' (drivers_license staff documents)
+        $type   = in_array($request->get('type'), [...self::TYPES, 'rider_license'], true) ? $request->get('type') : '';
+        // Approved tab: only the ones approved automatically by the face match
+        $auto   = $tab === 'approved' && $request->boolean('auto');
 
-        $query = VerificationRequest::with(['user', 'reviewer'])
-            ->whereIn('type', ['seller_application', 'customer_id_verification'])
-            ->when($search, fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-            ))
-            ->latest();
+        // One list across both tables: (src, id, created_at) rows, newest first, then the records are loaded
+        $parts = fn (string $status, bool $onlyAuto) => array_values(array_filter([
+            $type !== 'rider_license' ? $this->verificationIds($search, $type)->where('v.status', $status)
+                ->when($onlyAuto, fn ($q) => $q->where('v.auto_approved', true)) : null,
+            in_array($type, ['', 'rider_license'], true) ? $this->licenseIds($search)->where('d.status', $status)
+                ->when($onlyAuto, fn ($q) => $q->where('d.auto_approved', true)) : null,
+        ]));
+        $union = function (array $queries) {
+            $q = array_shift($queries);
+            foreach ($queries as $more) {
+                $q->unionAll($more);
+            }
 
-        $items = match ($tab) {
-            'approved' => (clone $query)->where('status', 'approved'),
-            'rejected' => (clone $query)->where('status', 'rejected'),
-            default    => (clone $query)->where('status', 'pending'),
+            return $q;
         };
+        $count = fn (string $status, bool $onlyAuto = false) => collect($parts($status, $onlyAuto))->sum(fn ($q) => $q->count());
 
         $counts = [
-            'pending'  => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'pending')->count(),
-            'approved' => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'approved')->count(),
-            'rejected' => VerificationRequest::whereIn('type', ['seller_application', 'customer_id_verification'])->where('status', 'rejected')->count(),
+            'pending'  => $count('pending'),
+            'approved' => $count('approved'),
+            'rejected' => $count('rejected'),
+            'auto'     => $count('approved', true),
         ];
 
-        $paginated = $items->paginate(25)->withQueryString();
+        $paginated = $union($parts($tab, $auto))->orderByDesc('created_at')->orderByDesc('id')->paginate(25)->withQueryString();
+
+        $vrRows  = VerificationRequest::with(['user', 'reviewer'])
+            ->whereIn('id', collect($paginated->items())->where('src', 'vr')->pluck('id'))->get()->keyBy('id');
+        $licRows = StaffDocument::with(['user' => fn ($q) => $q->withTrashed(), 'store' => fn ($q) => $q->withTrashed(), 'reviewer:id,name'])
+            ->whereIn('id', collect($paginated->items())->where('src', 'sd')->pluck('id'))->get()->keyBy('id');
 
         // Preload stores for all paginated results (avoids N+1)
-        $userIds = $paginated->pluck('user_id');
+        $userIds = $vrRows->pluck('user_id');
         $stores  = Store::whereIn('user_id', $userIds)->get()->keyBy('user_id');
 
         // Preload soft-deleted rejected applications to detect resubmissions (avoids N+1)
@@ -75,7 +93,11 @@ class VerificationController extends Controller
 
         return Inertia::render('admin/verifications', [
             'since'         => \App\Services\SectionVisitService::sinceIso($request),
-            'verifications' => $paginated->through(function ($v) use ($stores, $previousApps, $docFields, $customers, $orderCounts, $history, $request) {
+            'verifications' => $paginated->through(function ($row) use ($vrRows, $licRows, $stores, $previousApps, $docFields, $customers, $orderCounts, $history, $request) {
+                if ($row->src === 'sd') {
+                    return $this->licenseRow($licRows->get($row->id), $request);
+                }
+                $v              = $vrRows->get($row->id);
                 $store          = $stores->get($v->user_id);
                 $prevApp        = $previousApps->get($v->user_id);
                 $isResubmission = $prevApp !== null;
@@ -91,7 +113,11 @@ class VerificationController extends Controller
                 }
 
                 return [
+                    'key'              => "vr-{$v->id}",
+                    'source'           => 'verification',
                     'id'               => $v->id,
+                    'face'             => FaceMatchService::present($v) + ['has_selfie' => (bool) $v->selfie_path],
+                    'auto_approved'    => (bool) $v->auto_approved,
                     'seen'             => \App\Services\SectionVisitService::flagsFor($request, $v),
                     'type'             => $v->type,
                     'status'           => $v->status,
@@ -159,10 +185,119 @@ class VerificationController extends Controller
                 ];
             }),
             'ocr_enabled' => \App\Services\DocumentOcrService::enabled(),
+            'face_enabled' => FaceMatchService::enabled(),
             'counts' => $counts,
             'tab'    => $tab,
             'search' => $search,
+            'type'   => $type,
+            'auto'   => $auto,
         ]);
+    }
+
+    private const TYPES = ['seller_application', 'customer_id_verification'];
+
+    /** (src, id, created_at) of verification requests matching the search / type chip. */
+    private function verificationIds(string $search, string $type): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('verification_requests as v')
+            ->leftJoin('users as u', 'u.id', '=', 'v.user_id')
+            ->whereNull('v.deleted_at')
+            ->whereIn('v.type', $type !== '' ? [$type] : self::TYPES)
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w->where('u.name', 'like', "%{$search}%")->orWhere('u.email', 'like', "%{$search}%")))
+            ->selectRaw("'vr' as src, v.id as id, v.created_at as created_at");
+    }
+
+    /** (src, id, created_at) of riders' driver's licenses (pending ones are the admin's queue since J2). */
+    private function licenseIds(string $search): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('staff_documents as d')
+            ->leftJoin('users as u', 'u.id', '=', 'd.user_id')
+            ->where('d.doc_type', 'drivers_license')
+            // A pending upload replaced by a newer one is history, not a decision
+            ->where(fn ($q) => $q->whereNull('d.rejection_reason')->orWhere('d.rejection_reason', '!=', StaffDocument::REPLACED_REASON))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w->where('u.name', 'like', "%{$search}%")->orWhere('u.email', 'like', "%{$search}%")))
+            ->selectRaw("'sd' as src, d.id as id, d.created_at as created_at");
+    }
+
+    /** A rider's driver's license, in the same row shape as a verification (type 'rider_license'). */
+    private function licenseRow(StaffDocument $d, Request $request): array
+    {
+        $u = $d->user;
+        $days = $d->expires_at ? (int) StaffDocumentService::today()->diffInDays($d->expires_at->copy()->startOfDay(), false) : null;
+
+        return [
+            'key'              => "sd-{$d->id}",
+            'source'           => 'license',
+            'id'               => $d->id,
+            'seen'             => \App\Services\SectionVisitService::flagsFor($request, $d),
+            'type'             => 'rider_license',
+            'status'           => $d->status,
+            'rejection_reason' => $d->rejection_reason,
+            'reviewed_at'      => $d->reviewed_at?->format('M d, Y'),
+            'created_at'       => $d->created_at->format('M d, Y'),
+            'user_id'          => $d->user_id,
+            'user_name'        => $u?->name ?? '—',
+            'user_email'       => $u?->email ?? '—',
+            'user_id_verified' => false,
+            'user_full_name'   => $u ? (User::composeName($u->first_name, $u->middle_name, $u->last_name, $u->suffix) ?: $u->name) : null,
+            'user_phone'       => $u?->phone,
+            'user_joined'      => $u?->created_at?->format('M d, Y'),
+            'reviewer_name'    => $d->reviewer?->name,
+            'auto_approved'    => (bool) $d->auto_approved,
+            'face'             => FaceMatchService::present($d) + ['has_selfie' => (bool) $d->selfie_path],
+            'store_name'       => $d->store?->store_name,
+            'license_number'   => $d->document_number,
+            'license_expires_on' => $d->expires_at?->format('M j, Y'),
+            'license_days_left'  => $days,
+            'license_url'      => PrivateDocument::url('staff-document', $d->id, 'file_path'),
+            'selfie_url'       => PrivateDocument::urlIf($d->selfie_path, 'staff-document', $d->id, 'selfie_path'),
+            // Unused for licenses (same row shape as a verification)
+            'valid_id_url' => null, 'store_phone' => null, 'store_address' => null, 'store_city' => null, 'store_barangay' => null,
+            'is_resubmission' => false, 'previous_rejection_reason' => null, 'reuploaded_docs' => [],
+            'bir_permit_url' => null, 'business_permit_url' => null, 'fsic_permit_url' => null, 'doe_lpg_license_url' => null,
+        ];
+    }
+
+    /**
+     * Mark a customer ID verification approved — the ONE path for the admin's Approve and the automatic face-match
+     * approval ($by = null → auto_approved, reviewed_by stays null), so nothing else differs.
+     */
+    public static function approveCustomer(VerificationRequest $verification, ?User $by, ?array $face = null): void
+    {
+        $verification->update([
+            'status'           => 'approved',
+            'reviewed_by'      => $by?->id,
+            'reviewed_at'      => now(),
+            'rejection_reason' => null,
+            'auto_approved'    => $by === null,
+        ]);
+
+        $verification->user?->update([
+            'id_verification_status' => 'verified',
+            'id_verified_at'         => now(),
+            'id_rejection_reason'    => null,
+            'id_verified'            => true,
+        ]);
+
+        if ($verification->user_id) {
+            NotificationService::send(
+                $verification->user_id,
+                'system',
+                'Identity Verified!',
+                'Your identity has been verified. You can now place orders on the platform.',
+                ['link' => '/customer/products']
+            );
+        }
+
+        // Automatic: the admins still see it (in-app only)
+        if ($by === null) {
+            $name = $verification->user?->name ?? 'A customer';
+            $pct  = FaceMatchService::pct($face['score'] ?? (float) $verification->face_match_score);
+            foreach (['platform_admin', 'admin'] as $role) {
+                NotificationService::sendToRole($role, 'system', 'Verified automatically',
+                    "{$name} was verified automatically (face match {$pct}).", ['link' => '/admin/verifications?tab=approved&auto=1']);
+            }
+        }
     }
 
     public function approve(Request $request, VerificationRequest $verification): RedirectResponse
@@ -175,34 +310,18 @@ class VerificationController extends Controller
                 ->with('error', 'Approve sellers from the store page — the checklist is required.');
         }
 
-        $verification->update([
-            'status'      => 'approved',
-            'reviewed_by' => $request->user()->id,
-            'reviewed_at' => now(),
-        ]);
+        if ($verification->status !== 'pending') {
+            return back()->with('error', 'This request was already decided.');
+        }
 
         if ($verification->type === 'customer_id_verification') {
-            $verification->user?->update([
-                'id_verification_status' => 'verified',
-                'id_verified_at'         => now(),
-                'id_rejection_reason'    => null,
-                'id_verified'            => true,
-            ]);
-
-            if ($verification->user_id) {
-                NotificationService::send(
-                    $verification->user_id,
-                    'system',
-                    'Identity Verified!',
-                    'Your identity has been verified. You can now place orders on the platform.',
-                    ['link' => '/customer/products']
-                );
-            }
+            static::approveCustomer($verification, $request->user());
 
             return back()->with('success', "{$verification->user?->name}'s identity has been verified. They can now place orders.");
         }
 
         // Fallback
+        $verification->update(['status' => 'approved', 'reviewed_by' => $request->user()->id, 'reviewed_at' => now()]);
         $verification->user?->update([
             'id_verified'            => true,
             'id_verification_status' => 'verified',
@@ -216,6 +335,12 @@ class VerificationController extends Controller
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);
+
+        // Pending requests can be rejected; an APPROVED customer ID (e.g. auto-approved by the face match) can be revoked
+        $revoke = $verification->status === 'approved' && $verification->type === 'customer_id_verification';
+        if ($verification->status !== 'pending' && ! $revoke) {
+            return back()->with('error', 'This request was already decided.');
+        }
 
         $verification->update([
             'status'           => 'rejected',
@@ -243,19 +368,25 @@ class VerificationController extends Controller
             $verification->user?->update([
                 'id_verification_status' => 'rejected',
                 'id_rejection_reason'    => $request->reason,
+                // Revoke: they can't order again until a new ID is approved
+                'id_verified'            => false,
+                'id_verified_at'         => null,
             ]);
 
             if ($verification->user_id) {
                 NotificationService::send(
                     $verification->user_id,
                     'system',
-                    'Identity Verification Rejected',
-                    'Your ID verification was not approved. Reason: ' . $request->reason . '. Please re-upload your documents.',
+                    $revoke ? 'Identity verification revoked' : 'Identity Verification Rejected',
+                    ($revoke ? 'Your ID verification was revoked by an admin. Reason: ' : 'Your ID verification was not approved. Reason: ')
+                        . rtrim($request->reason, '. ') . '. Please re-upload your documents.',
                     ['link' => '/customer/id-verification']
                 );
             }
         }
 
-        return back()->with('success', "Verification for {$verification->user?->name} rejected.");
+        return back()->with('success', $revoke
+            ? "Verification for {$verification->user?->name} revoked — they can't order until a new ID is approved."
+            : "Verification for {$verification->user?->name} rejected.");
     }
 }

@@ -31,6 +31,13 @@ class VerificationRequest extends Model
         'rejection_reason',
         'terms_agreed_at',
         'ocr',
+        // Face++ ID vs selfie (J2); auto_approved = approved without a person (reviewed_by stays null)
+        'face_match_status',
+        'face_match_score',
+        'face_match_needed',
+        'face_match_message',
+        'auto_approved',
+        'face_checked_at',
     ];
 
     protected function casts(): array
@@ -39,6 +46,8 @@ class VerificationRequest extends Model
             'reviewed_at'    => 'datetime',
             'terms_agreed_at'=> 'datetime',
             'ocr'            => 'array',
+            'auto_approved'  => 'boolean',
+            'face_checked_at'=> 'datetime',
         ];
     }
 

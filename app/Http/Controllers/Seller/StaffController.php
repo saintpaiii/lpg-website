@@ -373,7 +373,7 @@ class StaffController extends Controller
                     'clock_out' => $a->clock_out?->format('h:i A'),
                     'status'    => $a->status,
                 ] + \App\Http\Controllers\Seller\AttendanceController::photoFields($a))->values(),
-            // Documents this staff member uploaded (the owner approves / rejects them here)
+            // Documents this staff member uploaded (the owner approves / rejects them here — except the driver's license: view only)
             'documents'      => \App\Models\StaffDocument::where('user_id', $user->id)->with('reviewer:id,name')->latest()->get()
                 ->map(fn ($d) => [
                     'id'              => $d->id,
@@ -387,11 +387,22 @@ class StaffController extends Controller
                     'reviewer'        => $d->reviewer?->name,
                     'date'            => $d->created_at->timezone('Asia/Manila')->format('M j, Y'),
                     'url'             => \App\Support\PrivateDocument::url('staff-document', $d->id, 'file_path'),
+                    'auto_approved'   => (bool) $d->auto_approved,
+                    'replaced'        => $d->rejection_reason === \App\Models\StaffDocument::REPLACED_REASON,
                 ])->values(),
-            'license'        => $user->sub_role === 'rider' ? [
-                'status'  => \App\Services\StaffDocumentService::riderLicenseStatus($user),
-                'message' => \App\Services\StaffDocumentService::message($user),
-            ] : null,
+            'license'        => $user->sub_role === 'rider' ? (function () use ($user) {
+                ['status' => $status, 'license' => $doc] = \App\Services\StaffDocumentService::licenseInfo($user);
+
+                return [
+                    'status'     => $status,
+                    'message'    => \App\Services\StaffDocumentService::message($user),
+                    'number'     => $doc?->document_number,
+                    'expires_on' => $doc?->expires_at?->format('M j, Y'),
+                    'days_left'  => $doc?->expires_at ? (int) \App\Services\StaffDocumentService::today()->diffInDays($doc->expires_at->copy()->startOfDay(), false) : null,
+                    'auto'       => (bool) $doc?->auto_approved,
+                    'reason'     => $status === 'rejected' ? $doc?->rejection_reason : null,
+                ];
+            })() : null,
         ]);
     }
 

@@ -210,6 +210,8 @@ class StoreController extends Controller
             'ocrEnabled'      => DocumentOcrService::enabled(),
             // Auto-read results of the required documents + the owner's ID (null = not read yet; key missing = no file)
             'documentOcr'     => $this->requiredOcr($store),
+            // Face++ owner ID vs live selfie (seller registration). Passed + no name mismatch → the ID item starts ticked.
+            'ownerFace'       => $verification ? \App\Services\FaceMatchService::present($verification) + ['has_selfie' => (bool) $verification->selfie_path] : null,
             'canReviewDocuments' => (bool) $request->user()?->canReviewDocuments(),
             'canApprove'      => $request->user()?->isAdmin() || $request->user()?->hasPermission('verifications.view'),
         ]);

@@ -10,19 +10,25 @@ use App\Services\StaffDocumentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
-/** The store owner approves or rejects documents uploaded by their staff and riders. */
+/**
+ * The store owner approves or rejects documents uploaded by their staff and riders — EXCEPT drivers' licenses:
+ * those are approved automatically by the face match or by the platform admin; the owner only monitors them (J2).
+ */
 class StaffDocumentReviewController extends Controller
 {
     public function approve(Request $request, StaffDocument $document): RedirectResponse
     {
         $this->ownStore($request, $document);
+        if ($document->doc_type === 'drivers_license') {
+            return back()->with('error', "Driver's licenses are checked automatically or by the platform admin — you can only view them.");
+        }
         if ($document->status !== 'pending') {
             return back()->with('error', 'This document was already reviewed.');
         }
 
         $data = $request->validate([
-            'expires_at' => [$document->doc_type === 'drivers_license' ? 'required' : 'nullable', 'date', 'after:today'],
-        ], ['expires_at.required' => 'Please enter the date the license is valid until.']);
+            'expires_at' => ['nullable', 'date', 'after:today'],
+        ]);
 
         $document->update([
             'status'      => 'approved',
@@ -41,6 +47,9 @@ class StaffDocumentReviewController extends Controller
     public function reject(Request $request, StaffDocument $document): RedirectResponse
     {
         $this->ownStore($request, $document);
+        if ($document->doc_type === 'drivers_license') {
+            return back()->with('error', "Driver's licenses are checked automatically or by the platform admin — you can only view them.");
+        }
         if ($document->status !== 'pending') {
             return back()->with('error', 'This document was already reviewed.');
         }

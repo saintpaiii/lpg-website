@@ -41,6 +41,16 @@ return [
         'url' => 'https://api.ocr.space/parse/image',
     ],
 
+    // Face++ Compare (ID / driver's license vs live selfie). No key → "skipped" (admin reviews).
+    // FACEPP_FAKE=pass|fail → no API call at all (demo / tests): pass = 95%, fail = 30%.
+    'facepp' => [
+        'key'      => env('FACEPP_API_KEY'),
+        'secret'   => env('FACEPP_API_SECRET'),
+        'endpoint' => env('FACEPP_ENDPOINT', 'https://api-us.faceplusplus.com/facepp/v3/compare'),
+        'timeout'  => 15,
+        'fake'     => env('FACEPP_FAKE'),
+    ],
+
     'google' => [
         'client_id'     => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

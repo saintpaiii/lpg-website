@@ -59,7 +59,7 @@ class StaffDocumentService
             $days = (int) $today->diffInDays($valid->expires_at->copy()->startOfDay(), false);
             return ['status' => $days <= 30 ? 'expiring' : 'valid', 'license' => $valid];
         }
-        // 2) waiting for the owner
+        // 2) waiting for the platform admin (the selfie didn't match automatically)
         if ($pending = $licenses->firstWhere('status', 'pending')) {
             return ['status' => 'pending', 'license' => $pending];
         }
@@ -108,7 +108,7 @@ class StaffDocumentService
         return match ($status) {
             'valid'    => "Your driver's license is valid until {$doc->expires_at->format('M j, Y')}.",
             'expiring' => "Your driver's license expires on {$doc->expires_at->format('M j, Y')}. Upload the renewed license soon.",
-            'pending'  => "Your driver's license is waiting for the store owner's approval.",
+            'pending'  => "Your driver's license is waiting for the platform admin's review.",
             'rejected' => "Your driver's license was rejected: {$doc->rejection_reason} Upload it again.",
             'expired'  => "Your driver's license expired on {$doc->expires_at->format('M j, Y')}. Upload the renewed license.",
             default    => "Upload your driver's license before you can make deliveries.",
@@ -120,7 +120,7 @@ class StaffDocumentService
     {
         return match ($status) {
             'valid', 'expiring' => null,
-            'pending'           => 'waiting approval',
+            'pending'           => 'license waiting for admin',
             'expired'           => 'license expired',
             'rejected'          => 'license rejected',
             default             => 'license missing',
@@ -148,6 +148,56 @@ class StaffDocumentService
         }
 
         return $out;
+    }
+
+    /**
+     * Approve a driver's license — automatically ($by = null: the live selfie matched) or by a platform admin.
+     * The rider and the store owner are told (the owner only monitors licenses since J2).
+     */
+    public static function approveLicense(StaffDocument $doc, ?User $by, ?string $expiresAt = null): void
+    {
+        $doc->update([
+            'status'           => 'approved',
+            'expires_at'       => $expiresAt ?? $doc->expires_at,
+            'rejection_reason' => null,
+            'reviewed_by'      => $by?->id,
+            'reviewed_at'      => now(),
+            'auto_approved'    => $by === null,
+        ]);
+
+        $rider = $doc->user;
+        $how   = $by === null ? 'approved automatically (your selfie matched)' : 'approved';
+        NotificationService::send($doc->user_id, 'system', "Driver's license approved",
+            "Your driver's license was {$how}. You can make deliveries after you clock in.", ['link' => '/rider/documents']);
+
+        if ($ownerId = $doc->store?->user_id ?? \App\Models\Store::whereKey($doc->store_id)->value('user_id')) {
+            $until = $doc->fresh()->expires_at?->format('M j, Y');
+            NotificationService::send($ownerId, 'system', "Rider's license approved",
+                "{$rider?->name}'s driver's license was " . ($by === null ? 'approved automatically (face match)' : 'approved by the platform admin')
+                . ($until ? ", valid until {$until}." : '.'), ['link' => "/seller/staff/{$doc->user_id}"]);
+        }
+    }
+
+    /** Reject (pending) or revoke (approved) a driver's license — platform admin only. Rider + owner are told. */
+    public static function rejectLicense(StaffDocument $doc, User $by, string $reason): void
+    {
+        $revoke = $doc->status === 'approved';
+        $doc->update([
+            'status'           => 'rejected',
+            'rejection_reason' => $reason,
+            'reviewed_by'      => $by->id,
+            'reviewed_at'      => now(),
+        ]);
+
+        $reason = rtrim($reason, '. ');
+        NotificationService::send($doc->user_id, 'system', $revoke ? "Driver's license approval revoked" : "Driver's license rejected",
+            "Your driver's license was " . ($revoke ? 'revoked' : 'rejected') . ": {$reason}. Upload it again with a new selfie.", ['link' => '/rider/documents']);
+
+        if ($ownerId = $doc->store?->user_id ?? \App\Models\Store::whereKey($doc->store_id)->value('user_id')) {
+            NotificationService::send($ownerId, 'system', $revoke ? "Rider's license revoked" : "Rider's license rejected",
+                "{$doc->user?->name}'s driver's license was " . ($revoke ? 'revoked' : 'rejected') . " by the platform admin: {$reason}. They can't make deliveries until a new license is approved.",
+                ['link' => "/seller/staff/{$doc->user_id}"]);
+        }
     }
 
     /** "{name} can't deliver yet: {message}", or null when the rider may be assigned. */

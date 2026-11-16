@@ -33,7 +33,7 @@ export function StoreVisibilityBanner() {
         : isVehicle ? { href: '/seller/vehicles', label: VEHICLE_ACTIONS[reason.code] }
         : full ? { href: '/seller/plan', label: 'My Plan' }
         : reason.code === 'no_rider' ? { href: '/seller/staff?add=rider', label: 'Add a rider' }
-        : reason.code === 'license_pending' && reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'Review license' }
+        : reason.code === 'license_pending' && reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'See license' }
         : reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'Open rider' }
         : { href: '/seller/staff', label: 'Open Staff' };
 

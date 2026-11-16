@@ -1,7 +1,8 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import { BadgeCheck, CheckCircle2, ExternalLink, Eye, FileText, Search, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import FaceMatchChip, { AutoApprovedBadge, type FaceMatch } from '@/components/face-match-chip';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -39,8 +40,19 @@ const breadcrumbs: BreadcrumbItem[] = [
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type VerificationRow = {
+    /** Unique across both lists: "vr-12" (verification) / "sd-5" (rider license) */
+    key: string;
+    source: 'verification' | 'license';
     id: number;
     seen?: SeenFlags;
+    /** Face++ ID / license vs live selfie */
+    face?: FaceMatch;
+    auto_approved?: boolean;
+    // Rider license only
+    license_number?: string | null;
+    license_expires_on?: string | null;
+    license_days_left?: number | null;
+    license_url?: string | null;
     type: string;
     status: string;
     rejection_reason: string | null;
@@ -94,7 +106,7 @@ type VerificationRow = {
     permit_expiries?: { type: string; label: string; expires_on: string | null; days_left: number | null; status: PermitStatus }[];
 };
 
-type Counts = { pending: number; approved: number; rejected: number };
+type Counts = { pending: number; approved: number; rejected: number; auto?: number };
 type Paginated = { data: VerificationRow[]; current_page: number; last_page: number; total: number };
 
 type Props = {
@@ -102,8 +114,26 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    /** '' = all types, or customer_id_verification / seller_application / rider_license */
+    type?: string;
+    /** Approved tab: auto-approved only */
+    auto?: boolean;
     since?: string | null;
     ocr_enabled?: boolean;
+    face_enabled?: boolean;
+};
+
+const TYPE_CHIPS = [
+    { key: '',                         label: 'All' },
+    { key: 'customer_id_verification', label: 'Customer ID' },
+    { key: 'seller_application',       label: 'Seller' },
+    { key: 'rider_license',            label: 'Rider license' },
+] as const;
+
+const LICENSE_STATUS: Record<string, [string, string]> = {
+    pending:  ['bg-yellow-100 text-yellow-700', 'Waiting for review'],
+    approved: ['bg-green-100 text-green-700', 'Approved'],
+    rejected: ['bg-red-100 text-red-700', 'Rejected'],
 };
 
 const TABS = [
@@ -115,6 +145,12 @@ const TABS = [
 const TYPE_LABELS: Record<string, string> = {
     customer_id_verification: 'Customer ID',
     seller_application:       'Seller Application',
+    rider_license:            'Rider license',
+};
+
+const TYPE_TONE: Record<string, string> = {
+    seller_application: 'bg-purple-100 text-purple-700',
+    rider_license:      'bg-teal-100 text-teal-700',
 };
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -165,12 +201,13 @@ function VerificationAutoRead({ v, enabled, cached, onResult }: {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Verifications({ verifications, counts, tab, search, ocr_enabled = false }: Props) {
+export default function Verifications({ verifications, counts, tab, search, type = '', auto = false, ocr_enabled = false }: Props) {
     // Auto-read results read on this page (so reopening a request doesn't read it again)
     const [ocrCache, setOcrCache] = useState<Record<number, OcrResult>>({});
     const rememberOcr = (id: number, r: OcrResult) => setOcrCache((c) => ({ ...c, [id]: r }));
-    // New / updated submissions since the last visit (until the admin leaves the page)
-    const seen = useSeenRows(verifications.data);
+    // New / updated submissions since the last visit (until the admin leaves the page) — keyed by "vr-…" / "sd-…"
+    const seenRows = useMemo(() => verifications.data.map((r) => ({ id: r.key, seen: r.seen })), [verifications.data]);
+    const seen = useSeenRows(seenRows);
     const [searchVal, setSearchVal]         = useState(search);
     const [detailTarget, setDetailTarget]   = useState<VerificationRow | null>(null);
     const [rejectMode, setRejectMode]       = useState(false);
@@ -178,14 +215,27 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
 
     const { data, setData, patch, processing, reset } = useForm({ reason: '' });
 
+    // Only non-empty filters go into the URL
+    const go = (params: { tab?: string; type?: string; auto?: boolean; page?: number }) => {
+        const next = { tab, search: searchVal, type, auto: tab === 'approved' && auto, ...params };
+        router.get('/admin/verifications', {
+            tab: next.tab, ...(next.search ? { search: next.search } : {}), ...(next.type ? { type: next.type } : {}),
+            ...(next.tab === 'approved' && next.auto ? { auto: 1 } : {}), ...(next.page ? { page: next.page } : {}),
+        }, { preserveState: true, replace: true });
+    };
+
     function goTab(t: string) {
-        router.get('/admin/verifications', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+        go({ tab: t, auto: false });
     }
 
     function doSearch(e: React.FormEvent) {
         e.preventDefault();
-        router.get('/admin/verifications', { tab, search: searchVal }, { preserveState: true, replace: true });
+        go({});
     }
+
+    const base = (r: VerificationRow) => r.source === 'license' ? `/admin/rider-licenses/${r.id}` : `/admin/verifications/${r.id}`;
+    // Approved customer IDs and rider licenses can be revoked (e.g. an automatic approval that looks wrong)
+    const canRevoke = (r: VerificationRow) => r.status === 'approved' && (r.type === 'customer_id_verification' || r.type === 'rider_license');
 
     function closeDetail() {
         setDetailTarget(null);
@@ -200,13 +250,15 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
     }
 
     function submitApprove() {
-        router.patch(`/admin/verifications/${approveTarget?.id}/approve`, {}, {
+        if (!approveTarget) return;
+        router.patch(`${base(approveTarget)}/approve`, {}, {
             onSuccess: () => setApproveTarget(null),
         });
     }
 
     function submitReject() {
-        patch(`/admin/verifications/${detailTarget?.id}/reject`, {
+        if (!detailTarget) return;
+        patch(`${base(detailTarget)}/reject`, {
             onSuccess: () => closeDetail(),
         });
     }
@@ -226,7 +278,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                             ID Verifications
                         </h1>
                         <p className="text-muted-foreground text-sm mt-0.5">
-                            Review uploaded IDs and approve or reject customer & seller verifications.
+                            Review uploaded IDs and riders' licenses. When the live selfie matches, they are approved automatically — you can still check and revoke them.
                         </p>
                     </div>
                     <form onSubmit={doSearch} className="flex gap-2">
@@ -267,6 +319,22 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                     ))}
                 </div>
 
+                {/* Type chips (+ "Auto-approved" on the Approved tab) */}
+                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by type">
+                    {TYPE_CHIPS.map((c) => (
+                        <button key={c.key || 'all'} type="button" onClick={() => go({ type: c.key, page: undefined })} aria-pressed={type === c.key}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${type === c.key ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-muted'}`}>
+                            {c.label}
+                        </button>
+                    ))}
+                    {tab === 'approved' && (
+                        <button type="button" onClick={() => go({ auto: !auto, page: undefined })} aria-pressed={auto}
+                            className={`ml-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${auto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}>
+                            Auto-approved{counts.auto ? ` (${counts.auto})` : ''}
+                        </button>
+                    )}
+                </div>
+
                 <SeenNote counts={seen.counts} onClear={seen.clear} />
 
                 {/* Table */}
@@ -291,20 +359,21 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                             </td>
                                         </tr>
                                     ) : verifications.data.map((row) => (
-                                        <tr key={row.id} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${seenRowClass(seen.get(row.id))}`}>
+                                        <tr key={row.key} className={`border-b last:border-0 hover:bg-muted/20 transition-colors ${seenRowClass(seen.get(row.key))}`}>
                                             <td className="px-4 py-3">
-                                                <p className="flex flex-wrap items-center gap-1.5 font-medium">{row.user_name}<SeenPill flags={seen.get(row.id)} /></p>
+                                                <p className="flex flex-wrap items-center gap-1.5 font-medium">{row.user_name}<SeenPill flags={seen.get(row.key)} /></p>
                                                 <p className="text-xs text-muted-foreground">{row.user_email}</p>
+                                                {row.status === 'pending' && row.type !== 'seller_application' && <FaceMatchChip face={row.face} className="mt-1" />}
+                                                {row.status === 'approved' && row.auto_approved && <AutoApprovedBadge face={row.face} className="mt-1" />}
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">
                                                 <div className="flex flex-col gap-1 items-start">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                        row.type === 'seller_application'
-                                                            ? 'bg-purple-100 text-purple-700'
-                                                            : 'bg-blue-100 text-blue-700'
+                                                        TYPE_TONE[row.type] ?? 'bg-blue-100 text-blue-700'
                                                     }`}>
                                                         {TYPE_LABELS[row.type] ?? row.type}
                                                     </span>
+                                                    {row.type === 'rider_license' && row.store_name && <span className="text-xs text-muted-foreground">{row.store_name}</span>}
                                                     {row.is_resubmission && row.status === 'pending' && (
                                                         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
                                                             Resubmitted
@@ -313,6 +382,11 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
+                                                {row.type === 'rider_license' ? (
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${LICENSE_STATUS[row.status]?.[0] ?? 'bg-muted'}`}>
+                                                        {LICENSE_STATUS[row.status]?.[1] ?? row.status}
+                                                    </span>
+                                                ) : (
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                                                     row.user_id_verified
                                                         ? 'bg-green-100 text-green-700'
@@ -320,6 +394,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                                 }`}>
                                                     {row.user_id_verified ? 'Verified' : 'Unverified'}
                                                 </span>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">
                                                 {row.created_at}
@@ -353,7 +428,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                 <div className="flex gap-1">
                                     {Array.from({ length: verifications.last_page }, (_, i) => i + 1).map((p) => (
                                         <button key={p}
-                                            onClick={() => router.get('/admin/verifications', { tab, search: searchVal, page: p })}
+                                            onClick={() => go({ page: p })}
                                             className={`w-8 h-8 rounded text-xs font-medium ${p === verifications.current_page ? 'bg-blue-600 text-white' : 'hover:bg-muted'}`}>
                                             {p}
                                         </button>
@@ -371,7 +446,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <BadgeCheck className="h-5 w-5 text-blue-600" />
-                            {v?.type === 'seller_application' ? 'Seller Application' : 'ID Verification'}
+                            {v?.type === 'seller_application' ? 'Seller Application' : v?.type === 'rider_license' ? "Rider's driver's license" : 'ID Verification'}
                             {v?.is_resubmission && v?.status === 'pending' && (
                                 <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
                                     Resubmitted
@@ -397,7 +472,15 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                         {v.email_verified && <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">verified</span>}
                                     </InfoLine>
                                     <InfoLine label="Phone">{v.user_phone || '—'}</InfoLine>
-                                    <InfoLine label="Home address">{v.customer_address || '—'}</InfoLine>
+                                    {v.type === 'rider_license' ? <>
+                                        <InfoLine label="Store">{v.store_name || '—'}</InfoLine>
+                                        <InfoLine label="License no.">{v.license_number || '—'}</InfoLine>
+                                        <InfoLine label="Valid until">
+                                            {v.license_expires_on || '—'}
+                                            {v.license_days_left != null && v.license_days_left < 0 && <span className="ml-2 text-xs font-medium text-red-600">expired</span>}
+                                            {v.license_days_left != null && v.license_days_left >= 0 && v.license_days_left <= 30 && <span className="ml-2 text-xs font-medium text-amber-600">expires in {v.license_days_left} day{v.license_days_left === 1 ? '' : 's'}</span>}
+                                        </InfoLine>
+                                    </> : <InfoLine label="Home address">{v.customer_address || '—'}</InfoLine>}
                                     <InfoLine label="Account created">{v.user_joined ?? '—'}</InfoLine>
                                     {v.order_count != null && <InfoLine label="Orders so far">{v.order_count}</InfoLine>}
                                     {(v.past_attempts?.length ?? 0) > 0 && (
@@ -450,13 +533,23 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                             <section>
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Documents</h3>
 
-                                {/* Customer ID verification: side-by-side image comparison */}
-                                {v.type === 'customer_id_verification' ? (
+                                {/* Rider's driver's license: license photo next to the live selfie + the face result */}
+                                {v.type === 'rider_license' ? (
+                                    <div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <IdDocumentTile url={v.license_url ?? null} label="Driver's license" />
+                                            <IdDocumentTile url={v.selfie_url} label="Live selfie" />
+                                        </div>
+                                        <div className="mt-2"><FaceMatchChip face={v.face} /></div>
+                                        <IdCheckHints />
+                                    </div>
+                                ) : v.type === 'customer_id_verification' ? (
                                     <div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <IdDocumentTile url={v.valid_id_url} label="Valid ID" />
                                             <IdDocumentTile url={v.selfie_url} label="Selfie" />
                                         </div>
+                                        <div className="mt-2"><FaceMatchChip face={v.face} /></div>
                                         <VerificationAutoRead key={v.id} v={v} enabled={ocr_enabled} cached={ocrCache[v.id]} onResult={rememberOcr} />
                                         <IdCheckHints />
                                     </div>
@@ -464,6 +557,8 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                     <div className="rounded-md border px-3 divide-y">
                                         <div className="pb-2">
                                             <DocRow label="Valid ID" url={v.valid_id_url} />
+                                            {v.selfie_url && <DocRow label="Selfie (live camera)" url={v.selfie_url} />}
+                                            {v.face?.status && <div className="pb-1"><FaceMatchChip face={v.face} /></div>}
                                             <VerificationAutoRead key={v.id} v={v} enabled={ocr_enabled} cached={ocrCache[v.id]} onResult={rememberOcr} />
                                         </div>
                                         {v.type === 'seller_application' && <>
@@ -525,7 +620,13 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                         {v.reviewed_at && (
                                             <div className="flex gap-2">
                                                 <span className="text-sm text-muted-foreground w-24 shrink-0">Reviewed</span>
-                                                <span className="text-sm">{v.reviewed_at}{v.reviewer_name ? ` by ${v.reviewer_name}` : ''}</span>
+                                                <span className="text-sm">{v.reviewed_at}{v.reviewer_name ? ` by ${v.reviewer_name}` : v.auto_approved && v.status === 'approved' ? ' — automatically (face match)' : ''}</span>
+                                            </div>
+                                        )}
+                                        {v.auto_approved && v.status === 'approved' && (
+                                            <div className="flex gap-2">
+                                                <span className="text-sm text-muted-foreground w-24 shrink-0">How</span>
+                                                <AutoApprovedBadge face={v.face} />
                                             </div>
                                         )}
                                         {v.rejection_reason && (
@@ -538,8 +639,18 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                 </section>
                             )}
 
-                            {/* 5. Action buttons (pending tab only) */}
-                            {tab === 'pending' && (
+                            {/* 5b. Approved customer ID / rider license: revoke (with a reason, the person is told) */}
+                            {canRevoke(v) && (
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t">
+                                    <p className="text-xs text-muted-foreground">Something wrong? Revoking makes them {v.type === 'rider_license' ? 'unable to deliver' : 'unverified'} until a new upload is approved.</p>
+                                    <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50" onClick={() => setRejectMode(true)}>
+                                        <XCircle className="h-4 w-4 mr-1.5" /> Revoke
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* 5. Action buttons (pending only) */}
+                            {v.status === 'pending' && (
                                 <div className="flex justify-end gap-2 pt-2 border-t">
                                     <Button
                                         variant="outline"
@@ -563,8 +674,8 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                     {v && rejectMode && (
                         <div className="space-y-4 py-1">
                             <p className="text-sm text-muted-foreground">
-                                Provide a reason for rejecting <strong>{v.user_name}</strong>'s application.
-                                This will be shown to the applicant so they know what to fix.
+                                Provide a reason for {v.status === 'approved' ? 'revoking' : 'rejecting'} <strong>{v.user_name}</strong>'s {v.type === 'rider_license' ? "driver's license" : v.type === 'seller_application' ? 'application' : 'ID verification'}.
+                                This will be shown to them so they know what to fix.
                             </p>
                             <ReasonTextPicker
                                 context="verification_reject"
@@ -584,7 +695,7 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                                     onClick={submitReject}
                                     disabled={!data.reason.trim() || processing}
                                 >
-                                    Confirm Rejection
+                                    {v.status === 'approved' ? 'Confirm Revoke' : 'Confirm Rejection'}
                                 </Button>
                             </div>
                         </div>
@@ -598,7 +709,9 @@ export default function Verifications({ verifications, counts, tab, search, ocr_
                     <AlertDialogHeader>
                         <AlertDialogTitle>Approve Application</AlertDialogTitle>
                         <AlertDialogDescription>
-                            {approveTarget?.type === 'customer_id_verification'
+                            {approveTarget?.type === 'rider_license'
+                                ? <>Approve <strong>{approveTarget?.user_name}</strong>'s driver's license (valid until {approveTarget?.license_expires_on ?? '—'})? They can make deliveries after clocking in. The store owner is told.</>
+                                : approveTarget?.type === 'customer_id_verification'
                                 ? <>Approve the identity verification for <strong>{approveTarget?.user_name}</strong>? They will be able to place orders on the platform.</>
                                 : <>Approve the seller application for <strong>{approveTarget?.user_name}</strong>? Their account will be promoted to seller and they can access the seller portal.</>
                             }

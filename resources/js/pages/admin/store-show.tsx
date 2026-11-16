@@ -17,9 +17,11 @@ import {
     ShoppingCart,
     XCircle,
     AlertTriangle,
+    ScanFace,
     ShieldCheck,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import FaceMatchChip, { type FaceMatch } from '@/components/face-match-chip';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -171,6 +173,8 @@ type Props = {
     documentOcr?: Record<string, OcrResult>;
     canReviewDocuments?: boolean;
     canApprove?: boolean;
+    /** Owner's ID vs live selfie (seller registration); null = no application */
+    ownerFace?: FaceMatch | null;
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -205,6 +209,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 export default function StoreShow({
     store, stats, subscription, visibility, history, documentHistory,
     checklist = [], approvalChecks = null, duplicates = [], ocrEnabled = false, documentOcr = {}, canReviewDocuments = false, canApprove = false,
+    ownerFace = null,
 }: Props) {
     // Platform staff with Stores but not Subscriptions: no links into Subscriptions (403)
     const canSubscriptions = useAdminAccess().canOpen('/admin/subscriptions');
@@ -223,7 +228,9 @@ export default function StoreShow({
 
 
     // "Before you approve": every item ticked + optional note (saved with the approval)
-    const approveForm = useForm<{ checks: Record<string, boolean>; note: string }>({ checks: {}, note: '' });
+    // The owner's ID item starts ticked when the face match passed and the ID name check didn't flag a mismatch
+    const faceTicksId = ownerFace?.status === 'passed' && documentOcr.valid_id?.name_match !== false;
+    const approveForm = useForm<{ checks: Record<string, boolean>; note: string }>({ checks: faceTicksId ? { id_matches_owner: true } : {}, note: '' });
     const allChecked = checklist.length > 0 && checklist.every((c) => approveForm.data.checks[c.key]);
     const approveError = approveForm.errors.checks
         ?? Object.entries(approveForm.errors).find(([k]) => k.startsWith('checks.'))?.[1]
@@ -240,6 +247,12 @@ export default function StoreShow({
     for (const [k, v] of Object.entries(documentOcr)) { ocrJobs[k] = store.id; ocrInitial[k] = v; }
     for (const d of documentHistory) if (d.ocr_key) { ocrJobs[d.ocr_key] = store.id; ocrInitial[d.ocr_key] = d.ocr ?? null; }
     const autoRead = useAutoRead(ocrJobs, ocrInitial, ocrEnabled && canReviewDocuments);
+    // The ID is read while the page is open: a name mismatch takes the automatic tick away again
+    const idNameMismatch = autoRead.results.valid_id?.name_match === false;
+    useEffect(() => {
+        if (idNameMismatch && faceTicksId) approveForm.setData('checks', { ...approveForm.data.checks, id_matches_owner: false });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [idNameMismatch]);
     const ocrLine = (key: string) => key in ocrJobs ? (
         <AutoReadLine
             result={autoRead.results[key] ?? null} reading={autoRead.reading === key} enabled={ocrEnabled}
@@ -457,6 +470,7 @@ export default function StoreShow({
                                             </a>
                                         ) : <span className="text-sm text-muted-foreground">Not taken</span>}
                                     </DocumentRow>
+                                    {ownerFace && <div className="-mt-1 flex justify-end"><FaceMatchChip face={ownerFace} /></div>}
                                     {store.permits.map((p) => {
                                         const url = (store as unknown as Record<string, string | null>)[`${p.type}_url`];
                                         const isDtiSec = p.type === 'dti_sec_registration';
@@ -543,6 +557,15 @@ export default function StoreShow({
                                         />
                                         <span className="min-w-0">
                                             <span>{c.label}</span>
+                                            {c.key === 'id_matches_owner' && ownerFace && (
+                                                ownerFace.status === 'passed' && !idNameMismatch ? (
+                                                    <span className="mt-0.5 flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
+                                                        <ScanFace className="h-3 w-3 shrink-0" /> Face match {Math.round(ownerFace.score ?? 0)}% — checked automatically
+                                                    </span>
+                                                ) : (
+                                                    <span className="mt-0.5 block"><FaceMatchChip face={ownerFace} /></span>
+                                                )
+                                            )}
                                             {hints.map((h, i) => (
                                                 <span key={i} className="mt-0.5 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
                                                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> <span className="break-words">{h}</span>
