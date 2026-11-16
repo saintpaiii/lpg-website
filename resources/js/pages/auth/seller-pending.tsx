@@ -2,8 +2,9 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, Clock, FileText, Flame, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { SharedData } from '@/types';
+import SellerResubmitCard, { type SentBack } from '@/components/seller-resubmit-card';
 
-export default function SellerPending() {
+export default function SellerPending({ sent_back = null }: { sent_back?: SentBack | null }) {
     const { flash } = usePage<SharedData>().props;
     const suspensionInfo = flash?.store_suspension_info;
     const STEPS = [
@@ -31,7 +32,7 @@ export default function SellerPending() {
         <div className="min-h-screen bg-gradient-to-br from-blue-800 via-blue-700 to-blue-500 flex items-center justify-center px-4 py-16">
             <Head title="Application Submitted — LPG Marketplace" />
 
-            <div className="w-full max-w-md">
+            <div className={`w-full ${sent_back ? "max-w-xl" : "max-w-md"}`}>
                 {/* Card */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8">
                     {/* Icon */}
@@ -47,13 +48,19 @@ export default function SellerPending() {
                     </div>
 
                     <h1 className="text-center text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                        {suspensionInfo ? 'Store Suspended' : 'Application Under Review'}
+                        {suspensionInfo ? 'Store Suspended' : sent_back ? 'Application Sent Back' : 'Application Under Review'}
                     </h1>
                     <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-8">
                         {suspensionInfo
                             ? 'Your store has been temporarily suspended by the platform administrator.'
                             : "Thank you for applying to the LPG Marketplace Cavite. Here's what happens next:"}
                     </p>
+
+                    {flash?.success && (
+                        <div className="mb-6 rounded-xl border border-green-300 bg-green-50 p-3 text-sm text-green-900">{flash.success}</div>
+                    )}
+                    {/* Sent back by the admin: each rejected document + re-upload just those (J3) */}
+                    {sent_back && <SellerResubmitCard sentBack={sent_back} />}
 
                     {/* Not blocking: same store name elsewhere / another store pinned within 50 m */}
                     {flash?.warning && (

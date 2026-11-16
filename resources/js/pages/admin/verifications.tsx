@@ -1,4 +1,4 @@
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import { BadgeCheck, CheckCircle2, ExternalLink, Eye, FileText, Search, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -78,6 +78,8 @@ type VerificationRow = {
     order_count?: number | null;
     past_attempts?: { date: string; status: string; reason: string | null; reviewer: string | null }[];
     // Store info
+    store_id?: number | null;
+    store_status?: string | null;
     store_name: string | null;
     store_phone: string | null;
     store_address: string | null;
@@ -455,7 +457,35 @@ export default function Verifications({ verifications, counts, tab, search, type
                         </DialogTitle>
                     </DialogHeader>
 
-                    {v && !rejectMode && (
+                    {/* Seller applications are reviewed ONLY on the store page (Accept / Reject per document) — J3 */}
+                    {v && v.type === 'seller_application' && (
+                        <div className="space-y-4 py-1">
+                            <div className="rounded-md border p-3 space-y-1.5">
+                                <InfoLine label="Store">{v.store_name ?? '—'}</InfoLine>
+                                <InfoLine label="Owner">{v.user_full_name || v.user_name} · {v.user_email}</InfoLine>
+                                <InfoLine label="Address">{[v.store_address, v.store_barangay, v.store_city].filter(Boolean).join(', ') || '—'}</InfoLine>
+                                <InfoLine label="Submitted">{v.created_at}{v.is_resubmission ? ' (resubmitted)' : ''}</InfoLine>
+                                <InfoLine label="Status">
+                                    <span className="capitalize">{v.status}</span>
+                                    {v.reviewed_at ? ` · ${v.reviewed_at}${v.reviewer_name ? ` by ${v.reviewer_name}` : ''}` : ''}
+                                </InfoLine>
+                                {v.face?.status && <InfoLine label="Owner ID"><FaceMatchChip face={v.face} /></InfoLine>}
+                                {v.rejection_reason && <InfoLine label="Sent back"><span className="whitespace-pre-line text-red-600">{v.rejection_reason}</span></InfoLine>}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Open each document on the store page, Accept or Reject it, then approve the store or send it back to the seller.
+                            </p>
+                            <div className="flex justify-end border-t pt-3">
+                                {v.store_id ? (
+                                    <Link href={`/admin/stores/${v.store_id}`}>
+                                        <Button className="gap-1.5 bg-blue-600 text-white hover:bg-blue-700">Review on store page →</Button>
+                                    </Link>
+                                ) : <span className="text-sm text-muted-foreground">The store record was removed.</span>}
+                            </div>
+                        </div>
+                    )}
+
+                    {v && v.type !== 'seller_application' && !rejectMode && (
                         <div className="space-y-5 py-1">
 
                             {/* 1. Applicant Info */}

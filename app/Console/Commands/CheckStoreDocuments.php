@@ -27,7 +27,7 @@ class CheckStoreDocuments extends Command
                 if ($days === null) {
                     continue;   // no date on file: no reminders, never hidden
                 }
-                $label = StoreDocuments::label($type);
+                $label = StoreDocuments::labelFor($store, $type);   // "DTI Business Name certificate" for a DTI store (J3)
                 $date  = StoreDocuments::expiry($store, $type)->format('M d, Y');
 
                 if (in_array($days, StoreDocuments::REMIND_DAYS, true)) {

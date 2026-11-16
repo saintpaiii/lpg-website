@@ -1,23 +1,19 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
-import { Check, ExternalLink, Loader2, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
-import InputError from '@/components/input-error';
+import { Eye } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAdminAccess } from '@/hooks/use-store-access';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
-import { ReasonTextPicker } from '@/components/reason-picker';
 import { AUTO_READ_DISCLAIMER, AutoReadLine, useAutoRead, type OcrResult } from '@/components/document-auto-read';
+import DocumentReviewViewer, { type ReviewItem } from '@/components/document-review-viewer';
 
 type Pending = {
     id: number; store_id: number; store_name: string | null; doc_type: string; label: string; is_other: boolean; has_expiry: boolean;
     current_expires: string | null; new_expires: string | null; new_expires_on: string | null; submitted_on: string; submitted_by: string | null; url: string;
-    ocr_key?: string; ocr?: OcrResult;
+    ocr_key?: string; ocr?: OcrResult; is_pdf?: boolean;
 };
 type PermitRow = { store_id: number; store_name: string; type: string; label: string; expires_on: string | null; days_left: number | null; documents_suspended: boolean };
 type Tab = 'pending' | 'expiring' | 'expired' | 'missing';
@@ -31,6 +27,7 @@ type Props = {
     counts: Record<Tab, number>;
     max_date: string;
     ocr_enabled?: boolean;
+    reject_reasons?: string[];
 };
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Store Documents', href: '/admin/store-documents' }];
@@ -41,7 +38,7 @@ const TABS: { key: Tab; label: string }[] = [
     { key: 'missing', label: 'Missing dates' },
 ];
 
-export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date, ocr_enabled = false }: Props) {
+export default function AdminStoreDocuments({ tab: initialTab, pending, expiring, expired, missing, counts, max_date, ocr_enabled = false, reject_reasons = [] }: Props) {
     // Platform staff with Verifications but not Stores: store names stay plain text (store page = 403)
     const canStores = useAdminAccess().canOpen('/admin/stores');
     // New / updated since the last visit (until the user leaves the page)
@@ -52,29 +49,13 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
     const ocrInitial: Record<string, OcrResult> = {};
     for (const p of pending) if (p.ocr_key) { ocrJobs[p.ocr_key] = p.store_id; ocrInitial[p.ocr_key] = p.ocr ?? null; }
     const autoRead = useAutoRead(ocrJobs, ocrInitial, ocr_enabled);
-    const [approving, setApproving] = useState<Pending | null>(null);
-    const [rejecting, setRejecting] = useState<Pending | null>(null);
-    const approveForm = useForm({ expires_at: '' });
-    const rejectForm = useForm({ reason: '' });
-
-    function openApprove(p: Pending) {
-        approveForm.clearErrors();
-        approveForm.setData('expires_at', p.new_expires ?? '');
-        setApproving(p);
-    }
-    function openReject(p: Pending) {
-        rejectForm.reset();
-        rejectForm.clearErrors();
-        setRejecting(p);
-    }
-    const submitApprove = (e: FormEvent) => {
-        e.preventDefault();
-        if (approving) approveForm.post(`/admin/store-documents/${approving.id}/approve`, { preserveScroll: true, onSuccess: () => setApproving(null) });
-    };
-    const submitReject = (e: FormEvent) => {
-        e.preventDefault();
-        if (rejecting) rejectForm.post(`/admin/store-documents/${rejecting.id}/reject`, { preserveScroll: true, onSuccess: () => setRejecting(null) });
-    };
+    // Same viewer as the store application review: Accept (with the "valid until" read by OCR) / Reject with a reason
+    const [openKey, setOpenKey] = useState<string | null>(null);
+    const items: ReviewItem[] = pending.map((p) => ({
+        key: String(p.id), label: `${p.label} — ${p.store_name ?? 'store'}`, url: p.url, is_pdf: !!p.is_pdf, needs_date: p.has_expiry,
+        status: null, ocr_key: p.ocr_key ?? null, saved_date: null,
+        extra: p.has_expiry && !p.is_other ? <p className="text-xs text-muted-foreground">Current valid until: {p.current_expires ?? 'no date'}</p> : undefined,
+    }));
 
     const rows = tab === 'expiring' ? expiring : tab === 'expired' ? expired : missing;
 
@@ -118,7 +99,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                         </p>
                                         {p.has_expiry && (
                                             <p className="text-muted-foreground">
-                                                Valid until: {p.is_other ? '' : `${p.current_expires ?? 'no date'} → `}<span className="font-medium text-foreground">{p.new_expires_on ?? 'no date'}</span>
+                                                Current valid until: {p.current_expires ?? 'no date'} — the new date is read from the document when you review it.
                                             </p>
                                         )}
                                         {p.ocr_key && (
@@ -129,9 +110,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                         )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <a href={p.url} target="_blank" rel="noopener"><Button size="sm" variant="outline" className="gap-1.5"><ExternalLink className="h-3.5 w-3.5" /> View file</Button></a>
-                                        <Button size="sm" className="gap-1.5 bg-green-600 text-white hover:bg-green-700" onClick={() => openApprove(p)}><Check className="h-3.5 w-3.5" /> Approve</Button>
-                                        <Button size="sm" variant="outline" className="gap-1.5 text-red-600" onClick={() => openReject(p)}><X className="h-3.5 w-3.5" /> Reject</Button>
+                                        <Button size="sm" className="gap-1.5" onClick={() => setOpenKey(String(p.id))}><Eye className="h-3.5 w-3.5" /> Review</Button>
                                     </div>
                                 </li>
                             ))}
@@ -172,59 +151,14 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                 )}
             </div>
 
-            <Dialog open={approving !== null} onOpenChange={(o) => !o && setApproving(null)}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Approve {approving?.label}?</DialogTitle>
-                        <DialogDescription>
-                            {approving?.is_other ? 'The document will be added to the store.' : 'The file and date replace the store’s current permit. The old file is kept.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={submitApprove} className="space-y-4">
-                        {approving?.has_expiry && (
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="approve_date">Valid until (correct it if it doesn't match the document)</Label>
-                                <Input id="approve_date" type="date" max={max_date} value={approveForm.data.expires_at} onChange={(e) => approveForm.setData('expires_at', e.target.value)} />
-                                <InputError message={approveForm.errors.expires_at} />
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setApproving(null)}>Cancel</Button>
-                            <Button type="submit" disabled={approveForm.processing} className="gap-1.5 bg-green-600 text-white hover:bg-green-700">
-                                {approveForm.processing && <Loader2 className="h-4 w-4 animate-spin" />} Approve
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            <Dialog open={rejecting !== null} onOpenChange={(o) => !o && setRejecting(null)}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Reject {rejecting?.label}?</DialogTitle>
-                        <DialogDescription>The store owner sees this reason and can upload again.</DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={submitReject} className="space-y-4">
-                        <div className="grid gap-1.5">
-                            <ReasonTextPicker
-                                context="verification_reject"
-                                reasonLabel="Reason"
-                                value={rejectForm.data.reason}
-                                onChange={(v) => rejectForm.setData('reason', v)}
-                                maxLength={500}
-                                rows={2}
-                            />
-                            <InputError message={rejectForm.errors.reason} />
-                        </div>
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setRejecting(null)}>Cancel</Button>
-                            <Button type="submit" disabled={rejectForm.processing || !rejectForm.data.reason.trim()} className="gap-1.5 bg-red-600 text-white hover:bg-red-700">
-                                {rejectForm.processing && <Loader2 className="h-4 w-4 animate-spin" />} Reject
-                            </Button>
-                        </div>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            <DocumentReviewViewer
+                items={items} openKey={openKey} onOpenKey={setOpenKey} reasons={reject_reasons} maxDate={max_date} title="Renewed / extra document"
+                ocr={{ results: autoRead.results, reading: autoRead.reading, readAgain: autoRead.readAgain, enabled: ocr_enabled }}
+                actions={{
+                    accept: (i, date) => ({ url: `/admin/store-documents/${i.key}/approve`, data: (i.needs_date ? { expires_at: date } : {}) as Record<string, string> }),
+                    reject: (i, reason, note) => ({ url: `/admin/store-documents/${i.key}/reject`, data: { reason: note ? `${reason} (${note})` : reason } }),
+                }}
+            />
         </AppLayout>
     );
 }

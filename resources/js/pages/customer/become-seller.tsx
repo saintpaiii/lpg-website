@@ -14,7 +14,7 @@ import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box'
 import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { lookupBarangay } from '@/components/address-map';
-import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type DtiSecKind, type ExpiringDoc } from '@/components/seller-application-fields';
+import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { OtherDocumentsFields, otherRowsPayload, StoreNameWarning, useStoreNameCheck, type OtherDocRow, type PreviousOtherDoc } from '@/components/other-documents-fields';
 
@@ -37,9 +37,6 @@ type PreviousStore = {
     logo_url: string | null;
     latitude: number | null;
     longitude: number | null;
-    business_permit_expires_at: string | null;
-    fsic_permit_expires_at: string | null;
-    doe_lpg_license_expires_at: string | null;
     dti_sec_kind?: DtiSecKind | null;
 } | null;
 
@@ -120,7 +117,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
     const [agreePlan, setAgreePlan] = useState(false);
     const allAgreed = agreeTerms && agreeAuthentic && agreePlan;
     const [step1Errors, setStep1Errors] = useState<Record<string, string>>({});
-    // Optional extra documents (sent as other_documents[i][label|file|expires_at])
+    // Optional extra documents (sent as other_documents[i][label|file])
     const [otherDocs, setOtherDocs] = useState<OtherDocRow[]>([]);
 
     const { data, setData, post, processing, errors, progress, transform } = useForm<{
@@ -140,9 +137,6 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
         logo: File | null;
         latitude: number | null;
         longitude: number | null;
-        business_permit_expires_at: string;
-        fsic_permit_expires_at: string;
-        doe_lpg_license_expires_at: string;
         terms_agreed: boolean;
     }>({
         store_name:        previous_store?.store_name    ?? '',
@@ -162,9 +156,6 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
         latitude:        previous_store?.latitude ?? null,
         longitude:       previous_store?.longitude ?? null,
         // Pre-filled on resubmission, still required
-        business_permit_expires_at: previous_store?.business_permit_expires_at ?? '',
-        fsic_permit_expires_at:     previous_store?.fsic_permit_expires_at ?? '',
-        doe_lpg_license_expires_at: previous_store?.doe_lpg_license_expires_at ?? '',
         terms_agreed:    false,
     });
 
@@ -270,8 +261,8 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                 <div>
                                     <p className="font-semibold text-red-800 dark:text-red-300">Application Rejected</p>
                                     {application?.rejection_reason && (
-                                        <p className="mt-1 text-sm text-red-700 dark:text-red-400">
-                                            Reason: {application.rejection_reason}
+                                        <p className="mt-1 whitespace-pre-line text-sm text-red-700 dark:text-red-400">
+                                            {application.rejection_reason}
                                         </p>
                                     )}
                                     <p className="mt-2 text-sm text-red-600 dark:text-red-400">
@@ -458,7 +449,6 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                         {/* Other required docs */}
                                         {DOC_FIELDS.map(doc => {
                                             const existingUrl = previous_docs?.[doc.urlKey] ?? null;
-                                            const expiryKey = isExpiringDoc(doc.key) ? (`${doc.key}_expires_at` as `${ExpiringDoc}_expires_at`) : null;
                                             return (
                                                 <div key={doc.key}>
                                                     {existingUrl && <PreviousDocBadge url={existingUrl} />}
@@ -475,12 +465,6 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                                     {doc.key === 'dti_sec_registration' && (
                                                         <div className="mt-2">
                                                             <DtiSecKindToggle value={data.dti_sec_kind} error={errors.dti_sec_kind} onChange={(v) => setData('dti_sec_kind', v)} />
-                                                        </div>
-                                                    )}
-                                                    {expiryKey && (
-                                                        <div className="mt-2">
-                                                            <PermitExpiryInput id={expiryKey} value={data[expiryKey]}
-                                                                error={errors[expiryKey]} onChange={(v) => setData(expiryKey, v)} />
                                                         </div>
                                                     )}
                                                 </div>

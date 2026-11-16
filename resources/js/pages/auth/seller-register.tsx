@@ -12,7 +12,7 @@ import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
-import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, EXPIRING_DOCS, isExpiringDoc, PermitExpiryInput, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
+import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { appendOtherRows, OtherDocumentsFields, StoreNameWarning, useStoreNameCheck, type OtherDocRow } from '@/components/other-documents-fields';
 import { Button } from '@/components/ui/button';
@@ -178,8 +178,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
         store_province:        'Cavite',
     });
 
-    // "Valid until" dates of the expiring permits, and the optional logo
-    const [expiries, setExpiries] = useState<Record<string, string>>({});
+    // The optional logo (no "valid until" dates: the admin reads them from the documents — J3)
     const [logo, setLogo] = useState<File | null>(null);
     // Owner's live-camera selfie (required, next to the valid ID) — no file upload
     const [selfie, setSelfie] = useState<File | null>(null);
@@ -228,7 +227,6 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
         for (const [key, file] of Object.entries(files)) {
             if (file) formData.append(key, file);
         }
-        for (const key of EXPIRING_DOCS) formData.append(`${key}_expires_at`, expiries[key] ?? '');
         formData.append('dti_sec_kind', dtiSecKind);
         if (logo) formData.append('logo', logo);
         if (selfie) formData.append('selfie', selfie);
@@ -252,7 +250,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
             // Navigate back to offending step
             const step1Keys = ['first_name', 'middle_name', 'last_name', 'suffix', 'email', 'phone', 'password', 'password_confirmation',
                                'store_name', 'store_description', 'store_address', 'store_city', 'store_barangay', 'logo', 'latitude', 'longitude'];
-            const step2Keys = [...DOC_FIELDS.map(d => d.key), 'selfie', 'dti_sec_kind', ...EXPIRING_DOCS.map((k) => `${k}_expires_at`)];
+            const step2Keys = [...DOC_FIELDS.map(d => d.key), 'selfie', 'dti_sec_kind'];
             if (step1Keys.some((k) => mapped[k])) setStep(1);
             else if (step2Keys.some((k) => mapped[k]) || Object.keys(mapped).some((k) => k.startsWith('other_documents'))) setStep(2);
             else setStep(3);
@@ -548,10 +546,6 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                             {doc.key === 'dti_sec_registration' && (
                                                 <DtiSecKindToggle value={dtiSecKind} error={errors.dti_sec_kind}
                                                     onChange={(v) => { setDtiSecKind(v); setErrors((p) => ({ ...p, dti_sec_kind: '' })); }} />
-                                            )}
-                                            {isExpiringDoc(doc.key) && (
-                                                <PermitExpiryInput id={`${doc.key}_expires_at`} value={expiries[doc.key] ?? ''} error={errors[`${doc.key}_expires_at`]}
-                                                    onChange={(v) => setExpiries((e) => ({ ...e, [doc.key]: v }))} />
                                             )}
                                         </div>
                                     ))}

@@ -109,6 +109,10 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
     });
     // Approve with the checklist — same access as Verifications → approve
     Route::patch('stores/{store}/approve', [StoreController::class, 'approve'])->middleware('permission:verifications.view')->name('stores.approve');
+    // Review an application one document at a time (Accept / Reject, saved at once) and send it back with the reasons (J3)
+    Route::post('stores/{store}/review/{key}', [StoreController::class, 'decide'])->where('key', '[a-z_]+|other-[0-9]+')
+        ->middleware(['permission:verifications.view', 'throttle:120,1'])->name('stores.review');
+    Route::post('stores/{store}/send-back', [StoreController::class, 'sendBack'])->middleware('permission:verifications.view')->name('stores.send-back');
     // Auto-read (OCR) one document: {key} = doc type, 'valid_id' or 'sub-{submissionId}'. canReviewDocuments() in the controller.
     Route::post('stores/{store}/documents/{key}/ocr', [\App\Http\Controllers\Admin\DocumentOcrController::class, 'read'])
         ->where('key', '[a-z_]+|sub-[0-9]+')->middleware('throttle:20,1')->name('stores.documents.ocr');

@@ -13,7 +13,7 @@ class Store extends Model
     use HasFactory, SoftDeletes;
 
     /** Admin review data — never sent to customers (raw Store models reach some customer pages) */
-    protected $hidden = ['approval_checks', 'document_ocr', 'duplicate_flags', 'document_hashes'];
+    protected $hidden = ['approval_checks', 'document_reviews', 'document_ocr', 'duplicate_flags', 'document_hashes'];
 
     protected $fillable = [
         'user_id',
@@ -64,6 +64,7 @@ class Store extends Model
         'business_permit_expires_at',
         'fsic_permit_expires_at',
         'doe_lpg_license_expires_at',
+        'dti_sec_expires_at',          // DTI Business Name certificate (DTI only) — J3
         'lto_permit_expires_at',
         // DTI Business Name or SEC Registration (replaces the LTO upload — the DOE license IS the LTO)
         'dti_sec_registration',
@@ -72,6 +73,7 @@ class Store extends Model
         'documents_suspended_at',
         'refund_window_days',
         'approval_checks',
+        'document_reviews',            // per-document Accept / Reject on the application (J3)
         'document_ocr',
         'duplicate_flags',
         'document_hashes',
@@ -95,6 +97,7 @@ class Store extends Model
             'business_permit_expires_at' => 'date',
             'fsic_permit_expires_at'     => 'date',
             'doe_lpg_license_expires_at' => 'date',
+            'dti_sec_expires_at'         => 'date',
             'lto_permit_expires_at'      => 'date',
             'documents_suspended'        => 'boolean',
             'documents_suspended_at'     => 'datetime',
@@ -105,6 +108,7 @@ class Store extends Model
             'consignment_due_days'     => 'integer',
             'refund_window_days'       => 'integer',
             'approval_checks'          => 'array',
+            'document_reviews'         => 'array',
             'document_ocr'             => 'array',
             'duplicate_flags'          => 'array',
             'document_hashes'          => 'array',

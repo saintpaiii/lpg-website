@@ -114,15 +114,14 @@ class SellerRegistrationController extends Controller
             'latitude'              => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
             'longitude'             => ['required', 'numeric', 'between:-180,180'],
 
-            // Permit "Valid until" dates
-            ...StoreDocuments::expiryRules(),
+            // No "valid until" dates here: the admin confirms them from the documents (OCR pre-fills them) — J3
 
             // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
             ...StoreDocuments::otherDocumentRules(),
 
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + \App\Support\UploadMessages::for(['selfie'], false) + ['selfie.required' => 'Please take a selfie with your camera.'] + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + \App\Support\UploadMessages::for(['selfie'], false) + ['selfie.required' => 'Please take a selfie with your camera.'] + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         $validated['suffix'] = ($validated['suffix'] ?? null) ?: null;
         if ($signedIn) {
@@ -209,9 +208,6 @@ class SellerRegistrationController extends Controller
                 'logo'             => $logoPath,
                 'latitude'         => $validated['latitude'],
                 'longitude'        => $validated['longitude'],
-                'business_permit_expires_at' => $validated['business_permit_expires_at'],
-                'fsic_permit_expires_at'     => $validated['fsic_permit_expires_at'],
-                'doe_lpg_license_expires_at' => $validated['doe_lpg_license_expires_at'],
                 'status'           => 'pending',
                 'subscription_plan'=> 'none',
                 'is_featured'      => false,

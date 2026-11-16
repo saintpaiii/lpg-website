@@ -9,6 +9,7 @@ use App\Models\AccountAction;
 use App\Models\Store;
 use App\Models\VerificationRequest;
 use App\Services\DocumentOcrService;
+use App\Services\StoreReviewService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -204,7 +205,8 @@ class StoreController extends Controller
                 ])->values(),
 
             // ── Review aids ──────────────────────────────────────────────────
-            'checklist'       => collect(config('store_checklist'))->map(fn ($label, $key) => ['key' => $key, 'label' => $label])->values(),
+            // Pending application: documents to review (Accept / Reject each) + the two checklist items (J3)
+            'review'          => $store->status === 'pending' ? $this->review($store, $verification) : null,
             'approvalChecks'  => $this->approvalChecks($store),
             'duplicates'      => array_values($store->duplicate_flags['matches'] ?? []),
             'ocrEnabled'      => DocumentOcrService::enabled(),
@@ -224,7 +226,8 @@ class StoreController extends Controller
         if (! $c) {
             return null;
         }
-        $labels = config('store_checklist');
+        // New keys, the pre-J3 keys (old approvals) and labels saved with the approval (extra documents)
+        $labels = array_merge((array) config('store_checklist.legacy'), collect(config('store_checklist'))->except('legacy')->all(), (array) ($c['labels'] ?? []));
 
         return [
             'items'   => collect($c['items'] ?? [])->filter()->keys()->map(fn ($k) => $labels[$k] ?? $k)->values(),
@@ -249,8 +252,9 @@ class StoreController extends Controller
     }
 
     /**
-     * Approve a seller application — only from the store page, with every item of the "Before you approve" checklist
-     * ticked (config/store_checklist.php). Same access as Verifications (route middleware permission:verifications.view).
+     * Approve a seller application — only from the store page, when every required document and the two checklist items
+     * are Accepted (stores.document_reviews, re-checked here) and every extra document is decided.
+     * Same access as Verifications (route middleware permission:verifications.view).
      */
     public function approve(Request $request, Store $store): RedirectResponse
     {
@@ -258,17 +262,19 @@ class StoreController extends Controller
             return back()->with('error', 'This store is not waiting for approval.');
         }
 
-        $keys = array_keys(config('store_checklist'));
-        $data = $request->validate([
-            'checks'   => ['required', 'array'],
-            ...collect($keys)->mapWithKeys(fn ($k) => ["checks.$k" => ['required', 'accepted']])->all(),
-            'note'     => ['nullable', 'string', 'max:500'],
-        ], [
-            'checks.required' => 'Tick every check before approving.',
-            ...collect($keys)->mapWithKeys(fn ($k) => ["checks.$k.required" => 'Tick every check before approving.', "checks.$k.accepted" => 'Tick every check before approving.'])->all(),
-        ]);
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
 
-        $approved = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $request, $keys, $data) {
+        $documents = StoreReviewService::documents($store);
+        $decisions = StoreReviewService::decisions($store, $documents);
+        if ($why = StoreReviewService::approveBlocker($documents, $decisions)) {
+            return back()->with('error', $why);
+        }
+        // What was accepted (saved like before: {items: {key: true}, note, by…}); extras keep their label for the history
+        $keys   = [...array_column(array_filter($documents, fn ($d) => $decisions[$d['key']]['status'] === 'accepted'), 'key'), ...StoreDocuments::REVIEW_ITEMS];
+        $extras = collect($documents)->where('required', false)->filter(fn ($d) => $decisions[$d['key']]['status'] === 'accepted')
+            ->mapWithKeys(fn ($d) => [$d['key'] => $d['label']])->all();
+
+        $approved = \Illuminate\Support\Facades\DB::transaction(function () use ($store, $request, $keys, $data, $extras) {
             // Lock the row: two admins clicking Approve at once approve (and start the trial) only once
             $row = Store::whereKey($store->id)->lockForUpdate()->first();
             if (! $row || $row->status !== 'pending') {
@@ -281,6 +287,7 @@ class StoreController extends Controller
                 'approved_by'     => $request->user()->id,
                 'approval_checks' => [
                     'items'   => collect($keys)->mapWithKeys(fn ($k) => [$k => true])->all(),
+                    'labels'  => $extras ?: null,
                     'note'    => ($data['note'] ?? null) ?: null,
                     'by_id'   => $request->user()->id,
                     'by_name' => $request->user()->name,
@@ -362,6 +369,151 @@ class StoreController extends Controller
             ]);
 
         return back()->with('success', "{$store->store_name} has been rejected.");
+    }
+
+    /**
+     * POST admin/stores/{store}/review/{key} — Accept / Reject ONE document (or address_pin / duplicates), saved at once.
+     * Accepting a document that expires needs its "valid until" date (pre-filled by OCR on the page) → written to the
+     * store's *_expires_at column so reminders and the auto-hide work. Extra documents also update their submission.
+     */
+    public function decide(Request $request, Store $store, string $key): RedirectResponse
+    {
+        if ($store->status !== 'pending') {
+            return back()->with('error', 'This store is not waiting for review.');
+        }
+        $documents = collect(StoreReviewService::documents($store))->keyBy('key');
+        abort_unless($documents->has($key) || in_array($key, StoreDocuments::REVIEW_ITEMS, true), 404);
+        $doc = $documents->get($key);
+
+        $accept = $request->input('decision') === 'accept';
+        $data = $request->validate([
+            'decision'   => ['required', 'in:accept,reject,undo'],
+            'reason'     => ['required_if:decision,reject', 'nullable', \Illuminate\Validation\Rule::in(StoreDocuments::REJECT_REASONS)],
+            'note'       => [$request->input('reason') === 'Other' ? 'required' : 'nullable', 'string', 'max:300'],
+            'expires_at' => $accept && ($doc['needs_date'] ?? false) ? StoreDocuments::validUntilRule() : ['nullable'],
+        ], [
+            'reason.required_if' => 'Choose why this document is rejected.',
+            'note.required'      => 'Type the reason.',
+        ] + StoreDocuments::validUntilMessages());
+
+        $user = $request->user();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($store, $key, $data, $doc, $user, $accept) {
+            $row = Store::whereKey($store->id)->lockForUpdate()->first();
+            $all = (array) ($row->document_reviews ?? []);
+            if ($data['decision'] === 'undo') {
+                unset($all[$key]);
+            } else {
+                $all[$key] = [
+                    'status'     => $accept ? 'accepted' : 'rejected',
+                    'reason'     => $accept ? null : $data['reason'],
+                    'note'       => $accept ? null : (($data['note'] ?? null) ?: null),
+                    'by_id'      => $user->id,
+                    'by_name'    => $user->name,
+                    'at'         => now()->toIso8601String(),
+                    'expires_at' => $accept && ($doc['needs_date'] ?? false) ? $data['expires_at'] : null,
+                ];
+            }
+            $updates = ['document_reviews' => $all ?: null];
+            // The confirmed date is the store's permit date (reminders, 7-day auto-hide)
+            if ($accept && ($doc['expiry_column'] ?? null)) {
+                $updates[$doc['expiry_column']] = $data['expires_at'];
+            }
+            $row->forceFill($updates)->save();
+
+            // An extra document's own row follows the decision (so it isn't reviewed twice in Store Documents)
+            if ($doc && $doc['submission_id']) {
+                \App\Models\StoreDocumentSubmission::whereKey($doc['submission_id'])->update(match ($data['decision']) {
+                    'accept' => ['status' => 'approved', 'rejection_reason' => null, 'reviewed_by' => $user->id, 'reviewed_at' => now()],
+                    'reject' => ['status' => 'rejected', 'rejection_reason' => $data['reason'] . (($data['note'] ?? null) ? " ({$data['note']})" : ''), 'reviewed_by' => $user->id, 'reviewed_at' => now()],
+                    default  => ['status' => 'pending', 'rejection_reason' => null, 'reviewed_by' => null, 'reviewed_at' => null],
+                });
+            }
+        });
+
+        $label = $doc['label'] ?? StoreDocuments::reviewLabel($key);
+
+        return back()->with('success', match ($data['decision']) {
+            'accept' => "{$label} accepted.",
+            'reject' => "{$label} rejected — {$data['reason']}.",
+            default  => "{$label} is back to Not reviewed.",
+        });
+    }
+
+    /**
+     * POST admin/stores/{store}/send-back — anything rejected → the application goes back to the seller (the existing
+     * reject / resubmission flow) with EACH rejected document and its reason. Accepted documents stay accepted.
+     */
+    public function sendBack(Request $request, Store $store): RedirectResponse
+    {
+        if ($store->status !== 'pending') {
+            return back()->with('error', 'This store is not waiting for review.');
+        }
+        $data = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
+
+        $documents = StoreReviewService::documents($store);
+        $lines = StoreReviewService::rejectedLines($documents, StoreReviewService::decisions($store, $documents));
+        if (! $lines) {
+            return back()->with('error', 'Reject at least one document before sending the application back.');
+        }
+
+        $reason = "Please fix and re-upload:\n" . collect($lines)->map(fn ($l) => '• ' . $l['text'])->implode("\n")
+            . (($data['note'] ?? null) ? "\nNote from the admin: {$data['note']}" : '');
+
+        $store->update(['status' => 'rejected']);
+        $store->owner?->verificationRequests()
+            ->where('type', 'seller_application')
+            ->where('status', 'pending')
+            ->update([
+                'status'           => 'rejected',
+                'reviewed_by'      => $request->user()->id,
+                'reviewed_at'      => now(),
+                'rejection_reason' => mb_substr($reason, 0, 1000),
+            ]);
+
+        AccountAction::create([
+            'target_type'  => 'store',
+            'target_id'    => $store->id,
+            'action'       => 'send_back',
+            'reason'       => collect($lines)->pluck('text')->implode('; '),
+            'notes'        => ($data['note'] ?? null) ?: null,
+            'performed_by' => $request->user()->id,
+        ]);
+
+        if ($store->user_id) {
+            // Seller-only accounts fix it on /seller/pending; "Start Selling" customers on /customer/become-seller
+            $link = $store->owner?->role === 'customer' ? '/customer/become-seller' : '/seller/pending';
+            \App\Services\NotificationService::send($store->user_id, 'system', 'Your store application needs changes',
+                'Please re-upload: ' . collect($lines)->pluck('text')->implode('; ') . '.', ['link' => $link]);
+        }
+
+        return back()->with('success', "{$store->store_name} was sent back to the seller (" . count($lines) . ' document' . (count($lines) === 1 ? '' : 's') . ' to fix).');
+    }
+
+    /** Documents to review + their decisions for the store page (pending applications). */
+    private function review(Store $store, ?VerificationRequest $application): array
+    {
+        $documents = StoreReviewService::documents($store, $application);
+        $decisions = StoreReviewService::decisions($store, $documents, $application);
+        $saved     = (array) ($store->document_ocr ?? []);
+        $subs      = \App\Models\StoreDocumentSubmission::whereIn('id', array_filter(array_column($documents, 'submission_id')))->get()->keyBy('id');
+
+        return [
+            'documents' => array_map(fn ($d) => $d + [
+                // Auto-read key: the doc type, or "sub-{id}" for an extra document (read one by one by the page)
+                'ocr_key' => $d['submission_id'] ? 'sub-' . $d['submission_id'] : $d['key'],
+                'ocr'     => DocumentOcrController::present($d['submission_id'] ? $subs->get($d['submission_id'])?->ocr : ($saved[$d['key']] ?? null)),
+            ], $documents),
+            'decisions' => $decisions,
+            'blocker'   => StoreReviewService::approveBlocker($documents, $decisions),
+            'rejected'  => StoreReviewService::rejectedLines($documents, $decisions),
+            'reasons'   => StoreDocuments::REJECT_REASONS,
+            'pin'       => [
+                'lat'     => $store->latitude !== null ? (float) $store->latitude : null,
+                'lng'     => $store->longitude !== null ? (float) $store->longitude : null,
+                'address' => collect([$store->address, $store->barangay, $store->city, $store->province])->filter()->implode(', '),
+            ],
+            'max_date'  => StoreDocuments::today()->addYears(5)->toDateString(),
+        ];
     }
 
     public function suspend(Request $request, Store $store): RedirectResponse

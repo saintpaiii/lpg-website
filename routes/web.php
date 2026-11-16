@@ -79,7 +79,10 @@ Route::post('/seller/register', [SellerRegistrationController::class, 'store'])-
 // "A store with this name already exists in …" while typing (guest page AND become-seller — no guest middleware).
 // Returns only {exists, count, cities}.
 Route::get('/seller/register/check-name', [SellerRegistrationController::class, 'checkName'])->middleware('throttle:20,1')->name('seller.register.check-name');
-Route::get('/seller/pending', fn () => inertia('auth/seller-pending'))->name('seller.pending');
+Route::get('/seller/pending', [\App\Http\Controllers\SellerPendingController::class, 'show'])->name('seller.pending');
+// Sent back by the admin (J3): a seller-only owner re-uploads just the rejected documents
+Route::post('/seller/pending/resubmit', [\App\Http\Controllers\SellerPendingController::class, 'resubmit'])
+    ->middleware(['auth', 'throttle:10,1'])->name('seller.pending.resubmit');
 
 require __DIR__.'/settings.php';
 require __DIR__.'/admin.php';

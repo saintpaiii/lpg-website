@@ -33,8 +33,9 @@ class DocumentOcrCheck
         }
 
         $dates  = static::findDates($text);
-        // The ID and the DTI / SEC registration get no expiry check (name check only)
-        $expiry = in_array($docType, ['valid_id', 'dti_sec_registration'], true) ? null : static::likelyExpiry($text, $dates);
+        // The ID and an SEC registration get no expiry check (name check only); a DTI Business Name certificate is valid 5 years
+        $noExpiry = $docType === 'valid_id' || ($docType === 'dti_sec_registration' && $store->dti_sec_kind !== 'dti');
+        $expiry = $noExpiry ? null : static::likelyExpiry($text, $dates);
         $tin    = preg_match('/\b\d{3}-?\d{3}-?\d{3}(?:-?\d{3,5})?\b/', $text, $m) ? $m[0] : null;
 
         // Name check: the owner's name on the ID; the store (or owner) name on business documents
@@ -58,7 +59,7 @@ class DocumentOcrCheck
                 $warnings[] = 'Expiry date on the document looks like ' . Carbon::parse($expiry)->format('M j, Y')
                     . ' — the seller typed ' . Carbon::parse($typed)->format('M j, Y') . '.';
             }
-        } elseif ($typedExpiry && StoreDocuments::expiryColumn($docType) && ! $expiry) {
+        } elseif ($typedExpiry && StoreDocuments::expiryColumnFor($store, $docType) && ! $expiry) {
             $warnings[] = 'No expiry date was found on the document — check it by eye.';
         }
         if ($expiry && Carbon::parse($expiry)->lt(StoreDocuments::today())) {

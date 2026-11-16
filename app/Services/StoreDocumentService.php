@@ -25,7 +25,7 @@ class StoreDocumentService
 
         if ($overdue && ! $store->documents_suspended) {
             $store->forceFill(['documents_suspended' => true, 'documents_suspended_at' => now()])->save();
-            $label = StoreDocuments::label($overdue['type']);
+            $label = StoreDocuments::labelFor($store, $overdue['type']);
             $date  = StoreDocuments::expiry($store, $overdue['type'])->format('M d, Y');
             NotificationService::send($store->user_id, 'system', 'Store hidden from customers',
                 "Your store is hidden from customers because your {$label} expired on {$date}. Upload the renewed document in Store Documents.",

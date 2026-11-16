@@ -59,7 +59,9 @@ class StoreDocumentController extends Controller
                     'label'           => $d->doc_type === 'dti_sec_registration' ? StoreDocuments::dtiSecLabel($d->dti_sec_kind)
                         : ($isPermit ? StoreDocuments::label($d->doc_type) : ($d->label ?? 'Other document')),
                     'is_other'        => ! $isPermit,
-                    'has_expiry'      => $isPermit ? StoreDocuments::expiryColumn($d->doc_type) !== null : true,
+                    // Only the 4 documents that expire ask for a date (DTI only when it is a DTI certificate); extras never
+                    'has_expiry'      => $isPermit && StoreDocuments::expiryColumn($d->doc_type, $d->dti_sec_kind ?? $d->store?->dti_sec_kind) !== null,
+                    'is_pdf'          => str_ends_with(strtolower((string) $d->file_path), '.pdf'),
                     'current_expires' => $isPermit && $d->store ? StoreDocuments::expiry($d->store, $d->doc_type)?->format('M d, Y') : null,
                     'new_expires'     => $d->expires_at?->toDateString(),
                     'new_expires_on'  => $d->expires_at?->format('M d, Y'),
@@ -82,6 +84,8 @@ class StoreDocumentController extends Controller
             'counts'   => ['pending' => $pending->count(), 'expiring' => count($rows['expiring']), 'expired' => count($rows['expired']), 'missing' => count($rows['missing'])],
             'max_date' => StoreDocuments::today()->addYears(5)->toDateString(),
             'ocr_enabled' => \App\Services\DocumentOcrService::enabled(),
+            // Same Reject reasons as the store application review (J3)
+            'reject_reasons' => StoreDocuments::REJECT_REASONS,
         ]);
     }
 
@@ -90,15 +94,18 @@ class StoreDocumentController extends Controller
         $this->allowed($request);
         abort_unless($submission->status === 'pending', 422, 'This document was already reviewed.');
 
-        $column = $submission->doc_type !== 'other' ? StoreDocuments::expiryColumn($submission->doc_type) : null;
+        // The admin confirms the "valid until" printed on the document (pre-filled by OCR; the seller no longer types it)
+        $column = $submission->doc_type !== 'other'
+            ? StoreDocuments::expiryColumn($submission->doc_type, $submission->dti_sec_kind ?? $submission->store?->dti_sec_kind)
+            : null;
         $data = $request->validate([
-            'expires_at' => [$column ? 'required' : 'nullable', 'date', 'after:today', 'before_or_equal:' . StoreDocuments::today()->addYears(5)->toDateString()],
-        ], ['expires_at.required' => 'Please enter the date the document is valid until.']);
+            'expires_at' => $column ? StoreDocuments::validUntilRule() : ['nullable'],
+        ], StoreDocuments::validUntilMessages());
 
         DB::transaction(function () use ($submission, $data, $column, $request) {
             $submission->update([
                 'status'      => 'approved',
-                'expires_at'  => $data['expires_at'] ?? $submission->expires_at,
+                'expires_at'  => $column ? $data['expires_at'] : null,
                 'reviewed_by' => $request->user()->id,
                 'reviewed_at' => now(),
             ]);
@@ -110,7 +117,11 @@ class StoreDocumentController extends Controller
                     $updates['dti_sec_kind'] = $submission->dti_sec_kind;
                 }
                 if ($column) {
-                    $updates[$column] = $submission->expires_at;
+                    $updates[$column] = $data['expires_at'];
+                }
+                // SEC now → no DTI date
+                if ($submission->doc_type === 'dti_sec_registration' && ! $column) {
+                    $updates['dti_sec_expires_at'] = null;
                 }
                 // Its auto-read result and file hash (duplicate check) now describe the store's current permit
                 $store  = Store::whereKey($submission->store_id)->lockForUpdate()->first();

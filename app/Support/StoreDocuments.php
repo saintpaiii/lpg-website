@@ -19,9 +19,41 @@ class StoreDocuments
         'fsic_permit'     => ['label' => 'Fire Safety Inspection Certificate (FSIC)', 'expiry' => 'fsic_permit_expires_at'],
         // RA 11592: the DOE issues the License to Operate — it IS the "LTO" (the old separate lto_permit is no longer asked)
         'doe_lpg_license' => ['label' => 'DOE License to Operate (LTO) — LPG Retail Outlet', 'expiry' => 'doe_lpg_license_expires_at'],
-        // Business-name registration: DTI (single owner) or SEC (corporation / partnership). Never expires here, never hides a store.
-        'dti_sec_registration' => ['label' => 'DTI Business Name or SEC Registration',   'expiry' => null],
+        // Business-name registration: DTI (single owner) or SEC (corporation / partnership). The DTI certificate is valid
+        // 5 years (dti_sec_expires_at, J3); SEC registration never expires — see expiryColumn($type, $kind).
+        'dti_sec_registration' => ['label' => 'DTI Business Name or SEC Registration',   'expiry' => 'dti_sec_expires_at'],
     ];
+
+    /** Required documents reviewed on the admin store page (+ every extra "other-{id}"), in review order. */
+    public const REVIEW_DOCS = ['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration'];
+
+    /** The two non-document checklist items. */
+    public const REVIEW_ITEMS = ['address_pin', 'duplicates'];
+
+    /** Reasons the admin picks when rejecting one document. */
+    public const REJECT_REASONS = [
+        'Blurry / unreadable',
+        'Expired',
+        'Wrong document',
+        "Business name doesn't match",
+        "Name on ID doesn't match the owner",
+        'Edited / tampered',
+        'Other',
+    ];
+
+    /** "Valid ID (owner)", "FSIC", "DTI Business Name certificate"… — short names for the review list and seller messages. */
+    public static function reviewLabel(string $key, ?string $dtiSecKind = null): string
+    {
+        return match ($key) {
+            'valid_id'             => 'Valid ID (owner)',
+            'fsic_permit'          => 'FSIC',
+            'doe_lpg_license'      => 'DOE License to Operate',
+            'dti_sec_registration' => $dtiSecKind === 'sec' ? 'SEC Registration' : ($dtiSecKind === 'dti' ? 'DTI Business Name certificate' : 'DTI / SEC Registration'),
+            'address_pin'          => 'Store address matches the map pin',
+            'duplicates'           => 'Duplicate warnings checked (or none)',
+            default                => self::label($key),
+        };
+    }
 
     /** dti_sec_kind values */
     public const DTI_SEC_KINDS = ['dti' => 'DTI', 'sec' => 'SEC'];
@@ -79,7 +111,6 @@ class StoreDocuments
             'other_documents'              => ['nullable', 'array', 'max:' . self::MAX_OTHER_AT_REGISTRATION],
             'other_documents.*.label'      => ['required_with:other_documents.*.file', 'nullable', 'string', 'max:100'],
             'other_documents.*.file'       => ['required_with:other_documents.*.label', 'nullable', \Illuminate\Validation\Rules\File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024)],
-            'other_documents.*.expires_at' => ['nullable', 'date', 'after:today'],
         ];
     }
 
@@ -161,7 +192,7 @@ class StoreDocuments
                 'doc_type'     => 'other',
                 'label'        => $label,
                 'file_path'    => $file->store('store_documents', 'local'),
-                'expires_at'   => $request->input("other_documents.$i.expires_at") ?: null,
+                'expires_at'   => null,   // extra documents have no expiry (J3)
                 'status'       => 'pending',
                 'submitted_by' => $userId,
             ]);
@@ -171,25 +202,22 @@ class StoreDocuments
         return $n;
     }
 
-    /** Validation for the "Valid until" dates on the seller application forms. */
-    public static function expiryRules(): array
+    /**
+     * Validation for the "Valid until" date the ADMIN confirms when accepting an expiring document (J3 — sellers no
+     * longer type it; OCR pre-fills it). At most 5 years ahead.
+     */
+    public static function validUntilRule(bool $required = true): array
     {
-        $rule = ['required', 'date', 'after:today', 'before_or_equal:' . self::today()->addYears(5)->toDateString()];
-
-        return collect(self::expiringTypes())->mapWithKeys(fn ($t) => [self::expiryColumn($t) => $rule])->all();
+        return [$required ? 'required' : 'nullable', 'date', 'after:today', 'before_or_equal:' . self::today()->addYears(5)->toDateString()];
     }
 
-    public static function expiryMessages(): array
+    public static function validUntilMessages(string $field = 'expires_at'): array
     {
-        $m = [];
-        foreach (self::expiringTypes() as $t) {
-            $col = self::expiryColumn($t);
-            $m["{$col}.required"]        = 'Please enter the date your ' . self::label($t) . ' is valid until.';
-            $m["{$col}.after"]           = 'The ' . self::label($t) . ' must still be valid (date after today).';
-            $m["{$col}.before_or_equal"] = 'Please check the ' . self::label($t) . ' date (at most 5 years ahead).';
-        }
-
-        return $m;
+        return [
+            "{$field}.required"        => 'Enter the "valid until" date printed on the document.',
+            "{$field}.after"           => 'This document has expired (the date is not after today) — reject it instead.',
+            "{$field}.before_or_equal" => 'Please check the date (at most 5 years ahead).',
+        ];
     }
 
     public static function label(string $type): string
@@ -197,12 +225,32 @@ class StoreDocuments
         return self::TYPES[$type]['label'] ?? $type;
     }
 
-    public static function expiryColumn(string $type): ?string
+    /**
+     * The store column holding the "valid until" date, or null when the document doesn't expire.
+     * The DTI / SEC registration expires only when it is a DTI certificate ($dtiSecKind = 'dti').
+     */
+    public static function expiryColumn(string $type, ?string $dtiSecKind = null): ?string
     {
+        if ($type === 'dti_sec_registration' && $dtiSecKind !== 'dti') {
+            return null;
+        }
+
         return self::TYPES[$type]['expiry'] ?? null;
     }
 
-    /** Types that have an expiry date. */
+    /** Same, for one store (uses its DTI / SEC choice). */
+    public static function expiryColumnFor(Store $store, string $type): ?string
+    {
+        return self::expiryColumn($type, $store->dti_sec_kind);
+    }
+
+    /** Reminder / banner label: "DTI Business Name certificate" instead of the combined DTI / SEC label. */
+    public static function labelFor(Store $store, string $type): string
+    {
+        return $type === 'dti_sec_registration' ? self::reviewLabel($type, $store->dti_sec_kind) : self::label($type);
+    }
+
+    /** Types that CAN have an expiry date (DTI / SEC: only a DTI certificate — use expiryColumnFor / statusFor per store). */
     public static function expiringTypes(): array
     {
         return array_keys(array_filter(self::TYPES, fn ($t) => $t['expiry'] !== null));
@@ -215,7 +263,7 @@ class StoreDocuments
 
     public static function expiry(Store $store, string $type): ?CarbonInterface
     {
-        $col = self::expiryColumn($type);
+        $col = self::expiryColumnFor($store, $type);
         $date = $col ? $store->{$col} : null;
 
         return $date ? Carbon::parse($date->format('Y-m-d'), 'Asia/Manila')->startOfDay() : null;
@@ -232,7 +280,7 @@ class StoreDocuments
     /** 'valid' | 'expiring' (≤ 30 days left) | 'expired' (date before today) | 'no_date' | 'no_expiry' (BIR) */
     public static function statusFor(Store $store, string $type): string
     {
-        if (! self::expiryColumn($type)) {
+        if (! self::expiryColumnFor($store, $type)) {
             return 'no_expiry';
         }
         $days = self::daysLeft($store, $type);
@@ -252,7 +300,7 @@ class StoreDocuments
 
         return [
             'type'       => $type,
-            'label'      => self::label($type),
+            'label'      => self::labelFor($store, $type),
             'expires'    => $exp?->toDateString(),
             'expires_on' => $exp?->format('M d, Y'),
             'days_left'  => self::daysLeft($store, $type),

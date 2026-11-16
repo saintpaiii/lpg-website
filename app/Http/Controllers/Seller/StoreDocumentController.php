@@ -35,7 +35,7 @@ class StoreDocumentController extends Controller
 
             return StoreDocuments::summary($store, $type) + [
                 'file_url'        => $store->{$type} ? PrivateDocument::url('store', $store->id, $type) : null,
-                'has_expiry'      => StoreDocuments::expiryColumn($type) !== null,
+                'has_expiry'      => StoreDocuments::expiryColumnFor($store, $type) !== null,
                 'pending'         => (bool) $mine->firstWhere('status', 'pending'),
                 'pending_expires' => $mine->firstWhere('status', 'pending')?->expires_at?->format('M d, Y'),
                 'rejected_reason' => $latest?->status === 'rejected' ? $latest->rejection_reason : null,
@@ -76,14 +76,9 @@ class StoreDocumentController extends Controller
             'file'       => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
             // DTI (single owner) or SEC (corporation / partnership) — only for the DTI / SEC registration
             'dti_sec_kind' => [Rule::requiredIf(fn () => $request->input('doc_type') === 'dti_sec_registration'), 'nullable', 'in:dti,sec'],
-            'expires_at' => [
-                Rule::requiredIf(fn () => StoreDocuments::expiryColumn((string) $request->input('doc_type')) !== null),
-                'nullable', 'date', 'after:today', 'before_or_equal:' . StoreDocuments::today()->addYears(5)->toDateString(),
-            ],
+            // No "valid until" here (J3): the admin reads it from the document (OCR pre-fills it) when approving
         ], [
             'label.required_if'   => 'Please enter the name of the document (e.g. DTI Registration).',
-            'expires_at.required' => 'Please enter the date this document is valid until.',
-            'expires_at.after'    => 'The document must still be valid (date after today).',
             'file.max'            => 'The file must be 5 MB or smaller.',
         ] + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['file']));
 
@@ -108,7 +103,7 @@ class StoreDocumentController extends Controller
             'doc_type'     => $type,
             'label'        => $label,
             'file_path'    => $request->file('file')->store('store_documents', 'local'),
-            'expires_at'   => $data['expires_at'] ?? null,
+            'expires_at'   => null,   // set by the admin on approval
             'status'       => 'pending',
             'submitted_by' => $request->user()->id,
             'dti_sec_kind' => $type === 'dti_sec_registration' ? ($data['dti_sec_kind'] ?? null) : null,

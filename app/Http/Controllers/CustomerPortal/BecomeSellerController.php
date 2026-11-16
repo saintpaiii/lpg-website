@@ -51,10 +51,6 @@ class BecomeSellerController extends Controller
                     'logo_url'    => $store->logo ? Storage::url($store->logo) : null,
                     'latitude'    => $store->latitude !== null ? (float) $store->latitude : null,
                     'longitude'   => $store->longitude !== null ? (float) $store->longitude : null,
-                    // Permit "Valid until" dates are pre-filled on resubmission (still required)
-                    ...collect(StoreDocuments::expiringTypes())->mapWithKeys(fn ($t) => [
-                        StoreDocuments::expiryColumn($t) => $store->{StoreDocuments::expiryColumn($t)}?->toDateString(),
-                    ])->all(),
                     'province'    => $store->province,
                     'phone'       => $store->phone,
                     'dti_sec_kind' => $store->dti_sec_kind,
@@ -99,6 +95,8 @@ class BecomeSellerController extends Controller
                 ? PrivateDocument::url('user', $user->id, 'valid_id_path')
                 : PrivateDocument::urlIf($user->valid_id, 'user', $user->id, 'valid_id'),
             'previous_store' => $previousStore,
+            // Sent back by the admin: "FSIC — Expired" … (J3)
+            'rejected_documents' => $ownStore ? \App\Services\StoreReviewService::rejectedForSeller($ownStore) : [],
             'previous_docs'  => $previousDocs,
             ...LegalService::sellerTermsProps(),
             // Max 5 rejected applications within 30 days
@@ -157,11 +155,10 @@ class BecomeSellerController extends Controller
             // Store pin (required — delivery fees and staff clock-in use it)
             'latitude'          => ['required', 'numeric', 'between:-90,90', new InServiceArea('longitude')],
             'longitude'             => ['required', 'numeric', 'between:-180,180'],
-            ...StoreDocuments::expiryRules(),
             // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
             ...StoreDocuments::otherDocumentRules(),
             'terms_agreed'      => ['required', 'accepted'],
-        ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
+        ], StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         // The user's existing store (resubmission) — never compared with itself
         $ownStore  = Store::where('user_id', $user->id)->first();
@@ -221,7 +218,7 @@ class BecomeSellerController extends Controller
         }
 
         $store = DB::transaction(function () use ($request, $user, $existingApp, $birPermitPath, $businessPermitPath, $fsicPermitPath,
-            $doeLicensePath, $dtiSecPath, $validIdPath, $logoPath, $hashes, $duplicate, $ocr, $otherRows) {
+            $doeLicensePath, $dtiSecPath, $validIdPath, $logoPath, $hashes, $duplicate, $ocr, $otherRows, $newHashes) {
             // Create or reset store for this user
             $store = Store::updateOrCreate(
                 ['user_id' => $user->id],
@@ -242,15 +239,18 @@ class BecomeSellerController extends Controller
                     'logo'            => $logoPath,
                     'latitude'        => $request->latitude,
                     'longitude'       => $request->longitude,
-                    'business_permit_expires_at' => $request->business_permit_expires_at,
-                    'fsic_permit_expires_at'     => $request->fsic_permit_expires_at,
-                    'doe_lpg_license_expires_at' => $request->doe_lpg_license_expires_at,
                     'status'          => 'pending',
                     'document_hashes' => $hashes ?: null,
                     'duplicate_flags' => DuplicateStoreService::flags($duplicate),
                     'document_ocr'    => $ocr ?: null,
                 ]
             );
+
+            // Resubmission: only the re-uploaded documents (and an edited address / pin) are reviewed again (J3)
+            if (! $store->wasRecentlyCreated) {
+                $addressChanged = $store->wasChanged(['address', 'city', 'barangay', 'latitude', 'longitude']);
+                \App\Services\StoreReviewService::resetReviews($store, array_keys($newHashes), $addressChanged);
+            }
 
             // Link user to store
             $user->update(['store_id' => $store->id]);

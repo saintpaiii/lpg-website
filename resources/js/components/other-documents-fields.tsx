@@ -27,13 +27,12 @@ export function appendOtherRows(fd: FormData, rows: OtherDocRow[]): void {
     filledOtherRows(rows).forEach((r, i) => {
         fd.append(`other_documents[${i}][label]`, r.label.trim());
         if (r.file) fd.append(`other_documents[${i}][file]`, r.file);
-        fd.append(`other_documents[${i}][expires_at]`, r.expires_at);
     });
 }
 
 /** For useForm: the filled rows as an array the Inertia FormData conversion understands */
 export function otherRowsPayload(rows: OtherDocRow[]) {
-    return filledOtherRows(rows).map((r) => ({ label: r.label.trim(), file: r.file, expires_at: r.expires_at }));
+    return filledOtherRows(rows).map((r) => ({ label: r.label.trim(), file: r.file }));
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -43,7 +42,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 /**
- * "Other documents (optional)": label (quick-pick chips) + file + optional expiry date per row, ✕ to remove.
+ * "Other documents (optional)": label (quick-pick chips) + file per row, ✕ to remove. Extras have no expiry date (J3).
  * errors use the server keys (other_documents.{i}.label …); {i} is the index among FILLED rows.
  */
 export function OtherDocumentsFields({ rows, onChange, errors = {}, max = 5, previous = [], minDate }: {
@@ -185,12 +184,6 @@ function OtherDocRowFields({ row, n, onChange, onRemove, errors, minDate }: {
                         </Button>
                     )}
                     {(problem || errors.file) && <p className="text-xs text-red-600">{problem ?? errors.file}</p>}
-                </div>
-                <div className="grid gap-1">
-                    <Input type="date" value={row.expires_at} min={minDate} onChange={(e) => onChange({ expires_at: e.target.value })}
-                        className="h-9 text-sm" aria-label={`Valid until (optional) for document ${n}`} />
-                    <p className="text-[11px] text-gray-500">Valid until (optional)</p>
-                    {errors.expires_at && <p className="text-xs text-red-600">{errors.expires_at}</p>}
                 </div>
             </div>
         </div>

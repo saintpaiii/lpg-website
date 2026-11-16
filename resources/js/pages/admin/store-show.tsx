@@ -20,7 +20,8 @@ import {
     ScanFace,
     ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import StoreReviewCard, { type StoreReview } from '@/components/admin/store-review-card';
 import FaceMatchChip, { type FaceMatch } from '@/components/face-match-chip';
 import {
     AlertDialog,
@@ -135,6 +136,7 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
     unsuspend: { label: 'Reinstated',   color: 'bg-blue-100 text-blue-700'     },
     archive:   { label: 'Archived',     color: 'bg-gray-100 text-gray-700'     },
     restore:   { label: 'Restored',     color: 'bg-teal-100 text-teal-700'     },
+    send_back: { label: 'Sent back',    color: 'bg-red-100 text-red-700'       },
 };
 
 type StoreStats = {
@@ -165,7 +167,8 @@ type Props = {
     visibility?: { visible: boolean; reasons: { code: string; text: string }[] } | null;
     history: ActionHistory[];
     documentHistory: DocumentHistoryRow[];
-    checklist?: { key: string; label: string }[];
+    /** Pending application: documents to review + decisions (J3) */
+    review?: StoreReview | null;
     approvalChecks?: ApprovalChecks;
     duplicates?: DuplicateMatch[];
     ocrEnabled?: boolean;
@@ -208,7 +211,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
 
 export default function StoreShow({
     store, stats, subscription, visibility, history, documentHistory,
-    checklist = [], approvalChecks = null, duplicates = [], ocrEnabled = false, documentOcr = {}, canReviewDocuments = false, canApprove = false,
+    review = null, approvalChecks = null, duplicates = [], ocrEnabled = false, documentOcr = {}, canReviewDocuments = false, canApprove = false,
     ownerFace = null,
 }: Props) {
     // Platform staff with Stores but not Subscriptions: no links into Subscriptions (403)
@@ -227,46 +230,19 @@ export default function StoreShow({
     const suspendForm = useForm({ reason: '', notes: '' });
 
 
-    // "Before you approve": every item ticked + optional note (saved with the approval)
-    // The owner's ID item starts ticked when the face match passed and the ID name check didn't flag a mismatch
-    const faceTicksId = ownerFace?.status === 'passed' && documentOcr.valid_id?.name_match !== false;
-    const approveForm = useForm<{ checks: Record<string, boolean>; note: string }>({ checks: faceTicksId ? { id_matches_owner: true } : {}, note: '' });
-    const allChecked = checklist.length > 0 && checklist.every((c) => approveForm.data.checks[c.key]);
-    const approveError = approveForm.errors.checks
-        ?? Object.entries(approveForm.errors).find(([k]) => k.startsWith('checks.'))?.[1]
-        ?? approveForm.errors.note;
-
-    function approve() {
-        if (!allChecked) return;
-        approveForm.patch(`/admin/stores/${store.id}/approve`, { preserveScroll: true });
-    }
-
     // Auto-read (OCR): required documents + the owner's ID + documents uploaded later, read one by one
     const ocrJobs: Record<string, number> = {};
     const ocrInitial: Record<string, OcrResult> = {};
     for (const [k, v] of Object.entries(documentOcr)) { ocrJobs[k] = store.id; ocrInitial[k] = v; }
     for (const d of documentHistory) if (d.ocr_key) { ocrJobs[d.ocr_key] = store.id; ocrInitial[d.ocr_key] = d.ocr ?? null; }
+    for (const d of review?.documents ?? []) if (d.ocr_key && !(d.ocr_key in ocrJobs)) { ocrJobs[d.ocr_key] = store.id; ocrInitial[d.ocr_key] = d.ocr ?? null; }
     const autoRead = useAutoRead(ocrJobs, ocrInitial, ocrEnabled && canReviewDocuments);
-    // The ID is read while the page is open: a name mismatch takes the automatic tick away again
-    const idNameMismatch = autoRead.results.valid_id?.name_match === false;
-    useEffect(() => {
-        if (idNameMismatch && faceTicksId) approveForm.setData('checks', { ...approveForm.data.checks, id_matches_owner: false });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idNameMismatch]);
     const ocrLine = (key: string) => key in ocrJobs ? (
         <AutoReadLine
             result={autoRead.results[key] ?? null} reading={autoRead.reading === key} enabled={ocrEnabled}
             canRead={canReviewDocuments} onReadAgain={() => autoRead.readAgain(key)}
         />
     ) : null;
-    const checkHints = (key: string): string[] => {
-        if (key === 'no_duplicate_concern') {
-            return duplicates.length ? [`${duplicates.length} possible duplicate${duplicates.length > 1 ? 's' : ''} — see the red box`] : [];
-        }
-        const src = CHECK_SOURCES[key];
-        if (!src) return [];
-        return src.keys.flatMap((k) => (autoRead.results[k]?.warnings ?? []).filter((w) => !src.only || src.only.test(w)));
-    };
 
     function submitReject() {
         rejectForm.patch(`/admin/stores/${store.id}/reject`, {
@@ -344,14 +320,12 @@ export default function StoreShow({
                                 <Button onClick={() => setShowReject(true)} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
                                     <XCircle className="h-4 w-4 mr-1.5" /> Reject
                                 </Button>
-                                {canApprove && (
+                                {review && (
                                     <Button
-                                        onClick={() => (allChecked ? approve() : document.getElementById('approve-checklist')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))}
-                                        disabled={approveForm.processing}
-                                        title={allChecked ? undefined : 'Tick every item in "Before you approve" first'}
-                                        className={`text-white ${allChecked ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600/50 hover:bg-green-600/60'}`}
+                                        onClick={() => document.getElementById('store-review')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                        className="bg-green-600 text-white hover:bg-green-700"
                                     >
-                                        <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
+                                        <CheckCircle2 className="h-4 w-4 mr-1.5" /> Review documents
                                     </Button>
                                 )}
                             </>
@@ -453,6 +427,12 @@ export default function StoreShow({
                                 </DocumentRow>
                             </div>
 
+                            {/* Pending application: the documents are in "Review the application" below */}
+                            {review ? (
+                                <p className="border-t pt-2 text-xs text-muted-foreground">
+                                    Documents: see <a href="#store-review" className="font-medium text-blue-600 hover:underline">Review the application</a> below.
+                                </p>
+                            ) : (
                             <div className="pt-2 border-t space-y-2">
                                 <DocumentHeading>Documents</DocumentHeading>
                                 <div className="space-y-2">
@@ -503,6 +483,7 @@ export default function StoreShow({
                                     <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                                 )}
                             </div>
+                            )}
 
                             <div className="pt-2 border-t">
                                 <div className="flex items-center justify-between">
@@ -534,65 +515,17 @@ export default function StoreShow({
                                 </li>
                             ))}
                         </ul>
-                        <p className="mt-1.5 text-xs">Check these before approving (checklist: “Duplicate warnings checked”).</p>
+                        <p className="mt-1.5 text-xs">Check these before approving (review item: “Duplicate warnings checked”).</p>
                     </div>
                 )}
 
-                {/* Before you approve — every item must be ticked */}
-                {store.status === 'pending' && canApprove && checklist.length > 0 && (
-                    <Card id="approve-checklist" className="scroll-mt-20 border-green-200 dark:border-green-900">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-green-600" /> Before you approve</CardTitle>
-                            <p className="text-xs text-muted-foreground">Tick each item after checking it yourself. {AUTO_READ_DISCLAIMER}</p>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {checklist.map((c) => {
-                                const hints = checkHints(c.key);
-                                return (
-                                    <label key={c.key} className="flex cursor-pointer items-start gap-2.5 text-sm">
-                                        <Checkbox
-                                            className="mt-0.5"
-                                            checked={!!approveForm.data.checks[c.key]}
-                                            onCheckedChange={(v) => approveForm.setData('checks', { ...approveForm.data.checks, [c.key]: v === true })}
-                                        />
-                                        <span className="min-w-0">
-                                            <span>{c.label}</span>
-                                            {c.key === 'id_matches_owner' && ownerFace && (
-                                                ownerFace.status === 'passed' && !idNameMismatch ? (
-                                                    <span className="mt-0.5 flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
-                                                        <ScanFace className="h-3 w-3 shrink-0" /> Face match {Math.round(ownerFace.score ?? 0)}% — checked automatically
-                                                    </span>
-                                                ) : (
-                                                    <span className="mt-0.5 block"><FaceMatchChip face={ownerFace} /></span>
-                                                )
-                                            )}
-                                            {hints.map((h, i) => (
-                                                <span key={i} className="mt-0.5 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-400">
-                                                    <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" /> <span className="break-words">{h}</span>
-                                                </span>
-                                            ))}
-                                        </span>
-                                    </label>
-                                );
-                            })}
-                            <div className="grid gap-1">
-                                <label htmlFor="approve-note" className="text-xs font-medium text-muted-foreground">Note (optional)</label>
-                                <textarea
-                                    id="approve-note" rows={2} maxLength={500} value={approveForm.data.note}
-                                    onChange={(e) => approveForm.setData('note', e.target.value)}
-                                    placeholder="e.g. Called the owner to confirm the address."
-                                    className="w-full resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                                />
-                            </div>
-                            {approveError && <p className="text-sm text-red-600">{approveError}</p>}
-                            <div className="flex flex-wrap items-center justify-end gap-2">
-                                {!allChecked && <span className="text-xs text-muted-foreground">Tick every item to approve.</span>}
-                                <Button onClick={approve} disabled={!allChecked || approveForm.processing} className="bg-green-600 text-white hover:bg-green-700">
-                                    <CheckCircle2 className="mr-1.5 h-4 w-4" /> {approveForm.processing ? 'Approving…' : 'Approve store'}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                {/* Review the application: each document Accept / Reject in the viewer = the checklist (J3) */}
+                {store.status === 'pending' && review && (
+                    <StoreReviewCard
+                        storeId={store.id} storeName={store.store_name} review={review} ownerFace={ownerFace}
+                        ownerSelfieUrl={store.owner_selfie_url ?? null} duplicateCount={duplicates.length} canApprove={canApprove}
+                        ocr={{ results: autoRead.results, reading: autoRead.reading, readAgain: autoRead.readAgain, enabled: ocrEnabled && canReviewDocuments }}
+                    />
                 )}
 
                 {/* Saved checklist (read-only) */}

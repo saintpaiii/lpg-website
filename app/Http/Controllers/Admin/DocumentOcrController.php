@@ -59,7 +59,7 @@ class DocumentOcrController extends Controller
             return [$application?->valid_id_path ?? $store->owner?->verifiedIdPath(), null];
         }
 
-        $col = StoreDocuments::expiryColumn($key);
+        $col = StoreDocuments::expiryColumnFor($store, $key);
 
         return [$store->{$key} ?: $application?->{"{$key}_path"}, $col ? $store->{$col}?->toDateString() : null];
     }
@@ -91,6 +91,8 @@ class DocumentOcrController extends Controller
             'warnings'      => array_values($r['warnings'] ?? []),
             'text'          => (string) ($r['text'] ?? ''),
             'likely_expiry' => ! empty($r['likely_expiry']) ? \Illuminate\Support\Carbon::parse($r['likely_expiry'])->format('M j, Y') : null,
+            // Y-m-d — pre-fills the reviewer's "Valid until" field (J3)
+            'likely_expiry_iso' => ! empty($r['likely_expiry']) ? \Illuminate\Support\Carbon::parse($r['likely_expiry'])->toDateString() : null,
             'found_tin'     => $r['found_tin'] ?? null,
             'name_match'    => $r['name_match'] ?? null,
         ];

@@ -154,6 +154,8 @@ class VerificationController extends Controller
                         ])->values(),
                     'reviewer_name'    => $v->reviewer?->name,
                     // Store info
+                    'store_id'         => $store?->id,   // seller applications: "Review on store page →" (J3)
+                    'store_status'     => $store?->status,
                     'store_name'       => $store?->store_name,
                     'store_phone'      => $store?->phone,
                     'store_address'    => $store?->address,
@@ -307,7 +309,7 @@ class VerificationController extends Controller
             $storeId = Store::where('user_id', $verification->user_id)->value('id');
 
             return ($storeId ? redirect("/admin/stores/{$storeId}") : back())
-                ->with('error', 'Approve sellers from the store page — the checklist is required.');
+                ->with('error', 'Review seller applications on the store page — accept or reject each document there.');
         }
 
         if ($verification->status !== 'pending') {
@@ -332,6 +334,14 @@ class VerificationController extends Controller
 
     public function reject(Request $request, VerificationRequest $verification): RedirectResponse
     {
+        // Seller applications are reviewed only on the store page (Accept / Reject per document, then send back) — J3
+        if ($verification->type === 'seller_application') {
+            $storeId = Store::where('user_id', $verification->user_id)->value('id');
+
+            return ($storeId ? redirect("/admin/stores/{$storeId}") : back())
+                ->with('error', 'Review seller applications on the store page — accept or reject each document there.');
+        }
+
         $request->validate([
             'reason' => ['required', 'string', 'max:1000'],
         ]);

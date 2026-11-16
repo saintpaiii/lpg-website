@@ -110,7 +110,7 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                                 )}
                                 {!p.pending && (
                                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => open(p.type, p.label, p.has_expiry, p.kind ?? '')}>
-                                        <Upload className="h-3.5 w-3.5" /> {p.missing ? 'Upload document' : p.status === 'no_date' ? 'Add expiry date' : 'Upload renewed document'}
+                                        <Upload className="h-3.5 w-3.5" /> {p.missing ? 'Upload document' : 'Upload renewed document'}
                                     </Button>
                                 )}
                             </CardContent>
@@ -186,14 +186,14 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                                 <DtiSecKindToggle value={form.data.dti_sec_kind} error={form.errors.dti_sec_kind} onChange={(v) => form.setData('dti_sec_kind', v)} />
                             </div>
                         )}
-                        {target?.doc_type !== 'dti_sec_registration' && <div className="grid gap-1.5">
-                            <Label htmlFor="doc_expires">Valid until{target?.needsDate ? '' : ' (optional)'}</Label>
-                            <Input id="doc_expires" type="date" min={tomorrow()} max={max_date} value={form.data.expires_at} onChange={(e) => form.setData('expires_at', e.target.value)} />
-                            <InputError message={form.errors.expires_at} />
-                        </div>}
+                        {target?.needsDate && (
+                            <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                                No need to type the "valid until" date — the platform admin reads it from the document when approving it.
+                            </p>
+                        )}
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setTarget(null)}>Cancel</Button>
-                            <Button type="submit" disabled={form.processing || !form.data.file || (target?.needsDate && !form.data.expires_at) || (target?.doc_type === 'other' && !form.data.label.trim()) || (target?.doc_type === 'dti_sec_registration' && !form.data.dti_sec_kind)} className="gap-1.5">
+                            <Button type="submit" disabled={form.processing || !form.data.file || (target?.doc_type === 'other' && !form.data.label.trim()) || (target?.doc_type === 'dti_sec_registration' && !form.data.dti_sec_kind)} className="gap-1.5">
                                 {form.processing && <Loader2 className="h-4 w-4 animate-spin" />} Submit
                             </Button>
                         </div>
