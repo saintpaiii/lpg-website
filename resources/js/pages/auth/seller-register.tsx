@@ -12,6 +12,7 @@ import InputError from '@/components/input-error';
 import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box';
 import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
+import { lookupBarangay } from '@/components/address-map';
 import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { appendOtherRows, OtherDocumentsFields, StoreNameWarning, useStoreNameCheck, type OtherDocRow } from '@/components/other-documents-fields';
@@ -195,6 +196,17 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
 
     function set(key: keyof typeof fields, value: string) {
         setFields((prev) => ({ ...prev, [key]: value }));
+    }
+
+    // No pin yet: start it at the chosen barangay (same as Start Selling) so the owner only drags it to the entrance.
+    // A pin the owner already placed / dragged is never moved (checked again when the answer comes back).
+    function autoPin(city: string, barangay: string) {
+        if (pin || !city || !barangay) return;
+        lookupBarangay(city, barangay).then((geo) => {
+            if (!geo || geo.precision === 'none') return;
+            setPin((p) => p ?? { lat: geo.latitude, lng: geo.longitude });
+            setErrors((e) => ({ ...e, latitude: '', longitude: '' }));
+        });
     }
 
     // Moving the store pin / "Use my current location" fills City + Barangay (and the street when it wasn't typed) —
@@ -479,8 +491,8 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                         city={fields.store_city}
                                         barangay={fields.store_barangay}
                                         onAddressChange={(v) => set('store_address', v)}
-                                        onCityChange={(v) => set('store_city', v)}
-                                        onBarangayChange={(v) => set('store_barangay', v)}
+                                        onCityChange={(v) => { set('store_city', v); autoPin(v, fields.store_barangay); }}
+                                        onBarangayChange={(v) => { set('store_barangay', v); autoPin(fields.store_city, v); }}
                                         errors={errors}
                                         errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
                                         requiredBarangay

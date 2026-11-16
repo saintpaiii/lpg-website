@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
+import { lookupBarangay } from '@/components/address-map';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 
 export type SentBack = {
@@ -40,6 +41,14 @@ export default function SellerResubmitCard({ sentBack }: { sentBack: SentBack })
         street: addr.address, pinned: !!pin,
         apply: (a) => setAddr({ address: a.street, city: a.city, barangay: a.barangay }),
     });
+
+    // No pin yet: start it at the chosen barangay; an existing / dragged pin is never moved
+    const autoPin = (city: string, barangay: string) => {
+        if (pin || !city || !barangay) return;
+        lookupBarangay(city, barangay).then((geo) => {
+            if (geo && geo.precision !== 'none') setPin((p) => p ?? { lat: geo.latitude, lng: geo.longitude });
+        });
+    };
 
     const needsSelfie = docs.some((d) => d.key === 'valid_id');
     const ready = docs.every((d) => files[d.key]) && (!needsSelfie || !!selfie) && (!fixPin || (!!pin && !!addr.address && !!addr.city && !!addr.barangay));
@@ -94,8 +103,8 @@ export default function SellerResubmitCard({ sentBack }: { sentBack: SentBack })
                     <AddressFields
                         address={addr.address} city={addr.city} barangay={addr.barangay}
                         onAddressChange={(v) => setAddr((a) => ({ ...a, address: v }))}
-                        onCityChange={(v) => setAddr((a) => ({ ...a, city: v }))}
-                        onBarangayChange={(v) => setAddr((a) => ({ ...a, barangay: v }))}
+                        onCityChange={(v) => { setAddr((a) => ({ ...a, city: v })); autoPin(v, addr.barangay); }}
+                        onBarangayChange={(v) => { setAddr((a) => ({ ...a, barangay: v })); autoPin(addr.city, v); }}
                         errors={errors} errorKeys={{ address: 'store_address', city: 'store_city', barangay: 'store_barangay' }}
                         requiredBarangay autoFill={autoFill}
                     />

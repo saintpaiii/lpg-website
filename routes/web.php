@@ -47,16 +47,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/notifications/read-all',    [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
     Route::post('/notifications/{id}/read',   [NotificationController::class, 'markAsRead'])   ->name('notifications.mark-read');
 
-    // Auto-pin an address on maps (checkout, profile)
-    Route::get('/api/barangay-coordinates', [\App\Http\Controllers\BarangayCoordinateController::class, 'getCoordinates'])
-        ->middleware('throttle:60,1')
-        ->name('api.barangay-coordinates');
 
     // Free OpenStreetMap services, proxied + cached (OSRM road routes)
     Route::get('/api/route', [\App\Http\Controllers\MapServiceController::class, 'route'])
         ->middleware('throttle:60,1')
         ->name('api.route');
 });
+
+// Auto-pin an address from City + Barangay (our own barangay table — no outside call). No login needed: the guest store
+// registration (/seller/register) pins the store when the barangay is chosen (K4). Checkout / profile use it too.
+Route::get('/api/barangay-coordinates', [\App\Http\Controllers\BarangayCoordinateController::class, 'getCoordinates'])
+    ->middleware('throttle:60,1')
+    ->name('api.barangay-coordinates');
 
 // Address search + "address from a map pin" (Nominatim, proxied + cached + throttled). No login needed: the guest store
 // registration (/seller/register) fills City / Barangay from the pin too.
