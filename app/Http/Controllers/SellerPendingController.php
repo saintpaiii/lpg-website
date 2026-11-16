@@ -25,11 +25,24 @@ use Inertia\Response;
  */
 class SellerPendingController extends Controller
 {
-    public function show(Request $request): Response
+    public function show(Request $request): Response|RedirectResponse
     {
+        // Approved meanwhile (owner, or staff of that store) → the dashboard; the page also re-checks every 30 s (K2)
+        $user = $request->user();
+        $mine = $user && in_array($user->role, ['seller', 'seller_staff'], true)
+            ? ($user->role === 'seller' ? Store::where('user_id', $user->id)->first() : ($user->store_id ? Store::find($user->store_id) : null))
+            : null;
+        if ($mine?->status === 'approved') {
+            return redirect()->route('seller.dashboard')->with('success', 'Your store is approved — welcome!');
+        }
+
         $store = $this->ownRejectedStore($request);
 
         return Inertia::render('auth/seller-pending', [
+            // pending | rejected | suspended | null (guest / no store) — the page polls only while 'pending'
+            'status'    => $mine?->status,
+            // Suspended: the reason stays on reload (the flash from EnsureIsSeller is only there once)
+            'suspension' => $mine?->status === 'suspended' ? ['reason' => $mine->suspension_reason, 'notes' => $mine->suspension_notes] : null,
             'sent_back' => $store ? [
                 'store_name' => $store->store_name,
                 'message'    => StoreReviewService::application($store)?->rejection_reason,

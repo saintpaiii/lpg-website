@@ -24,7 +24,7 @@ const FEATURES = [
 ];
 
 export default function Login({ status, canResetPassword, retryAfter = 0, remainingAttempts = null }: Props) {
-    const { flash } = usePage<SharedData>().props;
+    const { flash, contact_email } = usePage<SharedData & { contact_email?: string }>().props;
     const deactivationInfo = flash?.deactivation_info;
 
     const { data, setData, post, processing, errors } = useForm({
@@ -243,12 +243,13 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                                         {deactivationInfo.notes && (
                                             <p className="mt-0.5 text-sm text-red-600 italic">"{deactivationInfo.notes}"</p>
                                         )}
-                                        <p className="mt-2 text-xs text-red-500">
-                                            If you believe this is a mistake, please contact us at{' '}
-                                            <a href="mailto:support@lpgcavite.com" className="font-medium underline hover:text-red-700">
-                                                support@lpgcavite.com
-                                            </a>
-                                        </p>
+                                        {/* Admin → Settings → company email (hidden when not set) */}
+                                        {contact_email && (
+                                            <p className="mt-2 text-xs text-red-500">
+                                                If you believe this is a mistake, please contact us at{' '}
+                                                <a href={`mailto:${contact_email}`} className="font-medium underline hover:text-red-700">{contact_email}</a>
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>

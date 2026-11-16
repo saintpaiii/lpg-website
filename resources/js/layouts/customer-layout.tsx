@@ -336,6 +336,23 @@ export default function CustomerLayout({ children, title }: Props) {
                     </div>
                 )}
 
+                {/* Start Selling: the store application is still under review / sent back (K2) */}
+                {auth.store_application && (
+                    <div className={`border-b px-4 py-2.5 ${auth.store_application.status === 'rejected' ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20' : 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20'}`}>
+                        <div className="flex items-center gap-3">
+                            <Clock className={`h-4 w-4 shrink-0 ${auth.store_application.status === 'rejected' ? 'text-red-500' : 'text-blue-500'}`} />
+                            <p className={`flex-1 text-xs font-medium ${auth.store_application.status === 'rejected' ? 'text-red-700 dark:text-red-300' : 'text-blue-700 dark:text-blue-300'}`}>
+                                {auth.store_application.status === 'rejected'
+                                    ? 'Your store application was sent back — some documents need to be re-uploaded.'
+                                    : 'Your store application is under review. You can keep shopping meanwhile.'}
+                            </p>
+                            <Link href={auth.store_application.link} className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-white ${auth.store_application.status === 'rejected' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                {auth.store_application.status === 'rejected' ? 'Fix it' : 'View status'}
+                            </Link>
+                        </div>
+                    </div>
+                )}
+
                 {/* ID verification banner */}
                 {!isAdmin && auth.user.role === 'customer' && !isVerified && !bannerDismissed && !onVerifyPage && (
                     <div className={`border-b px-4 py-2.5 ${

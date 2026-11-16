@@ -27,6 +27,8 @@ export type ReviewItem = {
     at?: string | null;
     /** Already confirmed date (Y-m-d) */
     saved_date?: string | null;
+    /** Latest allowed "valid until" for this document (Business Permit / FSIC: 2 years; DOE / DTI: 6 years) */
+    max_date?: string | null;
     ocr_key?: string | null;
     /** Shown next to the document (e.g. the live selfie + face chip for the valid ID) */
     extra?: ReactNode;
@@ -183,7 +185,7 @@ export default function DocumentReviewViewer({ items, openKey, onOpenKey, reason
                                 {item.needs_date && (
                                     <div className="grid gap-1.5">
                                         <Label htmlFor="rv_date">Valid until</Label>
-                                        <Input id="rv_date" type="date" max={maxDate} value={date}
+                                        <Input id="rv_date" type="date" max={item.max_date ?? maxDate} value={date}
                                             onChange={(e) => { setDate(e.target.value); setDateSource('typed'); }} />
                                         <p className={cn('text-xs', dateSource === 'none' && !date ? 'text-amber-700' : 'text-muted-foreground')}>
                                             {dateSource === 'ocr' ? 'Read automatically — check it against the document.'

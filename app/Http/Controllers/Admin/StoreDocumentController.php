@@ -62,6 +62,7 @@ class StoreDocumentController extends Controller
                     // Only the 4 documents that expire ask for a date (DTI only when it is a DTI certificate); extras never
                     'has_expiry'      => $isPermit && StoreDocuments::expiryColumn($d->doc_type, $d->dti_sec_kind ?? $d->store?->dti_sec_kind) !== null,
                     'is_pdf'          => str_ends_with(strtolower((string) $d->file_path), '.pdf'),
+                    'max_date'        => StoreDocuments::maxValidUntil($d->doc_type),
                     'current_expires' => $isPermit && $d->store ? StoreDocuments::expiry($d->store, $d->doc_type)?->format('M d, Y') : null,
                     'new_expires'     => $d->expires_at?->toDateString(),
                     'new_expires_on'  => $d->expires_at?->format('M d, Y'),
@@ -99,8 +100,8 @@ class StoreDocumentController extends Controller
             ? StoreDocuments::expiryColumn($submission->doc_type, $submission->dti_sec_kind ?? $submission->store?->dti_sec_kind)
             : null;
         $data = $request->validate([
-            'expires_at' => $column ? StoreDocuments::validUntilRule() : ['nullable'],
-        ], StoreDocuments::validUntilMessages());
+            'expires_at' => $column ? StoreDocuments::validUntilRule(true, $submission->doc_type) : ['nullable'],
+        ], StoreDocuments::validUntilMessages('expires_at', $submission->doc_type));
 
         DB::transaction(function () use ($submission, $data, $column, $request) {
             $submission->update([

@@ -13,7 +13,7 @@ import DocumentReviewViewer, { type ReviewItem } from '@/components/document-rev
 type Pending = {
     id: number; store_id: number; store_name: string | null; doc_type: string; label: string; is_other: boolean; has_expiry: boolean;
     current_expires: string | null; new_expires: string | null; new_expires_on: string | null; submitted_on: string; submitted_by: string | null; url: string;
-    ocr_key?: string; ocr?: OcrResult; is_pdf?: boolean;
+    ocr_key?: string; ocr?: OcrResult; is_pdf?: boolean; max_date?: string;
 };
 type PermitRow = { store_id: number; store_name: string; type: string; label: string; expires_on: string | null; days_left: number | null; documents_suspended: boolean };
 type Tab = 'pending' | 'expiring' | 'expired' | 'missing';
@@ -53,7 +53,7 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
     const [openKey, setOpenKey] = useState<string | null>(null);
     const items: ReviewItem[] = pending.map((p) => ({
         key: String(p.id), label: `${p.label} — ${p.store_name ?? 'store'}`, url: p.url, is_pdf: !!p.is_pdf, needs_date: p.has_expiry,
-        status: null, ocr_key: p.ocr_key ?? null, saved_date: null,
+        status: null, ocr_key: p.ocr_key ?? null, saved_date: null, max_date: p.max_date,
         extra: p.has_expiry && !p.is_other ? <p className="text-xs text-muted-foreground">Current valid until: {p.current_expires ?? 'no date'}</p> : undefined,
     }));
 

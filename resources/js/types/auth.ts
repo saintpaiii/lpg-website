@@ -51,6 +51,8 @@ export type Auth = {
     permissions: string[];
     store: SellerStore | null;
     seller_application: SellerApplication;
+    /** Start Selling seller whose store is still under review / sent back (K2) */
+    store_application?: { status: 'pending' | 'rejected'; link: string } | null;
     /** Customers only: false = never verified and no orders yet (history pages locked too) */
     has_customer_history?: boolean | null;
     /** The user's home page (User::homeUrl on the server) */

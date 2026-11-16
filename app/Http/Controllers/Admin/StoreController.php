@@ -390,11 +390,11 @@ class StoreController extends Controller
             'decision'   => ['required', 'in:accept,reject,undo'],
             'reason'     => ['required_if:decision,reject', 'nullable', \Illuminate\Validation\Rule::in(StoreDocuments::REJECT_REASONS)],
             'note'       => [$request->input('reason') === 'Other' ? 'required' : 'nullable', 'string', 'max:300'],
-            'expires_at' => $accept && ($doc['needs_date'] ?? false) ? StoreDocuments::validUntilRule() : ['nullable'],
+            'expires_at' => $accept && ($doc['needs_date'] ?? false) ? StoreDocuments::validUntilRule(true, $key) : ['nullable'],
         ], [
             'reason.required_if' => 'Choose why this document is rejected.',
             'note.required'      => 'Type the reason.',
-        ] + StoreDocuments::validUntilMessages());
+        ] + StoreDocuments::validUntilMessages('expires_at', $key));
 
         $user = $request->user();
         \Illuminate\Support\Facades\DB::transaction(function () use ($store, $key, $data, $doc, $user, $accept) {
@@ -501,6 +501,8 @@ class StoreController extends Controller
             'documents' => array_map(fn ($d) => $d + [
                 // Auto-read key: the doc type, or "sub-{id}" for an extra document (read one by one by the page)
                 'ocr_key' => $d['submission_id'] ? 'sub-' . $d['submission_id'] : $d['key'],
+                // Latest allowed "valid until" for this document (K2)
+                'max_date' => StoreDocuments::maxValidUntil($d['key']),
                 'ocr'     => DocumentOcrController::present($d['submission_id'] ? $subs->get($d['submission_id'])?->ocr : ($saved[$d['key']] ?? null)),
             ], $documents),
             'decisions' => $decisions,

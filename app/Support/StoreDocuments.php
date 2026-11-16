@@ -206,17 +206,29 @@ class StoreDocuments
      * Validation for the "Valid until" date the ADMIN confirms when accepting an expiring document (J3 — sellers no
      * longer type it; OCR pre-fills it). At most 5 years ahead.
      */
-    public static function validUntilRule(bool $required = true): array
+    public static function validUntilRule(bool $required = true, ?string $type = null): array
     {
-        return [$required ? 'required' : 'nullable', 'date', 'after:today', 'before_or_equal:' . self::today()->addYears(5)->toDateString()];
+        return [$required ? 'required' : 'nullable', 'date', 'after:today', 'before_or_equal:' . self::maxValidUntil($type)];
     }
 
-    public static function validUntilMessages(string $field = 'expires_at'): array
+    /** How long each document can be valid (K2): permits renewed yearly → 2 years; DOE LTO / DTI certificate → 6 years. */
+    public const MAX_VALID_YEARS = ['business_permit' => 2, 'fsic_permit' => 2, 'doe_lpg_license' => 6, 'dti_sec_registration' => 6];
+
+    /** Latest allowed "valid until" (Y-m-d) for a document type — server rule AND the viewer's date input max. */
+    public static function maxValidUntil(?string $type): string
     {
+        return self::today()->addYears(self::MAX_VALID_YEARS[$type] ?? 5)->toDateString();
+    }
+
+    public static function validUntilMessages(string $field = 'expires_at', ?string $type = null): array
+    {
+        $years = self::MAX_VALID_YEARS[$type] ?? 5;
+        $name  = $type ? self::reviewLabel($type, $type === 'dti_sec_registration' ? 'dti' : null) : 'this document';
+
         return [
             "{$field}.required"        => 'Enter the "valid until" date printed on the document.',
             "{$field}.after"           => 'This document has expired (the date is not after today) — reject it instead.',
-            "{$field}.before_or_equal" => 'Please check the date (at most 5 years ahead).',
+            "{$field}.before_or_equal" => "The {$name} can be valid for at most {$years} years — check the date on the document.",
         ];
     }
 

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Decision = { status: 'accepted' | 'rejected' | null; reason: string | null; note: string | null; by_name: string | null; at: string | null; expires_at: string | null; auto: string | null };
-type ReviewDoc = { key: string; label: string; url: string | null; is_pdf: boolean; needs_date: boolean; current_expires: string | null; required: boolean; submission_id: number | null; ocr_key: string; ocr: OcrResult };
+type ReviewDoc = { key: string; label: string; url: string | null; is_pdf: boolean; needs_date: boolean; current_expires: string | null; required: boolean; submission_id: number | null; ocr_key: string; ocr: OcrResult; max_date?: string };
 
 /** StoreController::review() */
 export type StoreReview = {
@@ -61,7 +61,7 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
         return {
             key: d.key, label: d.label, url: d.url, is_pdf: d.is_pdf, needs_date: d.needs_date,
             status: dec.status, reason: dec.reason, note: dec.note, auto: dec.auto, by_name: dec.by_name, at: dec.at,
-            saved_date: dec.expires_at ?? d.current_expires, ocr_key: d.ocr_key,
+            saved_date: dec.expires_at ?? d.current_expires, ocr_key: d.ocr_key, max_date: d.max_date,
             extra: d.key === 'valid_id' ? (
                 <div className="space-y-1.5 rounded-md border p-2">
                     <p className="text-xs font-medium text-muted-foreground">Live selfie (taken at registration)</p>

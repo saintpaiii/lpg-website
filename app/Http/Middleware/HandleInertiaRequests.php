@@ -102,6 +102,11 @@ class HandleInertiaRequests extends Middleware
                     'has_location'         => $store->latitude !== null && $store->longitude !== null,
                 ] : null,
                 'seller_application' => $sellerApplication,
+                // A seller who can shop (applied through Start Selling) whose store is still under review / sent back:
+                // Customer Portal banner → /seller/pending (K2)
+                'store_application'  => $user && $user->role === 'seller' && $user->can_shop !== false && $store
+                    && in_array($store->status, ['pending', 'rejected'], true)
+                    ? ['status' => $store->status, 'link' => '/seller/pending'] : null,
             ],
             // Store plan (owner, staff and riders of a store) — sidebar badge, banner and popup need it on every page
             'plan' => fn () => $store
@@ -130,7 +135,9 @@ class HandleInertiaRequests extends Middleware
                 : null,
             // Plan comparison for the owner's "plan ends soon / ended" popup and the upgrade dialog (staff see it too)
             'planCatalog' => fn () => $store && in_array($user->role, ['seller', 'seller_staff'], true) ? \App\Services\SubscriptionService::publicPlans() : null,
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            // Platform contact email (Admin → Settings → company_email); '' = hide the "contact us" lines (K2)
+            'contact_email' => fn () => (string) \App\Models\Setting::get('company_email', ''),
+            'sidebarOpen' =>! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'flash' => [
                 'success'              => fn () => $request->session()->get('success'),
                 'error'                => fn () => $request->session()->get('error'),

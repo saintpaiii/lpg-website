@@ -1,12 +1,38 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle2, Clock, FileText, Flame, Mail, Phone } from 'lucide-react';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import type { SharedData } from '@/types';
 import SellerResubmitCard, { type SentBack } from '@/components/seller-resubmit-card';
 
-export default function SellerPending({ sent_back = null }: { sent_back?: SentBack | null }) {
-    const { flash } = usePage<SharedData>().props;
-    const suspensionInfo = flash?.store_suspension_info;
+/** Re-check the application while it's under review (the server redirects to the dashboard once approved) */
+const POLL_MS = 30_000;
+
+export default function SellerPending({ sent_back = null, status = null, suspension = null }: {
+    sent_back?: SentBack | null;
+    /** The signed-in user's store: pending | rejected | suspended | null (guest) */
+    status?: string | null;
+    suspension?: { reason: string | null; notes: string | null } | null;
+}) {
+    const { flash, auth, contact_email } = usePage<SharedData & { contact_email?: string }>().props;
+    const suspensionInfo = flash?.store_suspension_info ?? suspension;
+    const user = auth?.user ?? null;
+
+    // Under review: every 30 s ask again (only while the tab is visible). Approved → the server sends us to the dashboard.
+    useEffect(() => {
+        if (!user || status !== 'pending') return;
+        let timer: ReturnType<typeof setInterval> | null = null;
+        const check = () => router.reload({ only: ['status'] });
+        const start = () => { if (!timer) timer = setInterval(check, POLL_MS); };
+        const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+        const onVisibility = () => {
+            if (document.hidden) stop();
+            else { check(); start(); }
+        };
+        if (!document.hidden) start();
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => { stop(); document.removeEventListener('visibilitychange', onVisibility); };
+    }, [user, status]);
     const STEPS = [
         {
             icon: FileText,
@@ -51,6 +77,7 @@ export default function SellerPending({ sent_back = null }: { sent_back?: SentBa
                         {suspensionInfo ? 'Store Suspended' : sent_back ? 'Application Sent Back' : 'Application Under Review'}
                     </h1>
                     <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-8">
+                        {status === 'pending' && user && <span className="mb-1 block text-xs text-gray-400">This page updates by itself when your store is approved.</span>}
                         {suspensionInfo
                             ? 'Your store has been temporarily suspended by the platform administrator.'
                             : "Thank you for applying to the LPG Marketplace Cavite. Here's what happens next:"}
@@ -83,13 +110,13 @@ export default function SellerPending({ sent_back = null }: { sent_back?: SentBa
                                     {suspensionInfo.notes && (
                                         <p className="mt-0.5 text-sm text-orange-700 italic">"{suspensionInfo.notes}"</p>
                                     )}
-                                    <p className="mt-2 text-xs text-orange-600">
-                                        Contact us at{' '}
-                                        <a href="mailto:support@lpgcavite.com" className="font-medium underline">
-                                            support@lpgcavite.com
-                                        </a>{' '}
-                                        to resolve this issue.
-                                    </p>
+                                    {contact_email && (
+                                        <p className="mt-2 text-xs text-orange-600">
+                                            Contact us at{' '}
+                                            <a href={`mailto:${contact_email}`} className="font-medium underline">{contact_email}</a>{' '}
+                                            to resolve this issue.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -136,11 +163,26 @@ export default function SellerPending({ sent_back = null }: { sent_back?: SentBa
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <Link href="/login">
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                                Go to Login
-                            </Button>
-                        </Link>
+                        {user ? (
+                            <>
+                                {/* Applied through Start Selling: keep shopping while the store is reviewed */}
+                                {user.can_shop !== false && (
+                                    <Link href="/customer/products">
+                                        <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold">Continue shopping</Button>
+                                    </Link>
+                                )}
+                                <Button variant={user.can_shop !== false ? 'outline' : 'default'} onClick={() => router.post('/logout')}
+                                    className={user.can_shop !== false ? 'w-full' : 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold'}>
+                                    Log out
+                                </Button>
+                            </>
+                        ) : (
+                            <Link href="/login">
+                                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                                    Back to login
+                                </Button>
+                            </Link>
+                        )}
                         <Link href="/">
                             <Button variant="outline" className="w-full">
                                 Back to Home

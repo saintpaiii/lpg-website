@@ -29,6 +29,13 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponseCont
             ? ($user->id_verification_status === 'verified' ? route('customer.products') : route('customer.id-verification'))
             : $user->homeUrl();
 
+        // A seller who can shop (Start Selling) whose store is still under review / sent back: keep shopping meanwhile
+        // (the Customer Portal shows "Your store application is under review"). Seller-only accounts → /seller/pending.
+        if ($user->role === 'seller' && $user->can_shop !== false
+            && in_array(\App\Models\Store::where('user_id', $user->id)->value('status'), ['pending', 'rejected'], true)) {
+            $redirect = route('customer.products');
+        }
+
         // ── Attendance reminder redirect ────────────────────────────────────────
         // Store staff (HR too) who haven't clocked in today are sent to My Attendance (not on their day off).
         if (
