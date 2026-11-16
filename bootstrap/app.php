@@ -33,6 +33,8 @@ return Application::configure(basePath: dirname(__DIR__))
             // Staff paused by the plan's staff limit can't use any page
             \App\Http\Middleware\LogoutPausedStaff::class,
             HandleInertiaRequests::class,
+            // New Google user who hasn't picked buyer / seller-only yet → /choose-account (K1)
+            \App\Http\Middleware\EnsureAccountChosen::class,
             AddLinkHeadersForPreloadedAssets::class,
             // Last visit per sidebar section (badges + "New"/"Updated" row highlights)
             \App\Http\Middleware\TrackSectionVisit::class,

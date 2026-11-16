@@ -3,19 +3,31 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class SocialAuthController extends Controller
 {
-    public function redirectToGoogle()
+    /** Session key: Google was started from /seller/register (?intent=seller) — a new user goes straight to the seller form. */
+    public const INTENT_KEY = 'google_signup_intent';
+
+    public function redirectToGoogle(Request $request)
     {
+        if ($request->query('intent') === 'seller') {
+            $request->session()->put(self::INTENT_KEY, 'seller');
+        } else {
+            $request->session()->forget(self::INTENT_KEY);
+        }
+
         return Socialite::driver('google')->redirect();
     }
 
-    public function handleGoogleCallback()
+    public function handleGoogleCallback(Request $request)
     {
+        $intent = $request->session()->pull(self::INTENT_KEY);
+
         try {
             $googleUser = Socialite::driver('google')->user();
         } catch (\Exception $e) {
@@ -45,7 +57,7 @@ class SocialAuthController extends Controller
                 return redirect('/login')->withErrors(['email' => \App\Models\User::PAUSED_BY_PLAN_MESSAGE]);
             }
         } else {
-            // New user — create a customer account
+            // New user — a customer account as before, but they must still pick buyer / seller-only on /choose-account
             $nameParts = explode(' ', trim($googleUser->getName() ?? ''), 2);
             $firstName = $nameParts[0] ?? '';
             $lastName  = $nameParts[1] ?? '';
@@ -61,10 +73,19 @@ class SocialAuthController extends Controller
                 'is_admin'          => false,
                 'is_platform_staff' => false,
                 'email_verified_at' => now(),
+                'can_shop'          => true,
+                'needs_account_choice' => true,
             ]);
         }
 
         Auth::login($user, true);
+
+        // Hasn't chosen yet (new now, or closed the page last time): seller form when started from /seller/register
+        if ($user->needs_account_choice) {
+            return $intent === 'seller'
+                ? redirect()->route('seller.register')->with('success', "Signed in with Google as {$user->email}. Fill in your store details.")
+                : redirect()->route('account.choose')->with('success', 'Welcome, ' . $user->name . '! Choose how you will use your account.');
+        }
 
         // Customers whose ID isn't approved yet go straight to identity verification
         if ($user->role === 'customer' && $user->id_verification_status !== 'verified') {

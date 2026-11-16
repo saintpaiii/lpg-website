@@ -52,16 +52,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('throttle:60,1')
         ->name('api.barangay-coordinates');
 
-    // Free OpenStreetMap services, proxied + cached (Nominatim address search, OSRM road routes)
-    Route::get('/api/geocode', [\App\Http\Controllers\MapServiceController::class, 'geocode'])
-        ->middleware('throttle:30,1')
-        ->name('api.geocode');
-    Route::get('/api/reverse-geocode', [\App\Http\Controllers\MapServiceController::class, 'reverse'])
-        ->middleware('throttle:30,1')
-        ->name('api.reverse-geocode');
+    // Free OpenStreetMap services, proxied + cached (OSRM road routes)
     Route::get('/api/route', [\App\Http\Controllers\MapServiceController::class, 'route'])
         ->middleware('throttle:60,1')
         ->name('api.route');
+});
+
+// Address search + "address from a map pin" (Nominatim, proxied + cached + throttled). No login needed: the guest store
+// registration (/seller/register) fills City / Barangay from the pin too.
+Route::get('/api/geocode', [\App\Http\Controllers\MapServiceController::class, 'geocode'])
+    ->middleware('throttle:30,1')
+    ->name('api.geocode');
+Route::get('/api/reverse-geocode', [\App\Http\Controllers\MapServiceController::class, 'reverse'])
+    ->middleware('throttle:30,1')
+    ->name('api.reverse-geocode');
+
+// "Continue with Google" — a new user picks buyer or seller-only first (EnsureAccountChosen sends them here)
+Route::middleware('auth')->group(function () {
+    Route::get('/choose-account', [\App\Http\Controllers\AccountChoiceController::class, 'show'])->name('account.choose');
+    Route::post('/choose-account', [\App\Http\Controllers\AccountChoiceController::class, 'choose'])->middleware('throttle:20,1')->name('account.choose.store');
 });
 
 // ── Seller Registration & Pending (accessible without seller middleware) ─────

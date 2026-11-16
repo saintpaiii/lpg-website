@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'last_name',
         'suffix',
         'can_shop',
+        'needs_account_choice',   // new Google user who hasn't picked buyer / seller-only yet (K1)
         'email',
         'password',
         'email_verified_at',
@@ -77,6 +78,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'id_verified_at'          => 'datetime',
             'deactivated_at'          => 'datetime',
             'can_shop'                => 'boolean',
+            'needs_account_choice'    => 'boolean',
         ];
     }
 

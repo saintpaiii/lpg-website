@@ -25,13 +25,32 @@ use Inertia\Response;
 class SellerRegistrationController extends Controller
 {
     /** GET /seller/register */
-    public function create(): Response|RedirectResponse
+    public function create(Request $request): Response|RedirectResponse
     {
-        if (auth()->check()) {
+        $user = $request->user();
+        // Signed in: only a new Google user who chose "I only want to sell LPG" (needs_account_choice) fills it in here.
+        // Everyone else goes home (customers use Start Selling).
+        if ($user && ! static::signedInApplicant($user)) {
             return redirect()->route('home');
         }
 
-        return Inertia::render('auth/seller-register', LegalService::sellerTermsProps());
+        return Inertia::render('auth/seller-register', LegalService::sellerTermsProps() + [
+            // Signed-in mode: Google email read-only, no password fields, names prefilled (editable)
+            'signed_in' => $user ? [
+                'email'       => $user->email,
+                'first_name'  => (string) ($user->first_name ?? ''),
+                'middle_name' => (string) ($user->middle_name ?? ''),
+                'last_name'   => (string) ($user->last_name ?? ''),
+                'suffix'      => (string) ($user->suffix ?? ''),
+            ] : null,
+        ]);
+    }
+
+    /** A signed-in user who may apply here: a new Google account that hasn't chosen yet (never admins / staff). */
+    public static function signedInApplicant(User $user): bool
+    {
+        return $user->needs_account_choice && ! $user->isAdmin() && ! $user->is_platform_staff
+            && $user->role === 'customer' && ! Store::withTrashed()->where('user_id', $user->id)->exists();
     }
 
     /** GET /seller/register/check-name?name= — only {exists, count, cities}; the caller's own store is never counted. */
@@ -48,15 +67,25 @@ class SellerRegistrationController extends Controller
     {
         $fileRule = fn () => File::types(['jpg', 'jpeg', 'png', 'webp', 'pdf'])->max(5 * 1024);
 
+        // Signed-in mode (new Google user who chose seller only): the application goes on THIS account — no email / password
+        $signedIn = $request->user();
+        if ($signedIn && ! static::signedInApplicant($signedIn)) {
+            return $request->wantsJson()
+                ? response()->json(['message' => 'You already have an account. Use Start Selling instead.'], 403)
+                : redirect()->route('home');
+        }
+
         $validated = $request->validate([
             // Owner account — name parts (the full name is built with User::composeName)
             'first_name'            => ['required', 'string', 'max:255'],
             'middle_name'           => ['nullable', 'string', 'max:255'],
             'last_name'             => ['required', 'string', 'max:255'],
             'suffix'                => ['nullable', 'in:' . implode(',', User::SUFFIXES)],
-            'email'                 => ['required', 'email', 'max:255', 'unique:users,email'],
+            ...($signedIn ? [] : [
+                'email'             => ['required', 'email', 'max:255', 'unique:users,email'],
+                'password'          => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
+            ]),
             'phone'                 => ['required', 'string', 'regex:/^09\d{9}$/'],
-            'password'              => ['required', 'confirmed', Password::min(8)->mixedCase()->numbers()->symbols()],
 
             // Store info
             'store_name'            => ['required', 'string', 'max:255'],
@@ -96,6 +125,9 @@ class SellerRegistrationController extends Controller
         ], StoreDocuments::expiryMessages() + StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['valid_id', 'bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + \App\Support\UploadMessages::for(['selfie'], false) + ['selfie.required' => 'Please take a selfie with your camera.'] + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         $validated['suffix'] = ($validated['suffix'] ?? null) ?: null;
+        if ($signedIn) {
+            $validated['email'] = $signedIn->email;
+        }
         $validated['name']   = User::composeName($validated['first_name'], $validated['middle_name'] ?? null, $validated['last_name'], $validated['suffix']);
 
         $otherRows = StoreDocuments::filledOtherRows($request);
@@ -117,7 +149,7 @@ class SellerRegistrationController extends Controller
             throw ValidationException::withMessages([$duplicate['block']['field'] => $duplicate['block']['message']]);
         }
 
-        $store = DB::transaction(function () use ($request, $validated, $otherRows, $hashes, $duplicate) {
+        $store = DB::transaction(function () use ($request, $validated, $otherRows, $hashes, $duplicate, $signedIn) {
             // Store uploaded documents — private ('local' disk, served only to the owner and reviewers)
             $validIdPath        = $request->file('valid_id')->store('valid_ids', 'local');
             $selfiePath         = $request->file('selfie')->store('verifications/selfies', 'local');   // same folder as customer selfies
@@ -129,16 +161,13 @@ class SellerRegistrationController extends Controller
             // The logo is public (customers see it)
             $logoPath           = $request->hasFile('logo') ? $request->file('logo')->store('store-logos', 'public') : null;
 
-            // Create seller user account (email unverified)
             // Seller-only account: can_shop = false (no Customer Portal / orders). "Start Selling" keeps true.
-            $user = User::create([
+            $owner = [
                 'name'        => $validated['name'],
                 'first_name'  => $validated['first_name'],
                 'middle_name' => $validated['middle_name'] ?? null,
                 'last_name'   => $validated['last_name'],
                 'suffix'      => $validated['suffix'] ?? null,
-                'email'       => $validated['email'],
-                'password'    => Hash::make($validated['password']),
                 'phone'       => $validated['phone'],
                 'role'        => 'seller',
                 'can_shop'    => false,
@@ -146,7 +175,19 @@ class SellerRegistrationController extends Controller
                 'valid_id'    => $validIdPath,
                 'selfie_path' => $selfiePath,
                 'id_verified' => false,
-            ]);
+            ];
+            if ($signedIn) {
+                // Signed-in Google user: the SAME account becomes the seller (same state as a guest applicant);
+                // the account choice is made now. Email stays verified (Google); password unchanged (Forgot password works).
+                $user = $signedIn;
+                $user->forceFill($owner + ['needs_account_choice' => false])->save();
+            } else {
+                // Create seller user account (email unverified — verified with the OTP code on first login)
+                $user = User::create($owner + [
+                    'email'    => $validated['email'],
+                    'password' => Hash::make($validated['password']),
+                ]);
+            }
 
             // Create store (pending approval)
             $store = Store::create([
