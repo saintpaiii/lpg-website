@@ -122,8 +122,11 @@ class StoreReviewService
     }
 
     /** null when the store can be approved, else why not (plain English). */
-    public static function approveBlocker(array $documents, array $decisions): ?string
+    public static function approveBlocker(array $documents, array $decisions, ?Store $store = null): ?string
     {
+        if ($store && ! $store->owner?->hasVerifiedEmail()) {
+            return "Owner hasn't verified their email yet — the store can be approved after they enter the email code.";
+        }
         foreach ($documents as $d) {
             $status = $decisions[$d['key']]['status'] ?? null;
             if ($d['required'] && $status !== 'accepted') {

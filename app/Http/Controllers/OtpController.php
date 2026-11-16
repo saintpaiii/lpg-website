@@ -15,9 +15,15 @@ use Inertia\Response;
 
 class OtpController extends Controller
 {
+    /** Session flag set right after registration (customer or seller): the first code is sent automatically, once. */
+    public const AUTOSEND_KEY = 'otp_autosend';
+
+    /** Seconds between "Resend Code" clicks shown on the page. */
+    private const RESEND_COOLDOWN = 60;
+
     /**
-     * Show the OTP entry page.
-     * Does NOT auto-send — user must click "Send Verification Code" first.
+     * Show the OTP entry page. Right after registration the first code is sent by itself (once — a reload doesn't send
+     * another); otherwise the user clicks "Send Verification Code".
      */
     public function show(Request $request): Response|RedirectResponse
     {
@@ -28,13 +34,25 @@ class OtpController extends Controller
             return redirect($this->dashboardRoute($user));
         }
 
+        $sendError = null;
+        if ($request->session()->pull(self::AUTOSEND_KEY) && ! OtpCode::latestActiveFor($user)) {
+            RateLimiter::hit('otp-resend:' . $user->id, 60);
+            if (! $this->sendCode($user)) {
+                RateLimiter::clear('otp-resend:' . $user->id);
+                $sendError = "We couldn't send the code right now — click \"Send Verification Code\" to try again.";
+            }
+        }
+
         $activeOtp = OtpCode::latestActiveFor($user);
         $codeSent  = $activeOtp !== null;
         $expiresIn = $codeSent ? max(0, (int) now()->diffInSeconds($activeOtp->expires_at, false)) : 0;
+        // Resend cooldown counts from the last code sent (also the automatic one)
+        $sinceSent = $codeSent ? (int) $activeOtp->created_at->diffInSeconds(now()) : self::RESEND_COOLDOWN;
 
         return Inertia::render('auth/verify-otp', [
             'email'            => $user->email,
-            'resend_available' => $this->resendAvailableIn($user->id),
+            'resend_available' => max($this->resendAvailableIn($user->id), self::RESEND_COOLDOWN - $sinceSent, 0),
+            'send_error'       => $sendError,
             'code_expires_in'  => $expiresIn,
             'code_sent'        => $codeSent,
         ]);
@@ -108,6 +126,12 @@ class OtpController extends Controller
                 ->with('success', 'Email verified! Please complete identity verification to place orders.');
         }
 
+        // A seller whose store isn't approved yet: straight to the waiting page (not via the dashboard → the welcome
+        // message would be lost in the second redirect)
+        if ($user->role === 'seller' && \App\Models\Store::where('user_id', $user->id)->where('status', '!=', 'approved')->exists()) {
+            return redirect()->route('seller.pending')->with('success', 'Email verified! Your store application is being reviewed.');
+        }
+
         return redirect($this->dashboardRoute($user))
             ->with('success', 'Email verified successfully! Welcome, ' . $user->name . '!');
     }
@@ -134,17 +158,28 @@ class OtpController extends Controller
 
         RateLimiter::hit($throttleKey, 60); // 3 per 60 seconds
 
+        if (! $this->sendCode($user)) {
+            RateLimiter::clear($throttleKey);     // don't use up a resend attempt
+            return back()->withErrors(['resend' => "We couldn't send the code right now, please try again."]);
+        }
+
+        return back()->with('success', 'A new verification code has been sent to your email.');
+    }
+
+    /** New code + email; false when the email failed (the code is deleted so no countdown starts for it). */
+    private function sendCode($user): bool
+    {
         $otp = OtpCode::generateFor($user);
         try {
             Mail::to($user->email)->send(new OtpMail($user, $otp->code));
         } catch (\Throwable $e) {
             Log::warning('OTP email failed', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-            $otp->delete();                       // don't start the "code sent" countdown for a code nobody got
-            RateLimiter::clear($throttleKey);     // and don't use up a resend attempt
-            return back()->withErrors(['resend' => "We couldn't send the code right now, please try again."]);
+            $otp->delete();
+
+            return false;
         }
 
-        return back()->with('success', 'A new verification code has been sent to your email.');
+        return true;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ use App\Services\DuplicateStoreService;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -259,16 +260,25 @@ class SellerRegistrationController extends Controller
             ['link' => "/admin/stores/{$store->id}", 'store_id' => $store->id]
         );
 
-        // Not blocking: "same name elsewhere" / "another store within 50 m" — shown on the pending page
+        // Guest: sign the new owner in and go straight to the 6-digit email code (same as customer registration).
+        // Signed-in Google mode: the email is already verified → the waiting page.
+        if (! $signedIn) {
+            Auth::login($store->owner);
+            $request->session()->regenerate();
+            $request->session()->put(OtpController::AUTOSEND_KEY, true);   // /verify-otp sends the first code once
+        }
+        $next = $signedIn ? route('seller.pending', absolute: false) : route('otp.show', absolute: false);
+
+        // Not blocking: "same name elsewhere" / "another store within 50 m" — shown on the next page
         if ($warning = DuplicateStoreService::sellerWarning($duplicate)) {
             session()->flash('warning', $warning);
         }
 
-        // The page posts with axios: answer with JSON so the flash survives until it opens /seller/pending
+        // The page posts with axios: answer with JSON so the flash survives until it opens the next page
         if ($request->wantsJson()) {
-            return response()->json(['redirect' => route('seller.pending', absolute: false), 'warning' => $warning]);
+            return response()->json(['redirect' => $next, 'warning' => $warning]);
         }
 
-        return redirect()->route('seller.pending');
+        return redirect($next);
     }
 }

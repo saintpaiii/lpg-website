@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     Brain,
@@ -140,6 +140,7 @@ function Reveal({ children, delay = 0, className = '' }: {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Landing({ products, stats, plans }: Props) {
+    const contact_email = (usePage().props as { contact_email?: string }).contact_email ?? '';
     const [scrolled, setScrolled]     = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -678,10 +679,13 @@ export default function Landing({ products, stats, plans }: Props) {
                                         <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
                                         Cavite, Philippines
                                     </li>
-                                    <li className="flex items-center gap-2.5 text-sm text-slate-400">
-                                        <Mail className="h-4 w-4 shrink-0 text-blue-400" />
-                                        info@lpgcavite.ph
-                                    </li>
+                                    {/* Admin → Settings → company email (hidden when not set) */}
+                                    {contact_email && (
+                                        <li className="flex items-center gap-2.5 text-sm text-slate-400">
+                                            <Mail className="h-4 w-4 shrink-0 text-blue-400" />
+                                            <a href={`mailto:${contact_email}`} className="hover:text-white">{contact_email}</a>
+                                        </li>
+                                    )}
                                     <li className="flex items-center gap-2.5 text-sm text-slate-400">
                                         <Phone className="h-4 w-4 shrink-0 text-blue-400" />
                                         +63 (046) 000-0000

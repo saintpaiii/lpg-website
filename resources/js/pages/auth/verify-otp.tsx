@@ -10,10 +10,12 @@ type Props = {
     email: string;
     resend_available: number; // seconds until resend is available (0 = available now)
     code_expires_in: number;  // seconds until current OTP expires
-    code_sent: boolean;       // whether a code has been sent yet (false on fresh page load)
+    code_sent: boolean;       // whether a code has been sent yet (right after registration it is sent automatically)
+    /** The automatic first code couldn't be sent (mail problem) */
+    send_error?: string | null;
 };
 
-export default function VerifyOtp({ email, resend_available, code_expires_in, code_sent }: Props) {
+export default function VerifyOtp({ email, resend_available, code_expires_in, code_sent, send_error = null }: Props) {
     useFlashToast();
 
     // 6 individual digit refs
@@ -199,9 +201,9 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                                 <p className="text-center text-sm text-gray-500 dark:text-gray-400">
                                     Click the button below to receive your verification code.
                                 </p>
-                                {resendError && (
+                                {(resendError || send_error) && (
                                     <p className="text-center text-sm text-amber-600 dark:text-amber-400">
-                                        {resendError}
+                                        {resendError || send_error}
                                     </p>
                                 )}
                                 <Button

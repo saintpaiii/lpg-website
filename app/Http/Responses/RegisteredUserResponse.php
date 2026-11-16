@@ -14,7 +14,10 @@ class RegisteredUserResponse implements RegisterResponseContract
             return response()->json(['two_factor' => false]);
         }
 
+        // /verify-otp sends the first code by itself, once (K3)
+        $request->session()->put(\App\Http\Controllers\OtpController::AUTOSEND_KEY, true);
+
         return redirect()->route('otp.show')
-            ->with('success', 'Account created! Click "Send Verification Code" to verify your email.');
+            ->with('success', 'Account created! We sent a 6-digit code to your email.');
     }
 }

@@ -266,7 +266,7 @@ class StoreController extends Controller
 
         $documents = StoreReviewService::documents($store);
         $decisions = StoreReviewService::decisions($store, $documents);
-        if ($why = StoreReviewService::approveBlocker($documents, $decisions)) {
+        if ($why = StoreReviewService::approveBlocker($documents, $decisions, $store)) {
             return back()->with('error', $why);
         }
         // What was accepted (saved like before: {items: {key: true}, note, by…}); extras keep their label for the history
@@ -506,7 +506,9 @@ class StoreController extends Controller
                 'ocr'     => DocumentOcrController::present($d['submission_id'] ? $subs->get($d['submission_id'])?->ocr : ($saved[$d['key']] ?? null)),
             ], $documents),
             'decisions' => $decisions,
-            'blocker'   => StoreReviewService::approveBlocker($documents, $decisions),
+            'blocker'   => StoreReviewService::approveBlocker($documents, $decisions, $store),
+            // No store goes live with an unverified owner email (documents can still be accepted / rejected) — K3
+            'owner_email_verified' => (bool) $store->owner?->hasVerifiedEmail(),
             'rejected'  => StoreReviewService::rejectedLines($documents, $decisions),
             'reasons'   => StoreDocuments::REJECT_REASONS,
             'pin'       => [

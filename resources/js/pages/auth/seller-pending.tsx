@@ -151,13 +151,22 @@ export default function SellerPending({ sent_back = null, status = null, suspens
                             While you wait:
                         </p>
                         <ul className="space-y-1.5 text-sm text-blue-700 dark:text-blue-400">
-                            <li className="flex items-start gap-2">
-                                <Mail className="h-4 w-4 mt-0.5 shrink-0" />
-                                Check your email — we sent a verification link. Please verify your email address.
-                            </li>
+                            {user && (
+                                <li className="flex items-start gap-2">
+                                    <Mail className="h-4 w-4 mt-0.5 shrink-0" />
+                                    {user.email_verified_at ? (
+                                        <span className="inline-flex items-center gap-1">Email verified <CheckCircle2 className="h-4 w-4 text-green-600" aria-label="verified" /></span>
+                                    ) : (
+                                        <span className="flex flex-wrap items-center gap-2">
+                                            Your email isn't verified yet — the store can't be approved before it is.
+                                            <Link href="/verify-otp" className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-700">Verify your email</Link>
+                                        </span>
+                                    )}
+                                </li>
+                            )}
                             <li className="flex items-start gap-2">
                                 <Phone className="h-4 w-4 mt-0.5 shrink-0" />
-                                You'll receive an email notification once your application is approved or if we need more information.
+                                You'll get an email / notification when your application is approved or if we need more information.
                             </li>
                         </ul>
                     </div>

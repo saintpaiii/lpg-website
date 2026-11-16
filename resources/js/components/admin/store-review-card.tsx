@@ -22,6 +22,8 @@ export type StoreReview = {
     reasons: string[];
     pin: { lat: number | null; lng: number | null; address: string };
     max_date: string;
+    /** The owner entered the email code (no approval before) — K3 */
+    owner_email_verified?: boolean;
 };
 
 /**
@@ -180,6 +182,13 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
                         {duplicateCount > 0 && itemActions('duplicates')}
                     </li>
                 </ul>
+
+                {review.owner_email_verified === false && (
+                    <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>Owner hasn't verified their email yet. You can review the documents, but the store can be approved only after they enter the email code.</span>
+                    </div>
+                )}
 
                 {review.rejected.length > 0 && (
                     <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
