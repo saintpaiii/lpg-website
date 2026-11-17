@@ -83,6 +83,9 @@ class DashboardController extends Controller
             ->values();
 
         return Inertia::render('seller/dashboard', [
+            // J4: opening status + the "Closed today" switch (shown to people who can open Settings)
+            'hours_status' => \App\Support\StoreHours::status($store),
+            'closed_today' => \App\Support\StoreHours::closedToday($store),
             'stats' => [
                 'totalProducts'       => $totalProducts,
                 'activeProducts'      => $activeProducts,

@@ -17,6 +17,9 @@ import { lookupBarangay } from '@/components/address-map';
 import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { OtherDocumentsFields, otherRowsPayload, StoreNameWarning, useStoreNameCheck, type OtherDocRow, type PreviousOtherDoc } from '@/components/other-documents-fields';
+import { ApplicationHoursPolicy } from '@/components/store-hours-policy-cards';
+import { toWeek, type DayHours } from '@/components/store-hours-editor';
+import { defaultPolicy, type ExchangeOptions, type ExchangePolicyData } from '@/components/exchange-policy';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -38,6 +41,8 @@ type PreviousStore = {
     latitude: number | null;
     longitude: number | null;
     dti_sec_kind?: DtiSecKind | null;
+    opening_hours?: Record<string, DayHours> | null;
+    exchange_policy?: ExchangePolicyData;
 } | null;
 
 type PreviousDocs = {
@@ -65,6 +70,7 @@ type Props = {
     previous_other_docs?: PreviousOtherDoc[];
     /** How many extra documents can be added now (max 5 per form, 10 per store) */
     other_slots?: number;
+    exchange_options?: ExchangeOptions;
 };
 
 // ── File field definitions ─────────────────────────────────────────────────────
@@ -109,7 +115,12 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function BecomeSellerPage({ application, has_valid_id, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5 }: Props) {
+export default function BecomeSellerPage({ application, has_valid_id, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5, exchange_options }: Props) {
+    // J4 (optional): store hours (default open 24 hours) + tank exchange policy — prefilled on resubmission
+    const [hoursPolicy, setHoursPolicy] = useState<{ alwaysOpen: boolean; week: ReturnType<typeof toWeek>; policy: ExchangePolicyData }>(() => ({
+        alwaysOpen: !previous_store?.opening_hours, week: toWeek(previous_store?.opening_hours ?? null),
+        policy: previous_store?.exchange_policy ?? defaultPolicy(exchange_options),
+    }));
     const [step, setStep] = useState<1 | 2 | 3>(1);
 
     const [agreeTerms, setAgreeTerms]       = useState(false);
@@ -188,7 +199,9 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
     function submit(e: React.FormEvent) {
         e.preventDefault();
         if (!allAgreed) return;
-        transform(d => ({ ...d, terms_agreed: true, other_documents: otherRowsPayload(otherDocs) }));
+        transform(d => ({ ...d, terms_agreed: true, other_documents: otherRowsPayload(otherDocs),
+            // J4 (optional): store hours + tank exchange policy
+            always_open: hoursPolicy.alwaysOpen, opening_hours: hoursPolicy.alwaysOpen ? undefined : hoursPolicy.week, exchange_policy: hoursPolicy.policy }));
         post('/customer/become-seller', {
             forceFormData: true,
             // Go back to the step that has the problem (store info + pin on step 1, documents + dates on step 2)
@@ -410,6 +423,9 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                                 onChange={(lat, lng) => { setData((d) => ({ ...d, latitude: lat, longitude: lng })); setStep1Errors((e) => ({ ...e, latitude: '' })); }}
                                                 autoFill={autoFill}
                                                 error={errors.latitude || errors.longitude || step1Errors.latitude} />
+                                        </div>
+                                        <div className="mt-4">
+                                            <ApplicationHoursPolicy {...hoursPolicy} options={exchange_options} onChange={setHoursPolicy} />
                                         </div>
                                     </CardContent>
                                 </Card>

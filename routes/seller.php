@@ -280,5 +280,9 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             Route::put('settings/tax', [SettingsController::class, 'updateTax'])->middleware('seller_owner')->name('settings.tax');
             // Refund window (days after delivery) — owner or staff with Full access to Settings
             Route::put('settings/refunds', [SettingsController::class, 'updateRefunds'])->name('settings.refunds');
+            // J4: store hours, refill tank exchange policy, and the dashboard's "Closed today" switch
+            Route::put('settings/hours', [SettingsController::class, 'updateHours'])->name('settings.hours');
+            Route::put('settings/exchange-policy', [SettingsController::class, 'updateExchangePolicy'])->name('settings.exchange-policy');
+            Route::post('settings/closed-today', [SettingsController::class, 'closedToday'])->name('settings.closed-today');
         });
     });

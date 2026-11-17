@@ -14,6 +14,8 @@ import StoreAvatar from '@/components/store-avatar';
 import ProductCardImage from '@/components/product-card-image';
 import ProductGallery, { type GalleryMedia } from '@/components/product-gallery';
 import { NotePicker } from '@/components/reason-picker';
+import { PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
+import { ExchangePolicyLink, type ExchangePolicyData } from '@/components/exchange-policy';
 import { PhotoPicker, PhotoThumbs, ReviewEditDialog, ReviewOwnerActions, photoError, type MyReview } from '@/components/review-photos';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -45,6 +47,10 @@ type Product = {
     store_barangay: string;
     delivery_from: number | null;
     allow_pickup?: boolean;
+    /** J4: pick-up only (no rider / vehicle), opening status, refill tank exchange policy */
+    pickup_only?: boolean;
+    hours?: StoreHoursStatus;
+    exchange_policy?: ExchangePolicyData | null;
     /** Days after delivery a refund can be requested (set by the store) */
     refund_window_days?: number;
     avg_rating: number;
@@ -294,11 +300,19 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                             <p className="text-gray-500 pl-6">
                                 {[product.store_barangay, product.store_city].filter(Boolean).join(', ')}
                             </p>
-                            {(product.delivery_from != null || product.allow_pickup) && (
+                            {product.pickup_only ? (
+                                <p className="pl-6"><PickupOnlyBadge /></p>
+                            ) : (product.delivery_from != null || product.allow_pickup) && (
                                 <p className="text-gray-500 pl-6">
                                     {product.delivery_from != null
                                         ? `Delivery from ₱${product.delivery_from.toLocaleString('en-PH')} (final fee at checkout)`
                                         : 'Pick-up only'}
+                                </p>
+                            )}
+                            {product.hours && <p className="pl-6"><StoreHoursBadge hours={product.hours} className="text-xs" /></p>}
+                            {product.exchange_policy && (
+                                <p className="text-gray-500 pl-6">
+                                    Refill: bring an empty tank that meets the store's exchange policy · <ExchangePolicyLink policy={product.exchange_policy} storeName={product.store_name} />
                                 </p>
                             )}
                             <p className="text-gray-500 pl-6">

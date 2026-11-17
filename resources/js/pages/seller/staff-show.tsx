@@ -253,7 +253,7 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
             return;
         }
         if (!staff.paused_by_plan && staff.is_last_eligible_rider
-            && !window.confirm('This is your only rider who can deliver — your products will be hidden from customers. Pause anyway?')) {
+            && !window.confirm('This is your only rider who can deliver — customers will only be able to pick up (no delivery). Pause anyway?')) {
             return;
         }
         router.patch(`/seller/staff/${staff.id}/plan-pause`, {}, { preserveScroll: true });

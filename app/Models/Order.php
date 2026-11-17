@@ -139,6 +139,34 @@ class Order extends Model
         return $text;
     }
 
+    /**
+     * The store's automatic chat message for a pick-up order (J4): "Pick-up for Order ORD-… — Store, address.
+     * Map: https://www.google.com/maps?q=lat,lng · Hours: today's hours · instructions".
+     */
+    public function pickupChatMessage(): string
+    {
+        $store   = $this->store;
+        $address = collect([$store?->address, $store?->barangay, $store?->city, $store?->province])->filter()->implode(', ');
+        $parts   = ["Pick-up for Order {$this->order_number} — " . ($store?->store_name ?? 'Store') . ($address !== '' ? ", {$address}" : '') . '.'];
+        $tail    = [];
+        if ($store && (float) $store->latitude != 0.0 && (float) $store->longitude != 0.0) {
+            $tail[] = 'Map: https://www.google.com/maps?q=' . (float) $store->latitude . ',' . (float) $store->longitude;
+        }
+        if ($store) {
+            $tail[] = 'Hours: ' . \App\Support\StoreHours::todayLabel($store)
+                . (($note = \App\Support\StoreHours::closedNote($store)) ? " ({$note})" : '');
+        }
+        if ($store?->pickup_instructions) {
+            $tail[] = $store->pickup_instructions;
+        }
+        $text = $parts[0] . ($tail ? ' ' . implode(' · ', $tail) : '');
+        if ($this->needsEmptyTanks() && ($sum = $this->emptyTankSummary()) !== '') {
+            $text .= "\nPlease bring {$sum} empty tank(s) for the refill (they must meet our exchange policy).";
+        }
+
+        return $text;
+    }
+
     /** Status shown to people: pick-up orders say "Ready for pick-up" / "Picked up". */
     public function statusLabel(): string
     {

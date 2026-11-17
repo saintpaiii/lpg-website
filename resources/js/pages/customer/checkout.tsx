@@ -3,6 +3,8 @@ import axios from 'axios';
 import { overLimitText, type LimitPeriod } from '@/lib/order-limits';
 import { Banknote, ChevronDown, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
 import StoreLocationMap from '@/components/store-location-map';
+import { ClosedNote, type StoreHoursStatus } from '@/components/store-badges';
+import { ExchangePolicyLink, type ExchangePolicyData } from '@/components/exchange-policy';
 import { orderLoad, quoteFee, whyNoVehicle, type DeliveryOption } from '@/lib/delivery-fee';
 import { formatAddress } from '@/data/cavite-locations';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -47,6 +49,10 @@ type StoreGroup = {
     /** Delivery fee per vehicle type (lib/delivery-fee.ts quoteFee picks the vehicle) */
     delivery_options: DeliveryOption[];
     can_deliver: boolean;
+    /** J4: no rider / delivery vehicle → pick-up only (delivery off, pick-up pre-selected) */
+    pickup_only?: boolean;
+    hours?: StoreHoursStatus;
+    exchange_policy?: ExchangePolicyData;
     no_delivery_reason: string | null;
     /** Why the store can't deliver at all: no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy */
     no_delivery_code?: string | null;
@@ -228,7 +234,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const [selectedCoupons, setSelectedCoupons] = useState<Record<number, number | null>>({});
     // Deliver to me / pick up at the store, per store
     const [fulfillments, setFulfillments] = useState<Record<number, 'delivery' | 'pickup'>>({});
-    const fulfillmentOf = (sg: StoreGroup): 'delivery' | 'pickup' => (sg.allow_pickup && fulfillments[sg.store_id] === 'pickup' ? 'pickup' : 'delivery');
+    const fulfillmentOf = (sg: StoreGroup): 'delivery' | 'pickup' => (sg.pickup_only ? 'pickup' : sg.allow_pickup && fulfillments[sg.store_id] === 'pickup' ? 'pickup' : 'delivery');
     const allPickup = stores.length > 0 && stores.every((sg) => fulfillmentOf(sg) === 'pickup');
     // Refill = hand over an empty tank of the same size — the customer confirms once for the whole checkout
     const [emptyConfirmed, setEmptyConfirmed] = useState(false);
@@ -344,9 +350,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
 
     // Payment options per store. Consignment only when the backend marks it available for
     // THIS store (loyalty program on + customer's trust score qualifies); COD if the store allows it.
+    // J4: pick-up orders → only "Pay at the store (cash)" (cod) or full payment online — no consignment
     const modesFor = (sg: StoreGroup): PaymentMode[] => [
         'full',
-        ...(sg.consignment_available ? (['consignment'] as const) : []),
+        ...(sg.consignment_available && fulfillmentOf(sg) !== 'pickup' ? (['consignment'] as const) : []),
         ...(sg.allow_cod ? (['cod'] as const) : []),
     ];
     const modeOf = (sg: StoreGroup): PaymentMode => {
@@ -433,7 +440,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
             return;
         }
         if (hasRefill && !emptyConfirmed) {
-            toast.error('Please confirm you have the empty tank(s) ready for exchange.');
+            toast.error("Please confirm your empty tank(s) are ready and meet the store's exchange policy.");
             return;
         }
         if (tinInvalid) {
@@ -668,19 +675,30 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 </p>
                             </CardHeader>
                             <CardContent>
+                                {/* The store is closed now (ordering allowed) — J4 */}
+                                <ClosedNote note={sg.hours?.closed_note} className="mb-3" />
                                 {/* Deliver to me / Pick up at the store */}
                                 {sg.allow_pickup && (
                                     <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-gray-100 p-1 dark:bg-gray-800">
-                                        {([['delivery', 'Deliver to me', Truck], ['pickup', 'Pick up at the store', Store]] as const).map(([value, label, Icon]) => (
-                                            <button key={value} type="button"
-                                                onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: value }))}
-                                                className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                                                    fulfillmentOf(sg) === value ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'
-                                                }`}>
-                                                <Icon className="h-4 w-4" /> {label}
-                                            </button>
-                                        ))}
+                                        {([['delivery', 'Deliver to me', Truck], ['pickup', 'Pick up at the store', Store]] as const).map(([value, label, Icon]) => {
+                                            const off = value === 'delivery' && !!sg.pickup_only;
+                                            return (
+                                                <button key={value} type="button" disabled={off} aria-disabled={off}
+                                                    title={off ? 'Pick-up only — delivery not available right now' : undefined}
+                                                    onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: value }))}
+                                                    className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                                        fulfillmentOf(sg) === value ? 'bg-white text-blue-700 shadow-sm dark:bg-gray-900 dark:text-blue-400' : 'text-gray-600 hover:text-gray-900 dark:text-gray-400'
+                                                    }`}>
+                                                    <Icon className="h-4 w-4" /> {label}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
+                                )}
+                                {sg.pickup_only && (
+                                    <p className="mb-3 text-xs text-amber-800 dark:text-amber-300" data-testid="pickup-only-reason">
+                                        <strong>Pick-up only — delivery not available right now.</strong> This store has no rider or delivery vehicle available, so the order is picked up at the store.
+                                    </p>
                                 )}
                                 {/* Delivery not possible for this store (no vehicle fits / no vehicle / too far) */}
                                 {blocked && (
@@ -719,6 +737,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                             {pickup
                                                 ? `Bring ${refillSummary} empty tank(s) to the store.`
                                                 : `have ${refillSummary} empty tank(s) ready — our rider will collect them.`}
+                                            {sg.exchange_policy && <> They must meet the store's exchange policy · <ExchangePolicyLink policy={sg.exchange_policy} storeName={sg.store_name} /></>}
                                         </span>
                                     </p>
                                 )}
@@ -1029,7 +1048,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
                         <input type="checkbox" checked={emptyConfirmed} onChange={(e) => setEmptyConfirmed(e.target.checked)}
                             className="mt-0.5 h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500" />
-                        I have the empty tank(s) ready for exchange.
+                        <span>
+                            My empty tank(s) are ready and meet this store's exchange policy
+                            {(() => { const sg = stores.find((s) => s.exchange_policy && s.items.some((i) => i.transaction_type === 'refill')); return sg?.exchange_policy ? <> (<ExchangePolicyLink policy={sg.exchange_policy} storeName={sg.store_name} />)</> : null; })()}.
+                        </span>
                     </label>
                 )}
 

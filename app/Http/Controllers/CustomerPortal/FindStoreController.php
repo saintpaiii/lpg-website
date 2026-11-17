@@ -139,6 +139,9 @@ class FindStoreController extends Controller
             ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId))
             ->get();
 
+        // J4: stores without a rider / delivery vehicle are still listed — as pick-up only (no fee, no range check)
+        $canDeliver = Store::deliveryMap($products->pluck('store_id'));
+
         // 2–4. Distance, range, fee and total; keep each store's lowest total
         $best = [];
         foreach ($products as $p) {
@@ -156,18 +159,19 @@ class FindStoreController extends Controller
                 continue;
             }
             $distance = DeliveryFeeService::distanceKm($loc['lat'], $loc['lng'], $lat, $lng);
-            if ($distance > (float) ($store->max_delivery_radius_km ?? self::DEFAULT_RADIUS_KM)) {
+            $pickupOnly = ! ($canDeliver[$store->id] ?? false);
+            if (! $pickupOnly && $distance > (float) ($store->max_delivery_radius_km ?? self::DEFAULT_RADIUS_KM)) {
                 continue;
             }
 
             // Delivery fee exactly as checkout: the cheapest vehicle that carries this quantity; distance only from
             // the store's own pin (else the base fee). No vehicle fits → this store can't deliver it.
-            $quote = DeliveryFeeService::quote(
+            $quote = $pickupOnly ? ['fee' => 0.0] : DeliveryFeeService::quote(
                 $store,
                 ((float) $store->latitude != 0.0 && (float) $store->longitude != 0.0)
                     ? DeliveryFeeService::distanceKm((float) $store->latitude, (float) $store->longitude, $lat, $lng)
                     : null,
-                DeliveryFeeService::fullTankKg((float) $p->weight_kg) * $qty,   // full tanks, as at checkout
+                DeliveryFeeService::itemKg($p) * $qty,   // same weight as checkout (DeliveryFeeService::itemKg)
                 (float) $p->weight_kg > 0 ? $qty : 0,
             );
             if (! $quote) {
@@ -181,7 +185,7 @@ class FindStoreController extends Controller
             if (isset($best[$store->id]) && $best[$store->id]['total'] <= $total) {
                 continue;
             }
-            $best[$store->id] = compact('p', 'store', 'loc', 'distance', 'fee', 'unit', 'subtotal', 'total');
+            $best[$store->id] = compact('p', 'store', 'loc', 'distance', 'fee', 'unit', 'subtotal', 'total', 'pickupOnly');
         }
 
         // 5. Sort
@@ -238,6 +242,9 @@ class FindStoreController extends Controller
                 'approximate_location' => (bool) $r['loc']['approximate'],
                 'lat'                  => $r['loc']['lat'],
                 'lng'                  => $r['loc']['lng'],
+                // J4: no rider / delivery vehicle → pick-up only (delivery_fee is null then)
+                'pickup_only'          => (bool) $r['pickupOnly'],
+                'hours'                => \App\Support\StoreHours::forCustomer($store),
             ],
             'product' => [
                 'id'        => $p->id,
@@ -251,7 +258,7 @@ class FindStoreController extends Controller
             'quantity'     => $qty,
             'unit_price'   => round($r['unit'], 2),
             'subtotal'     => round($r['subtotal'], 2),
-            'delivery_fee' => round($r['fee'], 2),
+            'delivery_fee' => $r['pickupOnly'] ? null : round($r['fee'], 2),
             'total'        => $r['total'],
             'distance_km'  => round($r['distance'], 1),
             'stock_left'   => (int) ($p->inventory?->quantity ?? 0),

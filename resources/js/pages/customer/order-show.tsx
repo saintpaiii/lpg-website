@@ -27,6 +27,8 @@ import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/paymen
 import { NotePicker, ReasonPicker, reasonSubmitValue } from '@/components/reason-picker';
 import { PhotoPicker, PhotoThumbs, ReviewEditDialog, ReviewOwnerActions, photoError, type MyReview } from '@/components/review-photos';
 import { PHOTO_ACCEPT, preparePhotos } from '@/lib/resize-image';
+import OrderAdjustments, { type OrderAdjustment } from '@/components/order-adjustments';
+import { ClosedNote, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
 
 type Payment = {
     id: number;
@@ -52,7 +54,12 @@ type Order = {
         /** The customer's default address — the route starts here */
         from?: [number, number] | null;
         from_approximate?: boolean;
+        /** J4: Google Maps link + the store's opening status */
+        maps_url?: string | null;
+        hours?: StoreHoursStatus | null;
     } | null;
+    /** J4: tanks not accepted at handover */
+    adjustments?: OrderAdjustment[];
     /** Refill: empty tanks still to hand over */
     empty_tanks_needed?: boolean;
     empty_tank_summary?: string | null;
@@ -731,6 +738,11 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                     from={order.pickup.from ?? null}
                                     fromApproximate={order.pickup.from_approximate ?? false}
                                 />
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" data-testid="pickup-block">
+                                    {order.pickup.hours && <span>Hours today: <strong>{order.pickup.hours.today}</strong>{order.pickup.hours.label !== order.pickup.hours.today && <StoreHoursBadge hours={order.pickup.hours} className="ml-1" />}</span>}
+                                    {order.pickup.maps_url && <a href={order.pickup.maps_url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">Open in Google Maps</a>}
+                                </div>
+                                <ClosedNote note={order.pickup.hours?.closed_note} />
                             </div>
                         )}
                         {/* Picked up: just where it was */}
@@ -792,6 +804,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base">Order Items</CardTitle>
+                                {(order.adjustments?.length ?? 0) > 0 && <p className="text-xs text-amber-700">Adjusted at handover — see below.</p>}
                             </CardHeader>
                             <CardContent className="p-0">
                                 <table className="w-full text-sm">
@@ -844,6 +857,8 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 </table>
                             </CardContent>
                         </Card>
+                        {/* Tanks not accepted at handover (J4) */}
+                        <div className="mt-4"><OrderAdjustments adjustments={order.adjustments} /></div>
                     </div>
 
                     {/* Details sidebar */}

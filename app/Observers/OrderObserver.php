@@ -23,14 +23,15 @@ class OrderObserver
             $this->say($order, 'order_created', function () use ($order) {
                 $order->load(['items.product', 'customer.user']);
 
-                // Pick-up placed by the customer at checkout (not a walk-in order the store typed in): where to go
-                $placedByCustomer = $order->created_by && $order->created_by === $order->customer?->user_id;
-                $location = $order->isPickup() && $placedByCustomer ? "\n\nPick-up location:\n" . $order->pickupLocationText() : '';
-
                 return 'Thank you for your order, ' . $this->customerFirstName($order) . "! We received order {$order->order_number}"
                     . (($items = $this->itemSummary($order)) ? " — {$items}" : '')
-                    . ' — total ₱' . number_format($order->grandTotal(), 2) . ". We'll confirm it shortly." . $location;
+                    . ' — total ₱' . number_format($order->grandTotal(), 2) . ". We'll confirm it shortly.";
             });
+            // Pick-up placed by the customer at checkout (not a walk-in order the store typed in): where to go — its own
+            // automatic store message with the address, a Google Maps link, today's hours and the instructions (J4)
+            if ($order->isPickup() && $order->created_by && $order->created_by === $order->customer?->user_id) {
+                $this->say($order, 'pickup_location', fn () => $order->loadMissing('store')->pickupChatMessage());
+            }
             $this->broadcast($order, true);
         });
     }

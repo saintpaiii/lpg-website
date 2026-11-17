@@ -48,7 +48,7 @@ class CheckStaffDocuments extends Command
                     $last = $doc->store && $doc->store->eligibleRiders()->pluck('users.id')->all() === [$rider->id];
                     NotificationService::send($owner, 'system', "Rider's license expires soon",
                         "{$rider->name}'s driver's license expires on {$date} ({$days} {$n})."
-                        . ($last ? ' When it expires your products will be hidden from customers.' : ''), ['link' => "/seller/staff/{$rider->id}"]);
+                        . ($last ? ' When it expires customers can only pick up from your store (no delivery).' : ''), ['link' => "/seller/staff/{$rider->id}"]);
                 }
                 $sent++;
             } elseif ($days === -1) {
@@ -59,7 +59,7 @@ class CheckStaffDocuments extends Command
                     \App\Models\Store::forgetVisibilityCache($doc->store_id);
                     NotificationService::send($owner, 'system', "Rider's license expired",
                         "{$rider->name}'s driver's license expired. They can't make deliveries until a renewed license is approved."
-                        . ($hidden ? ' Your products are now hidden from customers.' : ''), ['link' => "/seller/staff/{$rider->id}"]);
+                        . ($hidden ? ' Customers can now only pick up from your store (no delivery).' : ''), ['link' => "/seller/staff/{$rider->id}"]);
                 }
                 $sent++;
             }

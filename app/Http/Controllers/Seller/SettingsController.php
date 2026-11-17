@@ -53,7 +53,60 @@ class SettingsController extends Controller
             ],
             'can_edit_tax' => auth()->user()->role === 'seller',
             'refund_window_days' => (int) ($store->refund_window_days ?? 7),
+            // J4: store hours (null = open 24 hours) + refill tank exchange policy
+            'opening_hours'   => \App\Support\StoreHours::normalise($store->opening_hours),
+            'hours_status'    => \App\Support\StoreHours::status($store),
+            'exchange_policy' => \App\Support\ExchangePolicy::for($store),
+            'exchange_options' => ['brands' => \App\Support\ExchangePolicy::BRANDS, 'rules' => \App\Support\ExchangePolicy::RULES],
         ]);
+    }
+
+    /** Validation for a submitted week of opening hours (null / missing = open 24 hours). Shared with the application forms. */
+    public static function hoursRules(string $prefix = 'opening_hours'): array
+    {
+        return [
+            $prefix                => ['nullable', 'array'],
+            "{$prefix}.*.open"     => ['nullable', 'date_format:H:i'],
+            "{$prefix}.*.close"    => ['nullable', 'date_format:H:i'],
+            "{$prefix}.*.closed"   => ['nullable', 'boolean'],
+            "{$prefix}.*.all_day"  => ['nullable', 'boolean'],
+        ];
+    }
+
+    /** Settings → Store hours (J4). Open 24 hours = opening_hours null. */
+    public function updateHours(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        $data  = $request->validate(['always_open' => 'nullable|boolean'] + static::hoursRules(),
+            ['opening_hours.*.open.date_format' => 'Use a time like 08:00.', 'opening_hours.*.close.date_format' => 'Use a time like 18:00.']);
+
+        $hours = $request->boolean('always_open') ? null : \App\Support\StoreHours::normalise($data['opening_hours'] ?? null);
+        $store->update(['opening_hours' => $hours]);
+
+        return back()->with('success', $hours === null ? 'Store hours saved: open 24 hours.' : 'Store hours saved.');
+    }
+
+    /** Settings → Tank exchange policy (J4). */
+    public function updateExchangePolicy(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        $data  = $request->validate(\App\Support\ExchangePolicy::rules());
+        $store->update(['exchange_policy' => \App\Support\ExchangePolicy::clean($data['exchange_policy'] ?? null)]);
+
+        return back()->with('success', 'Tank exchange policy saved.');
+    }
+
+    /** Dashboard → "Closed today" switch (J4): closed until midnight (Asia/Manila), or open again. */
+    public function closedToday(Request $request): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        $on    = $request->boolean('closed');
+        $store->update(['closed_today_until' => $on ? now('Asia/Manila')->endOfDay() : null]);
+        \App\Models\Store::forgetVisibilityCache($store->id);
+
+        return back()->with('success', $on
+            ? 'Closed today — customers see "Closed" until midnight. They can still order; delivery and pick-up start when you open.'
+            : 'Open again — "Closed today" was turned off.');
     }
 
     /** Settings → Refunds: days after delivery a customer can request a refund (new orders snapshot it). */

@@ -273,6 +273,8 @@ class InvoiceService
                 'archived'    => $order->trashed(),
             ] : null,
             'items'       => $items,
+            // J4: "Adjusted at handover on {date}: {lines}" (same invoice number, totals already updated)
+            'adjustments' => $order ? \App\Services\HandoverAdjustmentService::invoiceLines($order) : [],
             'breakdown'   => $breakdown,
             'tax'         => $invoice->vat_status === 'vat' ? [
                 'vatable_sales' => (float) $invoice->vatable_sales,
@@ -342,6 +344,12 @@ class InvoiceService
         self::queueEmail($invoice->id, 'paid');
     }
 
+    /** J4: the invoice was updated at handover (tank not accepted) — email the updated PDF again. */
+    public static function queueAdjustedEmail(int $invoiceId): void
+    {
+        self::queueEmail($invoiceId, 'adjusted');
+    }
+
     /** After the commit AND after the response (webhooks / rider app aren't slowed down). Not a queued job. */
     private static function queueEmail(int $invoiceId, string $kind): void
     {
@@ -370,8 +378,8 @@ class InvoiceService
                 return;
             }
 
-            // Became paid before the "issued" mail went out → send only the paid one
-            if ($invoice->payment_status === 'paid' && $invoice->paid_emailed_at === null) {
+            // Became paid before the "issued" mail went out → send only the paid one (an "adjusted" mail always goes)
+            if ($kind !== 'adjusted' && $invoice->payment_status === 'paid' && $invoice->paid_emailed_at === null) {
                 $kind = 'paid';
             }
             if ($kind === 'paid' && ($invoice->payment_status !== 'paid' || $invoice->paid_emailed_at !== null)) {
@@ -391,6 +399,9 @@ class InvoiceService
 
             // Query update — no model events (no loops)
             $now = now();
+            if ($kind === 'adjusted') {
+                return;
+            }
             Invoice::withTrashed()->whereKey($invoice->id)->update(
                 $kind === 'paid'
                     ? ['paid_emailed_at' => $now, 'emailed_at' => $invoice->emailed_at ?? $now]

@@ -54,6 +54,8 @@ class BecomeSellerController extends Controller
                     'province'    => $store->province,
                     'phone'       => $store->phone,
                     'dti_sec_kind' => $store->dti_sec_kind,
+                    'opening_hours'   => \App\Support\StoreHours::normalise($store->opening_hours),
+                    'exchange_policy' => \App\Support\ExchangePolicy::for($store),
                 ];
             }
             $previousDocs = [
@@ -99,6 +101,7 @@ class BecomeSellerController extends Controller
             'rejected_documents' => $ownStore ? \App\Services\StoreReviewService::rejectedForSeller($ownStore) : [],
             'previous_docs'  => $previousDocs,
             ...LegalService::sellerTermsProps(),
+            'exchange_options' => ['brands' => \App\Support\ExchangePolicy::BRANDS, 'rules' => \App\Support\ExchangePolicy::RULES],
             // Max 5 rejected applications within 30 days
             'limit_message'  => $application?->status === 'pending' ? null : $this->limitMessage($user->id),
             'attempt'        => $this->rejectedRecently($user->id)->count() + 1,
@@ -157,6 +160,10 @@ class BecomeSellerController extends Controller
             'longitude'             => ['required', 'numeric', 'between:-180,180'],
             // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
             ...StoreDocuments::otherDocumentRules(),
+            // J4 (optional): store hours + refill tank exchange policy
+            'always_open'       => ['nullable', 'boolean'],
+            ...\App\Http\Controllers\Seller\SettingsController::hoursRules(),
+            ...\App\Support\ExchangePolicy::rules(),
             'terms_agreed'      => ['required', 'accepted'],
         ], StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
@@ -240,6 +247,9 @@ class BecomeSellerController extends Controller
                     'latitude'        => $request->latitude,
                     'longitude'       => $request->longitude,
                     'status'          => 'pending',
+                    // J4: null = open 24 hours; null policy = the default
+                    'opening_hours'   => $request->boolean('always_open', true) ? null : \App\Support\StoreHours::normalise($request->input('opening_hours')),
+                    'exchange_policy' => $request->has('exchange_policy') ? \App\Support\ExchangePolicy::clean($request->input('exchange_policy')) : null,
                     'document_hashes' => $hashes ?: null,
                     'duplicate_flags' => DuplicateStoreService::flags($duplicate),
                     'document_ocr'    => $ocr ?: null,

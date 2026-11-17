@@ -126,6 +126,15 @@
     </tr>
 </table>
 
+@if(!empty($doc['adjustments']))
+<div class="box">
+    <div class="label">Adjusted at handover</div>
+    @foreach($doc['adjustments'] as $line)
+        <div class="small">{{ $line }}</div>
+    @endforeach
+</div>
+@endif
+
 <div class="box">
     <div class="label">Payment</div>
     @if($doc['is_void'])

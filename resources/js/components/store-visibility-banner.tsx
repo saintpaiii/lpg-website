@@ -1,12 +1,18 @@
 import { Link, usePage } from '@inertiajs/react';
-import { EyeOff } from 'lucide-react';
+import { Store } from 'lucide-react';
 import type { SharedData } from '@/types';
 
 type Reason = { code: string; text: string; rider_id: number | null };
-export type StoreVisibility = { visible: boolean; reasons: Reason[]; staff_full: boolean } | null;
-
-/** Plan and document reasons have their own banners (PlanStatusBanner, DocumentSuspensionBanner). */
-const OTHER_BANNERS = ['plan', 'documents'];
+export type StoreVisibility = {
+    visible: boolean;
+    /** Hidden reasons: plan / documents (their own banners: PlanStatusBanner, DocumentSuspensionBanner) */
+    reasons: Reason[];
+    can_deliver?: boolean;
+    /** J4: visible, but no rider / vehicle → customers can only pick up */
+    pickup_only?: boolean;
+    delivery_reasons?: Reason[];
+    staff_full: boolean;
+} | null;
 
 /** Vehicle reasons (Store::vehicleReason) — fixed on the Vehicles page */
 const VEHICLE_ACTIONS: Record<string, string> = {
@@ -15,41 +21,54 @@ const VEHICLE_ACTIONS: Record<string, string> = {
     no_delivery_fee:      'Set delivery fees',
 };
 
+/** The owner's fix link for one delivery reason (staff get no button). */
+function fixFor(reason: Reason, staffFull: boolean): { href: string; label: string } {
+    if (reason.code in VEHICLE_ACTIONS) return { href: '/seller/vehicles', label: VEHICLE_ACTIONS[reason.code] };
+    if (reason.code === 'no_rider') return staffFull ? { href: '/seller/plan', label: 'My Plan' } : { href: '/seller/staff?add=rider', label: 'Add a rider' };
+    if (reason.code === 'license_pending' && reason.rider_id) return { href: `/seller/staff/${reason.rider_id}`, label: 'See license' };
+    if (reason.rider_id) return { href: `/seller/staff/${reason.rider_id}`, label: 'Open rider' };
+    return { href: '/seller/staff', label: 'Open Staff' };
+}
+
 /**
- * "Your products are hidden from customers — No rider yet." A store needs at least one rider who can deliver
- * (active, not paused, approved valid driver's license) AND a vehicle that can take a delivery with a delivery fee
- * to be shown. Owner gets the fix button; staff get the text.
+ * J4: a store without an approved rider or a delivery vehicle is no longer hidden — customers can only PICK UP.
+ * This banner says so and lists what to fix (owner: a button per reason; staff: the text). A hidden store (plan ended,
+ * document expired) keeps its own banners.
  */
 export function StoreVisibilityBanner() {
     const { auth, storeVisibility } = usePage<SharedData & { storeVisibility?: StoreVisibility }>().props;
-    if (!storeVisibility || storeVisibility.visible) return null;
-    const reason = storeVisibility.reasons.find((r) => !OTHER_BANNERS.includes(r.code));
-    if (!reason) return null;
+    if (!storeVisibility || !storeVisibility.visible || !storeVisibility.pickup_only) return null;
+    const reasons = storeVisibility.delivery_reasons ?? [];
+    if (reasons.length === 0) return null;
 
     const isOwner = auth.user?.role === 'seller';
-    const full = reason.code === 'no_rider' && storeVisibility.staff_full;
-    const isVehicle = reason.code in VEHICLE_ACTIONS;
-    const action = !isOwner ? null
-        : isVehicle ? { href: '/seller/vehicles', label: VEHICLE_ACTIONS[reason.code] }
-        : full ? { href: '/seller/plan', label: 'My Plan' }
-        : reason.code === 'no_rider' ? { href: '/seller/staff?add=rider', label: 'Add a rider' }
-        : reason.code === 'license_pending' && reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'See license' }
-        : reason.rider_id ? { href: `/seller/staff/${reason.rider_id}`, label: 'Open rider' }
-        : { href: '/seller/staff', label: 'Open Staff' };
+    const full = reasons.some((r) => r.code === 'no_rider') && storeVisibility.staff_full;
 
     return (
-        <div className="mx-4 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 sm:mx-6">
-            <EyeOff className="h-4 w-4 shrink-0" />
-            <p className="flex-1 min-w-0">
-                <strong>Your products are hidden from customers</strong> — {reason.text}.
-                {full && ' Your staff limit is full — deactivate someone or upgrade your plan.'}
-                {!isOwner && (isVehicle ? ' Ask your store owner to set up a delivery vehicle.' : ' Ask your store owner to add or approve a rider.')}
+        <div className="mx-4 mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200 sm:mx-6" role="status">
+            <p className="flex items-start gap-2">
+                <Store className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
+                    <strong>Customers can only PICK UP from your store</strong> until you add an approved rider and a delivery vehicle.
+                    {full && ' Your staff limit is full — deactivate someone or upgrade your plan.'}
+                    {!isOwner && ' Ask your store owner to fix this.'}
+                </span>
             </p>
-            {action && (
-                <Link href={action.href} className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
-                    {action.label}
-                </Link>
-            )}
+            <ul className="mt-2 space-y-1.5 pl-6">
+                {reasons.map((r) => {
+                    const fix = fixFor(r, storeVisibility.staff_full);
+                    return (
+                        <li key={r.code} className="flex flex-wrap items-center gap-2">
+                            <span>• {r.text}</span>
+                            {isOwner && (
+                                <Link href={fix.href} className="rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700">
+                                    {fix.label}
+                                </Link>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
         </div>
     );
 }

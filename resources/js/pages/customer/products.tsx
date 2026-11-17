@@ -19,6 +19,7 @@ import CustomerLayout from '@/layouts/customer-layout';
 import { formatCity } from '@/data/cavite-locations';
 import StoreAvatar from '@/components/store-avatar';
 import ProductCardImage from '@/components/product-card-image';
+import { PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
 
 type Product = {
     id: number;
@@ -51,6 +52,9 @@ type Product = {
     /** Cheapest delivery option; null = no delivery */
     delivery_from: number | null;
     allow_pickup?: boolean;
+    /** J4: no rider / delivery vehicle → pick-up only */
+    pickup_only?: boolean;
+    hours?: StoreHoursStatus;
     avg_rating: number;
     review_count: number;
 };
@@ -487,11 +491,12 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                                 </p>
                                             </div>
                                         </div>
-                                        {p.delivery_from != null ? (
-                                            <p className="text-[10px] text-gray-400 mb-2">Delivery from ₱{p.delivery_from.toLocaleString('en-PH')}</p>
-                                        ) : p.allow_pickup ? (
-                                            <p className="text-[10px] text-gray-400 mb-2">Pick-up only</p>
+                                        {p.pickup_only ? (
+                                            <PickupOnlyBadge short className="mb-1" />
+                                        ) : p.delivery_from != null ? (
+                                            <p className="text-[10px] text-gray-400 mb-1">Delivery from ₱{p.delivery_from.toLocaleString('en-PH')}</p>
                                         ) : null}
+                                        <StoreHoursBadge hours={p.hours} className="mb-2 flex" />
                                         {isAdminPreview ? (
                                             <div className="w-full rounded-lg bg-gray-100 text-gray-400 text-xs font-medium h-9 flex items-center justify-center gap-1.5 border border-dashed border-gray-300">
                                                 <ShoppingCart className="h-3.5 w-3.5" />

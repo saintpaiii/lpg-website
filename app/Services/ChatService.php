@@ -468,7 +468,8 @@ class ChatService
             return null;
         }
         $isLocationMessage = $m->auto_kind === 'order_out_for_delivery'
-            || ($m->auto_kind === 'order_created' && str_contains((string) $m->body, 'Pick-up location'));   // walk-in orders have none
+            || $m->auto_kind === 'pickup_location'   // J4: the store's pick-up message after checkout
+            || ($m->auto_kind === 'order_created' && str_contains((string) $m->body, 'Pick-up location'));   // older orders
         if (! $isLocationMessage) {
             return null;
         }

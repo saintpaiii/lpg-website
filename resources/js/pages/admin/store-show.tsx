@@ -164,7 +164,7 @@ type Props = {
     store: StoreDetail;
     stats: StoreStats;
     subscription?: StoreSubscription;
-    visibility?: { visible: boolean; reasons: { code: string; text: string }[] } | null;
+    visibility?: { visible: boolean; reasons: { code: string; text: string }[]; pickup_only?: boolean; delivery_reasons?: { code: string; text: string }[] } | null;
     history: ActionHistory[];
     documentHistory: DocumentHistoryRow[];
     /** Pending application: documents to review + decisions (J3) */
@@ -552,7 +552,14 @@ export default function StoreShow({
                 {visibility && !visibility.visible && (
                     <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
                         <strong>Hidden from customers:</strong>{' '}
-                        {visibility.reasons.map((r) => (r.code.startsWith('license') || r.code.includes('rider') ? `no eligible rider (${r.text.toLowerCase()})` : r.text.toLowerCase())).join(' · ')}
+                        {visibility.reasons.map((r) => r.text.toLowerCase()).join(' · ')}
+                    </div>
+                )}
+                {/* J4: no rider / delivery vehicle → still shown, PICK-UP ONLY */}
+                {visibility && visibility.visible && visibility.pickup_only && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                        <strong>Pick-up only (customers can't get delivery):</strong>{' '}
+                        {(visibility.delivery_reasons ?? []).map((r) => r.text.toLowerCase()).join(' · ')}
                     </div>
                 )}
 

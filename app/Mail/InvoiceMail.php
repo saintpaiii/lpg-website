@@ -30,7 +30,11 @@ class InvoiceMail extends Mailable
     {
         $subject = "Invoice {$this->invoice->invoice_number} from {$this->storeName()}";
 
-        return new Envelope(subject: $this->kind === 'paid' ? "Paid — {$subject}" : $subject);
+        return new Envelope(subject: match ($this->kind) {
+            'paid'     => "Paid — {$subject}",
+            'adjusted' => "Updated — {$subject}",   // J4: changed at handover (tank not accepted)
+            default    => $subject,
+        });
     }
 
     public function content(): Content

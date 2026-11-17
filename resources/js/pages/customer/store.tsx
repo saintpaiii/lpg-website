@@ -20,6 +20,8 @@ import { formatAddress } from '@/data/cavite-locations';
 import StoreAvatar from '@/components/store-avatar';
 import { PhotoThumbs } from '@/components/review-photos';
 import ProductCardImage from '@/components/product-card-image';
+import { PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
+import { ExchangePolicyView, type ExchangePolicyData } from '@/components/exchange-policy';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,13 @@ type StoreInfo = {
     joined_at: string;
     is_top_rated: boolean;
     is_trusted: boolean;
+    // J4: pick-up only, opening status + the week, refill tank exchange policy
+    pickup_only?: boolean;
+    delivery_from?: number | null;
+    hours?: StoreHoursStatus;
+    week_hours?: { day: string; hours: string; today: boolean }[];
+    exchange_policy?: ExchangePolicyData;
+    pickup_instructions?: string | null;
 };
 
 type Product = {
@@ -206,6 +215,12 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         </span>
                                     )}
                                 </div>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    {store.pickup_only ? <PickupOnlyBadge /> : store.delivery_from != null && (
+                                        <span className="text-xs text-gray-500">Delivery from ₱{store.delivery_from.toLocaleString('en-PH')}</span>
+                                    )}
+                                    <StoreHoursBadge hours={store.hours} className="text-xs" />
+                                </div>
                             </div>
 
                             {/* Stats */}
@@ -230,6 +245,36 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Store hours + tank exchange policy (J4) */}
+                {(store.week_hours || store.exchange_policy) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {store.week_hours && (
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="mb-2 text-sm font-semibold">Store hours</p>
+                                    <ul className="space-y-0.5 text-sm" aria-label="Store hours this week">
+                                        {store.week_hours.map((d) => (
+                                            <li key={d.day} className={`flex justify-between gap-3 ${d.today ? 'font-semibold' : 'text-muted-foreground'}`}>
+                                                <span>{d.day}{d.today ? ' (today)' : ''}</span><span>{d.hours}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    {store.hours?.closed_note && <p className="mt-2 text-xs text-amber-700">{store.hours.closed_note} You can still order.</p>}
+                                </CardContent>
+                            </Card>
+                        )}
+                        {store.exchange_policy && (
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="mb-2 text-sm font-semibold">Tank exchange policy (refills)</p>
+                                    <ExchangePolicyView policy={store.exchange_policy} />
+                                    {store.pickup_instructions && <p className="mt-2 text-xs text-muted-foreground">Pick-up: {store.pickup_instructions}</p>}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
 
                 {/* Search */}
                 <form onSubmit={doSearch} className="flex gap-2 max-w-sm">

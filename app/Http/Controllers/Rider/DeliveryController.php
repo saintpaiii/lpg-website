@@ -67,6 +67,8 @@ class DeliveryController extends Controller
                 'empty_tanks_required'  => (int) $d->order->empty_tanks_required,
                 'empty_tank_summary'    => (int) $d->order->empty_tanks_required > 0 ? $d->order->emptyTankSummary() : null,
                 'empty_tanks_collected' => $d->order->empty_tanks_collected_at !== null,
+                // J4: refill items for "A tank was not accepted"
+                'refill_items'          => \App\Services\HandoverAdjustmentService::refillItems($d->order),
                 'shipping_fee'       => $d->order->shipping_fee ? (float) $d->order->shipping_fee : null,
                 'transaction_type'   => $d->order->transaction_type,
                 'payment_method'     => $d->order->payment_method,
@@ -208,6 +210,8 @@ class DeliveryController extends Controller
                     'empty_tanks_required'  => (int) ($o?->empty_tanks_required ?? 0),
                     'empty_tank_summary'    => $o && (int) $o->empty_tanks_required > 0 ? $o->emptyTankSummary() : null,
                     'empty_tanks_collected' => $o?->empty_tanks_collected_at !== null,
+                    // J4: refill items for "A tank was not accepted" (map view's Delivered dialog)
+                    'refill_items'          => $o && ! in_array($d->status, ['delivered', 'failed'], true) ? \App\Services\HandoverAdjustmentService::refillItems($o) : [],
                 ];
             })->all(),
         ];
@@ -299,7 +303,9 @@ class DeliveryController extends Controller
             'rider_longitude'   => 'nullable|numeric|between:-180,180',
             'rider_accuracy'    => 'nullable|numeric|min:0',
             'empty_tanks_collected' => 'nullable|boolean',
-        ], Delivery::failureMessages() + \App\Support\UploadMessages::for(['photo'], false));
+            // J4: "A tank was not accepted" (refill items) — only with Delivered
+            ...\App\Services\HandoverAdjustmentService::rules(),
+        ], Delivery::failureMessages() + \App\Support\UploadMessages::for(['photo'], false) + \App\Services\HandoverAdjustmentService::messages());
 
         $newStatus = $data['status'];
 
@@ -318,27 +324,40 @@ class DeliveryController extends Controller
             return back()->with('error', "Cannot move from {$delivery->status} to {$newStatus}.");
         }
 
-        // Refill: the rider confirms the empty tanks were collected
-        if ($newStatus === 'delivered' && $delivery->order) {
-            $delivery->order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, auth()->id());
+        if (! empty($data['not_accepted']) && $newStatus !== 'delivered') {
+            return back()->with('error', 'A tank that was not accepted is recorded with "Delivered".');
         }
 
         $riderLocSaved = false;
-        DB::transaction(function () use ($delivery, $newStatus, $data, $request, &$riderLocSaved) {
+        $adjusted = ['changed' => false, 'cancelled_all' => false];
+        DB::transaction(function () use ($delivery, $newStatus, $data, $request, &$riderLocSaved, &$adjusted) {
             $updates = ['status' => $newStatus];
 
             if (! empty($data['notes'])) {
                 $updates['notes'] = $data['notes'];
             }
 
+            if ($newStatus === 'delivered' && $delivery->order) {
+                // J4: tanks NOT accepted first (switch to New Purchase / cancel the item) — totals, stock, refund, invoice
+                $adjusted = \App\Services\HandoverAdjustmentService::apply($delivery->order, $data['not_accepted'] ?? [], $request, auth()->id(), 'delivery');
+                $delivery->setRelation('order', $delivery->order->fresh());
+                // Refill: the rider confirms the empty tanks that WERE accepted were collected
+                if (! $adjusted['cancelled_all']) {
+                    $delivery->order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, auth()->id());
+                }
+            }
+
             if ($newStatus === 'delivered' && ! $delivery->delivered_at) {
                 $updates['delivered_at'] = now();
-                $delivery->order?->update([
-                    'status'       => 'delivered',
-                    'delivered_at' => now(),
-                ]);
-                if ($delivery->order) {
-                    OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
+                // Every item cancelled at the door → the order is already cancelled (nothing delivered)
+                if (! $adjusted['cancelled_all']) {
+                    $delivery->order?->update([
+                        'status'       => 'delivered',
+                        'delivered_at' => now(),
+                    ]);
+                    if ($delivery->order) {
+                        OrderPaymentService::handleDelivered($delivery->order->fresh(), $delivery);
+                    }
                 }
             }
 
@@ -378,8 +397,19 @@ class DeliveryController extends Controller
             }
         });
 
+        if ($adjusted['cancelled_all']) {
+            return back()->with('success', 'Every tank was not accepted — the order was cancelled. Return the tanks to the store.');
+        }
         $label = ucfirst(str_replace('_', ' ', $newStatus));
-        return back()->with('success', "Delivery marked as {$label}.");
+        $order = $delivery->order?->fresh();
+
+        return back()->with('success', "Delivery marked as {$label}."
+            . ($adjusted['changed'] && $order ? ' Order adjusted — ' . match (true) {
+                $order->payment_status !== 'paid' => 'amount to collect now ₱' . number_format($order->grandTotal(), 2) . '.',
+                $adjusted['net'] < 0              => 'new total ₱' . number_format($order->grandTotal(), 2) . '. It was prepaid, so the store will refund ₱' . number_format(-$adjusted['net'], 2) . '.',
+                $adjusted['net'] > 0              => 'new total ₱' . number_format($order->grandTotal(), 2) . '. Collect ₱' . number_format($adjusted['net'], 2) . ' in cash for the difference (receipt recorded).',
+                default                           => 'new total ₱' . number_format($order->grandTotal(), 2) . '.',
+            } : ''));
     }
 
     // ── COD: Payment Collected ────────────────────────────────────────────────

@@ -47,9 +47,10 @@ class CartController extends Controller
                     'store_id'     => $storeId,
                     'store_name'   => $store->store_name,
                     'store_logo_url' => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
-                    // Cheapest delivery option ("Delivery from ₱40") — the final fee is computed at checkout
-                    'delivery_from' => \App\Services\DeliveryFeeService::fromFee($store),
-                    'allow_pickup'  => (bool) $store->allow_pickup,
+                    // "Delivery from ₱40" (null = no delivery), pick-up only (no rider / vehicle), opening status — J4
+                    ...collect($store->customerFacts())->only(['delivery_from', 'allow_pickup', 'pickup_only', 'can_deliver', 'hours'])->all(),
+                    // Weight alert: the store's biggest delivery-ready vehicle (null = none); items carry their unit kg
+                    'max_vehicle_kg' => \App\Services\DeliveryFeeService::biggestVehicle($store)['kg'] ?? null,
                     // False when the store is hidden (plan ended, permit expired…): its items can't be checked out
                     'store_available' => $store->isOpenToCustomers(),
                     'items'        => [],
@@ -62,6 +63,8 @@ class CartController extends Controller
                 'name'             => $product->name,
                 'brand'            => $product->brand ?? '',
                 'weight'           => $product->weight ?? (($product->weight_kg ?? '') . 'kg'),
+                // Delivery weight of ONE unit (DeliveryFeeService::itemKg — the same number checkout uses)
+                'unit_kg'          => \App\Services\DeliveryFeeService::itemKg($product),
                 'image_url'        => $product->image ? Storage::url($product->image) : null,
                 'refill_price'     => (float) $product->refill_price,
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),

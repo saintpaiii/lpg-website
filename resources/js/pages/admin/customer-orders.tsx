@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import OrderAdjustments, { type OrderAdjustment } from '@/components/order-adjustments';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +37,8 @@ type Order = {
     grand_total: number;
     created_at: string;
     items: OrderItem[];
+    /** J4: tanks not accepted at handover */
+    adjustments?: OrderAdjustment[];
 };
 
 type PaginatedOrders = {
@@ -160,6 +163,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                             {item.product?.name ?? '—'} × {item.quantity}
                                                         </div>
                                                     ))}
+                                                    <OrderAdjustments adjustments={o.adjustments} compact />
                                                 </td>
                                                 <td className="px-4 py-3 font-medium">{fmt(o.grand_total)}</td>
                                                 <td className="px-4 py-3">

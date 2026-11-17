@@ -73,13 +73,35 @@ class DeliveryFeeService
             $product = is_array($item) ? ($item['product'] ?? null) : $item->product;
             $qty     = (int) (is_array($item) ? ($item['quantity'] ?? 0) : $item->quantity);
             $w       = (float) ($product?->weight_kg ?? 0);
-            $kg += static::fullTankKg($w) * $qty;
+            $kg += static::itemKg($product) * $qty;
             if ($w > 0) {
                 $tanks += $qty;
             }
         }
 
         return ['kg' => round($kg, 2), 'tanks' => $tanks];
+    }
+
+    /**
+     * Weight ONE unit of this product adds to a delivery — the ONE place for it (orderLoad, checkout, the cart's
+     * weight alert). Today: the full-tank weight of its gas size.
+     */
+    public static function itemKg($product): float
+    {
+        return static::fullTankKg((float) ($product?->weight_kg ?? 0));
+    }
+
+    /**
+     * The store's biggest delivery-ready vehicle (usable + has a delivery fee): {kg, tanks}, or null when none.
+     * The cart compares the order's weight with it (J4).
+     */
+    public static function biggestVehicle(Store $store): ?array
+    {
+        $rates = static::rates($store);
+        $v = static::usableVehicles($store)->filter(fn (Vehicle $v) => $rates->has($v->vehicle_type))
+            ->sortByDesc(fn (Vehicle $v) => [(float) $v->max_capacity_kg, (int) $v->max_tanks])->first();
+
+        return $v ? ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks] : null;
     }
 
     /** All the store's vehicles (not deleted, not retired) — uses the eager-loaded relation when present. */

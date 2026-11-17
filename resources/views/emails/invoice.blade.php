@@ -24,11 +24,13 @@
     <div class="wrapper">
         <div class="header">
             <h1>{{ $storeName }}</h1>
-            <p>{{ $kind === 'paid' ? 'Payment received' : 'Your invoice' }}</p>
+            <p>{{ $kind === 'paid' ? 'Payment received' : ($kind === 'adjusted' ? 'Updated invoice' : 'Your invoice') }}</p>
         </div>
         <div class="body">
             <p class="heading">Hi{{ $customer ? ' ' . $customer : '' }},</p>
-            @if($kind === 'paid')
+            @if($kind === 'adjusted')
+                <p class="message">Your order was adjusted at handover (a tank was not accepted). The updated invoice <strong>{{ $number }}</strong> is attached as a PDF — same invoice number, new totals.</p>
+            @elseif($kind === 'paid')
                 <p class="message">Thank you! Your order is fully paid. Your invoice <strong>{{ $number }}</strong> from {{ $storeName }} is attached as a PDF.</p>
             @else
                 <p class="message">{{ $storeName }} confirmed your order. Your invoice <strong>{{ $number }}</strong> is attached as a PDF.</p>

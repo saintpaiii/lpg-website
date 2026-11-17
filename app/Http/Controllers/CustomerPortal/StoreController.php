@@ -98,6 +98,11 @@ class StoreController extends Controller
                 'joined_at'     => $store->created_at->format('M Y'),
                 'is_top_rated'  => $avgRating >= 4.5 && $totalReviews >= 5,
                 'is_trusted'    => $completedOrders >= 50,
+                // J4: pick-up only / opening status / the week's hours / refill exchange policy
+                ...$store->customerFacts(),
+                'week_hours'      => \App\Support\StoreHours::week($store),
+                'exchange_policy' => \App\Support\ExchangePolicy::for($store),
+                'pickup_instructions' => $store->pickup_instructions,
             ],
             'products'       => $products,
             'recent_reviews' => $recentReviews,

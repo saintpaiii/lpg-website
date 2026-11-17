@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { FeaturedBadge } from '@/components/featured-badge';
+import { PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
 import axios from 'axios';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -26,13 +27,14 @@ type Type = 'refill' | 'new_purchase';
 type Sort = 'nearest' | 'cheapest';
 
 type Result = {
-    store: { id: number; name: string; featured?: boolean; logo_url: string | null; area: string; approximate_location: boolean; lat: number; lng: number };
+    store: { id: number; name: string; featured?: boolean; logo_url: string | null; area: string; approximate_location: boolean; lat: number; lng: number; pickup_only?: boolean; hours?: StoreHoursStatus };
     product: { id: number; name: string; brand: string | null; weight: string; size_label: string; image_url: string | null };
     type: Type;
     quantity: number;
     unit_price: number;
     subtotal: number;
-    delivery_fee: number;
+    /** null = pick-up only (J4) */
+    delivery_fee: number | null;
     total: number;
     distance_km: number;
     stock_left: number;
@@ -413,6 +415,8 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                             : <StoreIcon className="h-5 w-5 text-gray-400" />}
                         <span className="font-semibold text-gray-900 dark:text-white">{r.store.name}</span>
                         {r.store.featured && <FeaturedBadge />}
+                        {r.store.pickup_only && <PickupOnlyBadge short />}
+                        <StoreHoursBadge hours={r.store.hours} />
                         {r.badges.includes('Nearest') && <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/50 dark:text-green-300">Nearest</span>}
                         {r.badges.includes('Cheapest') && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Cheapest</span>}
                     </div>
@@ -431,7 +435,7 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                                 <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">{r.product.size_label}</span>
                             </p>
                             <p className="text-gray-500 tabular-nums">{peso(r.unit_price)} × {r.quantity}</p>
-                            <p className="text-gray-500 tabular-nums">Delivery {peso(r.delivery_fee)}</p>
+                            <p className="text-gray-500 tabular-nums">{r.delivery_fee === null ? 'Pick-up only — no delivery' : `Delivery ${peso(r.delivery_fee)}`}</p>
                         </div>
                         <div className="sm:text-right">
                             <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white">Total {peso(r.total)}</p>

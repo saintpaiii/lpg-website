@@ -109,18 +109,26 @@ class CheckoutController extends Controller
                     // False when the store is hidden (plan ended, permit expired…) — the order can't be placed
                     'store_available'        => $store->isOpenToCustomers(),
                     // Delivery fee per vehicle type — the page picks the vehicle with lib/delivery-fee.ts quoteFee()
-                    'delivery_options'       => $options = DeliveryFeeService::clientOptions($store),
-                    'can_deliver'            => $options !== [],
-                    'no_delivery_reason'     => $options === [] ? DeliveryFeeService::whyNoVehicle($store, 0, 0) : null,
-                    // no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy — picks the hint under the message
-                    'no_delivery_code'       => $options === [] ? DeliveryFeeService::whyNoVehicleCode($store, 0, 0) : null,
+                    'delivery_options'       => $options = ($deliverable = $store->canDeliver()) ? DeliveryFeeService::clientOptions($store) : [],
+                    // J4: no eligible rider / delivery-ready vehicle → PICK-UP ONLY (delivery off, pick-up offered)
+                    'can_deliver'            => $deliverable && $options !== [],
+                    'pickup_only'            => ! $deliverable,
+                    'no_delivery_reason'     => ! $deliverable ? Store::PICKUP_ONLY_TEXT
+                        : ($options === [] ? DeliveryFeeService::whyNoVehicle($store, 0, 0) : null),
+                    // pickup_only | no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy — picks the hint
+                    'no_delivery_code'       => ! $deliverable ? 'pickup_only'
+                        : ($options === [] ? DeliveryFeeService::whyNoVehicleCode($store, 0, 0) : null),
+                    // Opening status + "closed now" note (ordering is allowed while closed) — J4
+                    'hours'                  => \App\Support\StoreHours::forCustomer($store),
+                    // Refill tank exchange policy (J4)
+                    'exchange_policy'        => \App\Support\ExchangePolicy::for($store),
                     'store_lat'            => $store->latitude  ? (float) $store->latitude  : null,
                     'store_lng'              => $store->longitude ? (float) $store->longitude : null,
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
                     'allow_cod'              => (bool) ($store->allow_cod ?? true),
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
-                    // Pick up at the store (₱0 delivery fee, no rider)
-                    'allow_pickup'           => (bool) $store->allow_pickup,
+                    // Pick up at the store (₱0 delivery fee, no rider) — automatic for a pick-up-only store (J4)
+                    'allow_pickup'           => (bool) $store->allow_pickup || ! $deliverable,
                     'refund_window_days'     => (int) ($store->refund_window_days ?? 7),
                     'pickup_instructions'    => $store->pickup_instructions,
                     'store_address'          => ['address' => $store->address, 'barangay' => $store->barangay, 'city' => $store->city],
@@ -426,6 +434,22 @@ class CheckoutController extends Controller
                 }
             }
 
+            // Deliver to me / pick up at the store (per store). J4: a store that can't deliver is pick-up only;
+            // pick-up is offered when the seller allows it OR automatically for a pick-up-only store.
+            $fulfillments = []; // store_id => delivery|pickup
+            foreach ($checkoutStores as $storeData) {
+                $sid  = (int) $storeData['store_id'];
+                $s    = $storeData['store_ref'];
+                $kind = $data['fulfillments'][$sid] ?? ($s && ! $s->canDeliver() ? 'pickup' : 'delivery');
+                if ($kind === 'pickup' && ! $s?->offersPickup()) {
+                    throw new CheckoutRuleException("{$storeData['store_name']} doesn't offer pick-up.");
+                }
+                if ($kind === 'delivery' && $s && ! $s->canDeliver()) {
+                    throw new CheckoutRuleException("{$storeData['store_name']}: " . Store::PICKUP_ONLY_TEXT . '. Choose pick-up at the store.');
+                }
+                $fulfillments[$sid] = $kind;
+            }
+
             // Resolve and validate each store's own payment option
             $modes      = []; // store_id => full|consignment|cod
             $dpPercents = []; // store_id => consignment down payment %
@@ -436,6 +460,10 @@ class CheckoutController extends Controller
 
                 if (! $mode) {
                     return $error("Please choose a payment option for {$storeData['store_name']}.");
+                }
+                // Pick-up: only "Pay at the store (cash)" (cod) or full payment online — no consignment (J4)
+                if (($fulfillments[$sid] ?? 'delivery') === 'pickup' && ! in_array($mode, ['cod', 'full'], true)) {
+                    return $error("Pick-up orders at {$storeData['store_name']} can be paid only in cash at the store or in full online.");
                 }
                 if ($mode === 'cod' && $s && ! $s->allow_cod) {
                     return $error("{$s->store_name} does not accept Cash on Delivery.");
@@ -454,19 +482,10 @@ class CheckoutController extends Controller
                 }
             }
 
-            // Deliver to me / pick up at the store (per store), and the refill empty-tank exchange
-            $fulfillments = []; // store_id => delivery|pickup
-            foreach ($checkoutStores as $storeData) {
-                $sid  = (int) $storeData['store_id'];
-                $kind = $data['fulfillments'][$sid] ?? 'delivery';
-                if ($kind === 'pickup' && ! $storeData['store_ref']?->allow_pickup) {
-                    throw new CheckoutRuleException("{$storeData['store_name']} doesn't offer pick-up.");
-                }
-                $fulfillments[$sid] = $kind;
-            }
+            // The refill empty-tank exchange: the customer confirms the tanks meet the store's exchange policy
             $hasRefill = collect($checkoutStores)->flatMap(fn ($s) => $s['items'])->contains(fn ($i) => ($i['transaction_type'] ?? 'refill') === 'refill');
             if ($hasRefill && ! $request->boolean('empty_tanks_confirmed')) {
-                throw new CheckoutRuleException('Please confirm you have the empty tank(s) ready for exchange.');
+                throw new CheckoutRuleException("Please confirm your empty tank(s) are ready and meet the store's exchange policy.");
             }
 
             // Create one order per store in a single DB transaction
@@ -554,9 +573,9 @@ class CheckoutController extends Controller
                             // "Reduce the quantity" only helps when the load is too heavy
                             $tooHeavy = DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks']) === 'too_heavy';
                             $hint = match (true) {
-                                $tooHeavy && (bool) $store->allow_pickup => ' Choose pick-up, or reduce the quantity.',
+                                $tooHeavy && $store->offersPickup()      => ' Choose pick-up, or reduce the quantity.',
                                 $tooHeavy                                => ' Reduce the quantity or remove some items.',
-                                (bool) $store->allow_pickup              => ' You can pick it up at the store instead.',
+                                $store->offersPickup()                   => ' You can pick it up at the store instead.',
                                 default                                  => " This store can't deliver right now. Please try another store.",
                             };
                             throw new CheckoutRuleException("{$store->store_name}: " . DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks']) . $hint);

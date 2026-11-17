@@ -112,7 +112,9 @@ class CustomerController extends Controller
             ->latest()
             ->paginate(10)
             // What the customer pays (items + delivery fee) — shown in the list
-            ->through(fn ($o) => $o->setAttribute('grand_total', $o->grandTotal()));
+            ->through(fn ($o) => $o->setAttribute('grand_total', $o->grandTotal())
+                // J4: tanks not accepted at handover (switched to New Purchase / item cancelled)
+                ->setAttribute('adjustments', \App\Services\HandoverAdjustmentService::present($o)));
 
         return Inertia::render('admin/customer-orders', [
             'customer' => $customer,

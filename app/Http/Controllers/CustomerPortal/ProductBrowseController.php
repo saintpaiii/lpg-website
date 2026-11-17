@@ -81,6 +81,8 @@ class ProductBrowseController extends Controller
         $products = $query->paginate(20)->withQueryString();
         // Max per customer: period, what is left for this customer and what is in their cart (2 queries for the page)
         $limits   = PurchaseLimitService::payloadForMany($request->user()?->id, $products->getCollection());
+        // J4: stores without a rider / vehicle are listed as PICK-UP ONLY (one query for the page)
+        $canDeliver = Store::deliveryMap($products->getCollection()->pluck('store_id'));
         $products = $products->through(fn ($p) => [
             'id'             => $p->id,
             'name'           => $p->name,
@@ -101,9 +103,9 @@ class ProductBrowseController extends Controller
             'store_city'     => $p->store?->city ?? '',
             'store_barangay' => $p->store?->barangay ?? '',
             'store_province' => $p->store?->province ?? '',
-            // "Delivery from ₱40" (cheapest vehicle base fee; null = no delivery)
-            'delivery_from'  => $p->store ? DeliveryFeeService::fromFee($p->store) : null,
-            'allow_pickup'   => (bool) $p->store?->allow_pickup,
+            // "Delivery from ₱40" (null = no delivery), pick-up only, opening status — Store::customerFacts (J4)
+            ...collect($p->store ? $p->store->customerFacts($canDeliver[$p->store_id] ?? false) : [])
+                ->only(['delivery_from', 'allow_pickup', 'pickup_only', 'hours'])->all(),
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),
             ...$limits[$p->id],
@@ -270,8 +272,9 @@ class ProductBrowseController extends Controller
                 'store_logo_url' => $product->store?->logo ? Storage::url($product->store->logo) : null,
                 'store_city'     => $product->store?->city ?? '',
                 'store_barangay' => $product->store?->barangay ?? '',
-                'delivery_from'  => $product->store ? DeliveryFeeService::fromFee($product->store) : null,
-                'allow_pickup'   => (bool) $product->store?->allow_pickup,
+                ...collect($product->store?->customerFacts() ?? [])->only(['delivery_from', 'allow_pickup', 'pickup_only', 'hours'])->all(),
+                // Refill tank exchange policy (J4)
+                'exchange_policy' => $product->store ? \App\Support\ExchangePolicy::for($product->store) : null,
                 'refund_window_days' => (int) ($product->store?->refund_window_days ?? 7),
                 'avg_rating'     => round((float) ($product->ratings_avg_rating ?? 0), 1),
                 'review_count'   => (int) ($product->ratings_count ?? 0),

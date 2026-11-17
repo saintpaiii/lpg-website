@@ -402,6 +402,11 @@ class OrderController extends Controller
         }
 
         return Inertia::render('seller/order-show', [
+            // J4: tanks not accepted at handover, the refill items for that dialog, and "store is closed now"
+            'adjustments'  => \App\Services\HandoverAdjustmentService::present($order),
+            'refill_items' => in_array($order->status, ['delivered', 'cancelled'], true) ? [] : \App\Services\HandoverAdjustmentService::refillItems($order),
+            'not_accepted_reasons' => \App\Support\ExchangePolicy::NOT_ACCEPTED_REASONS,
+            'closed_note'  => in_array($order->status, ['delivered', 'cancelled'], true) ? null : \App\Support\StoreHours::closedNote($store),
             'receipts'  => PaymentReceiptService::listFor($order, 'seller'),
             'breakdown' => $order->priceBreakdown(),
             'loyalty'   => $loyalty,
@@ -439,7 +444,12 @@ class OrderController extends Controller
             // "Mark as delivered / picked up": empty tanks received, cash received at the store
             'empty_tanks_collected' => 'nullable|boolean',
             'cash_paid'             => 'nullable|boolean',
-        ]);
+            // J4: "A tank was not accepted" (refill items) — only with Delivered / Picked up
+            ...\App\Services\HandoverAdjustmentService::rules(),
+        ], \App\Services\HandoverAdjustmentService::messages());
+        if (! empty($data['not_accepted']) && $data['status'] !== 'delivered') {
+            return back()->with('error', 'A tank that was not accepted is recorded with "Picked up" / "Delivered".');
+        }
 
         $newStatus = $data['status'];
         $oldStatus = $order->status;
@@ -477,9 +487,17 @@ class OrderController extends Controller
             return back()->with('error', 'Cannot confirm this consignment order until the customer pays the down payment.');
         }
 
-        DB::transaction(function () use ($order, $newStatus, $oldStatus, $store, $request, $cashAtStore) {
-            // Refill: the empty tanks must be received before delivered / picked up
+        $adjusted = ['changed' => false, 'cancelled_all' => false];
+        DB::transaction(function () use ($order, $newStatus, $oldStatus, $store, $request, $cashAtStore, $data, &$adjusted) {
             if ($newStatus === 'delivered') {
+                // J4: tanks NOT accepted at handover first (switch to New Purchase / cancel the item)
+                $adjusted = \App\Services\HandoverAdjustmentService::apply($order, $data['not_accepted'] ?? [], $request, auth()->id(),
+                    $order->isPickup() ? 'pickup' : 'delivery');
+                $order->refresh();
+                if ($adjusted['cancelled_all']) {
+                    return;   // every item cancelled → the order is cancelled already
+                }
+                // Refill: the empty tanks that WERE accepted must be received before delivered / picked up
                 $order->assertEmptyTanksCollected($request->has('empty_tanks_collected') ? $request->boolean('empty_tanks_collected') : null, auth()->id());
             }
 
@@ -559,6 +577,10 @@ class OrderController extends Controller
                 }
             }
         });
+
+        if ($adjusted['cancelled_all']) {
+            return back()->with('success', 'Every tank was not accepted — all items were cancelled, so the order was cancelled.');
+        }
 
         if ($cashAtStore) {
             NotificationService::sendToStore(

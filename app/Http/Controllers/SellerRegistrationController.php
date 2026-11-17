@@ -36,6 +36,7 @@ class SellerRegistrationController extends Controller
         }
 
         return Inertia::render('auth/seller-register', LegalService::sellerTermsProps() + [
+            'exchange_options' => ['brands' => \App\Support\ExchangePolicy::BRANDS, 'rules' => \App\Support\ExchangePolicy::RULES],
             // Signed-in mode: Google email read-only, no password fields, names prefilled (editable)
             'signed_in' => $user ? [
                 'email'       => $user->email,
@@ -119,6 +120,11 @@ class SellerRegistrationController extends Controller
 
             // Optional extra documents (DTI, barangay clearance, store photo…) — reviewed in Store Documents
             ...StoreDocuments::otherDocumentRules(),
+
+            // J4 (optional, prefilled "Open 24 hours" / the default policy): store hours + refill tank exchange policy
+            'always_open'           => ['nullable', 'boolean'],
+            ...\App\Http\Controllers\Seller\SettingsController::hoursRules(),
+            ...\App\Support\ExchangePolicy::rules(),
 
             // Terms agreement
             'terms_agreed'          => ['required', 'accepted'],
@@ -210,6 +216,9 @@ class SellerRegistrationController extends Controller
                 'latitude'         => $validated['latitude'],
                 'longitude'        => $validated['longitude'],
                 'status'           => 'pending',
+                // J4: null = open 24 hours; null policy = the default (any brand + all rules)
+                'opening_hours'    => $request->boolean('always_open', true) ? null : \App\Support\StoreHours::normalise($request->input('opening_hours')),
+                'exchange_policy'  => $request->has('exchange_policy') ? \App\Support\ExchangePolicy::clean($request->input('exchange_policy')) : null,
                 'subscription_plan'=> 'none',
                 'is_featured'      => false,
                 'document_hashes'  => $hashes ?: null,

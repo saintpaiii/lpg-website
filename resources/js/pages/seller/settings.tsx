@@ -29,6 +29,9 @@ import 'leaflet/dist/leaflet.css';
 import { Spinner } from '@/components/ui/spinner';
 import { TaxInvoiceCard, type TaxSettings } from '@/components/tax-invoice-card';
 import { RefundWindowCard } from '@/components/refund-window-card';
+import { ExchangePolicyCard, StoreHoursCard } from '@/components/store-hours-policy-cards';
+import type { ExchangeOptions, ExchangePolicyData } from '@/components/exchange-policy';
+import type { DayHours } from '@/components/store-hours-editor';
 import { IMAGE_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,6 +71,11 @@ interface Props {
     can_edit_tax: boolean;
     /** Settings → Refunds: days after delivery a refund can be requested */
     refund_window_days: number;
+    /** J4: store hours (null = open 24 hours), the current status, refill tank exchange policy */
+    opening_hours?: Record<string, DayHours> | null;
+    hours_status?: { label: string };
+    exchange_policy?: ExchangePolicyData;
+    exchange_options?: ExchangeOptions;
 }
 
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
@@ -105,7 +113,7 @@ function MapClickHandler({ onPickRef }: { onPickRef: React.RefObject<((lat: numb
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function SellerSettings({ store, tax, can_edit_tax, refund_window_days }: Props) {
+export default function SellerSettings({ store, tax, can_edit_tax, refund_window_days, opening_hours = null, hours_status, exchange_policy, exchange_options }: Props) {
     // The Loyalty Program page is owner-only; staff with settings.view see plain text
     const isOwner = usePage<SharedData>().props.auth.user?.role === 'seller';
     const { has } = usePlan();
@@ -698,6 +706,8 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
 
                 {/* Own form + endpoint (PUT seller/settings/refunds) */}
                 <RefundWindowCard days={refund_window_days} />
+                <StoreHoursCard hours={opening_hours} statusLabel={hours_status?.label} />
+                {exchange_policy && <ExchangePolicyCard policy={exchange_policy} options={exchange_options} />}
             </div>
         </AppLayout>
     );

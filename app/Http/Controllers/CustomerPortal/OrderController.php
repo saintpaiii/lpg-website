@@ -343,7 +343,13 @@ class OrderController extends Controller
                     'lat'          => $order->store?->latitude ? (float) $order->store->latitude : null,
                     'lng'          => $order->store?->longitude ? (float) $order->store->longitude : null,
                     'instructions' => $order->store?->pickup_instructions,
+                    // J4: Google Maps link, today's hours / open status, the week
+                    'maps_url'     => ($order->store?->latitude && $order->store?->longitude)
+                        ? 'https://www.google.com/maps?q=' . (float) $order->store->latitude . ',' . (float) $order->store->longitude : null,
+                    'hours'        => $order->store ? \App\Support\StoreHours::forCustomer($order->store) : null,
                 ] + $this->pickupStart($request->user()->id) : null,
+                // Tanks not accepted at handover (J4)
+                'adjustments'      => \App\Services\HandoverAdjustmentService::present($order),
                 // Refill: empty tanks to hand over
                 'empty_tanks_needed'  => $order->needsEmptyTanks() && ! in_array($order->status, ['delivered', 'cancelled'], true),
                 'empty_tank_summary'  => (int) $order->empty_tanks_required > 0 ? $order->emptyTankSummary() : null,

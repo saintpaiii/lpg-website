@@ -27,6 +27,8 @@ export type RouteStop = {
     empty_tanks_required?: number;
     empty_tank_summary?: string | null;
     empty_tanks_collected?: boolean;
+    /** J4: refill items for "A tank was not accepted" */
+    refill_items?: { id: number; name: string; quantity: number; refill_price: number; purchase_price: number }[];
 };
 
 export type RouteData = {

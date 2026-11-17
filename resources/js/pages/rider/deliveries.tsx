@@ -1,4 +1,5 @@
 import ReportCustomerButton from '@/components/reports/report-customer-button';
+import TankNotAcceptedFields, { notAcceptedPayload, rowsComplete, type NotAcceptedRow, type RefillItem } from '@/components/tank-not-accepted';
 import { actionGlow, SeenNote, SeenPill, seenRowClass, useSeenRows, type SeenFlags } from '@/components/seen-marker';
 import { useLiveReload } from '@/lib/echo';
 import MessageButton from '@/components/chat/message-button';
@@ -99,6 +100,8 @@ type OrderRef = {
     empty_tanks_required?: number;
     empty_tank_summary?: string | null;
     empty_tanks_collected?: boolean;
+    /** J4: refill items for "A tank was not accepted" */
+    refill_items?: RefillItem[];
     remaining_balance: number | null;
     delivery_latitude: number | null;
     delivery_longitude: number | null;
@@ -286,6 +289,10 @@ function UpdateStatusDialog({
     const [tanksCollected, setTanksCollected] = useState(false);
     useEffect(() => { setTanksCollected(false); }, [delivery?.id, targetStatus]);
     const needsTanks = targetStatus === 'delivered' && !!delivery?.order?.empty_tanks_required && !delivery.order.empty_tanks_collected;
+    // J4: "A tank was not accepted" — per refill item: how many, why, photo, switch to New Purchase / cancel
+    const refillItems: RefillItem[] = targetStatus === 'delivered' ? (delivery?.order?.refill_items ?? []) : [];
+    const [notAccepted, setNotAccepted] = useState<NotAcceptedRow[]>([]);
+    useEffect(() => { setNotAccepted([]); }, [delivery?.id, targetStatus]);
     const [preview, setPreview]       = useState<string | null>(null);
     const [photoProblem, setPhotoProblem] = useState<string | null>(null);
     const [gpsState, setGpsState]     = useState<GpsState>('idle');
@@ -362,7 +369,8 @@ function UpdateStatusDialog({
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
         if (!delivery) return;
-        transform((d) => ({ ...d, _method: 'PATCH', ...(needsTanks ? { empty_tanks_collected: tanksCollected ? '1' : '0' } : {}) }));
+        transform((d) => ({ ...d, _method: 'PATCH', ...(needsTanks ? { empty_tanks_collected: tanksCollected ? '1' : '0' } : {}),
+            ...(notAccepted.length ? { not_accepted: notAcceptedPayload(notAccepted) } : {}) }));
         post(`/rider/deliveries/${delivery.id}/status`, {
             forceFormData: true,
             onSuccess: () => {
@@ -517,10 +525,17 @@ function UpdateStatusDialog({
                         </div>
                     )}
 
+                    {refillItems.length > 0 && (
+                        <TankNotAcceptedFields items={refillItems} rows={notAccepted} onChange={setNotAccepted}
+                            currentTotal={(delivery?.order as { amount_to_collect?: number } | undefined)?.amount_to_collect} />
+                    )}
+                    {Object.entries(errors as Record<string, string>).filter(([k]) => k.startsWith('not_accepted')).map(([k, v]) => (
+                        <p key={k} className="text-xs text-red-500">{v}</p>
+                    ))}
                     {needsTanks && (
                         <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900">
                             <input type="checkbox" checked={tanksCollected} onChange={(e) => setTanksCollected(e.target.checked)} className="mt-0.5 h-4 w-4" />
-                            ♻ Collected {delivery?.order?.empty_tank_summary} empty tank(s)
+                            ♻ Collected {notAccepted.length ? 'the accepted' : delivery?.order?.empty_tank_summary} empty tank(s)
                         </label>
                     )}
                     {(errors as Record<string, string>).empty_tanks_collected && (
@@ -531,7 +546,7 @@ function UpdateStatusDialog({
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                         <Button
                             type="submit"
-                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data)) || (needsPhoto && !data.photo) || (needsTanks && !tanksCollected)}
+                            disabled={processing || (isFailed && !!failOptions && !failValuesComplete(failOptions, data)) || (needsPhoto && !data.photo) || (needsTanks && !tanksCollected && notAccepted.length === 0) || !rowsComplete(notAccepted)}
                             variant={isFailed ? 'destructive' : 'default'}
                             className={isFailed ? '' : 'bg-blue-600 hover:bg-blue-700 text-white'}
                         >
@@ -1072,6 +1087,8 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                 empty_tanks_required: stop.empty_tanks_required ?? 0,
                                 empty_tank_summary: stop.empty_tank_summary ?? null,
                                 empty_tanks_collected: stop.empty_tanks_collected ?? false,
+                                refill_items: stop.refill_items ?? [],
+                                amount_to_collect: stop.amount_to_collect ?? undefined,
                             } } as unknown as DeliveryRow, next);
                         }}
                     />

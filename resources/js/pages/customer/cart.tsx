@@ -17,12 +17,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import CustomerLayout from '@/layouts/customer-layout';
 import type { SharedData } from '@/types';
 import StoreAvatar from '@/components/store-avatar';
+import { ClosedNote, PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
+import { Scale } from 'lucide-react';
 
 type CartItem = {
     product_id: number;
     name: string;
     brand: string;
     weight: string;
+    /** Delivery weight of one unit (full tank, DeliveryFeeService::itemKg) */
+    unit_kg?: number;
     image_url: string | null;
     refill_price: number;
     purchase_price: number;
@@ -43,6 +47,11 @@ type StoreGroup = {
     /** Cheapest delivery option ("Delivery from ₱40"); null = no delivery. Final fee at checkout. */
     delivery_from: number | null;
     allow_pickup?: boolean;
+    /** J4: no rider / delivery vehicle → pick-up only */
+    pickup_only?: boolean;
+    hours?: StoreHoursStatus;
+    /** The store's biggest delivery-ready vehicle (kg); null = none */
+    max_vehicle_kg?: number | null;
     /** False when the store is hidden (plan ended, permit expired…) */
     store_available?: boolean;
     items: CartItem[];
@@ -241,7 +250,9 @@ export default function CartPage({ cart }: Props) {
                                                 <StoreAvatar name={sg.store_name} logoUrl={sg.store_logo_url} size={24} />
                                                 {sg.store_name}
                                             </CardTitle>
-                                            {sg.delivery_from != null ? (
+                                            {sg.pickup_only ? (
+                                                <PickupOnlyBadge short className="ml-auto" />
+                                            ) : sg.delivery_from != null ? (
                                                 <span className="ml-auto text-xs text-gray-500">
                                                     Delivery from ₱{sg.delivery_from.toLocaleString('en-PH')} <span className="text-gray-400">(final fee at checkout)</span>
                                                 </span>
@@ -249,6 +260,9 @@ export default function CartPage({ cart }: Props) {
                                                 <span className="ml-auto text-xs text-gray-500">Pick-up only</span>
                                             ) : null}
                                         </div>
+                                        <StoreHoursBadge hours={sg.hours} className="mt-1 pl-7" />
+                                        {available && <ClosedNote note={sg.hours?.closed_note} className="mt-2" />}
+                                        {available && <WeightAlert group={sg} selected={selected} />}
                                     </CardHeader>
 
                                     <CardContent className="p-0">
@@ -439,5 +453,33 @@ export default function CartPage({ cart }: Props) {
                 </AlertDialogContent>
             </AlertDialog>
         </CustomerLayout>
+    );
+}
+
+/**
+ * J4: the selected items of one store are heavier than its biggest delivery vehicle (same weight as checkout —
+ * DeliveryFeeService::itemKg, sent as unit_kg). Updates as quantities change. Pick-up only stores say so instead.
+ */
+function WeightAlert({ group, selected }: { group: StoreGroup; selected: Set<number> }) {
+    const kg = group.items.filter((i) => selected.has(i.product_id)).reduce((s, i) => s + (i.unit_kg ?? 0) * i.quantity, 0);
+    if (kg <= 0) return null;
+    const fmt = (n: number) => (Math.round(n * 10) / 10).toLocaleString('en-PH');
+    if (group.pickup_only) {
+        return (
+            <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="note">
+                <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" /> This store can't deliver right now — you'll pick this order ({fmt(kg)} kg) up at the store.
+            </p>
+        );
+    }
+    const max = group.max_vehicle_kg;
+    if (max == null || kg <= max) return null;
+    return (
+        <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="alert" data-testid="weight-alert">
+            <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+                This order weighs {fmt(kg)} kg, but this store's biggest vehicle carries {fmt(max)} kg. Reduce the quantity
+                (remove about {fmt(Math.ceil(kg - max))} kg){group.allow_pickup ? ' or choose pick-up at checkout' : ''}.
+            </span>
+        </p>
     );
 }

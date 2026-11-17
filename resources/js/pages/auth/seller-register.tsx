@@ -13,6 +13,9 @@ import SellerTermsBox, { type SellerTerms } from '@/components/seller-terms-box'
 import StorePinPicker from '@/components/store-pin-picker';
 import { useAutoFillAddress } from '@/hooks/use-auto-fill-address';
 import { lookupBarangay } from '@/components/address-map';
+import { ApplicationHoursPolicy } from '@/components/store-hours-policy-cards';
+import { appendHours, toWeek } from '@/components/store-hours-editor';
+import { appendPolicy, defaultPolicy, type ExchangeOptions, type ExchangePolicyData } from '@/components/exchange-policy';
 import { DOE_LTO_HELP, DTI_SEC_HELP, DtiSecKindToggle, StoreLogoPicker, type DtiSecKind } from '@/components/seller-application-fields';
 import { DOCUMENT_ACCEPT, prepareDocumentFile } from '@/lib/resize-image';
 import { appendOtherRows, OtherDocumentsFields, StoreNameWarning, useStoreNameCheck, type OtherDocRow } from '@/components/other-documents-fields';
@@ -146,7 +149,10 @@ const BENEFITS = [
 /** Signed-in mode: a new "Continue with Google" user who chose "I only want to sell LPG" (no email / password fields) */
 type SignedIn = { email: string; first_name: string; middle_name: string; last_name: string; suffix: string };
 
-export default function SellerRegister({ seller_terms, plan_catalog, signed_in = null }: { seller_terms: SellerTerms; plan_catalog?: PlanCatalog | null; signed_in?: SignedIn | null }) {
+export default function SellerRegister({ seller_terms, plan_catalog, signed_in = null, exchange_options }: { seller_terms: SellerTerms; plan_catalog?: PlanCatalog | null; signed_in?: SignedIn | null; exchange_options?: ExchangeOptions }) {
+    // J4 (optional): store hours (default open 24 hours) + refill tank exchange policy (default)
+    const [hoursPolicy, setHoursPolicy] = useState<{ alwaysOpen: boolean; week: ReturnType<typeof toWeek>; policy: ExchangePolicyData }>(
+        () => ({ alwaysOpen: true, week: toWeek(null), policy: defaultPolicy(exchange_options) }));
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors]         = useState<Record<string, string>>({});
     const [step, setStep]             = useState<1 | 2 | 3>(1);
@@ -243,6 +249,8 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
         if (logo) formData.append('logo', logo);
         if (selfie) formData.append('selfie', selfie);
         appendOtherRows(formData, otherDocs);
+        appendHours(formData, hoursPolicy.alwaysOpen, hoursPolicy.week);
+        appendPolicy(formData, hoursPolicy.policy);
         formData.append('latitude', pin ? String(pin.lat) : '');
         formData.append('longitude', pin ? String(pin.lng) : '');
         formData.append('terms_agreed', '1');
@@ -503,6 +511,8 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                         onChange={(lat, lng) => { setPin({ lat, lng }); setErrors((e) => ({ ...e, latitude: '', longitude: '' })); }}
                                         autoFill={autoFill}
                                         error={errors.latitude || errors.longitude} />
+
+                                    <ApplicationHoursPolicy {...hoursPolicy} options={exchange_options} onChange={setHoursPolicy} />
 
                                     <Button
                                         type="button"

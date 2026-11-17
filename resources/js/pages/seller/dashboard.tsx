@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BarChart3,
@@ -52,6 +52,9 @@ type Props = {
     ordersChart: ChartPoint[];
     recentOrders: RecentOrder[];
     lowStock: LowStockItem[];
+    /** J4: opening status + the "Closed today" switch */
+    hours_status?: { open: boolean; label: string };
+    closed_today?: boolean;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -67,7 +70,7 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock }: Props) {
+export default function SellerDashboard({ stats, ordersChart, recentOrders, lowStock, hours_status, closed_today = false }: Props) {
     const { auth, plan } = usePage<SharedData>().props;
     // Staff without a module see its numbers but no links into it (they would get a 403 page)
     const { canOpen } = useStoreAccess();
@@ -123,6 +126,19 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         <p className="text-muted-foreground text-sm mt-0.5">
                             Overview of your store's performance.
                         </p>
+                        {/* J4: opening status + "Closed today" (needs Settings access) */}
+                        {hours_status && (
+                            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+                                <span className={hours_status.open ? 'font-medium text-green-700' : 'font-medium text-red-600'} data-testid="dashboard-hours">{hours_status.label}</span>
+                                {canOpen('/seller/settings') && (
+                                    <label className="flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium">
+                                        <input type="checkbox" aria-label="Closed today" checked={closed_today}
+                                            onChange={(e) => router.post('/seller/settings/closed-today', { closed: e.target.checked }, { preserveScroll: true })} />
+                                        Closed today
+                                    </label>
+                                )}
+                            </div>
+                        )}
                     </div>
                     {/* Store plan (owner) */}
                     {plan && auth.user.role === 'seller' && (

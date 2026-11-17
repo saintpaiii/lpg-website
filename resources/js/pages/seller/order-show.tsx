@@ -29,6 +29,9 @@ import { bestFitId, riderOptionDisabled, riderOptionLabel, type Load, type Rider
 import type { FailInfo } from '@/components/delivery-fail-fields';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge } from '@/components/complete-pickup-dialog';
+import OrderAdjustments, { type OrderAdjustment } from '@/components/order-adjustments';
+import type { RefillItem } from '@/components/tank-not-accepted';
+import { ClosedNote } from '@/components/store-badges';
 import { orderStatusLabel } from '@/lib/order-status';
 import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
 
@@ -128,7 +131,9 @@ type CustomerLoyaltyInfo = {
     cancelled_orders: number;
 } | null;
 
-export default function SellerOrderShow({ order, riders, breakdown, loyalty, receipts = [] }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo; receipts?: PaymentReceiptRow[] }) {
+export default function SellerOrderShow({ order, riders, breakdown, loyalty, receipts = [], adjustments = [], refill_items = [], closed_note = null }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo; receipts?: PaymentReceiptRow[];
+    /** J4: tanks not accepted at handover, the refill items for that, and "store is closed now" */
+    adjustments?: OrderAdjustment[]; refill_items?: RefillItem[]; closed_note?: string | null }) {
     // Live: this order's status / delivery changes reload the page data
     const liveStoreId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
     useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
@@ -291,6 +296,11 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         )}
                     </div>
                 </div>
+
+                {/* J4: the store is closed now — the customer was told delivery / pick-up start when it opens */}
+                <ClosedNote note={closed_note} />
+                {/* J4: tanks not accepted at handover */}
+                <OrderAdjustments adjustments={adjustments} />
 
                 {/* Refill: empty tanks to receive */}
                 {order.empty_tanks_required > 0 && order.status !== 'cancelled' && (
@@ -620,7 +630,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                 </AlertDialogContent>
             </AlertDialog>
 
-            {showPickedUp && <CompletePickupDialog order={order} onClose={() => setShowPickedUp(false)} />}
+            {showPickedUp && <CompletePickupDialog order={order} refillItems={refill_items} onClose={() => setShowPickedUp(false)} />}
 
             {/* Assign rider dialog */}
             <AlertDialog open={showAssign} onOpenChange={setShowAssign}>

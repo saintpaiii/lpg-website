@@ -83,7 +83,7 @@ export function PlanChangeBox({ change }: { change: PlanChange }) {
                 <ul className="space-y-0.5 pl-6 text-xs">
                     {paused.length > 0 && <li><strong>Will be paused:</strong> {paused.join('; ')}. Nothing is deleted.</li>}
                     {p.locked_features.length > 0 && <li><strong>Will lock:</strong> {p.locked_features.join(', ')}.</li>}
-                    {p.hides_store && <li><strong>Your store will be hidden from customers</strong> (no rider left).</li>}
+                    {p.hides_store && <li><strong>Customers will only be able to pick up</strong> (no rider left to deliver).</li>}
                 </ul>
             )}
         </div>

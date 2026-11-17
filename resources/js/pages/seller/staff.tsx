@@ -526,7 +526,7 @@ export function LastRiderWarning() {
     return (
         <p className="flex items-start gap-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            This is your only rider who can deliver — your products will be hidden from customers.
+            This is your only rider who can deliver — customers will only be able to pick up (no delivery).
         </p>
     );
 }
@@ -618,7 +618,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
             return;
         }
         if (!s.paused_by_plan && s.is_last_eligible_rider
-            && !window.confirm('This is your only rider who can deliver — your products will be hidden from customers. Pause anyway?')) {
+            && !window.confirm('This is your only rider who can deliver — customers will only be able to pick up (no delivery). Pause anyway?')) {
             return;
         }
         router.patch(`/seller/staff/${s.id}/plan-pause`, {}, { preserveScroll: true });
