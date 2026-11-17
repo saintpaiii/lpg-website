@@ -2,17 +2,18 @@ import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { CheckCircle2, MapPin, MapPinOff } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 import ServiceAreaLimit from '@/components/service-area-limit';
 import 'leaflet/dist/leaflet.css';
 import { useEchoPrivate, usePollInterval } from '@/lib/echo';
-import { OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, type LatLng } from '@/lib/map';
+import { dotIcon, fetchRoute, haversineKm, OSM_ATTRIBUTION, OSM_TILES, PIN_COLORS, pinIcon, type LatLng } from '@/lib/map';
 import type { SharedData } from '@/types';
 
 type Tracking = {
     status: 'not_dispatched' | 'preparing_pickup' | 'on_the_way' | 'delivered';
     rider_name: string | null;
-    rider_area: { lat: number; lng: number; updated_at: string } | null;
+    /** exact = the rider's NEXT stop is this order (server rule, J6) → real position; else rounded to ≈1 km */
+    rider_area: { lat: number; lng: number; updated_at: string; exact?: boolean } | null;
     delivery_address: { lat: number; lng: number } | null;
     store_location: { lat: number; lng: number; name: string | null } | null;
     stops_before: number;
@@ -57,10 +58,28 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
     }, [orderId, pollMs]);
 
     // Live: the rider's (rounded) position moves the circle right away
-    useEchoPrivate<{ order_id: number; lat: number; lng: number; updated_at: string }>(`user.${meId}`, 'RiderLocationUpdated', (e) => {
+    useEchoPrivate<{ order_id: number; lat: number; lng: number; updated_at: string; exact?: boolean }>(`user.${meId}`, 'RiderLocationUpdated', (e) => {
         if (e.order_id !== orderId) return;
-        setData((d) => (d ? { ...d, rider_area: { lat: e.lat, lng: e.lng, updated_at: e.updated_at } } : d));
+        setData((d) => (d ? { ...d, rider_area: { lat: e.lat, lng: e.lng, updated_at: e.updated_at, exact: !!e.exact } } : d));
     });
+
+    // J6: the rider is coming to THIS order next → road route to the customer's pin + ETA (OSRM, else km ÷ 25 km/h)
+    const exact = !!data?.rider_area?.exact && data?.status === 'on_the_way';
+    const [route, setRoute] = useState<{ coords: LatLng[]; eta: number | null; km: number | null } | null>(null);
+    const routeKey = exact && data?.rider_area && data?.delivery_address
+        ? `${data.rider_area.lat.toFixed(4)},${data.rider_area.lng.toFixed(4)}>${data.delivery_address.lat},${data.delivery_address.lng}` : '';
+    useEffect(() => {
+        if (!routeKey || !data?.rider_area || !data.delivery_address) { setRoute(null); return; }
+        const from: LatLng = [data.rider_area.lat, data.rider_area.lng];
+        const to: LatLng = [data.delivery_address.lat, data.delivery_address.lng];
+        const ctl = new AbortController();
+        fetchRoute([from, to], ctl.signal).then((r) => {
+            const km = r.distanceKm ?? haversineKm(from[0], from[1], to[0], to[1]);
+            setRoute({ coords: r.coords, km, eta: r.durationMin ?? Math.max(1, Math.round((km / 25) * 60)) });
+        });
+        return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [routeKey]);
     // Live: delivery status changes refresh the card (and the "stops before you" count)
     useEchoPrivate<{ order_id: number }>(`user.${meId}`, 'DeliveryUpdated', (e) => {
         if (e.order_id !== orderId) return;
@@ -120,7 +139,13 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
                                     <Popup>{data.store_location.name ?? 'Store'}</Popup>
                                 </Marker>
                             )}
-                            {data.rider_area && (
+                            {exact && data.rider_area && (
+                                <Marker position={[data.rider_area.lat, data.rider_area.lng]} icon={dotIcon('#2563eb')}>
+                                    <Popup>{data.rider_name ?? 'Your rider'} — on the way to you</Popup>
+                                </Marker>
+                            )}
+                            {exact && route && route.coords.length > 1 && <Polyline positions={route.coords} pathOptions={{ color: '#2563eb', weight: 4, opacity: 0.75 }} />}
+                            {!exact && data.rider_area && (
                                 <Circle center={[data.rider_area.lat, data.rider_area.lng]} radius={900}
                                     pathOptions={{ color: '#2563eb', fillColor: '#3b82f6', fillOpacity: 0.18, weight: 1 }}>
                                     <Popup>Rider is somewhere in this area</Popup>
@@ -137,8 +162,13 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
                     <p><span className="text-gray-500">Rider:</span> <strong>{data.rider_name ?? '—'}</strong></p>
                     <p><span className="text-gray-500">Status:</span> {STATUS_TEXT[data.status]}</p>
                     <p><span className="text-gray-500">Deliveries before yours:</span> {data.stops_before}</p>
+                    {exact && route && (
+                        <p data-testid="tracking-eta"><span className="text-gray-500">Arriving in about:</span> <strong>{route.eta} min</strong>{route.km !== null && <span className="text-gray-500"> · {route.km.toFixed(1)} km</span>}</p>
+                    )}
                     <p className="text-xs text-gray-400">
-                        {data.rider_area
+                        {exact
+                            ? 'Your order is the rider\'s next stop — live position and route. Updates as the rider moves.'
+                            : data.rider_area
                             ? 'The circle shows the rider\'s approximate area, for privacy. Updates every 30 seconds.'
                             : 'The rider\'s area appears once they start sharing their location.'}
                     </p>

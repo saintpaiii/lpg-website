@@ -26,6 +26,7 @@ class RefundRequest extends Model
 
     protected $fillable = [
         'order_id',
+        'payment_id',   // J6: the PayMongo payment an 'overpayment' refund is for (unique — idempotent)
         'customer_id',
         'store_id',
         'amount',

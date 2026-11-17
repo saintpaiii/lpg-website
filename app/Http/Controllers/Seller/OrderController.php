@@ -157,7 +157,7 @@ class OrderController extends Controller
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'role', 'sub_role']);
+            ->get(['id', 'name', 'first_name', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
         // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
@@ -167,12 +167,18 @@ class OrderController extends Controller
             ->values()
             ->all();
 
+        // J6 Vehicle DSS: recommended rider / wait hint / split suggestion for the orders on this page waiting for a rider
+        $pageIds = collect($orders->items())->filter(fn ($o) => in_array($o['status'], ['confirmed', 'preparing'], true) && ($o['fulfillment'] ?? 'delivery') === 'delivery')->pluck('id');
+        $dss = $pageIds->isEmpty() ? [] : \App\Services\VehicleDssService::forOrders($store,
+            Order::with(['items.product', 'delivery'])->whereIn('id', $pageIds)->get(), $riderRows, $loads, $license);
+
         return Inertia::render('seller/orders', [
             'orders'  => $orders,
             'tab'     => $tab,
             'counts'  => $counts,
             'filters' => $request->only('status', 'search', 'tab', 'date_from', 'date_to', 'balance', 'fulfillment'),
             'riders'  => $riders,
+            'dss'     => (object) $dss,
             'since'   => \App\Services\SectionVisitService::sinceIso($request),
         ]);
     }
@@ -378,7 +384,7 @@ class OrderController extends Controller
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'role', 'sub_role']);
+            ->get(['id', 'name', 'first_name', 'phone', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
         // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
@@ -387,6 +393,8 @@ class OrderController extends Controller
             ->map(fn ($r) => ['id' => $r->id, 'name' => $r->name, 'phone' => $r->phone, 'can_deliver' => $license[$r->id]['can_deliver'], 'license_note' => $license[$r->id]['license_note']] + ($loads[$r->id] ?? []))
             ->values()
             ->all();
+        // J6 Vehicle DSS for this order (recommended rider, wait hint, split suggestion)
+        $dss = \App\Services\VehicleDssService::forOrders($store, collect([$order->loadMissing(['items.product', 'delivery'])]), $riderRows, $loads, $license)[$order->id] ?? null;
 
         $latestPayment = $order->payments->sortByDesc('created_at')->first();
 
@@ -429,6 +437,7 @@ class OrderController extends Controller
                 ] : null,
             ],
             'riders' => $riders,
+            'dss'    => $dss,
         ]);
     }
 
@@ -485,6 +494,11 @@ class OrderController extends Controller
         if ($newStatus === 'confirmed' && $oldStatus === 'pending'
             && $order->payment_mode === 'consignment' && $order->payment_status === 'unpaid') {
             return back()->with('error', 'Cannot confirm this consignment order until the customer pays the down payment.');
+        }
+        // J6 (E4): a half-payment order waits for its first half (paid online) before the store can confirm it
+        if ($newStatus === 'confirmed' && $oldStatus === 'pending'
+            && $order->payment_mode === 'half' && ! in_array($order->payment_status, ['partial', 'paid'], true)) {
+            return back()->with('error', 'Waiting for the first half payment — you can confirm this order once the customer pays it online.');
         }
         // J5: what the customer paid before a cancellation flips payment_status to to_refund
         $paidBeforeCancel = $newStatus === 'cancelled' ? \App\Services\PaymentReceiptService::paidSoFar($order) : 0.0;
@@ -624,6 +638,23 @@ class OrderController extends Controller
         $label = $order->fresh()->statusLabel();
         return back()->with('success', "Order {$order->order_number} marked as {$label}" . ($cashAtStore ? ' — cash payment recorded.' : '.')
             . ($cancelRefund ? ' A refund request for ₱' . number_format((float) $cancelRefund->amount, 2) . ' was created — send it back from Refunds.' : ''));
+    }
+
+    /**
+     * J6: send the (editable) split / pick-up suggestion to the customer's chat with this store — ChatService::send.
+     */
+    public function dssMessage(Request $request, Order $order): RedirectResponse
+    {
+        $store = request()->attributes->get('seller_store');
+        if ($order->store_id !== $store->id) abort(403);
+        $data = $request->validate(['body' => 'required|string|max:2000']);
+        $conversation = \App\Services\ChatService::conversationForOrder($order->loadMissing('customer'));
+        if (! $conversation) {
+            return back()->with('error', 'This customer has no account to message.');
+        }
+        \App\Services\ChatService::send($conversation, $request->user(), $data['body'], null, $order->id);
+
+        return back()->with('success', 'Message sent to the customer.');
     }
 
     public function markRefunded(Order $order): RedirectResponse
@@ -780,6 +811,11 @@ class OrderController extends Controller
 
         if ($order->isPickup()) {
             return back()->with('error', "Pick-up orders don't need a rider.");
+        }
+        // Same payment rule as the batch assign and the page: paid, COD, or the down payment / first half in (J6 E4)
+        if (! $order->paidEnoughToDispatch()) {
+            return back()->with('error', $order->payment_mode === 'half' ? 'Waiting for the first half payment — a rider can be assigned once it is paid.'
+                : "Order {$order->order_number} is awaiting payment and can't be dispatched yet.");
         }
 
         $data = $request->validate([

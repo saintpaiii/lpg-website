@@ -104,13 +104,25 @@ abstract class BaseMessageController extends Controller
     {
         $this->authorizeView($request, $conversation);
         $data = $request->validate([
-            'body'     => ['nullable', 'string', 'max:2000', 'required_without:image'],
-            'image'    => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'required_without:body'],
-            'order_id' => ['nullable', 'integer', 'exists:orders,id'],
+            'body'           => ['nullable', 'string', 'max:2000', 'required_without_all:image,latitude'],
+            'image'          => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'order_id'       => ['nullable', 'integer', 'exists:orders,id'],
+            // J6 "📍 Share location" — Philippines bounds only
+            'latitude'       => ['nullable', 'numeric', 'between:4,22', 'required_with:longitude'],
+            'longitude'      => ['nullable', 'numeric', 'between:116,127', 'required_with:latitude'],
+            'location_label' => ['nullable', 'string', 'max:255'],
         ], [
-            'body.required_without'  => 'Type a message or add a photo.',
-            'image.required_without' => 'Type a message or add a photo.',
+            'body.required_without_all' => 'Type a message, add a photo or share a location.',
+            'latitude.between'          => 'That location is outside the Philippines.',
+            'longitude.between'         => 'That location is outside the Philippines.',
         ]);
+
+        // Locations: at most 10 a minute per person
+        if (isset($data['latitude'])) {
+            $key = 'chat-location:' . $request->user()->id;
+            abort_if(\Illuminate\Support\Facades\RateLimiter::tooManyAttempts($key, 10), 429, 'Too many locations — try again in a minute.');
+            \Illuminate\Support\Facades\RateLimiter::hit($key, 60);
+        }
 
         // An order tag must be an order of this conversation's store (and customer)
         if (! empty($data['order_id'])) {
@@ -120,7 +132,9 @@ abstract class BaseMessageController extends Controller
             abort_unless($ok, 422, 'That order does not belong to this conversation.');
         }
 
-        $message = ChatService::send($conversation, $request->user(), $data['body'] ?? null, $request->file('image'), $data['order_id'] ?? null);
+        $location = isset($data['latitude'])
+            ? ['latitude' => (float) $data['latitude'], 'longitude' => (float) $data['longitude'], 'label' => $data['location_label'] ?? null] : null;
+        $message = ChatService::send($conversation, $request->user(), $data['body'] ?? null, $request->file('image'), $data['order_id'] ?? null, $location);
 
         return response()->json(['message' => $this->format($message, $conversation)], 201);
     }
@@ -203,6 +217,11 @@ abstract class BaseMessageController extends Controller
             'riders'             => $this->portal() === 'rider' ? [] : $riders,
             // rider view: the delivery they're on
             'my_delivery'        => $myDelivery,
+            // J6: seller one-tap "Send store location"
+            'store_location'     => $this->portal() === 'seller' && $c->store?->latitude && $c->store?->longitude
+                ? ['lat' => (float) $c->store->latitude, 'lng' => (float) $c->store->longitude,
+                    'label' => trim($c->store->store_name . ' — ' . collect([$c->store->address, $c->store->barangay, $c->store->city])->filter()->implode(', '), ' —')]
+                : null,
         ];
     }
 }

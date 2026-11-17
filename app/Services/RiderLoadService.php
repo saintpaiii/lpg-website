@@ -93,6 +93,9 @@ class RiderLoadService
             'vehicle'    => $vehicle,
             'kg'         => $load['kg'],
             'tanks'      => $load['tanks'],
+            // Tanks on board per gas size (J6) — the vehicle's tank_limits apply to them
+            'by_size'    => $load['by_size'] ?? [],
+            'tank_limits' => $vehicle?->tank_limits ?: null,
             'max_kg'     => $maxKg,
             'max_tanks'  => $maxTanks,
             'free_kg'    => $vehicle ? round(max(0, $maxKg - $load['kg']), 2) : 0.0,
@@ -172,12 +175,18 @@ class RiderLoadService
         // Nothing the store owns could carry it in one trip
         $store = Store::find($rider->store_id ?? $vehicle->store_id);
         $anyFits = $store && DeliveryFeeService::usableVehicles($store)
-            ->contains(fn (Vehicle $v) => (float) $v->max_capacity_kg >= $need['kg'] && (int) $v->max_tanks >= $need['tanks']);
-        if (! $anyFits && ! ((float) $vehicle->max_capacity_kg >= $need['kg'] && (int) $vehicle->max_tanks >= $need['tanks'])) {
+            ->contains(fn (Vehicle $v) => DeliveryFeeService::fits($v, $need) === null);
+        if (! $anyFits && DeliveryFeeService::fits($vehicle, $need) !== null) {
             return 'No vehicle of this store can carry ' . static::kg($need['kg']) . " kg / {$need['tanks']} tanks in one trip — split the order or use pick-up.";
         }
 
+        // What the vehicle already carries (kg, tanks, per size) + this order must fit — DeliveryFeeService::fits, the one rule
         $load = static::load($rider, $orders->pluck('id')->all());
+        if ($sizeWhy = DeliveryFeeService::fits($vehicle, $need, $load)) {
+            if (str_contains($sizeWhy, ' kg tanks per trip')) {
+                return "{$name}'s " . $sizeWhy . ' (including the tanks already on board).';
+            }
+        }
         if ($need['kg'] > $load['free_kg'] + 0.001 || $need['tanks'] > $load['free_tanks']) {
             return "{$name}'s " . DeliveryFeeService::label($vehicle->vehicle_type) . " {$vehicle->plate_number} has "
                 . static::kg($load['free_kg']) . " kg / {$load['free_tanks']} tank(s) free — this needs "

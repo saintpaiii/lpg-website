@@ -67,8 +67,10 @@ class LocationController extends Controller
     }
 
     /**
-     * Live position for each of the rider's active deliveries: the customer gets it rounded to
-     * 2 decimals (~1 km, same privacy rule as the tracking card), the store gets it exact.
+     * Live position for each of the rider's active deliveries: the store gets it exact; the customer gets it EXACT only
+     * while their order is the rider's next stop (picked up / in transit — RiderStatusService::exactForCustomer), else
+     * rounded to 2 decimals (~1 km) so other customers' stops stay private. J6: a rider on shift with no active delivery
+     * still shows on the store's live map (Available) — but only while clocked in, never after clock-out.
      */
     private function broadcastPosition(int $riderId, float $lat, float $lng): void
     {
@@ -86,11 +88,20 @@ class LocationController extends Controller
                     'delivery_ids' => $deliveries->pluck('id')->values(),
                 ], ["store.{$storeId}"]));
             }
+            // Available (no active delivery): the store's map still shows them — only while on shift
+            if ($active->isEmpty() && \App\Services\RiderStatusService::onShift($riderId)
+                && ($storeId = \App\Models\User::whereKey($riderId)->value('store_id'))) {
+                \App\Support\Realtime::send(new \App\Events\RiderLocationUpdated([
+                    'rider_id' => $riderId, 'lat' => $lat, 'lng' => $lng, 'updated_at' => $at, 'delivery_ids' => [],
+                ], ["store.{$storeId}"]));
+            }
+            $next = \App\Services\RiderStatusService::orderStops($active)->first()?->id;
             foreach ($active as $d) {
                 if ($userId = $d->order?->customer?->user_id) {
+                    $exact = $d->id === $next && in_array($d->status, ['picked_up', 'in_transit'], true);
                     \App\Support\Realtime::send(new \App\Events\RiderLocationUpdated([
                         'order_id' => $d->order_id, 'delivery_id' => $d->id,
-                        'lat' => round($lat, 2), 'lng' => round($lng, 2), 'updated_at' => $at,
+                        'lat' => $exact ? $lat : round($lat, 2), 'lng' => $exact ? $lng : round($lng, 2), 'exact' => $exact, 'updated_at' => $at,
                     ], ["user.{$userId}"]));
                 }
             }
@@ -120,11 +131,13 @@ class LocationController extends Controller
             return response()->json(['location' => null]);
         }
 
-        // Customers only ever get an approximate area (≈1.1 km), never exact GPS
+        // Exact only while this order is the rider's next stop (J6); otherwise an approximate area (≈1.1 km)
+        $exact = \App\Services\RiderStatusService::exactForCustomer($delivery);
         return response()->json([
             'location' => [
-                'latitude'  => round((float) $loc->latitude, 2),
-                'longitude' => round((float) $loc->longitude, 2),
+                'latitude'  => $exact ? (float) $loc->latitude : round((float) $loc->latitude, 2),
+                'longitude' => $exact ? (float) $loc->longitude : round((float) $loc->longitude, 2),
+                'exact'     => $exact,
                 'at'        => $loc->created_at->toIso8601String(),
             ],
         ]);
@@ -160,8 +173,8 @@ class LocationController extends Controller
 
         return response()->json([
             'location' => [
-                'latitude'  => $isRider ? (float) $loc->latitude : round((float) $loc->latitude, 2),
-                'longitude' => $isRider ? (float) $loc->longitude : round((float) $loc->longitude, 2),
+                'latitude'  => $isRider || \App\Services\RiderStatusService::exactForCustomer($delivery) ? (float) $loc->latitude : round((float) $loc->latitude, 2),
+                'longitude' => $isRider || \App\Services\RiderStatusService::exactForCustomer($delivery) ? (float) $loc->longitude : round((float) $loc->longitude, 2),
                 'accuracy'  => $isRider ? $loc->accuracy : null,
                 'at'        => $loc->created_at->toIso8601String(),
             ],

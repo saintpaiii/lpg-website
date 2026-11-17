@@ -128,6 +128,19 @@ type Props = {
     demandForecast: DemandForecast;
     insights: Insights;
     generatedAt: string;
+    /** J6 Vehicle DSS — Fleet */
+    fleet?: Fleet;
+};
+
+type Fleet = {
+    days: number;
+    miss_count: number;
+    waits: { date: string; hour: number }[];
+    peak_active: number;
+    vehicles: number;
+    biggest: { label: string; kg: number } | null;
+    per_vehicle: { id: number; label: string; trips: number; kg: number; pct_used: number | null; underused: boolean }[];
+    recommendations: { kind: string; text: string }[];
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -139,7 +152,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const FORECAST_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-type Tab = 'overview' | 'forecast' | 'trends';
+type Tab = 'overview' | 'forecast' | 'trends' | 'fleet';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -633,7 +646,7 @@ function RecommendationsCard({ recs }: { recs: Recommendation[] }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt }: Props) {
+export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt, fleet }: Props) {
     const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
     const warningCount  = reorderAlerts.filter((a) => a.severity === 'warning').length;
     const [tab, setTab]  = useState<Tab>('overview');
@@ -642,6 +655,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
         { key: 'overview',  label: 'Overview',            icon: CalendarDays },
         { key: 'forecast',  label: 'Forecast & Alerts',   icon: AlertTriangle },
         { key: 'trends',    label: 'Trends & Products',   icon: TrendingUp },
+        { key: 'fleet',     label: 'Fleet',               icon: Brain },
     ];
 
     return (
@@ -875,11 +889,68 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                     </>
                 )}
 
+                {/* ── Tab 4: Fleet (J6) ── */}
+                {tab === 'fleet' && fleet && <FleetSection fleet={fleet} />}
+
                 {/* Footer note */}
                 <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-3 text-center text-xs text-gray-400 mt-2">
                     DSS uses Simple Moving Average (demand forecast) and OLS linear regression (trend). Insights use rule-based logic — not AI. Scoped to your store, excludes cancelled orders.
                 </div>
             </div>
         </AppLayout>
+    );
+}
+
+/** J6 Vehicle DSS — "Fleet": did the vehicles keep up in the last 30 days, and what to add. Rule-based (config/delivery.php 'dss'). */
+function FleetSection({ fleet }: { fleet: Fleet }) {
+    const waitDays = new Set(fleet.waits.map((w) => w.date)).size;
+    const stat = (label: string, value: string | number, hint: string) => (
+        <div className="rounded-lg border bg-white p-3 dark:bg-gray-900">
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className="text-xl font-bold tabular-nums">{value}</p>
+            <p className="text-[11px] text-gray-400">{hint}</p>
+        </div>
+    );
+    return (
+        <div className="space-y-4" data-testid="dss-fleet">
+            <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Fleet — last {fleet.days} days</CardTitle></CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                    <ul className="space-y-1.5" data-testid="fleet-advice">
+                        {fleet.recommendations.map((r, i) => (
+                            <li key={i} className={`rounded-md px-3 py-2 ${r.kind === 'ok' ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200' : 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200'}`}>{r.text}</li>
+                        ))}
+                    </ul>
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {stat('Over your biggest vehicle', fleet.miss_count, fleet.biggest ? `${fleet.biggest.label} ${fleet.biggest.kg} kg` : 'no vehicle')}
+                        {stat('Waited for a vehicle', fleet.waits.length, `${waitDays} day(s)`)}
+                        {stat('Peak active deliveries', fleet.peak_active, 'at the same time')}
+                        {stat('Usable vehicles', fleet.vehicles, 'today')}
+                    </div>
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Per vehicle</CardTitle></CardHeader>
+                <CardContent className="overflow-x-auto p-0">
+                    <table className="w-full text-sm">
+                        <thead><tr className="border-b text-left text-xs text-gray-500"><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2 text-right">Trips</th><th className="px-4 py-2 text-right">kg carried</th><th className="px-4 py-2 text-right">Capacity used</th></tr></thead>
+                        <tbody className="divide-y">
+                            {fleet.per_vehicle.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-400">No vehicles yet.</td></tr>}
+                            {fleet.per_vehicle.map((v) => (
+                                <tr key={v.id}>
+                                    <td className="px-4 py-2">{v.label}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{v.trips}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{v.kg}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">
+                                        {v.pct_used === null ? '—' : `${v.pct_used}%`}
+                                        {v.underused && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">underused</span>}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </CardContent>
+            </Card>
+        </div>
     );
 }

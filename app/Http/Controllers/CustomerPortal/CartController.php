@@ -51,6 +51,8 @@ class CartController extends Controller
                     ...collect($store->customerFacts())->only(['delivery_from', 'allow_pickup', 'pickup_only', 'can_deliver', 'hours'])->all(),
                     // Weight alert: the store's biggest delivery-ready vehicle (null = none); items carry their unit kg
                     'max_vehicle_kg' => \App\Services\DeliveryFeeService::biggestVehicle($store)['kg'] ?? null,
+                    // J6: every delivery-ready vehicle (kg, tanks, per-size limits) — the alert uses fits() like checkout
+                    'vehicles'       => \App\Services\DeliveryFeeService::capacities($store),
                     // False when the store is hidden (plan ended, permit expired…): its items can't be checked out
                     'store_available' => $store->isOpenToCustomers(),
                     'items'        => [],
@@ -65,6 +67,8 @@ class CartController extends Controller
                 'weight'           => $product->weight ?? (($product->weight_kg ?? '') . 'kg'),
                 // Delivery weight of ONE unit (DeliveryFeeService::itemKg — the same number checkout uses)
                 'unit_kg'          => \App\Services\DeliveryFeeService::itemKg($product),
+                // Gas size key ("11") for the vehicles' per-size limits (J6)
+                'size_key'         => \App\Services\DeliveryFeeService::sizeKey((float) $product->weight_kg),
                 'image_url'        => $product->image ? Storage::url($product->image) : null,
                 'refill_price'     => (float) $product->refill_price,
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),

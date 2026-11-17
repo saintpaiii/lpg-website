@@ -18,6 +18,7 @@ class Vehicle extends Model
         'plate_number',
         'max_capacity_kg',
         'max_tanks',
+        'tank_limits',   // J6: max tanks per gas size per trip
         'description',
         'status',
         'assigned_rider_id',
@@ -38,6 +39,7 @@ class Vehicle extends Model
         return [
             'max_capacity_kg' => 'decimal:2',
             'max_tanks'       => 'integer',
+            'tank_limits'     => 'array',
             'paused_by_plan'  => 'boolean',
         ];
     }

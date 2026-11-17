@@ -578,20 +578,32 @@ class CheckoutController extends Controller
                         }
                         $load  = DeliveryFeeService::orderLoad($orderedItems);
                         $store->loadMissing(['vehicles', 'deliveryRates']);
-                        $quote = DeliveryFeeService::quote($store, $distKm, $load['kg'], $load['tanks']);
+                        $quote = DeliveryFeeService::quote($store, $distKm, $load['kg'], $load['tanks'], $load['by_size']);
                         if (! $quote) {
                             // "Reduce the quantity" only helps when the load is too heavy
-                            $tooHeavy = DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks']) === 'too_heavy';
+                            $tooHeavy = DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks'], $load['by_size']) === 'too_heavy';
                             $hint = match (true) {
                                 $tooHeavy && $store->offersPickup()      => ' Choose pick-up, or reduce the quantity.',
                                 $tooHeavy                                => ' Reduce the quantity or remove some items.',
                                 $store->offersPickup()                   => ' You can pick it up at the store instead.',
                                 default                                  => " This store can't deliver right now. Please try another store.",
                             };
-                            throw new CheckoutRuleException("{$store->store_name}: " . DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks']) . $hint);
+                            $why = DeliveryFeeService::whyNoVehicle($store, $load['kg'], $load['tanks'], $load['by_size']);
+                            $e = new CheckoutRuleException("{$store->store_name}: " . $why . $hint);
+                            // J6 Fleet DSS: count the orders no vehicle could carry
+                            throw $tooHeavy ? $e->withCapacityMiss($store->id, $load, str_starts_with($why, 'Too many tanks of one size') ? 'too_many_of_size' : 'too_heavy') : $e;
                         }
                         $finalFee    = $quote['fee'];
                         $vehicleType = $quote['vehicle_type'];
+                    } elseif ($store->canDeliver()) {
+                        // Pick-up of an order the store's vehicles couldn't deliver in one trip → "changed to pick-up because of weight" (J6 DSS)
+                        $load = DeliveryFeeService::orderLoad($orderedItems);
+                        $store->loadMissing(['vehicles', 'deliveryRates']);
+                        if (! DeliveryFeeService::quote($store, null, $load['kg'], $load['tanks'], $load['by_size'])
+                            && DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks'], $load['by_size']) === 'too_heavy') {
+                            \App\Models\VehicleCapacityMiss::create(['store_id' => $store->id, 'user_id' => $request->user()->id, 'kg' => $load['kg'],
+                                'tanks' => $load['tanks'], 'by_size' => $load['by_size'], 'reason' => 'switched_to_pickup']);
+                        }
                     }
 
                     // Store discount coupon (issued by this store as a refund resolution)
@@ -897,6 +909,14 @@ class CheckoutController extends Controller
             return $error($e->getMessage());
         } catch (CheckoutRuleException $e) {
             // Stock / max per order: the customer sees the real reason (the transaction rolled back)
+            if ($e->capacityMiss) {
+                // Saved now, outside the rolled-back transaction — at most one per customer + store per 10 minutes (retries)
+                $recent = \App\Models\VehicleCapacityMiss::where('store_id', $e->capacityMiss['store_id'])->where('user_id', auth()->id())
+                    ->where('created_at', '>=', now()->subMinutes(10))->exists();
+                if (! $recent) {
+                    \App\Models\VehicleCapacityMiss::create($e->capacityMiss + ['user_id' => auth()->id()]);
+                }
+            }
             return $error($e->getMessage());
         } catch (\App\Exceptions\PaymentServiceUnavailable $e) {
             // No connection to PayMongo — the transaction rolled back, nothing was saved

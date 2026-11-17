@@ -20,6 +20,7 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDate } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { bestFitId, riderOptionDisabled, riderOptionLabel, sumLoads, type Load, type RiderLoadFields } from '@/lib/rider-fit';
+import VehicleDssPanel, { type OrderDss } from '@/components/vehicle-dss-panel';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge, type PickupOrder } from '@/components/complete-pickup-dialog';
 import { orderStatusLabel } from '@/lib/order-status';
@@ -73,6 +74,8 @@ type Props = {
     tab:     string;
     filters: { status?: string; search?: string; date_from?: string; date_to?: string; balance?: string; fulfillment?: string };
     riders:  Rider[];
+    /** J6 Vehicle DSS per waiting order on this page */
+    dss?: Record<string, OrderDss>;
     since?:  string | null;
 };
 
@@ -100,7 +103,7 @@ type ActionDialog =
     | { type: 'assign_rider';  order: Order }
     | null;
 
-export default function SellerOrders({ orders, counts, tab, filters, riders }: Props) {
+export default function SellerOrders({ orders, counts, tab, filters, riders, dss = {} }: Props) {
     // "Mark as picked up" dialog (empty tanks + cash at the store)
     const [pickupOrder, setPickupOrder] = useState<PickupOrder | null>(null);
     // New / updated since the last visit (until the user leaves the page)
@@ -163,7 +166,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
 
     function openDialog(d: ActionDialog) {
         // Pre-select the rider whose vehicle fits this order most tightly ("Best fit")
-        const best = d?.type === 'assign_rider' ? bestFitId(riders, d.order.load ?? null) : null;
+        const best = d?.type === 'assign_rider' ? (dss[d.order.id]?.recommended_rider_id ?? bestFitId(riders, d.order.load ?? null)) : null;
         setRiderId(best ? String(best) : '');
         setCancelReason('');
         setCancelNotes('');
@@ -553,7 +556,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                 <SelectContent>
                                     {(() => {
                                         const need = dialog?.type === 'assign_rider' ? dialog.order.load ?? null : null;
-                                        const best = bestFitId(riders, need);
+                                        const best = (dialog?.type === 'assign_rider' ? dss[dialog.order.id]?.recommended_rider_id : null) ?? bestFitId(riders, need);
                                         return riders.map((r) => (
                                             <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, need)}>{riderOptionLabel(r, need, r.id === best)}</SelectItem>
                                         ));
@@ -561,6 +564,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                 </SelectContent>
                             </Select>
                         )}
+                        {dialog?.type === 'assign_rider' && <div className="mt-3"><VehicleDssPanel dss={dss[dialog.order.id]} orderId={dialog.order.id} onUseRecommended={(id) => setRiderId(String(id))} /></div>}
                     </div>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
@@ -599,7 +603,7 @@ function OrderActions({
 }) {
     const isPickup = order.fulfillment === 'pickup';
     const isFinal = ['delivered', 'cancelled'].includes(order.status);
-    const awaitingDownPayment = order.payment_mode === 'consignment' && order.payment_status === 'unpaid';
+    const awaitingDownPayment = (order.payment_mode === 'consignment' || order.payment_mode === 'half') && order.payment_status === 'unpaid';
 
     return (
         <div className="flex items-center justify-end gap-1.5 flex-wrap">
@@ -625,7 +629,7 @@ function OrderActions({
                     )}
                     {order.status === 'pending' && awaitingDownPayment && (
                         <span className="h-7 px-2.5 text-xs text-amber-600 flex items-center gap-1">
-                            ⏳ Awaiting down payment
+                            ⏳ {order.payment_mode === 'half' ? 'Waiting for the first half payment' : 'Awaiting down payment'}
                         </span>
                     )}
                     {order.status === 'confirmed' && (

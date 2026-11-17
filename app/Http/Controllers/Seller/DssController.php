@@ -176,6 +176,8 @@ class DssController extends Controller
             'topProducts'    => $topProducts,
             'demandForecast' => $demandForecast,
             'insights'       => $this->computeInsights($store),
+            // J6: Fleet — capacity misses, waits, peak vs vehicles, per-vehicle use + rule-based advice
+            'fleet'          => \App\Services\VehicleDssService::fleet($store),
             'generatedAt'    => now()->format('M d, Y g:i A'),
         ]);
     }

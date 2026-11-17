@@ -372,7 +372,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     // Delivery quote per store: load (kg + tanks) of its lines, distance from the store pin (none → base fee)
     const quoteOf = (sg: StoreGroup) => {
         const load = orderLoad(sg.items);
-        return quoteFee(sg.delivery_options, distFees[sg.store_id]?.distKm ?? null, load.kg, load.tanks);
+        return quoteFee(sg.delivery_options, distFees[sg.store_id]?.distKm ?? null, load.kg, load.tanks, load.by_size);
     };
 
     // Per-store totals (mirrors CheckoutController@store)
@@ -387,7 +387,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
         const distKm   = distFees[sg.store_id]?.distKm ?? null;
         const tooFar   = isDelivery && distKm != null && !!sg.max_delivery_radius_km && distKm > sg.max_delivery_radius_km;
         // Can't deliver: no vehicle fits / no vehicle, or beyond the store's radius
-        const blocked  = isDelivery ? (!quote ? whyNoVehicle(sg.delivery_options, sg.no_delivery_reason)
+        const blocked  = isDelivery ? (!quote ? whyNoVehicle(sg.delivery_options, sg.no_delivery_reason, orderLoad(sg.items))
             : tooFar ? `${sg.store_name} doesn't deliver that far (${distKm!.toFixed(1)} km, limit ${sg.max_delivery_radius_km} km).` : null) : null;
         // Which hint fits: vehicles exist with fees but none can carry it → too heavy; no options at all → the server's code
         const blockedCode = !blocked ? null

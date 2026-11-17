@@ -99,6 +99,48 @@ class RefundService
         return $refund;
     }
 
+    /**
+     * J6 — the customer paid MORE than the order still owed ("Pay the remaining" paid twice, or paid online after the rider
+     * collected the cash): one money refund request (reason overpayment, pending) for the extra, through the same refund
+     * flow. Idempotent per PayMongo payment: refund_requests.payment_id is unique — the webhook and the return-verify can
+     * both fire, there is never a second request. No receipt is issued for the extra (the caller only receipts what was owed).
+     */
+    public static function forOverpayment(Order $order, \App\Models\Payment $payment, float $amount): ?RefundRequest
+    {
+        $amount = round($amount, 2);
+        if ($amount <= 0 || ! $order->customer_id || ! $order->store_id) {
+            return null;
+        }
+        if ($existing = RefundRequest::where('payment_id', $payment->id)->first()) {
+            return $existing;
+        }
+        try {
+            $refund = RefundRequest::create([
+                'order_id'             => $order->id,
+                'payment_id'           => $payment->id,
+                'customer_id'          => $order->customer_id,
+                'store_id'             => $order->store_id,
+                'amount'               => $amount,
+                'reason'               => 'overpayment',
+                'preferred_resolution' => 'money_refund',
+                'description'          => "Order {$order->order_number} was paid twice / overpaid: an online payment of ₱" . number_format((float) $payment->amount, 2)
+                    . ' (PayMongo ' . ($payment->paymongo_payment_id ?: $payment->paymongo_checkout_id) . ') arrived when only ₱'
+                    . number_format(max(0, (float) $payment->amount - $amount), 2) . ' was still owed. Refund ₱' . number_format($amount, 2) . '.',
+                'status'               => 'pending',
+            ]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException $e) {
+            return RefundRequest::where('payment_id', $payment->id)->first();   // the other caller won the race
+        }
+
+        NotificationService::sendToStore($order->store_id, 'refund_request', 'Refund to send (paid twice)',
+            "Order {$order->order_number} was overpaid online. Send ₱" . number_format($amount, 2) . ' back and record the reference in Refunds.',
+            ['order_id' => $order->id, 'link' => '/seller/refunds']);
+        static::notifyCustomer($refund, 'refund_request', 'You paid more than your order',
+            "Order {$order->order_number}: we received ₱" . number_format($amount, 2) . ' more than you owed. The store will refund it.');
+
+        return $refund;
+    }
+
     /** All order-cancelled refunds of the order are sent → the order's payment_status becomes refunded. */
     public static function syncCancelledOrderStatus(?Order $order): void
     {
@@ -127,7 +169,7 @@ class RefundService
     public static function accept(RefundRequest $refund, string $resolution, array $data, int $actingUserId): void
     {
         // A cancelled order has nothing to replace — its money goes back (or as store credit)
-        if ($refund->reason === 'order_cancelled' && $resolution === 'replacement') {
+        if (in_array($refund->reason, ['order_cancelled', 'overpayment'], true) && $resolution === 'replacement') {
             throw new \RuntimeException('This order was cancelled — send the money back (Money Refund) or give a Store Discount.');
         }
 

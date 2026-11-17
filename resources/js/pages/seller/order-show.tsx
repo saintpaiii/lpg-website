@@ -26,6 +26,7 @@ import TrustScoreBar from '@/components/trust-score-bar';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { bestFitId, riderOptionDisabled, riderOptionLabel, type Load, type RiderLoadFields } from '@/lib/rider-fit';
+import VehicleDssPanel, { type OrderDss } from '@/components/vehicle-dss-panel';
 import type { FailInfo } from '@/components/delivery-fail-fields';
 import { ReasonPicker } from '@/components/reason-picker';
 import { CompletePickupDialog, FulfillmentBadge } from '@/components/complete-pickup-dialog';
@@ -132,9 +133,12 @@ type CustomerLoyaltyInfo = {
     cancelled_orders: number;
 } | null;
 
-export default function SellerOrderShow({ order, riders, breakdown, loyalty, receipts = [], adjustments = [], refill_items = [], closed_note = null }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo; receipts?: PaymentReceiptRow[];
+export default function SellerOrderShow({ order, riders, breakdown, loyalty, receipts = [], adjustments = [], refill_items = [], closed_note = null, dss = null }: Props & { breakdown: PriceBreakdown; loyalty: CustomerLoyaltyInfo; receipts?: PaymentReceiptRow[];
     /** J4: tanks not accepted at handover, the refill items for that, and "store is closed now" */
-    adjustments?: OrderAdjustment[]; refill_items?: RefillItem[]; closed_note?: string | null }) {
+    adjustments?: OrderAdjustment[]; refill_items?: RefillItem[]; closed_note?: string | null;
+    /** J6: Vehicle DSS (recommended rider, wait hint, split suggestion) while the order waits for a rider */
+    dss?: OrderDss | null }) {
+    const recommendedId = dss?.recommended_rider_id ?? bestFitId(riders, order.load ?? null);
     // Live: this order's status / delivery changes reload the page data
     const liveStoreId = (usePage<SharedData>().props.auth as { store?: { id: number } | null }).store?.id;
     useLiveReload(liveStoreId ? `store.${liveStoreId}` : null, ['order', 'breakdown', 'loyalty'], (e) => e.order_id === order.id,
@@ -195,7 +199,8 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
     const isFinal       = ['cancelled', 'delivered'].includes(order.status);
     const stepIndex     = STATUS_STEPS.indexOf(order.status);
     const isConsignment = order.payment_mode === 'consignment';
-    const awaitingDown  = isConsignment && order.payment_status === 'unpaid';
+    // J6 (E4): a half-payment order waits for its first half too (Confirm blocked on the server as well)
+    const awaitingDown  = (isConsignment || order.payment_mode === 'half') && order.payment_status === 'unpaid';
     const canConfirm    = order.status === 'pending' && !awaitingDown;
     const canPrepare    = order.status === 'confirmed';
     // Paid orders, COD orders and consignment / half-payment orders with the first payment in can be dispatched (Order::paidEnoughToDispatch)
@@ -240,7 +245,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         {order.status === 'pending' && awaitingDown && (
                             <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-400">
                                 <Banknote className="h-3.5 w-3.5 shrink-0" />
-                                Awaiting consignment down payment
+                                {order.payment_mode === 'half' ? 'Waiting for the first half payment' : 'Awaiting consignment down payment'}
                             </div>
                         )}
                         {order.is_overdue && (
@@ -271,7 +276,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         )}
                         {!isPickup && ['confirmed', 'preparing'].includes(order.status) && (
                             <Button
-                                onClick={() => { if (!canAssign) return; const best = bestFitId(riders, order.load ?? null); setSelectedRider(best ? String(best) : ''); setShowAssign(true); }}
+                                onClick={() => { if (!canAssign) return; setSelectedRider(recommendedId ? String(recommendedId) : ''); setShowAssign(true); }}
                                 size="sm"
                                 variant="outline"
                                 disabled={!canAssign}
@@ -476,7 +481,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                 {order.payment_mode === 'half' && (
                                     <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs dark:border-amber-800 dark:bg-amber-900/20" data-testid="seller-half-payment">
                                         <HalfPaymentNote order={order} className="block font-semibold" />
-                                        {order.payment_status === 'unpaid' && <p className="mt-0.5 text-muted-foreground">Waiting for the first half online — you can confirm, but a rider can be assigned only after it is paid.</p>}
+                                        {order.payment_status === 'unpaid' && <p className="mt-0.5 text-muted-foreground">Waiting for the first half payment online — you can confirm and assign a rider once it is paid.</p>}
                                         {order.payment_status === 'partial' && !isFinal && <p className="mt-0.5 text-muted-foreground">The customer may pay the rest online before delivery; otherwise the rider collects {fmt(order.remaining_balance ?? 0)} cash.</p>}
                                     </div>
                                 )}
@@ -658,12 +663,13 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                             <SelectContent>
                                 {riders.map((r) => (
                                     <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, order.load ?? null)}>
-                                        {riderOptionLabel(r, order.load ?? null, r.id === bestFitId(riders, order.load ?? null))}
+                                        {riderOptionLabel(r, order.load ?? null, r.id === recommendedId)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     )}
+                    <VehicleDssPanel dss={dss} orderId={order.id} onUseRecommended={(id) => setSelectedRider(String(id))} />
                     <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={submitAssign} disabled={!selectedRider} className="bg-blue-600 hover:bg-blue-700">Assign</AlertDialogAction>

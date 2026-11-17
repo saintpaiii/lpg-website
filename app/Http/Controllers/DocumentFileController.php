@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\DeliveryProof;
 use App\Models\OrderItemAdjustment;
 use App\Models\StaffDocument;
 use App\Models\Store;
@@ -29,6 +30,8 @@ class DocumentFileController extends Controller
         'attendance'     => ['clock_in_photo_path', 'clock_out_photo_path'],
         // J5: "tank not accepted" photo taken at handover (J4)
         'handover-photo' => ['photo_path'],
+        // J6: delivery proof photos (rider's Delivered / Failed photo)
+        'delivery-proof' => ['photo_path'],
     ];
 
     public function show(Request $request, string $kind, int $id, string $field): StreamedResponse
@@ -48,6 +51,9 @@ class DocumentFileController extends Controller
             // The order's customer, the store owner, the rider of the delivery and whoever recorded it (store staff with Orders: below)
             'handover-photo' => [$ha = OrderItemAdjustment::with(['order' => fn ($q) => $q->withTrashed()->with(['customer', 'store' => fn ($s) => $s->withTrashed(), 'delivery'])])->find($id),
                 [$ha?->order?->customer?->user_id, $ha?->order?->store?->user_id, $ha?->order?->delivery?->rider_id, $ha?->recorded_by]],
+            // The order's customer, the store owner, the delivery's rider and who took it (store staff with Orders / Deliveries: below)
+            'delivery-proof' => [$dp = DeliveryProof::with(['delivery' => fn ($q) => $q->withTrashed()->with(['order' => fn ($o) => $o->withTrashed()->with(['customer', 'store' => fn ($s) => $s->withTrashed()])])])->find($id),
+                [$dp?->delivery?->order?->customer?->user_id, $dp?->delivery?->order?->store?->user_id, $dp?->delivery?->rider_id, $dp?->user_id]],
         };
         abort_unless($record, 404);
 
@@ -58,7 +64,9 @@ class DocumentFileController extends Controller
                 && ($user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage')))
             // Handover photos: store staff of that store who can see its orders
             || ($kind === 'handover-photo' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->order?->store_id
-                && $user->hasPermission('orders.view'));
+                && $user->hasPermission('orders.view'))
+            || ($kind === 'delivery-proof' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->delivery?->order?->store_id
+                && ($user->hasPermission('orders.view') || $user->hasPermission('deliveries.view')));
         abort_unless($allowed, 403);
 
         $path = $record->{$field};

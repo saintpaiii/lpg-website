@@ -238,6 +238,10 @@ class DeliveryController extends Controller
         ]);
 
         $order = Order::findOrFail($data['order_id']);
+        // J6 (E4): same payment rule as the web assign
+        if (! $order->paidEnoughToDispatch()) {
+            return response()->json(['message' => $order->payment_mode === 'half' ? 'Waiting for the first half payment.' : 'This order is awaiting payment.'], 422);
+        }
         if ($order->isPickup()) {
             return response()->json(['message' => "Pick-up orders don't need a rider."], 422);
         }

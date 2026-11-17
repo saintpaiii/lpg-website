@@ -146,7 +146,8 @@ class BecomeSellerController extends Controller
             'store_city'        => ['required', 'string', 'max:100'],
             'store_barangay'    => ['required', 'string', 'max:100'],
             'store_province'    => ['required', 'string', 'max:100'],
-            'store_phone'       => ['required', 'string', 'regex:/^09\d{9}$/'],
+            // J6: store phone may be a landline too (the owner's own account phone stays mobile-only)
+            'store_phone'       => ['required', 'string', 'max:30', new \App\Rules\PhPhone()],
             'bir_permit'        => $docRule(),
             'business_permit'   => $docRule(),
             'fsic_permit'       => $docRule(),
@@ -236,7 +237,7 @@ class BecomeSellerController extends Controller
                     'city'            => $request->store_city,
                     'barangay'        => $request->store_barangay,
                     'province'        => $request->store_province,
-                    'phone'           => $request->store_phone,
+                    'phone'           => trim((string) $request->store_phone),
                     'bir_permit'      => $birPermitPath,
                     'business_permit' => $businessPermitPath,
                     'fsic_permit'     => $fsicPermitPath,

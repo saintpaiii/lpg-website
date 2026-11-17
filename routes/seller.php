@@ -76,6 +76,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             Route::get('messages/{conversation}', [SellerMessageController::class, 'show'])->name('messages.show');
             Route::get('messages/{conversation}/messages', [SellerMessageController::class, 'messages'])->name('messages.poll');
             Route::post('messages/{conversation}', [SellerMessageController::class, 'store'])->middleware('throttle:30,1')->name('messages.send');
+            // J6 Vehicle DSS: message the customer from the "split into trips" panel (prefilled text, editable)
+            Route::post('orders/{order}/dss-message', [OrderController::class, 'dssMessage'])->middleware('throttle:10,1')->name('orders.dss-message');
             Route::get('messages/{conversation}/crm', [SellerMessageController::class, 'crm'])->name('messages.crm');
             Route::get('quick-replies', [SellerMessageController::class, 'quickReplies'])->name('quick-replies');
             Route::post('quick-replies', [SellerMessageController::class, 'storeQuickReply'])->name('quick-replies.store');
@@ -85,6 +87,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
 
         Route::middleware('module:deliveries')->group(function () {
             Route::get('deliveries', [DeliveryController::class, 'index'])->name('deliveries');
+            // J6: rider status board + live map — JSON for polling when realtime is off
+            Route::get('deliveries/riders-live', [DeliveryController::class, 'ridersLive'])->middleware('throttle:30,1')->name('deliveries.riders-live');
             Route::post('deliveries/assign', [DeliveryController::class, 'assign'])->name('deliveries.assign');
             Route::patch('deliveries/{delivery}/status', [DeliveryController::class, 'updateStatus'])->name('deliveries.status');
         });

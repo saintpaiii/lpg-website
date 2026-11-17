@@ -40,11 +40,27 @@ class DeliveryFeeService
         if ($gas <= 0) {
             return 0.0;
         }
-        // Key like "2.7" / "11" (never the raw "2.70" decimal attribute; PHP turns '5' into int 5 anyway)
-        $key = rtrim(rtrim(number_format($gas, 1, '.', ''), '0'), '.');
+        $key = static::sizeKey($gas);
         $table = config('delivery.full_tank_kg', []);
 
         return isset($table[$key]) ? (float) $table[$key] : round($gas * 2, 1);
+    }
+
+    /**
+     * The gas-size key used by full_tank_kg and vehicles.tank_limits (J6): "2.7", "11", "50" — never "2.70" / "11.0".
+     * Null for products without a size. Mirrors sizeKey() in lib/delivery-fee.ts.
+     */
+    public static function sizeKey(?float $gasKg): ?string
+    {
+        $gas = round((float) $gasKg, 1);
+
+        return $gas > 0 ? rtrim(rtrim(number_format($gas, 1, '.', ''), '0'), '.') : null;
+    }
+
+    /** "11kg" label for a size key. */
+    public static function sizeLabel(string $key): string
+    {
+        return $key . 'kg';
     }
 
     /**
@@ -63,12 +79,13 @@ class DeliveryFeeService
      * Total weight (FULL tanks) and number of tanks of a set of order lines.
      *
      * @param  iterable<array{product: mixed, quantity: int}|object>  $items  each with ->product / ['product'] and quantity
-     * @return array{kg: float, tanks: int}
+     * @return array{kg: float, tanks: int, by_size: array<string, int>}  by_size: tanks per gas size (J6), e.g. ['11' => 3, '50' => 1]
      */
     public static function orderLoad(iterable $items): array
     {
         $kg = 0.0;
         $tanks = 0;
+        $bySize = [];
         foreach ($items as $item) {
             $product = is_array($item) ? ($item['product'] ?? null) : $item->product;
             $qty     = (int) (is_array($item) ? ($item['quantity'] ?? 0) : $item->quantity);
@@ -76,10 +93,82 @@ class DeliveryFeeService
             $kg += static::itemKg($product) * $qty;
             if ($w > 0) {
                 $tanks += $qty;
+                $key = static::sizeKey($w);
+                $bySize[$key] = ($bySize[$key] ?? 0) + $qty;
+            }
+        }
+        ksort($bySize, SORT_NUMERIC);
+
+        return ['kg' => round($kg, 2), 'tanks' => $tanks, 'by_size' => $bySize];
+    }
+
+    /**
+     * THE one check for "does this load fit this vehicle" (J6): total kg, total tanks AND the vehicle's per-size limits
+     * (vehicles.tank_limits, e.g. {"11": 4, "50": 1}; a missing size / null = no per-size limit for it).
+     * $onBoard: what the vehicle already carries on this trip (the rider's active deliveries) — added to $load first.
+     * Returns null when it fits, else a human reason. Mirrors fits() in lib/delivery-fee.ts.
+     *
+     * @param  array{kg: float, tanks: int, by_size?: array<string, int>}  $load
+     * @param  array{kg: float, tanks: int, by_size?: array<string, int>}|null  $onBoard
+     */
+    public static function fits(Vehicle $v, array $load, ?array $onBoard = null): ?string
+    {
+        return static::fitsCapacity(static::capacity($v), $load, $onBoard);
+    }
+
+    /** fits() on a plain capacity array {kg, tanks, tank_limits, label} — the DSS (pure functions) and tests use it. */
+    public static function fitsCapacity(array $cap, array $load, ?array $onBoard = null): ?string
+    {
+        $kg = (float) ($load['kg'] ?? 0) + (float) ($onBoard['kg'] ?? 0);
+        $tanks = (int) ($load['tanks'] ?? 0) + (int) ($onBoard['tanks'] ?? 0);
+        $bySize = $load['by_size'] ?? [];
+        foreach (($onBoard['by_size'] ?? []) as $size => $qty) {
+            $bySize[$size] = ($bySize[$size] ?? 0) + (int) $qty;
+        }
+        $name = $cap['label'] ?? 'This vehicle';
+        $num = fn (float $x) => rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.');
+
+        if ($kg > (float) $cap['kg'] + 0.001) {
+            return "{$name} carries up to {$num((float) $cap['kg'])} kg — this needs {$num($kg)} kg.";
+        }
+        if ($tanks > (int) $cap['tanks']) {
+            return "{$name} carries up to {$cap['tanks']} tanks — this needs {$tanks}.";
+        }
+        foreach ((array) ($cap['tank_limits'] ?? []) as $size => $max) {
+            if ($max === null || $max === '') {
+                continue;
+            }
+            $need = (int) ($bySize[(string) $size] ?? 0);
+            if ($need > (int) $max) {
+                return "{$name} carries up to {$max} × {$size} kg tanks per trip — this needs {$need}.";
             }
         }
 
-        return ['kg' => round($kg, 2), 'tanks' => $tanks];
+        return null;
+    }
+
+    /** "11kg ×4 · 22kg ×2 · 50kg ×1" for a vehicle's per-size limits (null when none). */
+    public static function tankLimitsLabel(?array $limits): ?string
+    {
+        $parts = collect($limits ?? [])->filter(fn ($m) => $m !== null && $m !== '')
+            ->sortKeys(SORT_NUMERIC)->map(fn ($m, $size) => "{$size}kg ×{$m}")->values();
+
+        return $parts->isEmpty() ? null : $parts->implode(' · ');
+    }
+
+    /** Normalises a submitted per-size limit map: string keys like "11", int values, empty entries dropped (null when none). */
+    public static function normaliseTankLimits(?array $limits): ?array
+    {
+        $out = [];
+        foreach ($limits ?? [] as $size => $max) {
+            $key = static::sizeKey((float) $size);
+            if ($key !== null && $max !== null && $max !== '') {
+                $out[$key] = (int) $max;
+            }
+        }
+        ksort($out, SORT_NUMERIC);
+
+        return $out ?: null;
     }
 
     /**
@@ -101,7 +190,27 @@ class DeliveryFeeService
         $v = static::usableVehicles($store)->filter(fn (Vehicle $v) => $rates->has($v->vehicle_type))
             ->sortByDesc(fn (Vehicle $v) => [(float) $v->max_capacity_kg, (int) $v->max_tanks])->first();
 
-        return $v ? ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks] : null;
+        return $v ? ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks, 'tank_limits' => $v->tank_limits ?: null] : null;
+    }
+
+    /**
+     * Every delivery-ready vehicle's capacity (kg, tanks, per-size limits) — the cart's alert runs fits() over them in TS (J6).
+     *
+     * @return array<int, array{kg: float, tanks: int, tank_limits: ?array, label: string}>
+     */
+    public static function capacities(Store $store): array
+    {
+        $rates = static::rates($store);
+
+        return static::usableVehicles($store)->filter(fn (Vehicle $v) => $rates->has($v->vehicle_type))
+            ->map(fn (Vehicle $v) => static::capacity($v))->values()->all();
+    }
+
+    /** One vehicle's capacity for the pages (same fields fits() reads). */
+    public static function capacity(Vehicle $v): array
+    {
+        return ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks, 'tank_limits' => $v->tank_limits ?: null,
+            'label' => static::label($v->vehicle_type) . ($v->plate_number ? ' ' . $v->plate_number : '')];
     }
 
     /** All the store's vehicles (not deleted, not retired) — uses the eager-loaded relation when present. */
@@ -138,14 +247,15 @@ class DeliveryFeeService
      *
      * @return array{vehicle_type: string, label: string, fee: float, base_fee: float, fee_per_km: float}|null
      */
-    public static function quote(Store $store, ?float $distKm, float $kg, int $tanks): ?array
+    public static function quote(Store $store, ?float $distKm, float $kg, int $tanks, ?array $bySize = null): ?array
     {
+        $load = ['kg' => $kg, 'tanks' => $tanks, 'by_size' => $bySize ?? []];
         $rates = static::rates($store);
         $order = array_flip(array_keys(static::types()));
         $best = null;
         foreach (static::usableVehicles($store) as $v) {
             $rate = $rates->get($v->vehicle_type);
-            if (! $rate || (float) $v->max_capacity_kg < $kg || (int) $v->max_tanks < $tanks) {
+            if (! $rate || static::fits($v, $load) !== null) {
                 continue;
             }
             $fee = static::feeFor((float) $rate->base_fee, (float) $rate->fee_per_km, $distKm);
@@ -171,7 +281,7 @@ class DeliveryFeeService
      * Why quote() found nothing, as a code: no_vehicle | vehicles_unavailable | no_delivery_fee | too_heavy
      * (same branches as whyNoVehicle; Store::deliveryReadyVehicles is the "usable + priced" rule as a query).
      */
-    public static function whyNoVehicleCode(Store $store, float $kg, int $tanks): string
+    public static function whyNoVehicleCode(Store $store, float $kg, int $tanks, ?array $bySize = null): string
     {
         if (static::vehicles($store)->isEmpty()) {
             return 'no_vehicle';
@@ -189,7 +299,7 @@ class DeliveryFeeService
     }
 
     /** Why quote() found nothing — for checkout messages. */
-    public static function whyNoVehicle(Store $store, float $kg, int $tanks): string
+    public static function whyNoVehicle(Store $store, float $kg, int $tanks, ?array $bySize = null): string
     {
         if (static::vehicles($store)->isEmpty()) {
             return 'This store has no delivery vehicle yet.';
@@ -204,6 +314,15 @@ class DeliveryFeeService
             return "This store hasn't set delivery fees yet.";
         }
         $largest = $priced->sortByDesc(fn (Vehicle $v) => [(float) $v->max_capacity_kg, (int) $v->max_tanks])->first();
+        // Within kg / tanks of a vehicle but over one of its per-size limits (J6): say which size
+        if ($bySize) {
+            foreach ($priced as $v) {
+                $why = static::fits($v, ['kg' => $kg, 'tanks' => $tanks, 'by_size' => $bySize]);
+                if ($why !== null && str_contains($why, ' kg tanks per trip')) {
+                    return 'Too many tanks of one size for this store\'s vehicles: ' . $why;
+                }
+            }
+        }
 
         return 'Too heavy for this store\'s vehicles (max ' . rtrim(rtrim(number_format((float) $largest->max_capacity_kg, 2, '.', ''), '0'), '.')
             . " kg / {$largest->max_tanks} tanks per trip).";
@@ -228,7 +347,7 @@ class DeliveryFeeService
                 'label'        => static::label($type),
                 'base_fee'     => (float) $rate->base_fee,
                 'fee_per_km'   => (float) $rate->fee_per_km,
-                'capacities'   => $vehicles->map(fn (Vehicle $v) => ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks])->values()->all(),
+                'capacities'   => $vehicles->map(fn (Vehicle $v) => ['kg' => (float) $v->max_capacity_kg, 'tanks' => (int) $v->max_tanks, 'tank_limits' => $v->tank_limits ?: null])->values()->all(),
             ];
         }
         $order = array_flip(array_keys(static::types()));

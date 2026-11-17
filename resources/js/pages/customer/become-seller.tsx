@@ -374,11 +374,12 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                             <input
                                                 type="text"
                                                 value={data.store_phone}
-                                                onChange={e => setData('store_phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                                onChange={e => setData('store_phone', e.target.value.replace(/[^\d+()\- ]/g, '').slice(0, 20))}
                                                 className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                                                placeholder="09xxxxxxxxx"
-                                                maxLength={11}
+                                                placeholder="09XXXXXXXXX or (046) 483-5678"
+                                                maxLength={20}
                                             />
+                                            <p className="mt-1 text-[11px] text-gray-500">09XXXXXXXXX or landline (046) 483-5678</p>
                                             {(errors.store_phone || step1Errors.store_phone) && <p className="mt-1 text-xs text-red-600">{errors.store_phone || step1Errors.store_phone}</p>}
                                         </div>
                                     </CardContent>

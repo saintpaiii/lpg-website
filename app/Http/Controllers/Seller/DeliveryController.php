@@ -75,7 +75,7 @@ class DeliveryController extends Controller
                 'proofs' => $d->proofs->map(fn ($p) => [
                     'id'            => $p->id,
                     'status'        => $p->status,
-                    'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,
+                    'photo_url'     => $p->photo_url,
                     'notes'         => $p->notes,
                     'location_note' => $p->location_note,
                     'created_at'    => $p->created_at->format('M d, Y g:i A'),
@@ -87,7 +87,7 @@ class DeliveryController extends Controller
             ->where('sub_role', 'rider')
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'name', 'phone', 'role', 'sub_role']);
+            ->get(['id', 'name', 'first_name', 'phone', 'role', 'sub_role']);
         // Driver's license check for every rider in one query (pickers show riders who can't deliver yet as disabled)
         $license = \App\Services\StaffDocumentService::forRiders($riderRows);
         // Shift vehicle + current load per rider (2 queries) — the picker shows free capacity and "Best fit"
@@ -122,7 +122,10 @@ class DeliveryController extends Controller
             ->with(['customer', 'delivery', 'items.product'])
             ->latest()
             ->take(50)
-            ->get()
+            ->get();
+        // J6 Vehicle DSS: recommended rider + wait hint + split suggestion per waiting order (one rider/vehicle context)
+        $dss = \App\Services\VehicleDssService::forOrders($store, $unassigned, $riderRows, $loads, $license);
+        $unassigned = $unassigned
             ->map(fn ($o) => [
                 'id'           => $o->id,
                 'order_number' => $o->order_number,
@@ -130,6 +133,7 @@ class DeliveryController extends Controller
                 'status'       => $o->status,
                 'redelivery'   => $o->delivery?->failInfo(),
                 'load'         => \App\Services\DeliveryFeeService::orderLoad($o->items),
+                'dss'          => $dss[$o->id] ?? null,
             ])
             ->values();
 
@@ -150,7 +154,17 @@ class DeliveryController extends Controller
             'date_from'  => $request->get('date_from') ?: '',
             'date_to'    => $request->get('date_to')   ?: '',
             'fail_options' => Delivery::failOptions(),
+            // J6: rider status board + live map (store pin + riders + their stops)
+            'board'        => \App\Services\RiderStatusService::board($store),
+            'store_pin'    => $store->latitude && $store->longitude ? ['lat' => (float) $store->latitude, 'lng' => (float) $store->longitude, 'name' => $store->store_name] : null,
+            'realtime'     => \App\Support\Realtime::enabled(),
         ]);
+    }
+
+    /** GET seller/deliveries/riders-live — the board rows as JSON (the map polls it every 30 s when realtime is off). */
+    public function ridersLive(Request $request): \Illuminate\Http\JsonResponse
+    {
+        return response()->json(['riders' => \App\Services\RiderStatusService::board($request->attributes->get('seller_store')), 'at' => now()->toIso8601String()]);
     }
 
     public function assign(Request $request): RedirectResponse
@@ -167,6 +181,11 @@ class DeliveryController extends Controller
             ->with('items.product')->firstOrFail();
         if ($order->isPickup()) {
             return back()->with('error', "Pick-up orders don't need a rider.");
+        }
+        // J6 (E4): paid, COD, or the down payment / first half in
+        if (! $order->paidEnoughToDispatch()) {
+            return back()->with('error', $order->payment_mode === 'half' ? 'Waiting for the first half payment — a rider can be assigned once it is paid.'
+                : "Order {$order->order_number} is awaiting payment and can't be dispatched yet.");
         }
         $rider = User::where('id', $data['rider_id'])->where('store_id', $store->id)->where('sub_role', 'rider')->firstOrFail();
         // Riders need an approved, unexpired driver's license

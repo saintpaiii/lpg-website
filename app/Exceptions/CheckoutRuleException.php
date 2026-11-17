@@ -10,4 +10,13 @@ use RuntimeException;
  */
 class CheckoutRuleException extends RuntimeException
 {
+    /** J6: the order no vehicle could carry — saved as a vehicle_capacity_miss AFTER the checkout transaction rolled back. */
+    public ?array $capacityMiss = null;
+
+    public function withCapacityMiss(int $storeId, array $load, string $reason): static
+    {
+        $this->capacityMiss = ['store_id' => $storeId, 'kg' => $load['kg'], 'tanks' => $load['tanks'], 'by_size' => $load['by_size'] ?? [], 'reason' => $reason];
+
+        return $this;
+    }
 }

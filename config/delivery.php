@@ -52,4 +52,23 @@ return [
     */
     'full_tank_kg' => ['2.7' => 7, '5' => 12, '7' => 15, '11' => 25, '22' => 45, '50' => 90],
 
+    /*
+    | Vehicle DSS (J6) — seller DSS page "Fleet" card thresholds (last `days` days).
+    |  misses_min        orders no vehicle could carry (refused / switched to pick-up) before suggesting a bigger vehicle
+    |  wait_hours        an order "waited for a vehicle" when assigned this many hours after it was confirmed
+    |  wait_days_min     days with at least one such wait before suggesting one more vehicle
+    |  stops_per_vehicle active stops one vehicle handles at once; peak active deliveries above vehicles × this → busy
+    |  underused_pct     a vehicle using less than this % of its capacity per trip is "underused"
+    |  miss_percentile   the order size (kg) the suggestion must cover ("most needed ≤ X kg")
+    */
+    'dss' => [
+        'days'              => 30,
+        'misses_min'        => 5,
+        'wait_hours'        => 2,
+        'wait_days_min'     => 5,
+        'stops_per_vehicle' => 3,
+        'underused_pct'     => 30,
+        'miss_percentile'   => 80,
+    ],
+
 ];

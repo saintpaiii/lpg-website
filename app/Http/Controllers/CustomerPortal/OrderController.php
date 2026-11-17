@@ -217,11 +217,19 @@ class OrderController extends Controller
         };
 
         $riderArea = null;
+        $exact = false;
         if ($delivery && in_array($status, ['on_the_way', 'preparing_pickup'])) {
             $loc = \App\Models\RiderCurrentLocation::where('user_id', $delivery->rider_id)->first();
             // Ignore stale positions (rider stopped sharing more than 30 minutes ago)
             if ($loc && $loc->updated_at && $loc->updated_at->gt(now()->subMinutes(30))) {
-                $riderArea = ['lat' => round($loc->latitude, 2), 'lng' => round($loc->longitude, 2), 'updated_at' => $loc->updated_at->toIso8601String()];
+                // J6: EXACT only while this order is the rider's next stop and on the way; else ≈1 km (other customers' privacy)
+                $exact = \App\Services\RiderStatusService::exactForCustomer($delivery);
+                $riderArea = [
+                    'lat' => $exact ? (float) $loc->latitude : round($loc->latitude, 2),
+                    'lng' => $exact ? (float) $loc->longitude : round($loc->longitude, 2),
+                    'exact' => $exact,
+                    'updated_at' => $loc->updated_at->toIso8601String(),
+                ];
             }
         }
 
@@ -363,6 +371,8 @@ class OrderController extends Controller
                 'payment_method'      => $order->payment_method,
                 'payment_status'      => $order->payment_status,
                 'payment_mode'        => $order->payment_mode ?? 'full',
+                // J6: a balance checkout is already open → "Resume payment" reuses it (no second page, no paying twice)
+                'balance_session_pending' => \App\Http\Controllers\CustomerPortal\PaymentController::hasPendingBalanceSession($order),
                 'down_payment_amount' => $order->down_payment_amount ? (float) $order->down_payment_amount : null,
                 'remaining_balance'   => $order->remaining_balance ? (float) $order->remaining_balance : null,
                 'balance_due_date'    => $order->balance_due_date?->format('M d, Y'),
@@ -424,7 +434,7 @@ class OrderController extends Controller
                     'fail_info'   => $order->delivery->failInfo(),
                     'proofs'      => $order->delivery->proofs->map(fn ($p) => [
                         'status'        => $p->status,
-                        'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,
+                        'photo_url'     => $p->photo_url,
                         'notes'         => $p->notes,
                         'location_note' => $p->location_note,
                         'created_at'    => $p->created_at->format('M d, Y g:i A'),

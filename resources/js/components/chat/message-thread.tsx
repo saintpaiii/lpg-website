@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
-import { ArrowDown, ArrowLeft, Bike, ImagePlus, Info, Loader2, Navigation, Phone, RotateCcw, Send, Sparkles, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Bike, Camera, ImagePlus, Info, Loader2, MapPin, Navigation, Phone, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -12,6 +12,7 @@ import { Avatar } from './conversation-list';
 import { dayKey, dayLabel, timeOf } from './format';
 import type { ChatMessage, ChatPortal, ConversationHeader } from './types';
 import PickupLocationCard from './pickup-location-card';
+import { compressImage, LocationBubble, LocationPicker } from './location-share';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const NEAR_BOTTOM_PX = 120;
@@ -78,6 +79,9 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
 
     const scrollRef   = useRef<HTMLDivElement>(null);
     const fileRef     = useRef<HTMLInputElement>(null);
+    // J6: "Take photo" (camera) + "📍 Location"
+    const cameraRef   = useRef<HTMLInputElement>(null);
+    const [locating, setLocating] = useState(false);
     const textRef     = useRef<HTMLTextAreaElement>(null);
     const lastIdRef   = useRef(0);
     const stickRef    = useRef(true);
@@ -103,7 +107,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
             let next = prev;
             for (const m of fresh) {
                 if (m.sender_id === me) {
-                    const temp = next.find((t) => t.status === 'sending' && (t.body ?? '') === (m.body ?? '') && !!t.attachment_url === !!m.attachment_url);
+                    const temp = next.find((t) => t.status === 'sending' && (t.body ?? '') === (m.body ?? '') && !!t.attachment_url === !!m.attachment_url && !!t.location === !!m.location);
                     if (temp) next = next.filter((t) => t !== temp);
                 }
             }
@@ -217,10 +221,12 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
         }
     }
 
-    function pickImage(file: File | undefined) {
+    async function pickImage(picked: File | undefined) {
         setImageError(null);
-        if (!file) return;
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { setImageError('Please choose a JPG, PNG or WEBP photo.'); return; }
+        if (!picked) return;
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(picked.type)) { setImageError('Please choose a JPG, PNG or WEBP photo.'); return; }
+        // Downscale to ≤ 1600 px first (camera photos are often 4000 px / 4+ MB)
+        const file = await compressImage(picked, 1600);
         if (file.size > MAX_IMAGE_BYTES) { setImageError('Photo is too large (max 5 MB).'); return; }
         setImage(file);
         setImagePreview(URL.createObjectURL(file));
@@ -230,12 +236,18 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
         if (imagePreview) URL.revokeObjectURL(imagePreview);
         setImage(null); setImagePreview(null); setImageError(null);
         if (fileRef.current) fileRef.current.value = '';
+        if (cameraRef.current) cameraRef.current.value = '';
     }
 
-    async function deliver(tempId: number, body: string, file: File | null) {
+    async function deliver(tempId: number, body: string, file: File | null, location: { lat: number; lng: number; label: string | null } | null = null) {
         const form = new FormData();
         if (body) form.append('body', body);
         if (file) form.append('image', file);
+        if (location) {
+            form.append('latitude', String(location.lat));
+            form.append('longitude', String(location.lng));
+            if (location.label) form.append('location_label', location.label);
+        }
         try {
             const res = await axios.post<{ message: ChatMessage }>(base, form);
             const real = res.data.message;
@@ -245,7 +257,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
             });
             lastIdRef.current = Math.max(lastIdRef.current, real.id);
         } catch (err) {
-            setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed', retry: { body, image: file } } : m)));
+            setMessages((prev) => prev.map((m) => (m.id === tempId ? { ...m, status: 'failed', retry: { body, image: file, location } } : m)));
             if (axios.isAxiosError(err) && err.response?.status === 422) {
                 pull().catch(() => {});   // the chat may have closed meanwhile — refresh the header
             }
@@ -272,7 +284,20 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
     function retry(m: ChatMessage) {
         if (!m.retry) return;
         setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, status: 'sending' } : x)));
-        deliver(m.id, m.retry.body, m.retry.image);
+        deliver(m.id, m.retry.body, m.retry.image, m.retry.location ?? null);
+    }
+
+    /** J6: send a location (no text needed) */
+    function sendLocation(loc: { lat: number; lng: number; label: string | null }) {
+        setLocating(false);
+        if (!header?.can_send) return;
+        const tempId = tempSeq--;
+        setMessages((prev) => [...prev, {
+            id: tempId, side: viewerSide, sender_id: me, is_automatic: false, sender_name: null, body: null, attachment_url: null,
+            location: { ...loc, google_url: `https://www.google.com/maps?q=${loc.lat},${loc.lng}` }, order: null, created_at: new Date().toISOString(), status: 'sending',
+        }]);
+        stickRef.current = true;
+        deliver(tempId, '', null, loc);
     }
 
     const insertText = (t: string) => {
@@ -412,6 +437,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                                                         <img src={m.attachment_url} alt="Photo" className="max-h-60 w-auto max-w-[240px] rounded-lg object-cover" />
                                                     </button>
                                                 )}
+                                                {m.location && <LocationBubble location={m.location} rider={portal === 'rider'} />}
                                                 {m.body && <p className="whitespace-pre-wrap break-words"><Linkified text={m.body} /></p>}
                                                 {m.pickup_card && m.order && <PickupLocationCard card={m.pickup_card} orderId={m.order.id} portal={portal} />}
                                                 {orderChip}
@@ -440,6 +466,8 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                 )}
             </div>
 
+            <LocationPicker open={locating} onClose={() => setLocating(false)} onSend={sendLocation} storeLocation={portal === 'seller' ? header.store_location : null} />
+
             {/* Composer */}
             {header.can_send ? (
                 <div className="border-t p-2">
@@ -453,8 +481,16 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                     {imageError && <p className="mb-1 text-xs text-red-600">{imageError}</p>}
                     <div className="flex items-end gap-1.5">
                         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pickImage(e.target.files?.[0])} />
-                        <Button type="button" variant="ghost" size="icon" onClick={() => fileRef.current?.click()} aria-label="Add photo" title="Photo">
+                        <Button type="button" variant="ghost" size="icon" onClick={() => fileRef.current?.click()} aria-label="Choose photo" title="Choose photo">
                             <ImagePlus className="h-5 w-5" />
+                        </Button>
+                        {/* J6: Take photo — opens the back camera on phones */}
+                        <input ref={cameraRef} type="file" accept="image/jpeg,image/png,image/webp" capture="environment" className="hidden" onChange={(e) => pickImage(e.target.files?.[0])} />
+                        <Button type="button" variant="ghost" size="icon" className="sm:hidden" onClick={() => cameraRef.current?.click()} aria-label="Take photo" title="Take photo">
+                            <Camera className="h-5 w-5" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => setLocating(true)} aria-label="Share location" title="📍 Location">
+                            <MapPin className="h-5 w-5" />
                         </Button>
                         {composerTools?.(insertText)}
                         <textarea

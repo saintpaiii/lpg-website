@@ -101,6 +101,12 @@ class PaymentController extends Controller
             return response()->json(['error' => 'No remaining balance.'], 422);
         }
 
+        // J6: a balance checkout opened earlier and not paid yet → reuse it while PayMongo still has it open (opening a
+        // second page is how customers ended up paying twice)
+        if ($open = self::openBalanceSession($order, $remaining)) {
+            return response()->json(['checkout_url' => $open, 'reused' => true]);
+        }
+
         try {
             $paymongo = app(PayMongoService::class);
             $user     = $request->user();
@@ -134,5 +140,33 @@ class PaymentController extends Controller
             Log::warning('Pay balance error: ' . $e->getMessage(), ['user_id' => auth()->id(), 'order_id' => $order->id]);
             return response()->json(['error' => PaymentServiceUnavailable::friendlyMessage($e) ?? 'Could not start balance payment. Please try again later.'], 422);
         }
+    }
+    /**
+     * The checkout URL of a still-open, unpaid PayMongo session for this order's remaining balance (null = none / expired /
+     * PayMongo unreachable → the caller opens a new one). Only sessions from the last 24 h for the same amount count.
+     */
+    public static function openBalanceSession(Order $order, float $remaining): ?string
+    {
+        $pending = Payment::where('order_id', $order->id)->where('status', 'pending')
+            ->where('created_at', '>=', now()->subDay())->latest('id')->first();
+        if (! $pending || abs((float) $pending->amount - $remaining) > 0.004) {
+            return null;
+        }
+        try {
+            $session = app(PayMongoService::class)->retrieveCheckoutSession($pending->paymongo_checkout_id);
+            $attrs = $session['attributes'] ?? [];
+
+            return ($attrs['status'] ?? null) === 'active' && ! empty($attrs['checkout_url']) ? $attrs['checkout_url'] : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Has this order an unpaid balance checkout from the last 24 h? (the order page shows "Resume payment") */
+    public static function hasPendingBalanceSession(Order $order): bool
+    {
+        return $order->payment_status === 'partial'
+            && Payment::where('order_id', $order->id)->where('status', 'pending')->where('created_at', '>=', now()->subDay())
+                ->where('amount', round((float) $order->remaining_balance, 2))->exists();
     }
 }

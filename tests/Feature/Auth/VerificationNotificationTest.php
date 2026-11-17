@@ -13,7 +13,8 @@ test('sends verification notification', function () {
         ->post(route('verification.send'))
         ->assertRedirect(route('home'));
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    // Email is verified with a one-time code (OTP page) — the old VerifyEmail link is never sent
+    Notification::assertNotSentTo($user, VerifyEmail::class);
 });
 
 test('does not send verification notification if email is verified', function () {
@@ -23,7 +24,7 @@ test('does not send verification notification if email is verified', function ()
 
     $this->actingAs($user)
         ->post(route('verification.send'))
-        ->assertRedirect(route('dashboard', absolute: false));
+        ->assertRedirect(config('fortify.home'));
 
     Notification::assertNothingSent();
 });

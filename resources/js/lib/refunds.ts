@@ -52,6 +52,7 @@ export const REASON_LABELS: Record<string, string> = {
     quality_issue:   'Quality Issue',
     other:           'Other',
     order_cancelled: 'Order Cancelled',
+    overpayment:     'Paid twice / overpaid',
 };
 
 export const RESOLUTION_LABELS: Record<RefundResolution, string> = {

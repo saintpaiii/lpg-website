@@ -1,19 +1,26 @@
+import { fits } from '@/lib/delivery-fee';
 import { riderDisabled, riderLicenseSuffix, type RiderLicenseFields } from '@/lib/rider-license';
 
 /** What the server adds to every rider in the pickers (RiderLoadService::forRiders) */
 export type RiderLoadFields = RiderLicenseFields & {
     clocked_in?: boolean;
     vehicle?: { id: number; type: string; label: string; plate: string } | null;
-    load?: { kg: number; tanks: number; max_kg: number; max_tanks: number; free_kg: number; free_tanks: number };
+    load?: { kg: number; tanks: number; max_kg: number; max_tanks: number; free_kg: number; free_tanks: number;
+        /** J6: tanks on board per gas size + the vehicle's per-size limits */
+        by_size?: Record<string, number>; tank_limits?: Record<string, number> | null };
 };
 
-export type Load = { kg: number; tanks: number };
+export type Load = { kg: number; tanks: number; by_size?: Record<string, number> };
 
 const kg = (n: number) => String(Math.round(n * 100) / 100);
 const icon = (type?: string) => (type === 'motorcycle' || type === 'tricycle' ? '🏍' : type?.includes('truck') ? '🚚' : '🚐');
 
 export const sumLoads = (loads: (Load | null | undefined)[]): Load =>
-    loads.reduce<Load>((s, l) => ({ kg: Math.round((s.kg + (l?.kg ?? 0)) * 100) / 100, tanks: s.tanks + (l?.tanks ?? 0) }), { kg: 0, tanks: 0 });
+    loads.reduce<Load>((s, l) => {
+        const by_size = { ...(s.by_size ?? {}) };
+        for (const [k, q] of Object.entries(l?.by_size ?? {})) by_size[k] = (by_size[k] ?? 0) + q;
+        return { kg: Math.round((s.kg + (l?.kg ?? 0)) * 100) / 100, tanks: s.tanks + (l?.tanks ?? 0), by_size };
+    }, { kg: 0, tanks: 0, by_size: {} });
 
 /** Can this rider's vehicle take the load on top of what it carries? (same rule as RiderLoadService::canTake) */
 export function riderFit(r: RiderLoadFields, need: Load | null): { ok: boolean; reason: string | null } {
@@ -22,6 +29,13 @@ export function riderFit(r: RiderLoadFields, need: Load | null): { ok: boolean; 
     if (!need) return { ok: true, reason: null };
     if (need.kg > r.load.free_kg + 0.001 || need.tanks > r.load.free_tanks) {
         return { ok: false, reason: `needs ${kg(need.kg)} kg / ${need.tanks} tank(s)` };
+    }
+    // J6: per-size limits, counting the tanks already on board (DeliveryFeeService::fits)
+    if (r.load.tank_limits) {
+        const by_size: Record<string, number> = { ...(r.load.by_size ?? {}) };
+        for (const [k, q] of Object.entries(need.by_size ?? {})) by_size[k] = (by_size[k] ?? 0) + q;
+        const why = fits({ kg: r.load.max_kg, tanks: r.load.max_tanks, tank_limits: r.load.tank_limits, label: 'vehicle' }, { kg: 0, tanks: 0, by_size });
+        if (why) return { ok: false, reason: why.replace(/^vehicle carries up to (\d+) × ([\d.]+) kg tanks per trip — this needs (\d+)\.$/, 'max $1 × $2kg per trip') };
     }
     return { ok: true, reason: null };
 }

@@ -40,6 +40,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { suggestedTankLimits } from '@/lib/delivery-fee';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -54,6 +55,9 @@ type Vehicle = {
     plate_number: string;
     max_capacity_kg: number;
     max_tanks: number;
+    /** J6: max tanks per gas size per trip, e.g. { "11": 4, "50": 1 } */
+    tank_limits?: Record<string, number> | null;
+    tank_limits_label?: string | null;
     description: string | null;
     status: VehicleStatus;
     paused_by_plan: boolean;
@@ -71,6 +75,8 @@ type Props = {
     planLimit?: PlanLimit;
     rates?: RateRow[];
     vehicle_limits: VehicleLimits;
+    /** J6: gas sizes the store sells */
+    store_sizes?: StoreSize[];
     /** Has a usable vehicle with a delivery fee */
     can_deliver?: boolean;
 };
@@ -94,6 +100,7 @@ const VEHICLE_TYPES: { value: VehicleType; label: string }[] = [
 
 /** Legal maximum per vehicle type (full tanks) — from config('delivery.vehicle_types') */
 type VehicleLimits = Record<string, { label: string; kg: number; tanks: number }>;
+type StoreSize = { key: string; label: string; full_kg: number };
 
 const STATUS_STYLES: Record<VehicleStatus, string> = {
     available:   'bg-emerald-100 text-emerald-700',
@@ -117,6 +124,8 @@ function blankForm() {
         plate_number:      '',
         max_capacity_kg:   '',
         max_tanks:         '',
+        /** size key → max tanks ("" = no per-size limit) */
+        tank_limits:       {} as Record<string, string>,
         description:       '',
         status:            'available' as VehicleStatus,
         assigned_rider_id: '',
@@ -125,7 +134,7 @@ function blankForm() {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], can_deliver = true, vehicle_limits }: Props) {
+export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], can_deliver = true, vehicle_limits, store_sizes = [] }: Props) {
     // ?filter=paused (from My Plan) shows only the vehicles paused by the plan limit
     const { url } = usePage();
     const [onlyPaused, setOnlyPaused] = useState(url.includes('filter=paused'));
@@ -153,6 +162,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
             plate_number:      v.plate_number,
             max_capacity_kg:   String(v.max_capacity_kg),
             max_tanks:         String(v.max_tanks),
+            tank_limits:       Object.fromEntries(Object.entries(v.tank_limits ?? {}).map(([k, m]) => [k, String(m)])),
             description:       v.description ?? '',
             status:            v.status,
             assigned_rider_id: v.assigned_rider ? String(v.assigned_rider.id) : '',
@@ -182,6 +192,8 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
             plate_number:      form.plate_number.toUpperCase().trim(),
             max_capacity_kg:   form.max_capacity_kg,
             max_tanks:         form.max_tanks,
+            // Sent as a list: a key like "2.7" would be read as a nested path by Laravel's validation
+            tank_limits:       Object.entries(form.tank_limits).filter(([, m]) => m !== '').map(([size, max]) => ({ size, max })),
             description:       form.description || null,
             status:            form.status,
             assigned_rider_id: form.assigned_rider_id || null,
@@ -292,6 +304,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                                 <td className="px-4 py-3 font-mono text-sm font-semibold">{v.plate_number}</td>
                                                 <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground">
                                                     <span>{v.max_tanks} tanks · {v.max_capacity_kg} kg max</span>
+                                                    {v.tank_limits_label && <span className="block text-[11px]" data-testid="tank-limits-label">{v.tank_limits_label}</span>}
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell text-sm">
                                                     {v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
@@ -380,12 +393,12 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
 
             {/* Add / Edit Dialog */}
             <Dialog open={showForm} onOpenChange={(o) => { if (!o) setShowForm(false); }}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
+                <DialogContent className="flex max-h-[90dvh] max-w-md flex-col gap-0 p-0">
+                    <DialogHeader className="border-b px-6 pt-6 pb-3">
                         <DialogTitle>{editTarget ? 'Edit Vehicle' : 'Add Vehicle'}</DialogTitle>
                     </DialogHeader>
 
-                    <div className="space-y-4 py-2">
+                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4" data-testid="vehicle-form-body">
                         {/* Vehicle Type */}
                         <div className="grid gap-1.5">
                             <Label>Vehicle Type <span className="text-red-500">*</span></Label>
@@ -452,6 +465,13 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                             </p>
                         )}
 
+                        {/* J6: Max tanks per size (optional) */}
+                        {store_sizes.length > 0 && (
+                            <TankLimitsSection sizes={store_sizes} maxKg={Number(form.max_capacity_kg) || 0} maxTanks={Number(form.max_tanks) || 0}
+                                value={form.tank_limits} errors={errors}
+                                onChange={(tank_limits) => setForm((f) => ({ ...f, tank_limits }))} />
+                        )}
+
                         {/* Description */}
                         <div className="grid gap-1.5">
                             <Label>Description</Label>
@@ -500,7 +520,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                         )}
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="sticky bottom-0 border-t bg-background px-6 py-3">
                         <Button variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
                         <Button
                             className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -537,5 +557,55 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                 </AlertDialogContent>
             </AlertDialog>
         </AppLayout>
+    );
+}
+
+/**
+ * J6 — "Max tanks per size (optional)": one box per gas size the store sells; empty = only the vehicle's total kg / tanks
+ * apply. "Fill suggested" = floor(max kg / full-tank kg) per size, capped by max tanks. Same checks as the server.
+ */
+function TankLimitsSection({ sizes, maxKg, maxTanks, value, errors, onChange }: {
+    sizes: StoreSize[];
+    maxKg: number;
+    maxTanks: number;
+    value: Record<string, string>;
+    errors: Record<string, string>;
+    onChange: (v: Record<string, string>) => void;
+}) {
+    const suggested = suggestedTankLimits(maxKg, maxTanks, sizes.map((s) => s.key));
+    // Server error keys are tank_limits.{row}.max, in the order the filled rows were sent
+    const sentOrder = Object.entries(value).filter(([, m]) => m !== '').map(([k]) => k);
+    return (
+        <div className="space-y-2 rounded-lg border p-3" data-testid="tank-limits">
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Max tanks per size <span className="font-normal text-muted-foreground">(optional)</span></p>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs" disabled={!maxKg || !maxTanks}
+                    onClick={() => onChange(Object.fromEntries(Object.entries(suggested).map(([k, m]) => [k, String(m)])))}>
+                    Fill suggested
+                </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Leave empty for no per-size limit — then only the total kg and tank count apply.</p>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {sizes.map((s) => {
+                    const v = value[s.key] ?? '';
+                    const count = v === '' ? null : Number(v);
+                    const kg = count === null ? null : Math.round(count * s.full_kg * 10) / 10;
+                    const over = kg !== null && maxKg > 0 && kg > maxKg;
+                    const err = errors[`tank_limits.${sentOrder.indexOf(s.key)}.max`];
+                    return (
+                        <div key={s.key} className="grid gap-1">
+                            <Label htmlFor={`tl-${s.key}`} className="text-xs">{s.label}</Label>
+                            <Input id={`tl-${s.key}`} type="number" inputMode="numeric" min={0} max={maxTanks || undefined} step={1}
+                                placeholder={`max ${suggested[s.key] ?? '—'}`} value={v} aria-label={`Max ${s.label} tanks`}
+                                onChange={(e) => onChange({ ...value, [s.key]: e.target.value })} />
+                            <span className={`text-[11px] ${over ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                {kg === null ? `${s.full_kg} kg each` : `= ${kg} kg${over ? ` — over ${maxKg} kg` : ''}`}
+                            </span>
+                            {err && <span className="text-[11px] text-red-600">{err}</span>}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
     );
 }

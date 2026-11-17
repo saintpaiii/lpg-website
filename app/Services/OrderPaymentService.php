@@ -111,6 +111,29 @@ class OrderPaymentService
     public static function applyOnlinePayment(Order $order, ?string $method, ?string $reference = null, ?Payment $payment = null): string
     {
         self::lockOrder($order);
+        // J6: more money than the order still owes (paid twice / paid after the rider took the cash) → the extra goes back as
+        // an 'overpayment' refund request; receipts below only ever cover what was owed
+        $extra = 0.0;
+        if ($payment && $order->status !== 'cancelled' && ! in_array($order->payment_status, ['to_refund', 'refunded'], true)) {
+            $owed  = max(0.0, round($order->grandTotal() - PaymentReceiptService::paidSoFar($order), 2));
+            $extra = round((float) $payment->amount - $owed, 2);
+            if ($owed <= 0.004 && $extra > 0) {
+                RefundService::forOverpayment($order, $payment, $extra);
+
+                return (string) $order->payment_status;   // nothing was owed: statuses and receipts stay as they are
+            }
+        }
+        $status = static::applyOnlinePaymentOwed($order, $method, $reference, $payment);
+        if ($extra > 0.004) {
+            RefundService::forOverpayment($order->fresh(), $payment, $extra);
+        }
+
+        return $status;
+    }
+
+    /** applyOnlinePayment() for a payment that does not exceed what is owed (or a cancelled order). */
+    private static function applyOnlinePaymentOwed(Order $order, ?string $method, ?string $reference = null, ?Payment $payment = null): string
+    {
         $order->loadMissing('store');
         $before = PaymentReceiptService::paidSoFar($order);
 

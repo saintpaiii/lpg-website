@@ -38,6 +38,9 @@ class VehicleController extends Controller
                 'plate_number'      => $v->plate_number,
                 'max_capacity_kg'   => (float) $v->max_capacity_kg,
                 'max_tanks'         => $v->max_tanks,
+                // J6: max tanks per gas size per trip + its short label ("11kg ×4 · 50kg ×1")
+                'tank_limits'       => $v->tank_limits ?: null,
+                'tank_limits_label' => DeliveryFeeService::tankLimitsLabel($v->tank_limits),
                 'description'       => $v->description,
                 'status'            => $v->status,
                 'paused_by_plan'    => (bool) $v->paused_by_plan,
@@ -62,6 +65,8 @@ class VehicleController extends Controller
             // Delivery fee per vehicle type the store currently has (non-retired, not deleted)
             'rates'    => $this->rateRows($store),
             'vehicle_limits' => self::vehicleLimits(),
+            // J6: the gas sizes this store sells ("Max tanks per size") with their full-tank weight
+            'store_sizes'    => self::storeSizes($store),
             'can_deliver' => DeliveryFeeService::clientOptions($store) !== [],
             'planLimit' => [
                 'used'    => SubscriptionService::usage($store)['vehicles'],
@@ -77,7 +82,7 @@ class VehicleController extends Controller
      * Each vehicle type has a fixed legal maximum (RA 11592 Sec. 38(d)(11): no loading LPG beyond a vehicle's
      * capacity). The store may set a lower limit, never higher.
      */
-    private function validateCapacity(Request $request): void
+    private function validateCapacity(Request $request): ?array
     {
         $request->validate(['vehicle_type' => 'required|in:' . implode(',', array_keys(DeliveryFeeService::types()))]);
         $type  = (string) $request->input('vehicle_type');
@@ -92,6 +97,52 @@ class VehicleController extends Controller
             'max_tanks.max'       => $msg,
             'max_capacity_kg.max' => $msg,
         ]);
+
+        // J6 — "Max tanks per size (optional)": integers 0..max_tanks, and size × full-tank kg within the vehicle's kg
+        $maxTanks = (int) $request->input('max_tanks');
+        $maxKg    = (float) $request->input('max_capacity_kg');
+        // Sent as a list [{size: "11", max: 4}] — a key like "2.7" would read as a nested path in validation
+        $request->validate([
+            'tank_limits'        => 'nullable|array|max:20',
+            'tank_limits.*.size' => 'required|numeric|min:0.1|max:500',
+            'tank_limits.*.max'  => "nullable|integer|min:0|max:{$maxTanks}",
+        ], [
+            'tank_limits.*.max.max'     => "A size can't have more tanks than the vehicle's {$maxTanks}-tank limit.",
+            'tank_limits.*.max.integer' => 'Enter a whole number of tanks.',
+            'tank_limits.*.max.min'     => 'Enter 0 or more.',
+        ]);
+        $rows   = collect((array) $request->input('tank_limits', []));
+        $limits = DeliveryFeeService::normaliseTankLimits($rows->mapWithKeys(fn ($r) => [(string) ($r['size'] ?? '') => $r['max'] ?? null])->all());
+        $errors = [];
+        $kg = fn (float $x) => rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.');
+        foreach ($rows as $i => $r) {
+            $size  = DeliveryFeeService::sizeKey((float) ($r['size'] ?? 0));
+            $count = $r['max'] ?? null;
+            if ($size === null || $count === null || $count === '') {
+                continue;
+            }
+            $per = DeliveryFeeService::fullTankKg((float) $size);
+            if ($per * (int) $count > $maxKg + 0.001) {
+                $errors["tank_limits.{$i}.max"] = "{$count} × {$size} kg tanks = {$kg($per * (int) $count)} kg is over this vehicle's {$kg($maxKg)} kg limit.";
+            }
+        }
+        if ($errors) {
+            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+        }
+
+        return $limits;
+    }
+
+    /**
+     * Gas sizes the store sells (from its products' weight_kg) with the full-tank weight, smallest first:
+     * [{key: "11", label: "11 kg", full_kg: 25}].
+     */
+    public static function storeSizes($store): array
+    {
+        $sizes = \App\Models\Product::where('store_id', $store->id)->where('weight_kg', '>', 0)->distinct()->pluck('weight_kg')
+            ->map(fn ($w) => DeliveryFeeService::sizeKey((float) $w))->filter()->unique()->sortBy(fn ($k) => (float) $k)->values();
+
+        return $sizes->map(fn ($k) => ['key' => $k, 'label' => \App\Support\LpgSize::label((float) $k), 'full_kg' => DeliveryFeeService::fullTankKg((float) $k)])->all();
     }
 
     /** Legal maximum per vehicle type, for the form. */
@@ -157,7 +208,7 @@ class VehicleController extends Controller
         $this->ownerOnly();
         $store = $request->attributes->get('seller_store');
 
-        $this->validateCapacity($request);
+        $tankLimits = $this->validateCapacity($request);
         $data = $request->validate([
             'vehicle_type'      => 'required|in:motorcycle,tricycle,multicab,van,pickup_truck,small_truck,large_truck',
             'plate_number'      => 'required|string|max:20',
@@ -185,6 +236,7 @@ class VehicleController extends Controller
             'plate_number'      => strtoupper(trim($data['plate_number'])),
             'max_capacity_kg'   => $data['max_capacity_kg'],
             'max_tanks'         => $data['max_tanks'],
+            'tank_limits'       => $tankLimits,
             'description'       => $data['description'] ?? null,
             'status'            => 'available',
             'assigned_rider_id' => $data['assigned_rider_id'] ?? null,
@@ -199,7 +251,7 @@ class VehicleController extends Controller
         $store = $request->attributes->get('seller_store');
         if ($vehicle->store_id !== $store->id) abort(403);
 
-        $this->validateCapacity($request);
+        $tankLimits = $this->validateCapacity($request);
         $data = $request->validate([
             'vehicle_type'      => 'required|in:motorcycle,tricycle,multicab,van,pickup_truck,small_truck,large_truck',
             'plate_number'      => 'required|string|max:20',
@@ -231,6 +283,7 @@ class VehicleController extends Controller
             'plate_number'      => $plate,
             'max_capacity_kg'   => $data['max_capacity_kg'],
             'max_tanks'         => $data['max_tanks'],
+            'tank_limits'       => $tankLimits,
             'description'       => $data['description'] ?? null,
             'status'            => $data['status'],
             'assigned_rider_id' => $data['assigned_rider_id'] ?? null,

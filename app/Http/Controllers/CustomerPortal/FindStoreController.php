@@ -173,6 +173,8 @@ class FindStoreController extends Controller
                     : null,
                 DeliveryFeeService::itemKg($p) * $qty,   // same weight as checkout (DeliveryFeeService::itemKg)
                 (float) $p->weight_kg > 0 ? $qty : 0,
+                // J6: the vehicle's per-size limits apply too
+                (float) $p->weight_kg > 0 ? [DeliveryFeeService::sizeKey((float) $p->weight_kg) => $qty] : [],
             );
             if (! $quote) {
                 continue;

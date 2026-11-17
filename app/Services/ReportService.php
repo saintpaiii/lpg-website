@@ -1265,7 +1265,7 @@ class ReportService
                 'rider'        => $o->delivery->rider?->name,
                 'status'       => ChatService::DELIVERY_LABELS[$o->delivery->status] ?? $o->delivery->status,
                 'delivered_at' => $o->delivery->delivered_at?->format('M d, Y g:i A'),
-                'proof_url'    => $proof?->photo_path ? Storage::url($proof->photo_path) : null,
+                'proof_url'    => $proof?->photo_url,
             ] : null,
             'refund'            => $refund ? ['status' => ucfirst((string) $refund->status), 'amount' => (float) $refund->amount] : null,
         ];

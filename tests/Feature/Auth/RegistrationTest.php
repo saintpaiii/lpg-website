@@ -7,13 +7,22 @@ test('registration screen can be rendered', function () {
 });
 
 test('new users can register', function () {
+    // The customer registration form (CreateNewUser): full name, mobile, address, strong password, terms
     $response = $this->post(route('register.store'), [
-        'name' => 'Test User',
+        'first_name' => 'Test',
+        'last_name' => 'User',
         'email' => 'test@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'phone' => '09171234567',
+        'address' => '1 Rizal St.',
+        'city' => 'Imus',
+        'barangay' => 'Alapan I-A',
+        'password' => 'Password@123',
+        'password_confirmation' => 'Password@123',
+        'terms' => '1',
     ]);
 
+    $response->assertSessionHasNoErrors();
     $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertRedirect();
+    expect(\App\Models\User::where('email', 'test@example.com')->value('role'))->toBe('customer');
 });

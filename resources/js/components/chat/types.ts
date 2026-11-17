@@ -43,6 +43,8 @@ export type ConversationHeader = {
     riders: RiderStrip[];
     /** Rider view: the delivery they're on */
     my_delivery: { order_id: number; order_number: string; status: string; status_label: string; navigate_url: string | null } | null;
+    /** J6: seller one-tap "Send store location" */
+    store_location?: { lat: number; lng: number; label: string } | null;
 };
 
 /** Same for every viewer; the page works out "is this mine" from side / sender_id. */
@@ -55,13 +57,15 @@ export type ChatMessage = {
     sender_name: string | null;
     body: string | null;
     attachment_url: string | null;
+    /** J6: a shared location (mini map + Open in Google Maps) */
+    location?: { lat: number; lng: number; label: string | null; google_url: string } | null;
     order: { id: number; order_number: string | null } | null;
     /** Store's pick-up message: location card that opens our map & route on the order page */
     pickup_card?: { store_name: string; address: string; lat: number | null; lng: number | null; google_url: string; active: boolean } | null;
     created_at: string | null;
     /** Client-only: optimistic send state */
     status?: 'sending' | 'failed';
-    retry?: { body: string; image: File | null };
+    retry?: { body: string; image: File | null; location?: { lat: number; lng: number; label: string | null } | null };
 };
 
 export type Paginated<T> = {

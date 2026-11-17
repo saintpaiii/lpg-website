@@ -253,7 +253,7 @@ class DeliveryController extends Controller
                 ] : null,
                 'proofs' => $d->proofs->map(fn ($p) => [
                     'status'        => $p->status,
-                    'photo_url'     => $p->photo_path ? Storage::url($p->photo_path) : null,
+                    'photo_url'     => $p->photo_url,
                     'notes'         => $p->notes,
                     'location_note' => $p->location_note,
                     'created_at'    => $p->created_at->format('M d, Y g:i A'),
@@ -372,7 +372,8 @@ class DeliveryController extends Controller
             // Store proof record
             $photoPath = null;
             if ($request->hasFile('photo')) {
-                $photoPath = $request->file('photo')->store('delivery_proofs', 'public');
+                // J6: private (local disk) — served by DocumentFileController to the customer, store, rider and admin
+                $photoPath = $request->file('photo')->store('delivery_proofs', 'local');
             }
 
             DeliveryProof::create([

@@ -19,6 +19,7 @@ import type { SharedData } from '@/types';
 import StoreAvatar from '@/components/store-avatar';
 import { ClosedNote, PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
 import { Scale } from 'lucide-react';
+import { fits, type VehicleCapacity } from '@/lib/delivery-fee';
 
 type CartItem = {
     product_id: number;
@@ -27,6 +28,8 @@ type CartItem = {
     weight: string;
     /** Delivery weight of one unit (full tank, DeliveryFeeService::itemKg) */
     unit_kg?: number;
+    /** Gas size key ("11") — vehicles' per-size limits (J6) */
+    size_key?: string | null;
     image_url: string | null;
     refill_price: number;
     purchase_price: number;
@@ -52,6 +55,8 @@ type StoreGroup = {
     hours?: StoreHoursStatus;
     /** The store's biggest delivery-ready vehicle (kg); null = none */
     max_vehicle_kg?: number | null;
+    /** J6: every delivery-ready vehicle — the alert runs fits() (kg, tanks, per-size limits) like checkout */
+    vehicles?: VehicleCapacity[];
     /** False when the store is hidden (plan ended, permit expired…) */
     store_available?: boolean;
     items: CartItem[];
@@ -472,7 +477,27 @@ function WeightAlert({ group, selected }: { group: StoreGroup; selected: Set<num
         );
     }
     const max = group.max_vehicle_kg;
-    if (max == null || kg <= max) return null;
+    // J6: the same fits() as checkout — kg, tank count and each vehicle's per-size limits
+    const chosen = group.items.filter((i) => selected.has(i.product_id));
+    const load = {
+        kg,
+        tanks: chosen.reduce((s, i) => s + (i.size_key ? i.quantity : 0), 0),
+        by_size: chosen.reduce<Record<string, number>>((m, i) => (i.size_key ? { ...m, [i.size_key]: (m[i.size_key] ?? 0) + i.quantity } : m), {}),
+    };
+    const vehicles = group.vehicles ?? [];
+    if (vehicles.length > 0 && vehicles.some((v) => fits(v, load) === null)) return null;
+    if (max == null) return null;
+    if (kg <= max) {
+        // Light enough, but no single vehicle takes this many tanks of a size
+        const why = vehicles.map((v) => fits(v, load)).find((w) => w && w.includes(' kg tanks per trip'));
+        if (!why) return null;
+        return (
+            <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="alert" data-testid="weight-alert">
+                <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>Too many tanks of one size for one trip: {why} Reduce the quantity{group.allow_pickup ? ' or choose pick-up at checkout' : ''}.</span>
+            </p>
+        );
+    }
     return (
         <p className="mt-2 flex items-start gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200" role="alert" data-testid="weight-alert">
             <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" />

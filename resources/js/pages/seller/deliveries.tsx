@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { SeenNote, SeenPill, seenRowClass, useSeenRows } from '@/components/seen-marker';
 import { Camera, ChevronDown, ChevronUp, MapPin, Search, Truck } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import DeliveryFailFields, { emptyFailValues, failValuesComplete } from '@/components/delivery-fail-fields';
 import type { FailInfo, FailOptions, FailValues } from '@/components/delivery-fail-fields';
 import { NotePicker } from '@/components/reason-picker';
@@ -20,6 +20,8 @@ import AppLayout from '@/layouts/app-layout';
 import { fmtDateTime } from '@/lib/utils';
 import type { BreadcrumbItem } from '@/types';
 import { bestFitId, riderOptionDisabled, riderOptionLabel, type Load, type RiderLoadFields } from '@/lib/rider-fit';
+import VehicleDssPanel, { type OrderDss } from '@/components/vehicle-dss-panel';
+import RiderBoard, { type BoardRider } from '@/components/rider-board';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard',  href: '/seller/dashboard'  },
@@ -54,7 +56,7 @@ type Delivery = {
 
 type Rider = { id: number; name: string; phone: string | null } & RiderLoadFields;
 type Vehicle = { id: number; vehicle_type: string; plate_number: string; max_capacity_kg: number; max_tanks: number; status: string };
-type Unassigned = { id: number; order_number: string; customer: string; status: string; redelivery: FailInfo | null; load?: Load };
+type Unassigned = { id: number; order_number: string; customer: string; status: string; redelivery: FailInfo | null; load?: Load; dss?: OrderDss | null };
 type Counts = { active: number; completed: number };
 type Paginated = { data: Delivery[]; current_page: number; last_page: number; total: number };
 
@@ -79,6 +81,10 @@ type Props = {
     date_from: string;
     date_to: string;
     fail_options: FailOptions;
+    /** J6: rider status board + live map */
+    board?: BoardRider[];
+    store_pin?: { lat: number; lng: number; name: string } | null;
+    realtime?: boolean;
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -178,7 +184,7 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
     );
 }
 
-export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to, fail_options }: Props) {
+export default function SellerDeliveries({ deliveries, riders, vehicles, unassigned, counts, tab, search, date_from, date_to, fail_options, board = [], store_pin = null, realtime = false }: Props) {
     // New / updated since the last visit (until the user leaves the page)
     const seen = useSeenRows(deliveries.data);
     const [searchVal, setSearchVal]           = useState(search);
@@ -187,7 +193,9 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     const [assignOrderId, setAssignOrderId]   = useState('');
     // The chosen order's load → which riders' vehicles can take it, and the "Best fit"
     const assignNeed = unassigned.find((o) => String(o.id) === assignOrderId)?.load ?? null;
-    const assignBest = bestFitId(riders, assignNeed);
+    const assignDss  = unassigned.find((o) => String(o.id) === assignOrderId)?.dss ?? null;
+    // J6: the server's Vehicle DSS pick (smallest fit → fewer stops → nearest) wins over the client-side best fit
+    const assignBest = assignDss?.recommended_rider_id ?? bestFitId(riders, assignNeed);
     const [assignRiderId, setAssignRiderId]   = useState('');
     const [assignVehicleId, setAssignVehicleId] = useState('');
     const [showAssign, setShowAssign]         = useState(false);
@@ -266,7 +274,8 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
     // Choosing the order pre-selects the rider whose vehicle fits it most tightly ("Best fit")
     function pickAssignOrder(id: string) {
         setAssignOrderId(id);
-        const best = bestFitId(riders, unassigned.find((o) => String(o.id) === id)?.load ?? null);
+        const o = unassigned.find((x) => String(x.id) === id);
+        const best = o?.dss?.recommended_rider_id ?? bestFitId(riders, o?.load ?? null);
         setAssignRiderId(best ? String(best) : '');
     }
 
@@ -305,6 +314,9 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                         )}
                     </div>
                 </div>
+
+                {/* J6: Riders — status board / live map */}
+                <RiderBoard initial={board} storePin={store_pin} realtime={realtime} />
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b">
@@ -353,7 +365,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                     {deliveries.data.length === 0 ? (
                                         <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No deliveries found.</td></tr>
                                     ) : deliveries.data.map((d) => (
-                                        <>
+                                        <Fragment key={d.id}>
                                             <tr key={d.id} className={`border-b transition-colors ${expanded === d.id ? 'bg-muted/10' : `hover:bg-muted/20 ${seenRowClass(seen.get(d.id))}`}`}>
                                                 <td className="px-4 py-3">
                                                     {d.order ? (
@@ -435,7 +447,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                     </td>
                                                 </tr>
                                             )}
-                                        </>
+                                        </Fragment>
                                     ))}
                                 </tbody>
                             </table>
@@ -502,6 +514,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                     This order: {assignNeed.kg} kg / {assignNeed.tanks} tank(s) (full tanks). It goes on the rider's own vehicle for today.
                                 </p>
                             )}
+                            {assignOrderId && <VehicleDssPanel dss={assignDss} orderId={Number(assignOrderId)} onUseRecommended={(id) => setAssignRiderId(String(id))} />}
                         </div>
                     </div>
                     <AlertDialogFooter>

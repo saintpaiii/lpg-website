@@ -73,6 +73,8 @@ type Order = {
     payment_method: string | null;
     payment_status: string;
     payment_mode: 'full' | 'consignment' | 'cod' | 'half';
+    /** J6: an unpaid balance checkout is open — the button resumes it */
+    balance_session_pending?: boolean;
     down_payment_amount: number | null;
     remaining_balance: number | null;
     balance_due_date: string | null;
@@ -602,7 +604,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 ) : (
                                     <CreditCard className="h-4 w-4" />
                                 )}
-                                {isHalf ? `Pay the remaining ${peso(order.remaining_balance ?? 0)}` : `Pay Balance ${order.remaining_balance ? peso(order.remaining_balance) : ''}`}
+                                {order.balance_session_pending ? 'Resume payment' : isHalf ? `Pay the remaining ${peso(order.remaining_balance ?? 0)}` : `Pay Balance ${order.remaining_balance ? peso(order.remaining_balance) : ''}`}
                             </Button>
                         )}
                         {canRate && (
@@ -1018,7 +1020,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                                 {canPayBalance && (
                                                     <Button size="sm" className="mt-1 w-full gap-1.5 bg-blue-600 text-white hover:bg-blue-700" onClick={payBalance} disabled={payingBalance}>
                                                         {payingBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-                                                        Pay the remaining {peso(order.remaining_balance ?? 0)}
+                                                        {order.balance_session_pending ? 'Resume payment' : `Pay the remaining ${peso(order.remaining_balance ?? 0)}`}
                                                     </Button>
                                                 )}
                                             </>

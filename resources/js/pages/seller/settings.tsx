@@ -546,10 +546,12 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                         id="phone"
                                         type="tel"
                                         value={data.phone}
-                                        onChange={(e) => setData('phone', e.target.value.replace(/\D/g, '').slice(0, 11))}
-                                        placeholder="09xxxxxxxxx"
-                                        maxLength={11}
+                                        onChange={(e) => setData('phone', e.target.value.replace(/[^\d+()\- ]/g, '').slice(0, 20))}
+                                        placeholder="09XXXXXXXXX or (046) 483-5678"
+                                        maxLength={20}
+                                        aria-describedby="phone-hint"
                                     />
+                                    <p id="phone-hint" className="text-[11px] text-muted-foreground">09XXXXXXXXX or landline (046) 483-5678</p>
                                     {allErrors.phone && <p className="text-xs text-red-500">{allErrors.phone}</p>}
                                 </div>
                                 <div className="grid gap-1.5">

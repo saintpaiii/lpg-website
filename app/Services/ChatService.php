@@ -243,7 +243,10 @@ class ChatService
 
     // ── Messages ──────────────────────────────────────────────────────────────
 
-    public static function send(Conversation $c, User $sender, ?string $body, ?UploadedFile $image = null, ?int $orderId = null): ConversationMessage
+    /**
+     * @param  array{latitude: float, longitude: float, label?: ?string}|null  $location  J6 "📍 Share location" (body may be empty)
+     */
+    public static function send(Conversation $c, User $sender, ?string $body, ?UploadedFile $image = null, ?int $orderId = null, ?array $location = null): ConversationMessage
     {
         if ($reason = static::cannotSendReason($c, $sender)) {
             throw ValidationException::withMessages(['body' => match ($reason) {
@@ -256,7 +259,8 @@ class ChatService
         }
 
         $body = $body !== null ? trim($body) : null;
-        $path = $image?->store("chat_attachments/{$c->id}", 'public');
+        // J6: photos are private (local disk) — served only to the chat's participants + admin (ChatAttachmentController)
+        $path = $image?->store(ConversationMessage::PRIVATE_PREFIX . $c->id, 'local');
 
         $message = ConversationMessage::create([
             'conversation_id' => $c->id,
@@ -265,6 +269,9 @@ class ChatService
             'body'            => $body !== '' ? $body : null,
             'attachment_path' => $path,
             'order_id'        => $orderId,
+            'latitude'        => $location['latitude'] ?? null,
+            'longitude'       => $location['longitude'] ?? null,
+            'location_label'  => isset($location['label']) ? Str::limit(trim((string) $location['label']), 250, '') ?: null : null,
         ]);
 
         static::touch($c, $message);
@@ -315,7 +322,7 @@ class ChatService
     {
         $c->forceFill([
             'last_message_at'      => $m->created_at,
-            'last_message_preview' => Str::limit($m->body ?: '📷 Photo', 110),
+            'last_message_preview' => Str::limit($m->body ?: ($m->hasLocation() ? '📍 Location' : '📷 Photo'), 110),
         ])->save();
     }
 
@@ -451,6 +458,13 @@ class ChatService
             'sender_name'     => $senderName,
             'body'            => $m->body,
             'attachment_url'  => $m->attachment_url,
+            // J6: shared location → mini map + "Open in Google Maps"
+            'location'        => $m->hasLocation() ? [
+                'lat'        => (float) $m->latitude,
+                'lng'        => (float) $m->longitude,
+                'label'      => $m->location_label,
+                'google_url' => 'https://www.google.com/maps?q=' . $m->latitude . ',' . $m->longitude,
+            ] : null,
             'order'           => $m->order_id ? ['id' => $m->order_id, 'order_number' => $m->order?->order_number] : null,
             'pickup_card'     => static::pickupCard($m),
             'created_at'      => $m->created_at?->toIso8601String(),
@@ -603,7 +617,7 @@ class ChatService
                 'rider' => static::displayName($sender) . ' (Rider)',
                 default => static::displayName($sender),
             };
-            $preview = Str::limit($m->body ?: '📷 Photo', 80);
+            $preview = Str::limit($m->previewText() ?: '📷 Photo', 80);
 
             foreach ($targets as $userId => $portal) {
                 // Skip if they already have an unread new-message notice for this chat from the last 10 minutes

@@ -188,7 +188,8 @@ class SettingsController extends Controller
             // NOT NULL columns → required (saving them empty used to give a 500)
             'barangay'          => 'required|string|max:100',
             'province'          => 'required|string|max:100',
-            'phone'             => ['required', 'string', 'regex:/^09\d{9}$/'],
+            // J6: a store may have a landline — (046) 483-5678, (02) 8123-4567 — or a mobile number
+            'phone'             => ['required', 'string', 'max:30', new \App\Rules\PhPhone()],
             'email'             => 'nullable|email|max:255',
             'max_delivery_radius_km'   => 'nullable|integer|min:1|max:200',
             'logo'                     => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
@@ -204,8 +205,7 @@ class SettingsController extends Controller
             'latitude.required'  => "Please pin your store's location on the map.",
             'longitude.required' => "Please pin your store's location on the map.",
             'barangay.required'  => "Enter the store's barangay.",
-            'phone.required'     => "Enter the store's phone number (09XXXXXXXXX).",
-            'phone.regex'        => "Enter the store's phone number (09XXXXXXXXX).",
+            'phone.required'     => \App\Rules\PhPhone::MESSAGE,
         ] + \App\Support\UploadMessages::for(['logo'], false));
 
         // Renamed or pin moved → duplicate check again: a true duplicate is refused, otherwise the admin's
@@ -239,7 +239,7 @@ class SettingsController extends Controller
             'city'              => $data['city'],
             'barangay'          => $data['barangay'] ?? null,
             'province'          => $data['province'],
-            'phone'             => $data['phone'] ?? null,
+            'phone'             => isset($data['phone']) ? trim($data['phone']) : null,   // saved as typed (trimmed)
             'email'             => $data['email'] ?? null,
             'max_delivery_radius_km'   => $data['max_delivery_radius_km'] ?? 20,
             'latitude'                 => $data['latitude'] ?? null,
