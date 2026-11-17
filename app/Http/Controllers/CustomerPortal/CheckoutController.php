@@ -36,6 +36,7 @@ class CheckoutController extends Controller
         'full'        => 'Full Payment',
         'consignment' => 'Consignment',
         'cod'         => 'Cash on Delivery',
+        'half'        => 'Half Payment',
     ];
 
     private function generateOrderNumber(): string
@@ -127,6 +128,8 @@ class CheckoutController extends Controller
                     'max_delivery_radius_km' => $store->max_delivery_radius_km ? (int) $store->max_delivery_radius_km : null,
                     'allow_cod'              => (bool) ($store->allow_cod ?? true),
                     'allow_consignment'      => (bool) ($store->allow_consignment ?? true),
+                    // Half payment (J5): 50% online now, the rest online before delivery or cash to the rider — delivery only
+                    'allow_half_payment'     => (bool) $store->allow_half_payment,
                     // Pick up at the store (₱0 delivery fee, no rider) — automatic for a pick-up-only store (J4)
                     'allow_pickup'           => (bool) $store->allow_pickup || ! $deliverable,
                     'refund_window_days'     => (int) ($store->refund_window_days ?? 7),
@@ -333,8 +336,8 @@ class CheckoutController extends Controller
             $data = $request->validate([
                 // Each store's order has its own payment option (payment_mode = legacy single choice)
                 'payment_modes'              => 'nullable|array',
-                'payment_modes.*'            => 'in:full,consignment,cod',
-                'payment_mode'               => 'nullable|in:full,consignment,cod',
+                'payment_modes.*'            => 'in:full,consignment,cod,half',
+                'payment_mode'               => 'nullable|in:full,consignment,cod,half',
                 // Optional consignment down payment per store (never below the tier minimum)
                 'down_payment_percents'      => 'nullable|array',
                 'down_payment_percents.*'    => 'integer|min:20|max:90',
@@ -464,6 +467,13 @@ class CheckoutController extends Controller
                 // Pick-up: only "Pay at the store (cash)" (cod) or full payment online — no consignment (J4)
                 if (($fulfillments[$sid] ?? 'delivery') === 'pickup' && ! in_array($mode, ['cod', 'full'], true)) {
                     return $error("Pick-up orders at {$storeData['store_name']} can be paid only in cash at the store or in full online.");
+                }
+                // Half payment (J5): delivery orders only, and only when the store turned it on
+                if ($mode === 'half' && ($fulfillments[$sid] ?? 'delivery') === 'pickup') {
+                    return $error("Half payment is not available for pick-up orders at {$storeData['store_name']} — pay in cash at the store or in full online.");
+                }
+                if ($mode === 'half' && $s && ! $s->allow_half_payment) {
+                    return $error("{$s->store_name} does not offer Half payment.");
                 }
                 if ($mode === 'cod' && $s && ! $s->allow_cod) {
                     return $error("{$s->store_name} does not accept Cash on Delivery.");
@@ -644,6 +654,10 @@ class CheckoutController extends Controller
                         $downPayment      = round($grandTotal * $dpPercents[$storeId] / 100, 2);
                         $remainingBalance = round($grandTotal - $downPayment, 2);
                     }
+                    // Half payment: 50% (rounded up to the centavo) online now, the rest later
+                    if ($paymentMode === 'half') {
+                        [$downPayment, $remainingBalance] = Order::halfSplit($grandTotal);
+                    }
 
                     $order = Order::create([
                         'order_number'               => $this->generateOrderNumber(),
@@ -708,7 +722,7 @@ class CheckoutController extends Controller
                         'dp_percent'   => $dpPercents[$storeId] ?? null,
                         // Amount collected online right now
                         'pay_now'      => match ($paymentMode) {
-                            'consignment' => $downPayment,
+                            'consignment', 'half' => $downPayment,
                             'cod'         => 0.0,
                             default       => $grandTotal,
                         },
@@ -741,7 +755,7 @@ class CheckoutController extends Controller
 
                 // Orders fully covered by a store coupon need no online payment
                 foreach ($createdOrders as $entry) {
-                    if ($entry['mode'] === 'full' && $entry['pay_now'] <= 0) {
+                    if (in_array($entry['mode'], ['full', 'half'], true) && $entry['pay_now'] <= 0) {
                         $entry['order']->update(['payment_status' => 'paid']);
                     }
                 }
@@ -768,6 +782,14 @@ class CheckoutController extends Controller
                         $lineItems[] = [
                             'name'        => "Down Payment — {$store->store_name}",
                             'description' => "{$pct}% consignment down payment for Order {$order->order_number}",
+                            'amount'      => (int) round($entry['pay_now'] * 100),
+                            'currency'    => 'PHP',
+                            'quantity'    => 1,
+                        ];
+                    } elseif ($entry['mode'] === 'half') {
+                        $lineItems[] = [
+                            'name'        => "Half Payment (50%) — {$store->store_name}",
+                            'description' => 'First half of Order ' . $order->order_number . ' — ₱' . number_format((float) $order->remaining_balance, 2) . ' left to pay before delivery or in cash to the rider',
                             'amount'      => (int) round($entry['pay_now'] * 100),
                             'currency'    => 'PHP',
                             'quantity'    => 1,

@@ -309,6 +309,43 @@ class Order extends Model
         return round((float) $this->total_amount + (float) ($this->shipping_fee ?? 0), 2);
     }
 
+    // ── Half payment (J5) ─────────────────────────────────────────────────────
+
+    /** [now, later] for a grand total: 50% rounded UP to the centavo now, the rest later (₱1,615 → 807.50 / 807.50; ₱1,615.25 → 807.63 / 807.62). */
+    public static function halfSplit(float $grandTotal): array
+    {
+        $cents = (int) round($grandTotal * 100);
+        $now   = intdiv($cents + 1, 2);   // ceil(cents / 2)
+
+        return [round($now / 100, 2), round(($cents - $now) / 100, 2)];
+    }
+
+    public function isHalfPayment(): bool
+    {
+        return $this->payment_mode === 'half';
+    }
+
+    /**
+     * Cash the rider (or the counter) still has to collect: the whole order for an unpaid COD order,
+     * the remaining half for a half-payment order whose first half is in; otherwise nothing.
+     */
+    public function amountToCollect(): float
+    {
+        return match (true) {
+            $this->payment_mode === 'cod' && $this->payment_status === 'unpaid'     => $this->grandTotal(),
+            $this->payment_mode === 'half' && $this->payment_status === 'partial'   => round(max(0, (float) $this->remaining_balance), 2),
+            default                                                                 => 0.0,
+        };
+    }
+
+    /** Paid enough to hand to a rider: paid, COD, or consignment / half payment with the first payment in. */
+    public function paidEnoughToDispatch(): bool
+    {
+        return $this->payment_status === 'paid'
+            || $this->payment_mode === 'cod'
+            || (in_array($this->payment_mode, ['consignment', 'half'], true) && $this->payment_status === 'partial');
+    }
+
     /**
      * Full price breakdown for detail pages and invoices. Rows always add up to
      * grandTotal() — the amount the customer pays (and the rider collects on COD).

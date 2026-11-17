@@ -37,12 +37,14 @@ class PaymentController extends Controller
         try {
             $paymongo  = app(PayMongoService::class);
             $user      = $request->user();
-            $isConsign = $order->payment_mode === 'consignment' && (float) $order->down_payment_amount > 0;
+            // Consignment down payment / half payment's first half (J5) — the rest is paid later
+            $isConsign = in_array($order->payment_mode, ['consignment', 'half'], true) && (float) $order->down_payment_amount > 0;
+            $isHalf    = $order->payment_mode === 'half';
             $amount    = $isConsign ? (float) $order->down_payment_amount : $order->grandTotal();
 
             $lineItems = [[
-                'name'        => $isConsign ? "Down Payment — Order {$order->order_number}" : "LPG Order {$order->order_number}",
-                'description' => $isConsign ? 'Consignment down payment' : 'Items + delivery fee',
+                'name'        => $isHalf ? "Half Payment (50%) — Order {$order->order_number}" : ($isConsign ? "Down Payment — Order {$order->order_number}" : "LPG Order {$order->order_number}"),
+                'description' => $isHalf ? 'First half — the rest is paid before delivery or in cash to the rider' : ($isConsign ? 'Consignment down payment' : 'Items + delivery fee'),
                 'amount'      => (int) round($amount * 100),
                 'currency'    => 'PHP',
                 'quantity'    => 1,
@@ -74,7 +76,8 @@ class PaymentController extends Controller
     }
 
     /**
-     * Pay the remaining consignment balance for a partially-paid order.
+     * Pay the remaining balance of a partially-paid order: a consignment balance, or the second half of a
+     * half-payment order (J5 — online any time before the order is delivered; after that the rider collected it).
      */
     public function payBalance(Request $request, Order $order): \Illuminate\Http\JsonResponse
     {
@@ -84,8 +87,13 @@ class PaymentController extends Controller
             abort(403);
         }
 
-        if ($order->payment_mode !== 'consignment' || $order->payment_status !== 'partial') {
+        if (! in_array($order->payment_mode, ['consignment', 'half'], true) || $order->payment_status !== 'partial') {
             return response()->json(['error' => 'This order is not eligible for balance payment.'], 422);
+        }
+        if ($order->payment_mode === 'half' && in_array($order->status, ['delivered', 'cancelled'], true)) {
+            return response()->json(['error' => $order->status === 'cancelled'
+                ? 'This order was cancelled — nothing more to pay.'
+                : 'This order was delivered — the rest is paid in cash to the rider.'], 422);
         }
 
         $remaining = (float) $order->remaining_balance;
@@ -101,8 +109,8 @@ class PaymentController extends Controller
                 'reference_number' => $order->order_number . '-BAL',
                 'description'      => "Balance Payment — Order {$order->order_number}",
                 'line_items'       => [[
-                    'name'        => "Remaining Balance — Order {$order->order_number}",
-                    'description' => 'Full balance settlement',
+                    'name'        => $order->payment_mode === 'half' ? "Second Half — Order {$order->order_number}" : "Remaining Balance — Order {$order->order_number}",
+                    'description' => $order->payment_mode === 'half' ? 'The remaining 50% of the order' : 'Full balance settlement',
                     'amount'      => (int) round($remaining * 100),
                     'currency'    => 'PHP',
                     'quantity'    => 1,

@@ -80,7 +80,7 @@ class HandoverAdjustmentService
             }
             $left[$item->id] -= $qty;
 
-            $photo  = $request->file("not_accepted.{$i}.photo")->store('handover_photos', 'public');
+            $photo  = $request->file("not_accepted.{$i}.photo")->store('handover_photos', 'local');   // private (J5) — served by DocumentFileController
             $before = (float) $item->unit_price;
             $after  = $row['choice'] === 'new_purchase' ? (float) ($item->product?->purchase_price ?? $before) : null;
             $change = $row['choice'] === 'new_purchase' ? round(($after - $before) * $qty, 2) : round(-$before * $qty, 2);
@@ -145,7 +145,8 @@ class HandoverAdjustmentService
 
         // Money already paid online / as a down payment
         $refundAmount = 0.0;
-        if ($order->payment_mode === 'consignment' && $order->down_payment_amount !== null) {
+        // Consignment and half payment (J5): the new total moves the remaining balance; paid more than the new total → refund the difference
+        if (in_array($order->payment_mode, ['consignment', 'half'], true) && $order->down_payment_amount !== null && $order->payment_status !== 'paid') {
             $balance = round($order->grandTotal() - $paidBefore, 2);
             $order->update(['remaining_balance' => max(0, $balance)] + ($balance <= 0 && $paidBefore > 0 ? ['payment_status' => 'paid'] : []));
             $refundAmount = $balance < 0 ? -$balance : 0.0;
@@ -180,7 +181,7 @@ class HandoverAdjustmentService
                 ['link' => "/customer/orders/{$order->id}"]);
         }
 
-        return ['changed' => true, 'net' => $net, 'cancelled_all' => $cancelledAll, 'lines' => $lines];
+        return ['changed' => true, 'net' => $net, 'cancelled_all' => $cancelledAll, 'lines' => $lines, 'refund' => round($refundAmount, 2)];
     }
 
     /** The order's invoice keeps its number: new totals + "Adjusted at handover on …" and it is emailed again. */
@@ -197,8 +198,10 @@ class HandoverAdjustmentService
             'grand_total'   => $invoice->vat_status !== null ? $grand : $invoice->grand_total,
             'vatable_sales' => $vat['vatable_sales'],
             'vat_amount'    => $vat['vat_amount'],
-            'paid_amount'   => $invoice->payment_status === 'paid' ? $grand : min((float) $invoice->paid_amount, $grand),
-        ]);
+            'paid_amount'   => $invoice->payment_status === 'paid' || $order->payment_status === 'paid' ? $grand : min((float) $invoice->paid_amount, $grand),
+        ] + ($order->payment_status === 'paid' && $invoice->payment_status !== 'paid'
+            // A half / down payment now covers the smaller total (the overpayment goes back as a refund)
+            ? ['payment_status' => 'paid', 'paid_at' => $invoice->paid_at ?? now()] : []));
         if ($order->status !== 'cancelled') {
             InvoiceService::queueAdjustedEmail($invoice->id);
         }
@@ -228,7 +231,7 @@ class HandoverAdjustmentService
                 'amount_change' => (float) $a->amount_change,
                 'unit_before'  => (float) $a->unit_price_before,
                 'unit_after'   => $a->unit_price_after !== null ? (float) $a->unit_price_after : null,
-                'photo_url'    => Storage::url($a->photo_path),
+                'photo_url'    => \App\Support\PrivateDocument::url('handover-photo', $a->id, 'photo_path'),
                 'stage'        => $a->stage === 'pickup' ? 'At pick-up' : 'At delivery',
                 'by'           => $a->recorder?->name,
                 'at'           => $a->created_at->timezone('Asia/Manila')->format('M j, Y g:i A'),

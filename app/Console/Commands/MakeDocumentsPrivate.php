@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\OrderItemAdjustment;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\VerificationRequest;
@@ -15,12 +16,14 @@ use Illuminate\Support\Facades\Storage;
 class MakeDocumentsPrivate extends Command
 {
     protected $signature   = 'documents:make-private {--dry-run : Only count, do not move anything}';
-    protected $description = 'Move IDs, selfies and permits from the public disk to the private disk.';
+    protected $description = 'Move IDs, selfies, permits and handover photos from the public disk to the private disk.';
 
     private const COLUMNS = [
         User::class                => ['valid_id', 'valid_id_path', 'selfie_path'],
         VerificationRequest::class => ['valid_id_path', 'selfie_path', 'bir_permit_path', 'business_permit_path', 'fsic_permit_path', 'doe_lpg_license_path', 'lto_permit_path', 'dti_sec_registration_path'],
         Store::class               => ['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'lto_permit', 'dti_sec_registration'],
+        // J5: "tank not accepted" photos (handover_photos/…)
+        OrderItemAdjustment::class => ['photo_path'],
     ];
 
     public function handle(): int
@@ -31,7 +34,8 @@ class MakeDocumentsPrivate extends Command
         $paths  = [];
 
         foreach (self::COLUMNS as $model => $columns) {
-            $model::withTrashed()->select($columns)->chunk(500, function ($rows) use ($columns, &$paths) {
+            $query = in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($model), true) ? $model::withTrashed() : $model::query();
+            $query->select(array_merge(['id'], $columns))->orderBy('id')->chunk(500, function ($rows) use ($columns, &$paths) {
                 foreach ($rows as $row) {
                     foreach ($columns as $col) {
                         if ($row->{$col}) {

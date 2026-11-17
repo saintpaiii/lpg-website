@@ -47,7 +47,7 @@ class OrderPaymentService
         if ($method) {
             $updates['payment_method'] = $method;
         }
-        if ($order->payment_mode === 'consignment') {
+        if (in_array($order->payment_mode, ['consignment', 'half'], true)) {
             $updates['remaining_balance'] = 0;
         }
         $order->update($updates);
@@ -119,6 +119,14 @@ class OrderPaymentService
         if ($order->status === 'cancelled' || in_array($order->payment_status, ['to_refund', 'refunded'], true)) {
             PaymentReceiptService::record($order, (float) ($payment?->amount ?? 0), $method, 'online', $reference, $payment?->id);
 
+            // J5: one automatic refund request for everything paid on the cancelled order (no duplicates)
+            if ($order->status === 'cancelled') {
+                if ($order->payment_status !== 'refunded') {
+                    $order->update(['payment_status' => 'to_refund']);
+                }
+                RefundService::forCancelledOrder($order);
+            }
+
             if ($order->store_id) {
                 NotificationService::sendToStore(
                     $order->store_id,
@@ -163,7 +171,31 @@ class OrderPaymentService
             return 'partial';
         }
 
+        // Half payment (J5): the first half is in → partial; the second half (below) settles it
+        if ($order->payment_mode === 'half' && $order->payment_status === 'unpaid' && (float) $order->remaining_balance > 0) {
+            $first = (float) ($order->down_payment_amount ?? 0);
+            $order->update(['payment_status' => 'partial', 'payment_method' => $method]);
+            if ($order->invoice) {
+                $order->invoice->update(['payment_status' => 'partial', 'paid_amount' => $first, 'payment_method' => $method, 'paid_at' => null]);
+            }
+            PaymentReceiptService::record($order, PaymentReceiptService::paidSoFar($order) - $before, $method, 'online', $reference, $payment?->id);
+
+            if ($order->store) {
+                NotificationService::sendToStore(
+                    $order->store->id,
+                    'payment',
+                    'Half Payment Received',
+                    "Order {$order->order_number} — first half (₱" . number_format($first, 2) . ') paid online. ₱' . number_format((float) $order->remaining_balance, 2)
+                        . ' is left: paid online before delivery or in cash to the rider. You may proceed with the order.',
+                    ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
+                );
+            }
+
+            return 'partial';
+        }
+
         $wasPartial = $order->payment_status === 'partial';
+        $wasHalf    = $order->payment_mode === 'half';
         static::markPaid($order, $method, 'online', $reference, false);
         PaymentReceiptService::record($order, $order->grandTotal() - $before, $method, 'online', $reference, $payment?->id);
 
@@ -171,7 +203,7 @@ class OrderPaymentService
             NotificationService::sendToStore(
                 $order->store->id,
                 'payment',
-                'Consignment Balance Paid',
+                $wasHalf ? 'Half Payment — Rest Paid Online' : 'Consignment Balance Paid',
                 "Order {$order->order_number} — the customer has paid the remaining balance. The order is now fully paid.",
                 ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
             );

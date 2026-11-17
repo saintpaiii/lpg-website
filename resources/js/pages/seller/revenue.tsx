@@ -54,6 +54,7 @@ const MODE_LABELS: Record<string, string> = {
     full:        'Full Payment',
     consignment: 'Consignment',
     cod:         'COD',
+    half:        'Half Payment',
 };
 
 export default function SellerRevenue({ tax, summary, orders, filters }: Props) {

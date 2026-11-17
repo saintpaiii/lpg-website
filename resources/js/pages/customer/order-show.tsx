@@ -72,7 +72,7 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
-    payment_mode: 'full' | 'consignment' | 'cod';
+    payment_mode: 'full' | 'consignment' | 'cod' | 'half';
     down_payment_amount: number | null;
     remaining_balance: number | null;
     balance_due_date: string | null;
@@ -355,7 +355,10 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
     const [cancelling,     setCancelling]      = useState(false);
     const [payingBalance,  setPayingBalance]   = useState(false);
 
-    const canPayBalance = order.payment_mode === 'consignment' && order.payment_status === 'partial';
+    const isHalf = order.payment_mode === 'half';
+    // Consignment balance, or the second half of a half payment (J5: online any time before the order is delivered)
+    const canPayBalance = order.payment_status === 'partial' && (order.payment_mode === 'consignment'
+        || (isHalf && (order.remaining_balance ?? 0) > 0 && !['delivered', 'cancelled'].includes(order.status)));
     // Online order (Full Payment / Consignment) whose PayMongo payment was never completed
     const awaitingPayment = order.payment_mode !== 'cod' && order.payment_status === 'unpaid' && ['pending', 'confirmed'].includes(order.status);
     const [payingNow, setPayingNow] = useState(false);
@@ -599,7 +602,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 ) : (
                                     <CreditCard className="h-4 w-4" />
                                 )}
-                                Pay Balance {order.remaining_balance ? peso(order.remaining_balance) : ''}
+                                {isHalf ? `Pay the remaining ${peso(order.remaining_balance ?? 0)}` : `Pay Balance ${order.remaining_balance ? peso(order.remaining_balance) : ''}`}
                             </Button>
                         )}
                         {canRate && (
@@ -700,7 +703,9 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         <div className="flex-1">
                             <p className="font-semibold text-amber-900 dark:text-amber-200">Waiting for payment</p>
                             <p className="text-sm text-amber-800 dark:text-amber-300">
-                                {order.payment_mode === 'consignment' && order.down_payment_amount
+                                {isHalf && order.down_payment_amount
+                                    ? `Pay the first half (${peso(order.down_payment_amount)})`
+                                    : order.payment_mode === 'consignment' && order.down_payment_amount
                                     ? `Pay the ${peso(order.down_payment_amount)} down payment`
                                     : `Pay ${peso(grandTotal)}`}
                                 {' '}within 60 minutes of placing the order, or it will be cancelled automatically.
@@ -908,6 +913,8 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                     <span className="flex items-center gap-1 text-xs font-medium">
                                         {order.payment_mode === 'consignment' ? (
                                             <><Handshake className="h-3.5 w-3.5 text-amber-500" /> Consignment</>
+                                        ) : isHalf ? (
+                                            <><CreditCard className="h-3.5 w-3.5 text-amber-500" /> Half Payment</>
                                         ) : order.payment_mode === 'cod' ? (
                                             <><Banknote className="h-3.5 w-3.5 text-emerald-500" /> Cash on Delivery</>
                                         ) : (
@@ -921,7 +928,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? ''}`}>
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                          order.payment_status === 'refunded'  ? 'Refunded' :
-                                         order.payment_status === 'partial'   ? 'Down Paid' :
+                                         order.payment_status === 'partial'   ? (isHalf ? 'Half Paid' : 'Down Paid') :
                                          order.payment_status}
                                     </span>
                                 </div>
@@ -993,6 +1000,32 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                         </div>
                                     );
                                 })()}
+
+                                {/* Half payment (J5) */}
+                                {isHalf && (
+                                    <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs dark:border-amber-800 dark:bg-amber-900/20" data-testid="customer-half-payment">
+                                        <div className="flex justify-between text-gray-600 dark:text-gray-300"><span>Order Total</span><span className="font-medium">{peso(grandTotal)}</span></div>
+                                        <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
+                                            <span>First half {order.payment_status === 'unpaid' ? '(unpaid)' : '(paid online)'}</span>
+                                            <span className="font-medium">{peso(order.down_payment_amount ?? 0)}</span>
+                                        </div>
+                                        {order.payment_status === 'partial' && (
+                                            <>
+                                                <div className="mt-1 flex justify-between border-t border-amber-200 pt-1.5 text-sm font-semibold text-amber-800 dark:border-amber-800 dark:text-amber-300">
+                                                    <span>Remaining</span><span>{peso(order.remaining_balance ?? 0)}</span>
+                                                </div>
+                                                {canPayBalance && <p className="text-amber-700 dark:text-amber-400">Pay it online now, or in cash to the rider when your order arrives.</p>}
+                                                {canPayBalance && (
+                                                    <Button size="sm" className="mt-1 w-full gap-1.5 bg-blue-600 text-white hover:bg-blue-700" onClick={payBalance} disabled={payingBalance}>
+                                                        {payingBalance ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+                                                        Pay the remaining {peso(order.remaining_balance ?? 0)}
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                        {order.payment_status === 'paid' && <p className="font-medium text-emerald-700 dark:text-emerald-400">Fully paid — thank you!</p>}
+                                    </div>
+                                )}
 
                                 {/* COD note */}
                                 {order.payment_mode === 'cod' && order.payment_status === 'unpaid' && order.status !== 'cancelled' && (

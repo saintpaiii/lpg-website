@@ -166,6 +166,9 @@ class DemoSeeder extends Seeder
             'updated_at'              => $this->now,
         ]);
 
+        // J5: both demo stores offer Half payment (new stores start with it off)
+        DB::table('stores')->whereIn('id', [$store1Id, $store2Id])->update(['allow_half_payment' => true]);
+
         // Tax & invoice: store 1 is VAT-registered, store 2 Non-VAT; each has its own invoice series
         // (the migration's backfill ran before these stores existed)
         DB::table('stores')->where('id', $store1Id)->update([

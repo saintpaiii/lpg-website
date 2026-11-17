@@ -1,5 +1,5 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -12,6 +12,8 @@ import {
     Store,
     UserX,
 } from 'lucide-react';
+import HalfPaymentNote from '@/components/half-payment-note';
+import OrderAdjustments, { type OrderAdjustment } from '@/components/order-adjustments';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -64,6 +66,11 @@ interface OrderRow {
     /** What the customer pays: items + delivery fee (shown instead of total_amount) */
     grand_total: number;
     created_at: string;
+    payment_mode?: string | null;
+    payment_status?: string;
+    down_payment_amount?: number | null;
+    remaining_balance?: number | null;
+    adjustments?: OrderAdjustment[];
 }
 
 interface Props {
@@ -310,16 +317,24 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                         </thead>
                                         <tbody className="divide-y">
                                             {orders.map((o) => (
-                                                <tr key={o.id} className="hover:bg-muted/30">
+                                                <Fragment key={o.id}>
+                                                <tr className="hover:bg-muted/30">
                                                     <td className="py-2 font-mono text-xs">{o.order_number}</td>
                                                     <td className="py-2">
                                                         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                                             {o.status.replace(/_/g, ' ')}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 text-right font-medium">{fmt(o.grand_total)}</td>
+                                                    <td className="py-2 text-right font-medium">
+                                                        {fmt(o.grand_total)}
+                                                        <HalfPaymentNote order={o} className="block text-[11px] font-normal" />
+                                                    </td>
                                                     <td className="py-2 text-muted-foreground">{fmtDate(o.created_at)}</td>
                                                 </tr>
+                                                {o.adjustments && o.adjustments.length > 0 && (
+                                                    <tr><td colSpan={4} className="pb-3"><OrderAdjustments adjustments={o.adjustments} compact /></td></tr>
+                                                )}
+                                                </Fragment>
                                             ))}
                                         </tbody>
                                     </table>

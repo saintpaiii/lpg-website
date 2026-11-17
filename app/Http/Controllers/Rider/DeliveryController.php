@@ -74,9 +74,9 @@ class DeliveryController extends Controller
                 'payment_method'     => $d->order->payment_method,
                 'payment_status'     => $d->order->payment_status,
                 'payment_mode'       => $d->order->payment_mode ?? 'full',
-                'amount_to_collect'  => $d->order->payment_mode === 'cod' && $d->order->payment_status === 'unpaid'
-                    ? $d->order->grandTotal()
-                    : 0,
+                // Cash to collect: an unpaid COD order, or the rest of a half-payment order (J5)
+                'amount_to_collect'  => $d->order->amountToCollect(),
+                'down_payment_amount' => $d->order->down_payment_amount !== null ? (float) $d->order->down_payment_amount : null,
                 'remaining_balance'  => $d->order->remaining_balance ? (float) $d->order->remaining_balance : null,
                 'delivery_latitude'           => $d->order->delivery_latitude  ? (float) $d->order->delivery_latitude  : null,
                 'delivery_longitude'          => $d->order->delivery_longitude ? (float) $d->order->delivery_longitude : null,
@@ -183,7 +183,7 @@ class DeliveryController extends Controller
             ->sortBy(fn (Delivery $d) => [$d->batch_id ? 0 : 1, optional($d->assigned_at)->timestamp ?? 0, $d->sequence ?? 0])
             ->values();
 
-        $modeLabels = ['full' => 'Full Payment', 'consignment' => 'Consignment', 'cod' => 'COD'];
+        $modeLabels = ['full' => 'Full Payment', 'consignment' => 'Consignment', 'cod' => 'COD', 'half' => 'Half Payment'];
 
         return [
             'store' => \App\Services\DeliveryRouteService::storeLocation($user->store_id ? \App\Models\Store::find($user->store_id) : null),
@@ -205,7 +205,7 @@ class DeliveryController extends Controller
                     'lng'               => $o?->delivery_longitude ? (float) $o->delivery_longitude : null,
                     'amount'            => $o ? $o->grandTotal() : 0,
                     'payment_label'     => $modeLabels[$o?->payment_mode ?? 'full'] ?? 'Full Payment',
-                    'amount_to_collect' => $o && $o->payment_mode === 'cod' && $o->payment_status === 'unpaid' ? $o->grandTotal() : 0,
+                    'amount_to_collect' => $o ? $o->amountToCollect() : 0,
                     // Refill: empty tanks to collect before "Delivered"
                     'empty_tanks_required'  => (int) ($o?->empty_tanks_required ?? 0),
                     'empty_tank_summary'    => $o && (int) $o->empty_tanks_required > 0 ? $o->emptyTankSummary() : null,
@@ -405,8 +405,11 @@ class DeliveryController extends Controller
 
         return back()->with('success', "Delivery marked as {$label}."
             . ($adjusted['changed'] && $order ? ' Order adjusted — ' . match (true) {
-                $order->payment_status !== 'paid' => 'amount to collect now ₱' . number_format($order->grandTotal(), 2) . '.',
-                $adjusted['net'] < 0              => 'new total ₱' . number_format($order->grandTotal(), 2) . '. It was prepaid, so the store will refund ₱' . number_format(-$adjusted['net'], 2) . '.',
+                $order->payment_mode === 'consignment' && $order->payment_status === 'partial'
+                    => 'new total ₱' . number_format($order->grandTotal(), 2) . '; balance ₱' . number_format((float) $order->remaining_balance, 2) . ' is paid online later.',
+                $order->payment_status !== 'paid' => 'amount to collect now ₱' . number_format($order->amountToCollect(), 2)
+                    . ($order->payment_mode === 'half' ? ' (the rest of the half payment).' : '.'),
+                ($adjusted['refund'] ?? 0) > 0     => 'new total ₱' . number_format($order->grandTotal(), 2) . '. More was paid in advance than the new total, so the store will refund ₱' . number_format($adjusted['refund'], 2) . '.',
                 $adjusted['net'] > 0              => 'new total ₱' . number_format($order->grandTotal(), 2) . '. Collect ₱' . number_format($adjusted['net'], 2) . ' in cash for the difference (receipt recorded).',
                 default                           => 'new total ₱' . number_format($order->grandTotal(), 2) . '.',
             } : ''));
@@ -422,8 +425,11 @@ class DeliveryController extends Controller
 
         $order = $delivery->order;
 
-        if (! $order || $order->payment_mode !== 'cod') {
+        if (! $order || ! in_array($order->payment_mode, ['cod', 'half'], true)) {
             return back()->with('error', 'This is not a Cash on Delivery order.');
+        }
+        if ($order->payment_mode === 'half' && $order->payment_status !== 'partial') {
+            return back()->with('error', $order->payment_status === 'paid' ? 'Payment was already recorded for this order.' : 'The first half of this order is not paid yet.');
         }
         if ($delivery->status !== 'delivered') {
             return back()->with('error', 'Mark the order as delivered before recording the payment.');
@@ -432,6 +438,7 @@ class DeliveryController extends Controller
             return back()->with('error', 'Payment was already recorded for this order.');
         }
 
+        $collected = $order->amountToCollect();   // whole order (COD) or the remaining half (J5)
         DB::transaction(fn () => OrderPaymentService::markPaid($order, 'cash', 'cash_on_delivery'));
 
         if ($order->store_id) {
@@ -439,11 +446,12 @@ class DeliveryController extends Controller
                 $order->store_id,
                 'payment',
                 'COD Payment Collected',
-                'Rider ' . auth()->user()->name . " collected ₱" . number_format($order->grandTotal(), 2) . " cash for order {$order->order_number}.",
+                'Rider ' . auth()->user()->name . " collected ₱" . number_format($collected, 2) . " cash for order {$order->order_number}"
+                    . ($order->payment_mode === 'half' ? ' (the rest of a half payment).' : '.'),
                 ['order_id' => $order->id, 'link' => '/seller/orders/' . $order->id]
             );
         }
 
-        return back()->with('success', "Cash payment recorded for {$order->order_number}.");
+        return back()->with('success', 'Cash payment of ₱' . number_format($collected, 2) . " recorded for {$order->order_number}.");
     }
 }

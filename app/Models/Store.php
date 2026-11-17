@@ -57,6 +57,7 @@ class Store extends Model
         'max_delivery_radius_km',
         'allow_cod',
         'allow_consignment',
+        'allow_half_payment',   // J5
         'allow_pickup',
         'pickup_instructions',
         'opening_hours',        // J4 — per weekday; null = open 24 hours (StoreHours)
@@ -106,6 +107,7 @@ class Store extends Model
             'documents_suspended_at'     => 'datetime',
             'allow_cod'                => 'boolean',
             'allow_consignment'        => 'boolean',
+            'allow_half_payment'       => 'boolean',
             'allow_pickup'             => 'boolean',
             'opening_hours'            => 'array',
             'closed_today_until'       => 'datetime',

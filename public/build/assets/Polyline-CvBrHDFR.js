@@ -1,0 +1,1 @@
+import{j as s}from"./map-CnOJTV5T.js";import{c as a,b as l,e as r}from"./leaflet-ui00Kxk7.js";const f=a(function({positions:t,...e},o){const n=new s.Polyline(t,e);return l(n,r(o,{overlayContainer:n}))},function(t,e,o){e.positions!==o.positions&&t.setLatLngs(e.positions)});export{f as P};

@@ -51,6 +51,7 @@ export const REASON_LABELS: Record<string, string> = {
     missing_items:   'Missing Items',
     quality_issue:   'Quality Issue',
     other:           'Other',
+    order_cancelled: 'Order Cancelled',
 };
 
 export const RESOLUTION_LABELS: Record<RefundResolution, string> = {

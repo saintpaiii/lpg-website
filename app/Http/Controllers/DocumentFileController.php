@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\OrderItemAdjustment;
 use App\Models\StaffDocument;
 use App\Models\Store;
 use App\Models\StoreDocumentSubmission;
@@ -26,6 +27,8 @@ class DocumentFileController extends Controller
         'staff-document' => ['file_path', 'selfie_path'],   // selfie_path: the rider's live selfie for the license face check
         // Live-camera clock-in / clock-out photos
         'attendance'     => ['clock_in_photo_path', 'clock_out_photo_path'],
+        // J5: "tank not accepted" photo taken at handover (J4)
+        'handover-photo' => ['photo_path'],
     ];
 
     public function show(Request $request, string $kind, int $id, string $field): StreamedResponse
@@ -42,6 +45,9 @@ class DocumentFileController extends Controller
             'staff-document' => [$sd = StaffDocument::with(['store' => fn ($q) => $q->withTrashed()])->find($id), [$sd?->user_id, $sd?->store?->user_id]],
             // The staff member and their store's owner (store staff with the Attendance module: checked below)
             'attendance'     => [$at = Attendance::with(['store' => fn ($q) => $q->withTrashed()])->find($id), [$at?->user_id, $at?->store?->user_id]],
+            // The order's customer, the store owner, the rider of the delivery and whoever recorded it (store staff with Orders: below)
+            'handover-photo' => [$ha = OrderItemAdjustment::with(['order' => fn ($q) => $q->withTrashed()->with(['customer', 'store' => fn ($s) => $s->withTrashed(), 'delivery'])])->find($id),
+                [$ha?->order?->customer?->user_id, $ha?->order?->store?->user_id, $ha?->order?->delivery?->rider_id, $ha?->recorded_by]],
         };
         abort_unless($record, 404);
 
@@ -49,11 +55,19 @@ class DocumentFileController extends Controller
         $allowed = in_array($user->id, array_filter((array) $ownerId), true) || $user->canReviewDocuments()
             // Attendance photos: also staff of the same store who see everyone's attendance (owner / HR pages)
             || ($kind === 'attendance' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->store_id
-                && ($user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage')));
+                && ($user->hasPermission('attendance.view') || $user->hasPermission('attendance.manage')))
+            // Handover photos: store staff of that store who can see its orders
+            || ($kind === 'handover-photo' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->order?->store_id
+                && $user->hasPermission('orders.view'));
         abort_unless($allowed, 403);
 
         $path = $record->{$field};
         abort_unless($path, 404);
+
+        // Handover photos saved on the public disk before J5: moved to private storage on first view (same path)
+        if ($kind === 'handover-photo') {
+            PrivateDocument::moveToPrivate($path);
+        }
 
         return PrivateDocument::response($path);
     }

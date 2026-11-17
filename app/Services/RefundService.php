@@ -27,8 +27,110 @@ class RefundService
         'store_discount' => 'Store Discount',
     ];
 
+    // ── Cancelled order with money paid (J5) ──────────────────────────────────
+
+    /**
+     * THE one path for "a paid order was cancelled": a money refund request (reason order_cancelled, status pending)
+     * for everything the customer paid on it — Full Payment, a half payment, a consignment down payment, or money
+     * that arrived after the cancellation. Safe to call more than once: it only ever adds what is not yet covered
+     * (a pending request grows; a handled one gets a second request for the rest), so there are never duplicates.
+     *
+     * $paidBefore: what was paid, measured by the caller BEFORE the order's payment_status changed to to_refund
+     * (receipts are used too, so older orders without receipts still get the right amount).
+     */
+    public static function forCancelledOrder(Order $order, ?float $paidBefore = null): ?RefundRequest
+    {
+        $created = false;
+        $refund = DB::transaction(function () use ($order, $paidBefore, &$created) {
+            $order = Order::withTrashed()->whereKey($order->id)->lockForUpdate()->first();
+            if (! $order || $order->status !== 'cancelled' || ! $order->customer_id || ! $order->store_id) {
+                return null;
+            }
+
+            $receipts = (float) \App\Models\PaymentReceipt::where('order_id', $order->id)->sum('amount');
+            $paid     = round(max((float) ($paidBefore ?? 0), $receipts), 2);
+
+            $base  = RefundRequest::where('order_id', $order->id)->where('status', '!=', 'rejected');
+            $other = (float) (clone $base)->where('reason', '!=', 'order_cancelled')->sum('amount');   // e.g. a J4 handover refund
+            $mine  = (clone $base)->where('reason', 'order_cancelled')->orderBy('id')->get();
+            $extra = round($paid - $other - (float) $mine->sum('amount'), 2);
+            if ($extra <= 0) {
+                return $mine->last();
+            }
+
+            $describe = fn (float $amount) => "Order {$order->order_number} was cancelled"
+                . ($order->cancelled_by ? " by the {$order->cancelled_by}" : '')
+                . ($order->cancellation_reason ? " ({$order->cancellation_reason})" : '')
+                . '. Refund the ₱' . number_format($amount, 2) . ' the customer paid'
+                . ($order->payment_method ? ' (' . str_replace('_', ' ', $order->payment_method) . ')' : '') . '.';
+
+            $pending = $mine->firstWhere('status', 'pending');
+            if ($pending) {
+                $amount = round((float) $pending->amount + $extra, 2);
+                $pending->update(['amount' => $amount, 'description' => $describe($amount)]);
+
+                return $pending;
+            }
+
+            $created = true;
+
+            return RefundRequest::create([
+                'order_id'             => $order->id,
+                'customer_id'          => $order->customer_id,
+                'store_id'             => $order->store_id,
+                'amount'               => $extra,
+                'reason'               => 'order_cancelled',
+                'preferred_resolution' => 'money_refund',
+                'description'          => $describe($extra),
+                'status'               => 'pending',
+            ]);
+        });
+
+        if ($refund && $created) {
+            $refund->loadMissing('order');
+            $no = $refund->order?->order_number;
+            NotificationService::sendToStore($refund->store_id, 'refund_request', 'Refund to send (order cancelled)',
+                "Order {$no} was cancelled after the customer paid. Send ₱" . number_format((float) $refund->amount, 2) . ' back and record the reference in Refunds.',
+                ['order_id' => $refund->order_id, 'link' => '/seller/refunds']);
+            static::notifyCustomer($refund, 'refund_request', 'Refund on its way',
+                "Order {$no} was cancelled. The store will refund the ₱" . number_format((float) $refund->amount, 2) . ' you paid.');
+        }
+
+        return $refund;
+    }
+
+    /** All order-cancelled refunds of the order are sent → the order's payment_status becomes refunded. */
+    public static function syncCancelledOrderStatus(?Order $order): void
+    {
+        if (! $order || $order->status !== 'cancelled' || $order->payment_status !== 'to_refund') {
+            return;
+        }
+        $open = RefundRequest::where('order_id', $order->id)->where('reason', 'order_cancelled')->whereIn('status', ['pending', 'approved'])->exists();
+        if (! $open) {
+            $order->update(['payment_status' => 'refunded']);
+        }
+    }
+
+    /** The seller's "Mark as refunded" on the order page also closes its pending order-cancelled refund requests. */
+    public static function closeCancelledOrderRefunds(Order $order, int $actingUserId, ?string $reference = null): void
+    {
+        RefundRequest::where('order_id', $order->id)->where('reason', 'order_cancelled')->where('status', 'pending')
+            ->each(fn (RefundRequest $r) => $r->update([
+                'status'              => 'processed',
+                'seller_resolution'   => 'money_refund',
+                'refund_reference'    => $reference ?: 'Marked refunded on the order page',
+                'seller_responded_at' => now(),
+                'processed_at'        => now(),
+            ]));
+    }
+
     public static function accept(RefundRequest $refund, string $resolution, array $data, int $actingUserId): void
     {
+        // A cancelled order has nothing to replace — its money goes back (or as store credit)
+        if ($refund->reason === 'order_cancelled' && $resolution === 'replacement') {
+            throw new \RuntimeException('This order was cancelled — send the money back (Money Refund) or give a Store Discount.');
+        }
+
         DB::transaction(function () use ($refund, $resolution, $data, $actingUserId) {
             $base = [
                 'seller_resolution'   => $resolution,
@@ -49,6 +151,7 @@ class RefundService
         });
 
         $refund->refresh()->loadMissing(['order', 'customer', 'coupon']);
+        static::syncCancelledOrderStatus($refund->order);   // J5: last cancelled-order refund sent → order 'refunded'
         $orderNo = $refund->order?->order_number;
 
         $message = match ($resolution) {

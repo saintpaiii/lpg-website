@@ -22,6 +22,29 @@ class PrivateDocument
         abort(404);
     }
 
+    /**
+     * Move one file from the public disk (web-accessible under /storage/…) to the private 'local' disk, keeping its path.
+     * Returns true when the file is private afterwards. Used for files uploaded before they became private.
+     */
+    public static function moveToPrivate(string $path): bool
+    {
+        $public = Storage::disk('public');
+        $local  = Storage::disk('local');
+        if (! $public->exists($path)) {
+            return $local->exists($path);
+        }
+        if (! $local->exists($path)) {
+            $local->put($path, $public->get($path));
+        }
+        if ($local->exists($path) && $local->size($path) === $public->size($path)) {
+            $public->delete($path);
+
+            return true;
+        }
+
+        return false;
+    }
+
     /** Link that opens the file in the browser (checked on every request). */
     public static function url(string $kind, int $id, string $field): string
     {

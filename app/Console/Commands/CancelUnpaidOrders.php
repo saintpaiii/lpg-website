@@ -33,7 +33,7 @@ class CancelUnpaidOrders extends Command
     {
         $cancelled = $confirmed = $skipped = 0;
 
-        $orders = Order::whereIn('payment_mode', ['full', 'consignment'])
+        $orders = Order::whereIn('payment_mode', ['full', 'consignment', 'half'])
             ->where('status', 'pending')
             ->where('payment_status', 'unpaid')
             ->whereDoesntHave('payments', fn ($q) => $q->where('status', 'paid'))

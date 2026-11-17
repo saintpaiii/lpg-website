@@ -1,7 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { overLimitText, type LimitPeriod } from '@/lib/order-limits';
-import { Banknote, ChevronDown, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, Store, TicketPercent, Truck } from 'lucide-react';
+import { Banknote, ChevronDown, CreditCard, Crosshair, Handshake, Loader2, MapPin, Navigation, Recycle, ShieldCheck, ShoppingCart, SplitSquareHorizontal, Store, TicketPercent, Truck } from 'lucide-react';
 import StoreLocationMap from '@/components/store-location-map';
 import { ClosedNote, type StoreHoursStatus } from '@/components/store-badges';
 import { ExchangePolicyLink, type ExchangePolicyData } from '@/components/exchange-policy';
@@ -21,6 +21,7 @@ import { allocateDiscount, type CouponRules } from '@/lib/coupons';
 import TierBadge, { TIER_LABELS, type Tier } from '@/components/tier-badge';
 import type { SharedData } from '@/types';
 import { NotePicker } from '@/components/reason-picker';
+import { halfSplit } from '@/components/half-payment-note';
 
 type CartItem = {
     product_id: number;
@@ -61,6 +62,8 @@ type StoreGroup = {
     max_delivery_radius_km: number | null;
     allow_cod: boolean;
     allow_consignment: boolean;
+    /** J5: 50% online now, the rest online before delivery or cash to the rider (delivery orders only) */
+    allow_half_payment?: boolean;
     /** Store offers "Pick up at the store" (₱0 delivery fee, no rider) */
     allow_pickup?: boolean;
     pickup_instructions?: string | null;
@@ -110,11 +113,12 @@ type Props = {
     savedAddresses?: SavedAddress[];
 };
 
-type PaymentMode = 'full' | 'consignment' | 'cod';
+type PaymentMode = 'full' | 'consignment' | 'cod' | 'half';
 
 const PAYMENT_MODE_META: Record<PaymentMode, { label: string; icon: React.ElementType }> = {
     full:        { label: 'Full Payment',     icon: CreditCard },
     consignment: { label: 'Consignment',      icon: Handshake  },
+    half:        { label: 'Half payment',     icon: SplitSquareHorizontal },
     cod:         { label: 'Cash on Delivery', icon: Banknote   },
 };
 
@@ -354,6 +358,8 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const modesFor = (sg: StoreGroup): PaymentMode[] => [
         'full',
         ...(sg.consignment_available && fulfillmentOf(sg) !== 'pickup' ? (['consignment'] as const) : []),
+        // J5: half payment — only when the store turned it on, and never for pick-up
+        ...(sg.allow_half_payment && fulfillmentOf(sg) !== 'pickup' ? (['half'] as const) : []),
         ...(sg.allow_cod ? (['cod'] as const) : []),
     ];
     const modeOf = (sg: StoreGroup): PaymentMode => {
@@ -404,9 +410,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
         const total    = round2(t.subtotal - t.discount + t.fee - promoCut.total);
         const mode     = modeOf(t.store);
         const dpPct    = dpOf(t.store);
-        const down     = mode === 'consignment' ? round2(total * dpPct / 100) : 0;
-        // Charged online now: full → everything, consignment → down payment, COD → nothing
-        const payNow   = mode === 'full' ? total : mode === 'consignment' ? down : 0;
+        // Half payment: 50% rounded UP to the centavo now (Order::halfSplit), the rest later
+        const down     = mode === 'consignment' ? round2(total * dpPct / 100) : mode === 'half' ? halfSplit(total)[0] : 0;
+        // Charged online now: full → everything, consignment → down payment, half → first half, COD → nothing
+        const payNow   = mode === 'full' ? total : mode === 'consignment' || mode === 'half' ? down : 0;
         return { ...t, promoCut, total, mode, dpPct, down, balance: round2(total - down), payNow };
     });
 
@@ -419,12 +426,19 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
     const payNowTotal   = round2(storeTotals.reduce((s, t) => s + t.payNow, 0));
     const codTotal      = round2(storeTotals.filter((t) => t.mode === 'cod').reduce((s, t) => s + t.total, 0));
     const balanceTotal  = round2(storeTotals.filter((t) => t.mode === 'consignment').reduce((s, t) => s + t.balance, 0));
+    const halfLaterTotal = round2(storeTotals.filter((t) => t.mode === 'half').reduce((s, t) => s + t.balance, 0));
 
     const modeDescription = (sg: StoreGroup, mode: PaymentMode) => ({
         full:        'Pay 100% now via GCash, Maya, Card, or GrabPay',
         consignment: `Pay ${sg.min_down_payment_percent}% down now, settle the balance within ${sg.consignment_due_days} days after delivery`,
         cod:         'Pay in cash to the rider when your order arrives',
+        half:        'Pay 50% now online, the rest online before delivery or in cash to the rider',
     })[mode];
+    /** "Half payment — pay 50% now (₱X), the rest (₱Y) online before delivery or in cash to the rider" */
+    const halfDescription = (total: number) => {
+        const [now, later] = halfSplit(total);
+        return `Pay 50% now (${peso(now)}), the rest (${peso(later)}) online before delivery or in cash to the rider`;
+    };
 
     // Estimated minutes (from OSRM, single store only)
     const estimatedMins = osrmRoute?.durationMin ?? null;
@@ -828,7 +842,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-white">
                                         <CreditCard className="h-4 w-4 text-blue-600" /> Payment Option
                                     </p>
-                                    <div className={`grid gap-2 ${modesFor(sg).length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                                    <div className={`grid gap-2 ${modesFor(sg).length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`} data-testid={`pay-options-${sg.store_id}`}>
                                         {modesFor(sg).map((m) => {
                                             const { icon: Icon } = PAYMENT_MODE_META[m];
                                             const label = m === 'cod' && pickup ? 'Pay at the store (cash)' : PAYMENT_MODE_META[m].label;
@@ -846,7 +860,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                         <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
                                                         <span className={`text-sm font-semibold ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{label}</span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500">{m === 'cod' && pickup ? 'Pay in cash when you pick up your order' : modeDescription(sg, m)}</p>
+                                                    <p className="text-xs text-gray-500">{m === 'cod' && pickup ? 'Pay in cash when you pick up your order' : m === 'half' ? halfDescription(total) : modeDescription(sg, m)}</p>
                                                     {m === 'consignment' && sg.loyalty.tier && (
                                                         <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                                                             <TierBadge tier={sg.loyalty.tier} size="sm" />
@@ -890,6 +904,14 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                             <div className="flex justify-between text-amber-700 dark:text-amber-400">
                                                 <span>Balance — due {sg.consignment_due_days} days after delivery</span><span className="font-medium">{peso(balance)}</span>
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {mode === 'half' && (
+                                        <div className="mt-3 space-y-1 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-900/20" data-testid="half-breakdown">
+                                            <div className="flex justify-between text-gray-700 dark:text-gray-300"><span>Order total</span><span className="font-medium">{peso(total)}</span></div>
+                                            <div className="flex justify-between font-semibold text-blue-700 dark:text-blue-400"><span>First half — pay now online</span><span>{peso(down)}</span></div>
+                                            <div className="flex justify-between text-amber-700 dark:text-amber-400"><span>The rest — online before delivery or cash to the rider</span><span className="font-medium">{peso(balance)}</span></div>
                                         </div>
                                     )}
 
@@ -992,6 +1014,12 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     <div className="flex justify-between text-emerald-700 dark:text-emerald-400">
                                         <span>Cash on delivery</span>
                                         <span>{peso(codTotal)}</span>
+                                    </div>
+                                )}
+                                {halfLaterTotal > 0 && (
+                                    <div className="flex justify-between text-amber-700 dark:text-amber-400">
+                                        <span>Half payment — the rest (before / at delivery)</span>
+                                        <span>{peso(halfLaterTotal)}</span>
                                     </div>
                                 )}
                                 {balanceTotal > 0 && (

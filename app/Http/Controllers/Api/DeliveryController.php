@@ -40,9 +40,7 @@ class DeliveryController extends Controller
                 'payment_method'   => $d->order->payment_method,
                 'payment_status'   => $d->order->payment_status,
                 'payment_mode'     => $d->order->payment_mode ?? 'full',
-                'amount_to_collect'=> $d->order->payment_mode === 'cod' && $d->order->payment_status === 'unpaid'
-                    ? $d->order->grandTotal()
-                    : 0,
+                'amount_to_collect'=> $d->order->amountToCollect(),
                 'customer' => $d->order->customer ? [
                     'id'      => $d->order->customer->id,
                     'name'    => $d->order->customer->name,

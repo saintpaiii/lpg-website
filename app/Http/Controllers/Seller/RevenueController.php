@@ -111,7 +111,7 @@ class RevenueController extends Controller
         $data = $rows->map(fn (Order $o) => [
             'order'     => $o->order_number,
             'delivered' => ($o->delivered_at ?? $o->created_at)->setTimezone('Asia/Manila')->format('M d, Y'),
-            'payment'   => ucfirst($o->payment_mode ?? 'full') . ($o->payment_method ? ' · ' . str_replace('_', ' ', $o->payment_method) : ''),
+            'payment'   => ($o->payment_mode === 'half' ? 'Half payment' : ucfirst($o->payment_mode ?? 'full')) . ($o->payment_method ? ' · ' . str_replace('_', ' ', $o->payment_method) : ''),
             'subtotal'  => $this->peso((float) $o->total_amount),
             'shipping'  => $this->peso((float) $o->shipping_fee),
             'total'     => $this->peso($o->grandTotal()),

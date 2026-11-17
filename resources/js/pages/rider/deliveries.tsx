@@ -94,8 +94,10 @@ type OrderRef = {
     transaction_type: string;
     payment_method: string;
     payment_status: string;
-    payment_mode: 'full' | 'consignment' | 'cod';
+    payment_mode: 'full' | 'consignment' | 'cod' | 'half';
     amount_to_collect: number;
+    /** Half payment (J5): the half paid online */
+    down_payment_amount?: number | null;
     /** Refill: empty tanks to collect */
     empty_tanks_required?: number;
     empty_tank_summary?: string | null;
@@ -846,6 +848,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                 <span className="text-gray-500">
                     {o.payment_mode === 'cod' ? 'Cash on Delivery'
                         : o.payment_mode === 'consignment' ? 'Consignment (balance paid online later)'
+                        : o.payment_mode === 'half' ? (o.payment_status === 'paid' ? 'Half payment (both halves paid)' : 'Half payment (half paid online, rest in cash)')
                         : (PAYMENT_METHOD_LABELS[o.payment_method] ?? o.payment_method)}
                 </span>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STATUS_STYLES[o.payment_status] ?? ''}`}>
@@ -1225,6 +1228,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                             <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                                                 <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
                                                     Collect ₱{d.order.amount_to_collect.toLocaleString('en-PH', { minimumFractionDigits: 2 })} cash
+                                                    {d.order.payment_mode === 'half' && ' (half already paid online)'}
                                                 </span>
                                                 {d.status === 'delivered' && (
                                                     <Button
@@ -1239,8 +1243,8 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                 )}
                                             </div>
                                         )}
-                                        {d.order?.payment_mode === 'cod' && d.order.payment_status === 'paid' && (
-                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">Cash collected</span>
+                                        {(d.order?.payment_mode === 'cod' || d.order?.payment_mode === 'half') && d.order.payment_status === 'paid' && (
+                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{d.order.payment_mode === 'half' ? 'Paid in full' : 'Cash collected'}</span>
                                         )}
 
                                         {!isHistory && ['assigned', 'picked_up', 'in_transit'].includes(d.status) && (

@@ -60,6 +60,7 @@ interface StoreData {
     longitude: number | null;
     attendance_radius: number;
     allow_cod: boolean;
+    allow_half_payment?: boolean;
     allow_pickup: boolean;
     pickup_instructions: string;
 }
@@ -211,6 +212,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         email: string;
         max_delivery_radius_km: string;
         allow_cod: boolean;
+        allow_half_payment: boolean;
         allow_pickup: boolean;
         pickup_instructions: string;
         logo: File | null;
@@ -225,6 +227,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         email:        store.email ?? '',
         max_delivery_radius_km: String(store.max_delivery_radius_km ?? 20),
         allow_cod:                store.allow_cod,
+        allow_half_payment:       !!store.allow_half_payment,
         allow_pickup:             !!store.allow_pickup,
         pickup_instructions:      store.pickup_instructions ?? '',
         logo:                   null,
@@ -267,6 +270,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         fd.append('email',       data.email);
         fd.append('max_delivery_radius_km', data.max_delivery_radius_km || '20');
         fd.append('allow_cod',                data.allow_cod ? '1' : '0');
+        fd.append('allow_half_payment',       data.allow_half_payment ? '1' : '0');
         fd.append('allow_pickup',             data.allow_pickup ? '1' : '0');
         fd.append('pickup_instructions',      data.pickup_instructions);
         // Location fields — sent as numeric strings or empty (→ null on backend)
@@ -447,6 +451,12 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                 hint="The rider collects cash when the order is delivered."
                                 checked={data.allow_cod}
                                 onChange={(v) => setData('allow_cod', v)}
+                            />
+                            <ToggleRow
+                                label="Half payment (50% now, rest on delivery)"
+                                hint="Customers pay half online when they order and the rest online before delivery or in cash to the rider. Not for pick-up."
+                                checked={data.allow_half_payment}
+                                onChange={(v) => setData('allow_half_payment', v)}
                             />
                             {/* Consignment lives in the Loyalty Program (owner only; Pro plan) */}
                             <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">

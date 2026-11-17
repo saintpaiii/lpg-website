@@ -79,6 +79,13 @@ class UsersController extends Controller
                         // What the customer pays (items + delivery fee) — shown in the list
                         'grand_total'  => $o->grandTotal(),
                         'created_at'   => $o->created_at->format('M d, Y'),
+                        // Half payment (J5): "₱X paid online, ₱Y remaining"
+                        'payment_mode'        => $o->payment_mode,
+                        'payment_status'      => $o->payment_status,
+                        'down_payment_amount' => $o->down_payment_amount !== null ? (float) $o->down_payment_amount : null,
+                        'remaining_balance'   => $o->remaining_balance !== null ? (float) $o->remaining_balance : null,
+                        // "Adjusted at handover" — same as the other admin order pages (J5 fix)
+                        'adjustments'  => \App\Services\HandoverAdjustmentService::present($o),
                     ])
                     ->values()
                     ->toArray();

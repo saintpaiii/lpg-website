@@ -33,7 +33,7 @@ type Order = {
     grand_total: number;
     payment_method: string;
     payment_status: string;
-    payment_mode: 'full' | 'consignment' | 'cod';
+    payment_mode: 'full' | 'consignment' | 'cod' | 'half';
     remaining_balance: number | null;
     balance_due_date: string | null;
     is_overdue: boolean;
@@ -330,6 +330,9 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                          order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                                                     </span>
                                                     )}
+                                                    {order.payment_mode === 'half' && order.payment_status === 'partial' && order.remaining_balance !== null && (
+                                                        <p className="mt-0.5 text-[10px] font-medium text-amber-600">Half paid · ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })} left</p>
+                                                    )}
                                                     {order.payment_mode === 'consignment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
                                                         <p className={`text-[10px] font-medium mt-0.5 ${order.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
                                                             Balance: ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -358,7 +361,8 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                                 Pay now
                                                             </Button>
                                                         )}
-                                                        {order.payment_mode === 'consignment' && order.payment_status === 'partial' && (
+                                                        {order.payment_status === 'partial' && (order.payment_mode === 'consignment'
+                                                            || (order.payment_mode === 'half' && !['delivered', 'cancelled'].includes(order.status))) && (
                                                             <Button
                                                                 size="sm"
                                                                 className="h-7 px-2 text-xs bg-blue-600 hover:bg-blue-700 text-white gap-1"

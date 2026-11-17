@@ -34,6 +34,7 @@ import type { RefillItem } from '@/components/tank-not-accepted';
 import { ClosedNote } from '@/components/store-badges';
 import { orderStatusLabel } from '@/lib/order-status';
 import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
+import HalfPaymentNote from '@/components/half-payment-note';
 
 type OrderItem = {
     id: number;
@@ -74,7 +75,7 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
-    payment_mode: 'full' | 'consignment' | 'cod';
+    payment_mode: 'full' | 'consignment' | 'cod' | 'half';
     down_payment_amount: number | null;
     remaining_balance: number | null;
     balance_due_date: string | null;
@@ -197,10 +198,10 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
     const awaitingDown  = isConsignment && order.payment_status === 'unpaid';
     const canConfirm    = order.status === 'pending' && !awaitingDown;
     const canPrepare    = order.status === 'confirmed';
-    // Paid orders, COD orders and consignment orders with the down payment in can be dispatched
+    // Paid orders, COD orders and consignment / half-payment orders with the first payment in can be dispatched (Order::paidEnoughToDispatch)
     const canDispatch   = order.payment_status === 'paid'
         || order.payment_mode === 'cod'
-        || (isConsignment && order.payment_status === 'partial');
+        || ((isConsignment || order.payment_mode === 'half') && order.payment_status === 'partial');
     const isPickup      = order.fulfillment === 'pickup';
     // Pick-up orders never get a rider
     const canAssign     = !isPickup && ['confirmed', 'preparing'].includes(order.status) && canDispatch;
@@ -411,6 +412,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                     <CreditCard className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                     <span className="text-muted-foreground text-xs">
                                         {order.payment_mode === 'consignment' ? 'Consignment (down payment via PayMongo)'
+                                            : order.payment_mode === 'half' ? 'Half Payment (50% online now, rest before delivery or cash to the rider)'
                                             : order.payment_mode === 'cod' ? 'Cash on Delivery'
                                             : 'Full Payment (PayMongo)'}
                                     </span>
@@ -429,7 +431,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                         {order.payment_status === 'paid'      && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                          order.payment_status === 'refunded'  ? 'Refunded' :
-                                         order.payment_status === 'partial'   ? 'Partial (Down Paid)' :
+                                         order.payment_status === 'partial'   ? (order.payment_mode === 'half' ? 'Partial (Half Paid)' : 'Partial (Down Paid)') :
                                          order.payment_status}
                                     </span>
                                 </div>
@@ -467,6 +469,15 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                                 </p>
                                             )
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Half payment (J5) */}
+                                {order.payment_mode === 'half' && (
+                                    <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs dark:border-amber-800 dark:bg-amber-900/20" data-testid="seller-half-payment">
+                                        <HalfPaymentNote order={order} className="block font-semibold" />
+                                        {order.payment_status === 'unpaid' && <p className="mt-0.5 text-muted-foreground">Waiting for the first half online — you can confirm, but a rider can be assigned only after it is paid.</p>}
+                                        {order.payment_status === 'partial' && !isFinal && <p className="mt-0.5 text-muted-foreground">The customer may pay the rest online before delivery; otherwise the rider collects {fmt(order.remaining_balance ?? 0)} cash.</p>}
                                     </div>
                                 )}
 

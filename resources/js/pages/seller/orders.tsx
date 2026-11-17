@@ -40,7 +40,7 @@ type Order = {
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
-    payment_mode: 'full' | 'consignment' | 'cod';
+    payment_mode: 'full' | 'consignment' | 'cod' | 'half';
     remaining_balance: number | null;
     balance_due_date: string | null;
     is_overdue: boolean;
@@ -61,7 +61,7 @@ type Order = {
 /** Confirmed/preparing orders whose payment allows dispatch (same rule as single assignment). */
 const isDispatchable = (o: Order) =>
     o.fulfillment !== 'pickup' && ['confirmed', 'preparing'].includes(o.status)
-    && (o.payment_status === 'paid' || o.payment_mode === 'cod' || (o.payment_mode === 'consignment' && o.payment_status === 'partial'));
+    && (o.payment_status === 'paid' || o.payment_mode === 'cod' || ((o.payment_mode === 'consignment' || o.payment_mode === 'half') && o.payment_status === 'partial'));
 
 type Rider  = { id: number; name: string } & RiderLoadFields;
 type Counts = { pending: number; confirmed: number; preparing: number; out_for_delivery: number; outstanding_balance: number; overdue_balance: number };
@@ -409,7 +409,10 @@ export default function SellerOrders({ orders, counts, tab, filters, riders }: P
                                                      o.payment_status}
                                                 </span>
                                                 {o.payment_mode !== 'full' && (
-                                                    <p className="text-[10px] text-muted-foreground mt-0.5">{o.payment_mode === 'cod' ? 'COD' : 'Consignment'}</p>
+                                                    <p className="text-[10px] text-muted-foreground mt-0.5">{o.payment_mode === 'cod' ? 'COD' : o.payment_mode === 'half' ? 'Half payment' : 'Consignment'}</p>
+                                                )}
+                                                {o.payment_mode === 'half' && o.payment_status === 'partial' && o.remaining_balance !== null && (
+                                                    <span className="mt-0.5 block text-[10px] font-medium text-amber-600">Remaining: ₱{o.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                                 )}
                                                 {o.payment_mode === 'consignment' && o.payment_status === 'partial' && o.remaining_balance !== null && (
                                                     <div className="mt-0.5 flex flex-col items-center gap-0.5">

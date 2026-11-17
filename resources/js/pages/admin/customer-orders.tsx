@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import HalfPaymentNote from '@/components/half-payment-note';
 import OrderAdjustments, { type OrderAdjustment } from '@/components/order-adjustments';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -39,6 +40,10 @@ type Order = {
     items: OrderItem[];
     /** J4: tanks not accepted at handover */
     adjustments?: OrderAdjustment[];
+    /** J5: half payment */
+    payment_mode?: string | null;
+    down_payment_amount?: number | string | null;
+    remaining_balance?: number | string | null;
 };
 
 type PaginatedOrders = {
@@ -171,6 +176,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge value={o.payment_status} colors={PAYMENT_COLORS} />
+                                                    <HalfPaymentNote order={o} className="mt-1 block text-[11px]" />
                                                 </td>
                                                 <td className="px-4 py-3 text-gray-500">{fmtDate(o.created_at)}</td>
                                             </tr>

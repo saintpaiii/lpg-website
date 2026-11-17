@@ -37,6 +37,7 @@ class SettingsController extends Controller
                 'longitude'                => $store->longitude ? (float) $store->longitude : null,
                 'attendance_radius'        => $store->attendance_radius ?? 500,
                 'allow_cod'                => (bool) ($store->allow_cod ?? true),
+                'allow_half_payment'       => (bool) $store->allow_half_payment,   // J5
                 'allow_pickup'             => (bool) $store->allow_pickup,
                 'pickup_instructions'      => $store->pickup_instructions ?? '',
             ],
@@ -196,6 +197,7 @@ class SettingsController extends Controller
             'longitude'         => 'required|numeric|between:-180,180',
             'attendance_radius' => 'nullable|integer|min:50|max:5000',
             'allow_cod'                => 'nullable|boolean',
+            'allow_half_payment'       => 'nullable|boolean',
             'allow_pickup'             => 'nullable|boolean',
             'pickup_instructions'      => 'nullable|string|max:255',
         ], [
@@ -244,6 +246,8 @@ class SettingsController extends Controller
             'longitude'         => $data['longitude'] ?? null,
             'attendance_radius' => $data['attendance_radius'] ?? 500,
             'allow_cod'                => $request->has('allow_cod') ? $request->boolean('allow_cod') : $store->allow_cod,
+            // J5: half payment (50% online now, the rest before delivery or cash to the rider)
+            'allow_half_payment'       => $request->has('allow_half_payment') ? $request->boolean('allow_half_payment') : (bool) $store->allow_half_payment,
             // Consignment (allow / deadline) is edited on the Loyalty Program page
             'allow_pickup'             => $request->has('allow_pickup') ? $request->boolean('allow_pickup') : (bool) $store->allow_pickup,
             'pickup_instructions'      => $request->has('pickup_instructions') ? ($data['pickup_instructions'] ?? null) : $store->pickup_instructions,

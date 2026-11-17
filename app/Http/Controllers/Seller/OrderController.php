@@ -470,9 +470,9 @@ class OrderController extends Controller
                     return back()->with('error', 'Mark the order "Ready for pick-up" before marking it picked up.');
                 }
                 $paidEnough = $order->payment_status === 'paid'
-                    || ($order->payment_mode === 'consignment' && $order->payment_status === 'partial');
+                    || (in_array($order->payment_mode, ['consignment', 'half'], true) && $order->payment_status === 'partial');
                 if (! $paidEnough) {
-                    if ($order->payment_mode === 'consignment' || ! $request->boolean('cash_paid')) {
+                    if (in_array($order->payment_mode, ['consignment', 'half'], true) || ! $request->boolean('cash_paid')) {
                         return back()->with('error', "Record the customer's payment first.");
                     }
                     $cashAtStore = true;
@@ -486,6 +486,8 @@ class OrderController extends Controller
             && $order->payment_mode === 'consignment' && $order->payment_status === 'unpaid') {
             return back()->with('error', 'Cannot confirm this consignment order until the customer pays the down payment.');
         }
+        // J5: what the customer paid before a cancellation flips payment_status to to_refund
+        $paidBeforeCancel = $newStatus === 'cancelled' ? \App\Services\PaymentReceiptService::paidSoFar($order) : 0.0;
 
         $adjusted = ['changed' => false, 'cancelled_all' => false];
         DB::transaction(function () use ($order, $newStatus, $oldStatus, $store, $request, $cashAtStore, $data, &$adjusted) {
@@ -582,6 +584,10 @@ class OrderController extends Controller
             return back()->with('success', 'Every tank was not accepted — all items were cancelled, so the order was cancelled.');
         }
 
+        // J5: cancelled after the customer paid → one automatic refund request (Refunds page)
+        $cancelRefund = $newStatus === 'cancelled' && $paidBeforeCancel > 0
+            ? \App\Services\RefundService::forCancelledOrder($order, $paidBeforeCancel) : null;
+
         if ($cashAtStore) {
             NotificationService::sendToStore(
                 $order->store_id,
@@ -616,7 +622,8 @@ class OrderController extends Controller
         }
 
         $label = $order->fresh()->statusLabel();
-        return back()->with('success', "Order {$order->order_number} marked as {$label}" . ($cashAtStore ? ' — cash payment recorded.' : '.'));
+        return back()->with('success', "Order {$order->order_number} marked as {$label}" . ($cashAtStore ? ' — cash payment recorded.' : '.')
+            . ($cancelRefund ? ' A refund request for ₱' . number_format((float) $cancelRefund->amount, 2) . ' was created — send it back from Refunds.' : ''));
     }
 
     public function markRefunded(Order $order): RedirectResponse
@@ -629,6 +636,8 @@ class OrderController extends Controller
         }
 
         $order->update(['payment_status' => 'refunded']);
+        // J5: keep the automatic refund request in step (one record of the refund)
+        \App\Services\RefundService::closeCancelledOrderRefunds($order, (int) auth()->id());
 
         return back()->with('success', "Order {$order->order_number} marked as refunded.");
     }
@@ -710,8 +719,7 @@ class OrderController extends Controller
             return back()->with('error', "Order {$bad->order_number}'s address is not mapped, so it can't be routed. Assign it individually instead.");
         }
         // Same payment rule as single assignment: paid, COD, or consignment with the down payment in
-        if ($bad = $orders->first(fn ($o) => ! ($o->payment_status === 'paid' || $o->payment_mode === 'cod'
-                || ($o->payment_mode === 'consignment' && $o->payment_status === 'partial')))) {
+        if ($bad = $orders->first(fn ($o) => ! $o->paidEnoughToDispatch())) {
             return back()->with('error', "Order {$bad->order_number} is awaiting payment and can't be dispatched yet.");
         }
 
