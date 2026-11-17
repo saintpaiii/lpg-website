@@ -77,6 +77,15 @@ trait BuildsLpgWorld
         return $this->makeUser($attrs + ['name' => 'Rider ' . Str::random(4), 'first_name' => 'Rider' . Str::random(3), 'role' => 'seller_staff', 'sub_role' => 'rider', 'store_id' => $store->id]);
     }
 
+    /** An approved, unexpired driver's license → the rider counts for "the store can deliver" (Store::hasEligibleRider). */
+    protected function giveLicense(User $rider): User
+    {
+        \App\Models\StaffDocument::forceCreate(['user_id' => $rider->id, 'store_id' => $rider->store_id, 'doc_type' => 'drivers_license',
+            'file_path' => 'staff_documents/license.jpg', 'status' => 'approved', 'expires_at' => now()->addYear()->toDateString(), 'reviewed_at' => now()]);
+
+        return $rider;
+    }
+
     /** A customer account + its customers row. */
     protected function makeCustomer(array $attrs = []): array
     {

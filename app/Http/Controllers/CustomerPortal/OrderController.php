@@ -143,6 +143,12 @@ class OrderController extends Controller
                 return ['status' => 'paid', 'message' => 'Payment received, but this order was cancelled. The store will refund you.'];
             }
 
+            // K5: this payment was more than the order still owed (e.g. the rider already collected the cash) →
+            // applyOnlinePayment created ONE 'overpayment' refund for it (refund_requests.payment_id is unique)
+            if ($extra = \App\Models\RefundRequest::where('payment_id', $payment->id)->where('reason', 'overpayment')->value('amount')) {
+                return ['status' => 'overpaid', 'message' => 'We received an extra payment of ₱' . number_format((float) $extra, 2) . '. A refund request was created automatically.'];
+            }
+
             if ($newStatus === 'partial') {
                 return ['status' => 'partial', 'message' => 'Down payment confirmed! The remaining balance is due after delivery.'];
             }
@@ -320,9 +326,15 @@ class OrderController extends Controller
 
         $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments', 'store']);
 
-        // Auto-verify when returning from PayMongo success URL
-        if ($request->query('payment') === 'success' && $order->payment_status !== 'paid') {
-            $this->attemptVerifyPayment($order);
+        // Auto-verify when returning from PayMongo success URL — also when the order is already paid but a checkout row is
+        // still pending (an older "Pay the remaining" page finished after the rider collected cash): that payment is
+        // recorded and its extra becomes an automatic 'overpayment' refund, without waiting for the webhook (K5)
+        if ($request->query('payment') === 'success'
+            && ($order->payment_status !== 'paid' || $order->payments->contains('status', 'pending'))) {
+            $result = $this->attemptVerifyPayment($order);
+            if ($result['status'] === 'overpaid') {
+                session()->now('success', $result['message']);
+            }
             // Refresh model so the response reflects any updates just made
             $order->refresh();
             $order->load(['items.product', 'delivery.rider', 'delivery.proofs', 'invoice', 'payments', 'store']);

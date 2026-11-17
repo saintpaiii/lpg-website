@@ -11,6 +11,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import {
     peso,
+    preferredLine,
     REASON_LABELS,
     REFUND_STATUS_LABELS,
     REFUND_STATUS_STYLES,
@@ -207,11 +208,14 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                         <p className="text-xs text-muted-foreground mt-0.5">
                                             {r.customer_name}{r.customer_phone && ` · ${r.customer_phone}`} · {REASON_LABELS[r.reason] ?? r.reason} · {r.created_at}
                                         </p>
-                                        {r.preferred_resolution && (
-                                            <p className="text-xs mt-0.5">
-                                                Customer prefers: <span className="font-semibold">{RESOLUTION_LABELS[r.preferred_resolution]}</span>
-                                            </p>
-                                        )}
+                                        {(() => {
+                                            const line = preferredLine(r, 'seller');
+                                            return line && (
+                                                <p className="text-xs mt-0.5" data-testid="refund-type">
+                                                    {line.label} <span className="font-semibold">{line.value}</span>
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {r.escalated_to_admin && !r.admin_decision && (

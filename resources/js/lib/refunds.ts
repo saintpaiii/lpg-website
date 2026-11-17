@@ -61,6 +61,20 @@ export const RESOLUTION_LABELS: Record<RefundResolution, string> = {
     store_discount: 'Store Discount',
 };
 
+/** Refunds the SYSTEM created (a paid order was cancelled / the customer paid twice) — the customer didn't ask for them. */
+export const AUTOMATIC_REFUND_REASONS = ['order_cancelled', 'overpayment'];
+export const isAutomaticRefund = (reason: string | null | undefined) => !!reason && AUTOMATIC_REFUND_REASONS.includes(reason);
+
+/**
+ * The "what kind of refund" line: "Refund type: Money refund (automatic)" for automatic refunds (both sides);
+ * otherwise the customer's own choice — "You asked for: …" (customer) / "Customer prefers: …" (seller).
+ */
+export function preferredLine(r: { reason: string; preferred_resolution?: RefundResolution | null }, side: 'customer' | 'seller'): { label: string; value: string } | null {
+    if (isAutomaticRefund(r.reason)) return { label: 'Refund type:', value: 'Money refund (automatic)' };
+    if (!r.preferred_resolution) return null;
+    return { label: side === 'customer' ? 'You asked for:' : 'Customer prefers:', value: RESOLUTION_LABELS[r.preferred_resolution] };
+}
+
 export const RETURN_METHOD_LABELS: Record<ReturnMethod, string> = {
     rider_pickup:     'Rider picks up the item',
     customer_dropoff: 'Customer drops off the item',

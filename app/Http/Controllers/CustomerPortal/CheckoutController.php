@@ -202,6 +202,29 @@ class CheckoutController extends Controller
 
     // ─────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Fleet DSS (K5): every store group of this checkout that no vehicle can carry (too heavy / too many of one size)
+     * → one VehicleCapacityMiss (deduped). Pick-up-only stores are skipped. Never breaks the page.
+     */
+    private function logCapacityMisses(array $checkoutStores, int $userId): void
+    {
+        try {
+            foreach ($checkoutStores as $group) {
+                $store = Store::with(['vehicles', 'deliveryRates'])->find($group['store_id']);
+                if (! $store || ! $store->canDeliver()) {
+                    continue;   // pick-up only / hidden: not a capacity problem
+                }
+                $products = Product::whereIn('id', array_column($group['items'], 'product_id'))->get()->keyBy('id');
+                $load = DeliveryFeeService::orderLoad(collect($group['items'])->map(fn ($i) => ['product' => $products->get($i['product_id']), 'quantity' => (int) $i['quantity']]));
+                if ($load['tanks'] > 0 && ($reason = \App\Models\VehicleCapacityMiss::reasonFor($store, $load))) {
+                    \App\Models\VehicleCapacityMiss::record($store->id, $userId, $load, $reason);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Checkout: capacity miss logging failed', ['user_id' => $userId, 'error' => $e->getMessage()]);
+        }
+    }
+
     public function index(Request $request): Response|RedirectResponse
     {
         // Block unverified customers from reaching checkout
@@ -230,6 +253,10 @@ class CheckoutController extends Controller
         if (empty($checkoutStores)) {
             return redirect('/customer/products')->with('error', 'Your cart is empty. Browse products to start shopping.');
         }
+
+        // K5: the page disables "Place Order" when no vehicle can carry a store's order, so the POST never happens —
+        // log the capacity miss for the Fleet DSS when the page loads (deduped per customer + store, 10 min)
+        $this->logCapacityMisses($checkoutStores, $userId);
 
         // Initial delivery pin: always from the customer's TEXT address (barangay_coordinates lookup,
         // else city centre). customers.latitude/longitude is deliberately NOT used — pins set at
@@ -601,8 +628,7 @@ class CheckoutController extends Controller
                         $store->loadMissing(['vehicles', 'deliveryRates']);
                         if (! DeliveryFeeService::quote($store, null, $load['kg'], $load['tanks'], $load['by_size'])
                             && DeliveryFeeService::whyNoVehicleCode($store, $load['kg'], $load['tanks'], $load['by_size']) === 'too_heavy') {
-                            \App\Models\VehicleCapacityMiss::create(['store_id' => $store->id, 'user_id' => $request->user()->id, 'kg' => $load['kg'],
-                                'tanks' => $load['tanks'], 'by_size' => $load['by_size'], 'reason' => 'switched_to_pickup']);
+                            \App\Models\VehicleCapacityMiss::record($store->id, $request->user()->id, $load, 'switched_to_pickup');
                         }
                     }
 
@@ -910,12 +936,9 @@ class CheckoutController extends Controller
         } catch (CheckoutRuleException $e) {
             // Stock / max per order: the customer sees the real reason (the transaction rolled back)
             if ($e->capacityMiss) {
-                // Saved now, outside the rolled-back transaction — at most one per customer + store per 10 minutes (retries)
-                $recent = \App\Models\VehicleCapacityMiss::where('store_id', $e->capacityMiss['store_id'])->where('user_id', auth()->id())
-                    ->where('created_at', '>=', now()->subMinutes(10))->exists();
-                if (! $recent) {
-                    \App\Models\VehicleCapacityMiss::create($e->capacityMiss + ['user_id' => auth()->id()]);
-                }
+                // Saved now, outside the rolled-back transaction — at most one per customer + store per 10 minutes
+                // (retries, and the row the page load already wrote)
+                \App\Models\VehicleCapacityMiss::record($e->capacityMiss['store_id'], auth()->id(), $e->capacityMiss, $e->capacityMiss['reason']);
             }
             return $error($e->getMessage());
         } catch (\App\Exceptions\PaymentServiceUnavailable $e) {

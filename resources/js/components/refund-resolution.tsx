@@ -1,5 +1,5 @@
 import { Gavel, Package, ShieldAlert, TicketPercent, Wallet2, XCircle } from 'lucide-react';
-import { peso, RESOLUTION_LABELS, RETURN_METHOD_LABELS, type RefundItem } from '@/lib/refunds';
+import { peso, preferredLine, RETURN_METHOD_LABELS, type RefundItem } from '@/lib/refunds';
 
 /** Seller's resolution, escalation and admin decision for a refund request. */
 export function RefundResolution({ refund: r }: { refund: RefundItem }) {
@@ -58,8 +58,8 @@ export function RefundResolution({ refund: r }: { refund: RefundItem }) {
                 </Box>
             )}
 
-            {r.preferred_resolution && !r.seller_resolution && r.status === 'pending' && (
-                <p className="text-xs text-muted-foreground">Customer prefers: {RESOLUTION_LABELS[r.preferred_resolution]}</p>
+            {!r.seller_resolution && r.status === 'pending' && preferredLine(r, 'seller') && (
+                <p className="text-xs text-muted-foreground">{preferredLine(r, 'seller')!.label} {preferredLine(r, 'seller')!.value}</p>
             )}
         </div>
     );

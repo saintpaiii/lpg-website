@@ -15,10 +15,10 @@ import {
 import CustomerLayout from '@/layouts/customer-layout';
 import {
     peso,
+    preferredLine,
     REASON_LABELS,
     REFUND_STATUS_LABELS,
     REFUND_STATUS_STYLES,
-    RESOLUTION_LABELS,
     type RefundItem,
 } from '@/lib/refunds';
 import { ReasonTextPicker } from '@/components/reason-picker';
@@ -124,11 +124,14 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                                             {r.store_name && <span>{r.store_name} · </span>}
                                             {REASON_LABELS[r.reason] ?? r.reason} · {r.created_at}
                                         </p>
-                                        {r.preferred_resolution && (
-                                            <p className="text-xs text-muted-foreground">
-                                                You asked for: {RESOLUTION_LABELS[r.preferred_resolution]}
-                                            </p>
-                                        )}
+                                        {(() => {
+                                            const line = preferredLine(r, 'customer');
+                                            return line && (
+                                                <p className="text-xs text-muted-foreground" data-testid="refund-type">
+                                                    {line.label} {line.value}
+                                                </p>
+                                            );
+                                        })()}
                                     </div>
                                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${REFUND_STATUS_STYLES[r.status] ?? 'bg-gray-100 text-gray-600'}`}>
                                         {REFUND_STATUS_LABELS[r.status] ?? r.status}
