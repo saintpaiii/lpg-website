@@ -38,6 +38,7 @@ type Order = {
     /** Failed delivery waiting for a new rider */
     redelivery: { short: string | null; reason_label: string | null; range_label: string | null } | null;
     transaction_type: string;
+    type_label?: string;
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
@@ -377,7 +378,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                                             )}
                                             <td className="px-4 py-3">
                                                 <p className="flex flex-wrap items-center gap-1.5 font-mono text-xs text-blue-600 font-medium">{o.order_number}<SeenPill flags={seen.get(o.id)} className="font-sans" /></p>
-                                                <p className="text-xs text-muted-foreground capitalize">{o.transaction_type.replace('_', ' ')}</p>
+                                                <p className="text-xs text-muted-foreground">{o.type_label ?? o.transaction_type.replace('_', ' ')}</p>
                                                 <div className="mt-0.5"><FulfillmentBadge fulfillment={o.fulfillment} /></div>
                                             </td>
                                             <td className="px-4 py-3 hidden sm:table-cell">{o.customer?.name ?? '—'}</td>

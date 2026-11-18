@@ -54,13 +54,14 @@ class LocationController extends Controller
             'accuracy'    => $data['accuracy'] ?? null,
         ]);
 
-        // Keep only last 50 records per delivery
-        $ids = RiderLocation::where('delivery_id', $delivery->id)
+        // Keep only the last 50 records per delivery. K7: MySQL/MariaDB reject OFFSET without LIMIT, so find the id of
+        // the 50th newest row and delete everything older.
+        $cut = RiderLocation::where('delivery_id', $delivery->id)
             ->orderByDesc('id')
-            ->skip(50)
-            ->pluck('id');
-        if ($ids->isNotEmpty()) {
-            RiderLocation::whereIn('id', $ids)->delete();
+            ->skip(49)->take(1)
+            ->value('id');
+        if ($cut) {
+            RiderLocation::where('delivery_id', $delivery->id)->where('id', '<', $cut)->delete();
         }
 
         return response()->json(['success' => true, 'at' => now()->toIso8601String()]);

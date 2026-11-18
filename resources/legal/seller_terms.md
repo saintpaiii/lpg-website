@@ -1,7 +1,7 @@
 These Seller Terms apply to every store owner ("Seller") who sells LPG on {company_name} (the "Platform"). By submitting a seller application, you agree to these Seller Terms, the Customer Terms of Service where they apply to your customers, and our Privacy Policy.
 
 ## 1. Eligibility and documents
-- You must operate a legal LPG business in Cavite and upload valid documents: a valid ID, BIR registration, Business Permit, Fire Safety Inspection Certificate (FSIC), DOE LPG license and LTO permit.
+- You must operate a legal LPG business in Cavite and upload valid documents: a valid government ID with a live selfie, BIR Certificate of Registration, Business / Mayor's Permit, Fire Safety Inspection Certificate (FSIC), DOE License to Operate (LPG retail outlet), and DTI Business Name certificate (or SEC registration for corporations / partnerships).
 - All documents must be authentic and up to date. The Platform reviews them before your store is approved.
 - Expired, fake or missing documents can lead to rejection or suspension of your store.
 

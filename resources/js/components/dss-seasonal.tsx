@@ -14,7 +14,7 @@ type ChartPoint = { ym: string; label: string; actual: number | null; fitted: nu
 type ForecastMonth = { ym: string; label: string; month: number; qty: number; index: number; normal: number };
 export type SeasonalSeries = {
     key: string; kind: 'total' | 'group' | 'product'; label: string; unit: string; product_id?: number;
-    method: 'cma' | 'mean' | 'none'; method_label: string; months: number; enough: boolean; message: string | null;
+    method: 'cma' | 'mean' | 'none'; method_label: string; months: number; enough: boolean; basis?: 'months' | 'recent'; message: string | null;
     indices: Record<string, number>; peaks: number[]; lows: number[]; trend: { level: number; slope: number };
     current: { ym: string; label: string; qty: number; remaining_days: number; remaining_qty: number };
     forecast: ForecastMonth[]; next_30: number; next_90: number;
@@ -74,7 +74,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
 
             {s.message && (
                 <p className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="seasonal-not-enough">
-                    <Info className="h-4 w-4 shrink-0" /> {s.message} The forecast below uses the plain trend.
+                    <Info className="h-4 w-4 shrink-0" /> {s.message}{s.basis === 'recent' ? '' : ' The forecast below uses the plain trend.'}
                 </p>
             )}
 

@@ -167,6 +167,22 @@ class Order extends Model
         return $text;
     }
 
+    /**
+     * K7: the real mix of an order — each kind present, in this order: "Refill", "New purchase", "Accessory"
+     * (e.g. "Refill + Accessory"). From the items (accessories by product type); the order's own transaction_type
+     * (still used by the filters) only when it has no items.
+     */
+    public function typeLabel(): string
+    {
+        $kinds = [];
+        foreach ($this->items as $i) {
+            $kinds[$i->product?->isAccessory() ? 'Accessory' : (($i->transaction_type ?? $this->transaction_type) === 'refill' ? 'Refill' : 'New purchase')] = true;
+        }
+        $ordered = array_values(array_filter(['Refill', 'New purchase', 'Accessory'], fn ($k) => isset($kinds[$k])));
+
+        return $ordered ? implode(' + ', $ordered) : ($this->transaction_type === 'refill' ? 'Refill' : ($this->transaction_type ? 'New purchase' : '—'));
+    }
+
     /** Status shown to people: pick-up orders say "Ready for pick-up" / "Picked up". */
     public function statusLabel(): string
     {

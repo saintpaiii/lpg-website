@@ -48,6 +48,7 @@ class OrderController extends Controller
             // Full-tank load (kg / tanks) — rider pickers check what fits the rider's vehicle
             'load'             => \App\Services\DeliveryFeeService::orderLoad($o->items),
             'transaction_type' => $o->transaction_type,
+            'type_label'       => $o->typeLabel(),
             'total_amount'     => (float) $o->total_amount,
             'payment_method'      => $o->payment_method,
             'payment_status'      => $o->payment_status,
@@ -189,7 +190,7 @@ class OrderController extends Controller
         $tab    = $request->input('tab', 'active');
         $format = $request->get('format', 'csv');
 
-        $query = Order::with(['customer'])
+        $query = Order::with(['customer', 'items.product'])
             ->where('store_id', $store->id);
 
         if ($tab === 'archived') {
@@ -229,7 +230,7 @@ class OrderController extends Controller
             'customer_name'    => $o->customer?->name ?? '—',
             'created_at'       => $o->created_at->setTimezone('Asia/Manila')->format('M d, Y'),
             'status'           => $o->statusLabel() . ($o->isPickup() ? ' (pick-up)' : ''),
-            'transaction_type' => $o->transaction_type ?? '—',
+            'transaction_type' => $o->typeLabel(),
             'payment_method'   => $o->payment_method ?? '—',
             'payment_status'   => $o->payment_status,
             // Export shows what the customer pays (items + delivery fee), same as the list

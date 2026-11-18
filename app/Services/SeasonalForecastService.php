@@ -138,7 +138,7 @@ class SeasonalForecastService
      *
      * @param  array<string, float|int>  $series  "YYYY-MM" => sales, consecutive, oldest first
      */
-    public static function analyse(array $series, CarbonInterface $today, ?array $cfg = null): array
+    public static function analyse(array $series, CarbonInterface $today, ?array $cfg = null, ?array $recent = null): array
     {
         $cfg ??= config('forecast');
         $yms = array_keys($series);
@@ -150,17 +150,20 @@ class SeasonalForecastService
         $current = $today->format('Y-m');
         // t of the current month: right after the last complete month (the series always ends the month before)
         $tCur = $n;
+        $daysIn = fn (string $ym) => Carbon::parse("{$ym}-01")->daysInMonth;
+        // K7: no complete month yet (a new store / product) → a flat daily rate from the recent days instead of 0
+        $rate = $n === 0 && $recent && ($recent['qty'] ?? 0) > 0 && ($recent['days'] ?? 0) > 0 ? $recent['qty'] / $recent['days'] : null;
 
         // Forecast: the current month (in full + the remaining days) and the next N calendar months
         $monthly = [];
         for ($k = 0; $k <= (int) $cfg['forecast_months']; $k++) {
             $ym = static::addMonths($current, $k);
             $m = (int) substr($ym, 5, 2);
-            $f = static::forecastAt($trend, $tCur + $k, $idx[$m]);
+            $f = $rate !== null ? $rate * $daysIn($ym) : static::forecastAt($trend, $tCur + $k, $idx[$m]);
+            $normal = $rate !== null ? $f : max(0.0, $trend['intercept'] + $trend['slope'] * ($tCur + $k));
             $monthly[$ym] = ['ym' => $ym, 'label' => static::label($ym), 'month' => $m, 'qty' => (int) round($f), 'raw' => $f,
-                'index' => $idx[$m], 'normal' => (int) round(max(0.0, $trend['intercept'] + $trend['slope'] * ($tCur + $k)))];
+                'index' => $idx[$m], 'normal' => (int) round($normal)];
         }
-        $daysIn = fn (string $ym) => Carbon::parse("{$ym}-01")->daysInMonth;
         $sumDays = function (int $days) use ($today, $monthly, $daysIn) {
             $total = 0.0;
             for ($i = 0; $i < $days; $i++) {
@@ -225,7 +228,10 @@ class SeasonalForecastService
             'method'       => $ind['method'],
             'months'       => $n,
             'enough'       => $ind['method'] !== 'none',
-            'message'      => $ind['method'] === 'none' ? "Not enough history for seasonality (need {$cfg['min_months']} months; you have {$n})." : null,
+            'basis'        => $rate !== null ? 'recent' : 'months',
+            'message'      => $rate !== null
+                ? 'Based on your last ' . $recent['days'] . ' ' . ($recent['days'] === 1 ? 'day' : 'days') . ' (not enough history for seasonality).'
+                : ($ind['method'] === 'none' ? "Not enough history for seasonality (need {$cfg['min_months']} months; you have {$n})." : null),
             'method_label' => match ($ind['method']) {
                 'cma'  => "ratio-to-moving-average, {$n} months",
                 'mean' => "ratio-to-mean, {$n} months",
@@ -288,15 +294,36 @@ class SeasonalForecastService
             ->whereNull('orders.deleted_at')->whereNull('order_items.deleted_at')
             ->where('orders.created_at', '>=', $start)->where('orders.created_at', '<', $end)
             ->groupBy('order_items.product_id', DB::raw('YEAR(orders.created_at)'), DB::raw('MONTH(orders.created_at)'))
-            ->selectRaw('order_items.product_id AS pid, YEAR(orders.created_at) AS y, MONTH(orders.created_at) AS m, SUM(order_items.quantity) AS q')->get();
+            ->selectRaw('order_items.product_id AS pid, YEAR(orders.created_at) AS y, MONTH(orders.created_at) AS m, SUM(order_items.quantity) AS q, MIN(DATE(orders.created_at)) AS d')->get();
         $historyRows = DB::table('sales_history')->where('store_id', $store->id)
             ->where('sold_on', '>=', $start->toDateString())->where('sold_on', '<', $end->toDateString())
             ->groupBy('product_id', 'size_group', DB::raw('YEAR(sold_on)'), DB::raw('MONTH(sold_on)'))
-            ->selectRaw('product_id AS pid, size_group AS g, YEAR(sold_on) AS y, MONTH(sold_on) AS m, SUM(quantity) AS q')->get();
+            ->selectRaw('product_id AS pid, size_group AS g, YEAR(sold_on) AS y, MONTH(sold_on) AS m, SUM(quantity) AS q, MIN(sold_on) AS d')->get();
+
+        // K7: the recent days of the CURRENT month (≤ 30) — the forecast of a series with no complete month yet
+        $recentFrom = $today->copy()->subDays(29)->max($end);
+        $recentTo = $today->copy()->addDay();
+        $recentRows = DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->where('orders.store_id', $store->id)->where('orders.status', '!=', 'cancelled')
+            ->whereNull('orders.deleted_at')->whereNull('order_items.deleted_at')
+            ->where('orders.created_at', '>=', $recentFrom)->where('orders.created_at', '<', $recentTo)
+            ->groupBy('order_items.product_id')
+            ->selectRaw('order_items.product_id AS pid, NULL AS g, SUM(order_items.quantity) AS q, MIN(DATE(orders.created_at)) AS d')->get()
+            ->concat(DB::table('sales_history')->where('store_id', $store->id)
+                ->where('sold_on', '>=', $recentFrom->toDateString())->where('sold_on', '<', $recentTo->toDateString())
+                ->groupBy('product_id', 'size_group')
+                ->selectRaw('product_id AS pid, size_group AS g, SUM(quantity) AS q, MIN(sold_on) AS d')->get());
 
         $total = $groups = $byProduct = [];
+        $first = $recent = [];   // series key → [ym → earliest date] / ['qty', 'first']
         $orderMonths = [];
-        $add = function (?int $pid, ?string $g, int $y, int $m, int $q) use (&$total, &$groups, &$byProduct, $products, $group) {
+        $keysOf = function (?int $pid, ?string $g) use ($products, $group) {
+            $p = $pid ? $products->get($pid) : null;
+            $g = $p ? $group($p) : ($g ?: 'other');
+
+            return array_filter(['total', "group:{$g}", $pid ? "product:{$pid}" : null]);
+        };
+        $add = function (?int $pid, ?string $g, int $y, int $m, int $q, ?string $d) use (&$total, &$groups, &$byProduct, &$first, $products, $group, $keysOf) {
             $ym = sprintf('%04d-%02d', $y, $m);
             $total[$ym] = ($total[$ym] ?? 0) + $q;
             $p = $pid ? $products->get($pid) : null;
@@ -305,30 +332,61 @@ class SeasonalForecastService
             if ($pid) {
                 $byProduct[$pid][$ym] = ($byProduct[$pid][$ym] ?? 0) + $q;
             }
+            if ($d && $q > 0) {
+                foreach ($keysOf($pid, $g) as $k) {
+                    $first[$k][$ym] = isset($first[$k][$ym]) ? min($first[$k][$ym], $d) : $d;
+                }
+            }
         };
         foreach ($orderRows as $r) {
-            $add($r->pid ? (int) $r->pid : null, null, (int) $r->y, (int) $r->m, (int) $r->q);
+            $add($r->pid ? (int) $r->pid : null, null, (int) $r->y, (int) $r->m, (int) $r->q, $r->d ? substr((string) $r->d, 0, 10) : null);
             $orderMonths[sprintf('%04d-%02d', $r->y, $r->m)] = true;
         }
         foreach ($historyRows as $r) {
-            $add($r->pid ? (int) $r->pid : null, $r->g, (int) $r->y, (int) $r->m, (int) $r->q);
+            $add($r->pid ? (int) $r->pid : null, $r->g, (int) $r->y, (int) $r->m, (int) $r->q, $r->d ? substr((string) $r->d, 0, 10) : null);
         }
+        foreach ($recentRows as $r) {
+            if ((int) $r->q <= 0) {
+                continue;
+            }
+            $d = substr((string) $r->d, 0, 10);
+            foreach ($keysOf($r->pid ? (int) $r->pid : null, $r->g) as $k) {
+                $recent[$k]['qty'] = ($recent[$k]['qty'] ?? 0) + (int) $r->q;
+                $recent[$k]['first'] = isset($recent[$k]['first']) ? min($recent[$k]['first'], $d) : $d;
+            }
+        }
+
+        // complete months → partial first month dropped / scaled → analysis (with the recent-days fallback)
+        $windowStart = $start->format('Y-m');
+        $run = function (string $key, array $byMonth) use ($end, $today, $cfg, $first, $recent, $windowStart) {
+            $s = static::complete($byMonth, $end);
+            $firstYm = array_key_first($s);
+            // The window's first month may hold older sales outside the window → never treated as a partial start
+            if ($firstYm !== null && $firstYm !== $windowStart) {
+                $s = static::partialFirst($s, $first[$key][$firstYm] ?? null, (int) $cfg['min_months']);
+            }
+            $r = isset($recent[$key]) ? ['qty' => $recent[$key]['qty'],
+                'days' => min(30, (int) Carbon::parse($recent[$key]['first'])->diffInDays($today) + 1)] : null;
+
+            return static::analyse($s, $today, $cfg, $r);
+        };
 
         // Same 30 / 90 days last year (for "vs last year" on the forecast cards): 2 queries
         $ly = static::lastYearWindows($store->id, $today);
 
         $series = [];
         $series['total'] = ['key' => 'total', 'kind' => 'total', 'label' => 'All products (store total)', 'unit' => 'units']
-            + static::analyse(static::complete($total, $end), $today, $cfg) + ['last_year' => $ly['total']];
-        $groupKeys = collect(array_keys($groups))->sortBy(fn ($g) => $g === 'accessory' ? 9999 : ($g === 'other' ? 9998 : (float) $g))->values();
+            + $run('total', $total) + ['last_year' => $ly['total']];
+        $groupKeys = collect(array_keys($groups + array_flip(array_map(fn ($k) => substr($k, 6), array_filter(array_keys($recent), fn ($k) => str_starts_with($k, 'group:'))))))
+            ->sortBy(fn ($g) => $g === 'accessory' ? 9999 : ($g === 'other' ? 9998 : (float) $g))->values();
         foreach ($groupKeys as $g) {
             $series["group:{$g}"] = ['key' => "group:{$g}", 'kind' => 'group', 'label' => $g === 'accessory' ? 'Accessories (all)' : ($g === 'other' ? 'Other products' : "All {$g} tanks"),
-                'unit' => $g === 'accessory' ? 'units' : 'tanks'] + static::analyse(static::complete($groups[$g], $end), $today, $cfg)
+                'unit' => $g === 'accessory' ? 'units' : 'tanks'] + $run("group:{$g}", $groups[$g] ?? [])
                 + ['last_year' => $ly['groups'][$g] ?? ['d30' => 0, 'd90' => 0, 'known' => $ly['known']]];
         }
         foreach ($products->filter(fn ($p) => ! $p->trashed() && $p->is_active)->sortBy('name') as $p) {
             $series["product:{$p->id}"] = ['key' => "product:{$p->id}", 'kind' => 'product', 'label' => $p->name, 'product_id' => $p->id,
-                'unit' => $p->isAccessory() ? 'units' : 'tanks'] + static::analyse(static::complete($byProduct[$p->id] ?? [], $end), $today, $cfg)
+                'unit' => $p->isAccessory() ? 'units' : 'tanks'] + $run("product:{$p->id}", $byProduct[$p->id] ?? [])
                 + ['last_year' => $ly['products'][$p->id] ?? ['d30' => 0, 'd90' => 0, 'known' => $ly['known']]];
         }
 
@@ -379,6 +437,57 @@ class SeasonalForecastService
         }
 
         return array_slice($out, $start, null, true);
+    }
+
+    /**
+     * K7: a series whose earliest sale is after the 1st of its first month (a store / product that started mid-month,
+     * or demo history starting on e.g. Nov 19) → that month is partial. Drop it, unless that leaves fewer than
+     * $min complete months — then scale it to a full-month estimate (total × days in month ÷ days covered).
+     *
+     * @param  array<string, int>  $series  complete() output
+     */
+    public static function partialFirst(array $series, ?string $firstDate, int $min = 12): array
+    {
+        $ym = array_key_first($series);
+        if ($ym === null || ! $firstDate) {
+            return $series;
+        }
+        $d = Carbon::parse($firstDate);
+        if ($d->format('Y-m') !== $ym || $d->day === 1) {
+            return $series;
+        }
+        if (count($series) - 1 >= $min) {
+            return array_slice($series, 1, null, true);
+        }
+        $covered = $d->daysInMonth - $d->day + 1;
+        $series[$ym] = (int) round($series[$ym] * $d->daysInMonth / $covered);
+
+        return $series;
+    }
+
+    /**
+     * K7: how much to order for a peak month. The store keeps selling until the peak starts, so:
+     *   sold_before = forecast demand from today (its remaining part included) to the day before the peak month
+     *                 (each month's forecast ÷ its days)
+     *   projected   = usable + on order − sold_before
+     *   order       = max(0, ceil(peak forecast − max(projected, 0)))
+     *
+     * @param  array<string, array{raw: float}>  $monthly  analyse()['_monthly']
+     * @return array{sold_before: int, projected: int, order: int}
+     */
+    public static function peakOrder(int $usable, int $onOrder, array $monthly, string $peakYm, CarbonInterface $today): array
+    {
+        $peakStart = Carbon::parse("{$peakYm}-01");
+        $sold = 0.0;
+        for ($d = Carbon::parse($today->toDateString()); $d->lt($peakStart); $d = $d->copy()->addDay()) {
+            $ym = $d->format('Y-m');
+            $sold += isset($monthly[$ym]) ? $monthly[$ym]['raw'] / $d->daysInMonth : 0.0;
+        }
+        $projected = $usable + $onOrder - $sold;
+        $peak = (float) ($monthly[$peakYm]['raw'] ?? 0);
+
+        return ['sold_before' => (int) round($sold), 'projected' => (int) round($projected),
+            'order' => (int) max(0, ceil(round($peak - max($projected, 0.0), 6)))];
     }
 
     /** Units sold in the same 30 / 90 days one year ago (orders + history), per product, size group and store. */
@@ -459,14 +568,18 @@ class SeasonalForecastService
                     $have = $usable[$pid] ?? 0;
                     $onOrder = ReorderService::onOrder($pid);
                     $days = $lead[$pid] ?? (int) $cfg['default_lead_days'];
-                    $need = max(0, $f['qty'] - $have - $onOrder);
+                    $calc = static::peakOrder($have, $onOrder, $s['_monthly'], $ym, $today);
+                    $need = $calc['order'];
                     $by = $startOn->copy()->subDays($days);
-                    $stock = "You have {$have} usable" . ($onOrder ? " + {$onOrder} on order" : '');
+                    $stock = "You have {$have} usable" . ($onOrder ? " + {$onOrder} on order" : '')
+                        . "; about {$calc['sold_before']} will sell before {$month}";
                     $text = "{$month} is usually " . static::pct($f['index']) . " for {$s['label']}. Expect about {$f['qty']} {$unit} (vs {$f['normal']} a normal month). "
                         . ($need > 0
-                            ? "{$stock}; with a {$days}-day supplier lead time, order about {$need} more " . ($by->lte($today) ? 'now.' : 'by ' . $by->format('M j') . '.')
-                            : "{$stock} — enough for the expected demand.");
-                    $out[] = ['type' => 'peak', 'product_id' => $pid, 'month' => $f['month'], 'order_qty' => $need, 'order_by' => $need > 0 ? $by->toDateString() : null, 'text' => $text];
+                            ? "{$stock}, so order about {$need} " . ($by->lte($today) ? 'now' : 'by ' . $by->format('M j'))
+                                . " to cover {$month} ({$f['qty']}) — {$days}-day supplier lead time."
+                            : "{$stock}, leaving about " . max(0, $calc['projected']) . " — enough for the expected demand.");
+                    $out[] = ['type' => 'peak', 'product_id' => $pid, 'month' => $f['month'], 'order_qty' => $need, 'order_by' => $need > 0 ? $by->toDateString() : null,
+                        'sold_before' => $calc['sold_before'], 'projected' => $calc['projected'], 'text' => $text];
                 } elseif (in_array($f['month'], $s['lows'], true)) {
                     $out[] = ['type' => 'low', 'product_id' => $pid, 'month' => $f['month'],
                         'text' => "{$month} is usually " . static::pct($f['index']) . " for {$s['label']} — avoid overstocking."];

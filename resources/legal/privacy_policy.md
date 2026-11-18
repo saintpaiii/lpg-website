@@ -9,7 +9,7 @@
 
 ## 2. Information we collect from sellers, staff and riders
 - Name, email address, phone number and store details.
-- Business documents: valid ID, BIR registration, Business Permit, FSIC, DOE LPG license and LTO permit.
+- Business documents: a valid government ID with a live selfie, BIR Certificate of Registration, Business / Mayor's Permit, Fire Safety Inspection Certificate (FSIC), DOE License to Operate (LPG retail outlet), and DTI Business Name certificate (or SEC registration for corporations / partnerships).
 - For riders: location while using the rider map or making a delivery, and proof-of-delivery photos.
 - For staff and riders: the location of the device when clocking in and out, and attendance and payroll records entered by the store.
 

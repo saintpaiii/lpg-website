@@ -374,6 +374,7 @@ class OrderController extends Controller
                 'empty_tanks_needed'  => $order->needsEmptyTanks() && ! in_array($order->status, ['delivered', 'cancelled'], true),
                 'empty_tank_summary'  => (int) $order->empty_tanks_required > 0 ? $order->emptyTankSummary() : null,
                 'transaction_type' => $order->transaction_type,
+                'type_label'       => $order->typeLabel(),
                 'total_amount'     => (float) $order->total_amount,
                 'shipping_fee'     => $order->shipping_fee ? (float) $order->shipping_fee : null,
                 'delivery_latitude'          => $order->delivery_latitude  ? (float) $order->delivery_latitude  : null,

@@ -73,6 +73,8 @@ type Order = {
     /** Full-tank load — the rider picker checks what fits */
     load?: Load;
     transaction_type: string;
+    /** K7: the real mix, e.g. "Refill + Accessory" */
+    type_label?: string;
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
@@ -235,8 +237,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                 <FulfillmentBadge fulfillment={order.fulfillment} />
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
+                                {order.type_label && <span data-testid="order-type">{order.type_label} · </span>}
                                 Created {fmtDateTime(order.created_at)}
-                                {order.ordered_at && ` · Ordered ${fmtDateTime(order.ordered_at)}`}
+                                {order.ordered_at &&` · Ordered ${fmtDateTime(order.ordered_at)}`}
                             </p>
                         </div>
                     </div>

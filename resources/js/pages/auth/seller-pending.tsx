@@ -43,7 +43,7 @@ export default function SellerPending({ sent_back = null, status = null, suspens
         {
             icon: Clock,
             title: 'Under Review (1–3 business days)',
-            desc: 'Our team is reviewing your BIR permit, business permit, and valid ID.',
+            desc: 'Our team is reviewing your documents (ID, BIR, business permit, FSIC, DOE license, DTI/SEC).',
             done: false,
         },
         {

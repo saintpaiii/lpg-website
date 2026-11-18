@@ -69,6 +69,7 @@ type Order = {
     delivery_distance_km: number | null;
     estimated_delivery_minutes: number | null;
     transaction_type: string;
+    type_label?: string;
     total_amount: number;
     payment_method: string | null;
     payment_status: string;
@@ -882,7 +883,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Type</span>
-                                    <span className="font-medium">{order.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</span>
+                                    <span className="font-medium">{order.type_label ?? (order.transaction_type === 'refill' ? 'Refill' : 'New Purchase')}</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-gray-500">Ordered</span>

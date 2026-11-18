@@ -224,10 +224,11 @@ function StaffFormDialog({
     const isEdit = !!editTarget;
     // "+ Create a new role" — RoleEditor opened on top of this dialog
     const [creatingRole, setCreatingRole] = useState(false);
-    // "Add a rider" (store hidden banner) pre-selects the Rider starter role, otherwise Cashier
+    // K7: no role is pre-selected (an owner adding a rider must never give cashier access by accident). Only the
+    // explicit "Add a rider" link (store hidden banner, ?add=rider) starts with the Rider starter role ticked.
     const [defaultRoles] = useState<number[]>(() => {
-        const key = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('add') === 'rider' ? 'rider' : 'cashier';
-        const r = roles.find((x) => x.starter_key === key);
+        if (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('add') !== 'rider') return [];
+        const r = roles.find((x) => x.starter_key === 'rider');
         return r ? [r.id] : [];
     });
 
@@ -457,7 +458,7 @@ function StaffFormDialog({
 
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-                        <Button type="submit" disabled={processing} className="bg-blue-600 hover:bg-blue-700 text-white">
+                        <Button type="submit" disabled={processing || data.role_ids.length === 0} title={data.role_ids.length === 0 ? 'Tick at least one role' : undefined} className="bg-blue-600 hover:bg-blue-700 text-white">
                             {processing && <Spinner className="mr-1.5" />}
                             {processing ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Account')}
                         </Button>
