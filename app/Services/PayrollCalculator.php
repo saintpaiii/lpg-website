@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\StorePayrollSettings;
 use App\Models\StoreRole;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
@@ -206,6 +207,66 @@ class PayrollCalculator
         ]);
     }
 
+    /** K8 safety net: a staff member's listed period never spans more days than this (Generate never hangs). */
+    public const MAX_RANGE_DAYS = 400;
+
+    /**
+     * Every date from $from to $to inclusive ("Y-m-d"), whatever Carbon class comes in (immutable-safe: the step is
+     * always reassigned). $from after $to → []. More than MAX_RANGE_DAYS days → null (the caller skips).
+     *
+     * @return string[]|null
+     */
+    public static function dateRange(CarbonInterface $from, CarbonInterface $to): ?array
+    {
+        $d = CarbonImmutable::instance($from)->startOfDay();
+        $end = CarbonImmutable::instance($to)->startOfDay();
+        if ($d->gt($end)) {
+            return [];
+        }
+        if ((int) $d->diffInDays($end) + 1 > self::MAX_RANGE_DAYS) {
+            return null;
+        }
+        $out = [];
+        for (; $d->lte($end); $d = $d->addDay()) {
+            $out[] = $d->toDateString();
+        }
+
+        return $out;
+    }
+
+    /**
+     * The days listed on a payslip: max(period start, account created) … min(period end, yesterday), immutable.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
+     */
+    public static function listedRange(User $staff, string $periodStart, string $periodEnd): array
+    {
+        $start = CarbonImmutable::parse($periodStart)->startOfDay();
+        $created = $staff->created_at ? CarbonImmutable::instance($staff->created_at)->startOfDay() : $start;
+        $end = CarbonImmutable::parse($periodEnd)->startOfDay();
+        $yesterday = CarbonImmutable::now()->subDay()->startOfDay();
+
+        return [$created->gt($start) ? $created : $start, $end->lt($yesterday) ? $end : $yesterday];
+    }
+
+    /**
+     * Why this staff member gets no payslip for the period (null = fine): added after the period ended, or the period
+     * is longer than MAX_RANGE_DAYS days.
+     */
+    public static function periodProblem(User $staff, string $periodStart, string $periodEnd): ?string
+    {
+        $start = CarbonImmutable::parse($periodStart)->startOfDay();
+        $end = CarbonImmutable::parse($periodEnd)->startOfDay();
+        if ($staff->created_at && CarbonImmutable::instance($staff->created_at)->startOfDay()->gt($end)) {
+            return 'added after this period';
+        }
+        if ((int) $start->diffInDays($end) + 1 > self::MAX_RANGE_DAYS) {
+            return 'period longer than ' . self::MAX_RANGE_DAYS . ' days';
+        }
+
+        return null;
+    }
+
     /**
      * Payroll figures of one staff member for a period (fillable Payroll attributes + rate_source).
      */
@@ -224,12 +285,14 @@ class PayrollCalculator
         // Dates listed: every day from max(period start, account created) to min(period end, YESTERDAY) + rows up to
         // yesterday. Today is still running: it is listed only when that shift is finished (clocked in AND out) —
         // never as Absent / Day off / "No clock-out".
-        $from = max(Carbon::parse($periodStart)->startOfDay(), $staff->created_at?->copy()->startOfDay() ?? Carbon::parse($periodStart));
-        $to   = min(Carbon::parse($periodEnd)->startOfDay(), now()->subDay()->startOfDay());
-        $dates = [];
-        for ($d = $from->copy(); $d->lte($to); $d->addDay()) {
-            $dates[$d->toDateString()] = true;
+        // K8: everything CarbonImmutable (Eloquent dates and now() are immutable — Date::use) and the loop lives in
+        // dateRange(), which always reassigns. A staff member created mid-period used to loop forever here.
+        [$from, $to] = self::listedRange($staff, $periodStart, $periodEnd);
+        $range = self::dateRange($from, $to);
+        if ($range === null) {
+            throw new \InvalidArgumentException('Payroll period longer than ' . self::MAX_RANGE_DAYS . ' days.');
         }
+        $dates = array_fill_keys($range, true);
         $yesterday = now()->subDay()->toDateString();
         foreach ($rows as $k => $a) {
             if ($k <= $yesterday || ($a->clock_in && $a->clock_out)) {

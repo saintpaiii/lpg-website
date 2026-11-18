@@ -232,7 +232,7 @@ class StoreHours
         $start = Carbon::parse($date->toDateString() . ' ' . $d['open'], self::TZ);
         $end = Carbon::parse($date->toDateString() . ' ' . $d['close'], self::TZ);
         if ($end->lte($start)) {
-            $end->addDay();
+            $end = $end->addDay();   // K8: reassign — safe whether Carbon is mutable or immutable
         }
 
         return [$start, $end];

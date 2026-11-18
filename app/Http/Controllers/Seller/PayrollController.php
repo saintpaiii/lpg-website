@@ -271,58 +271,71 @@ class PayrollController extends Controller
 
         $made = $locked = 0;
         $skipped = [];   // "Ana Cruz (Rider)" — no personal rate and no role rate
-        foreach ($staffList as $staff) {
-            // Skip staff with no attendance records in the period
-            $hasAttendance = Attendance::where('user_id', $staff->id)
-                ->where('store_id', $store->id)
-                ->whereBetween('date', [$start, $end])
-                ->exists();
-            if (! $hasAttendance) {
-                continue;
-            }
-
-            $existing = Payroll::withTrashed()
-                ->where('store_id', $store->id)
-                ->where('user_id', $staff->id)
-                ->whereDate('period_start', $start)
-                ->whereDate('period_end', $end)
-                ->first();
-
-            // Released / paid payslips are final — never recalculated
-            if ($existing && ! $existing->trashed() && in_array($existing->status, ['released', 'paid'], true)) {
-                $locked++;
-                continue;
-            }
-
-            // No hourly rate (no personal rate, no role rate) → no payslip. A draft for this period (e.g. made with
-            // the old store default) is removed so it can't be released by mistake.
-            if (PayrollCalculator::hourlyRateFor($staff, $store)['source'] === 'none') {
-                if ($existing && ! $existing->trashed() && $existing->status === 'draft') {
-                    $existing->delete();
+        $periodSkipped = [];   // K8: "Ana Cruz (added after this period)"
+        // K8: all payslips of one Generate in ONE transaction — a failure never leaves a half-generated period
+        \Illuminate\Support\Facades\DB::transaction(function () use ($staffList, $store, $start, $end, $settings, &$made, &$locked, &$skipped, &$periodSkipped) {
+            foreach ($staffList as $staff) {
+                // Skip staff with no attendance records in the period
+                $hasAttendance = Attendance::where('user_id', $staff->id)
+                    ->where('store_id', $store->id)
+                    ->whereBetween('date', [$start, $end])
+                    ->exists();
+                if (! $hasAttendance) {
+                    continue;
                 }
-                $roles = StaffAccess::roleNames($staff);
-                $skipped[] = $staff->name . ' (' . ($roles ? implode(', ', $roles) : 'no role') . ')';
-                continue;
-            }
 
-            $calc =PayrollCalculator::calculate($staff, $store, $start, $end, $settings);
-            unset($calc['rate_source']);   // kept in breakdown.rules
-            $attrs = $calc + ['status' => 'draft', 'released_at' => null, 'paid_at' => null];
-
-            if ($existing) {
-                if ($existing->trashed()) {
-                    $existing->restore();
+                // K8 safety net: never loop over an impossible period for one person
+                if ($problem = PayrollCalculator::periodProblem($staff, $start, $end)) {
+                    $periodSkipped[] = "{$staff->name} ({$problem})";
+                    continue;
                 }
-                $existing->fill($attrs)->save();
-            } else {
-                Payroll::create($attrs + [
-                    'store_id' => $store->id, 'user_id' => $staff->id, 'period_start' => $start, 'period_end' => $end,
-                ]);
+
+                $existing = Payroll::withTrashed()
+                    ->where('store_id', $store->id)
+                    ->where('user_id', $staff->id)
+                    ->whereDate('period_start', $start)
+                    ->whereDate('period_end', $end)
+                    ->first();
+
+                // Released / paid payslips are final — never recalculated
+                if ($existing && ! $existing->trashed() && in_array($existing->status, ['released', 'paid'], true)) {
+                    $locked++;
+                    continue;
+                }
+
+                // No hourly rate (no personal rate, no role rate) → no payslip. A draft for this period (e.g. made with
+                // the old store default) is removed so it can't be released by mistake.
+                if (PayrollCalculator::hourlyRateFor($staff, $store)['source'] === 'none') {
+                    if ($existing && ! $existing->trashed() && $existing->status === 'draft') {
+                        $existing->delete();
+                    }
+                    $roles = StaffAccess::roleNames($staff);
+                    $skipped[] = $staff->name . ' (' . ($roles ? implode(', ', $roles) : 'no role') . ')';
+                    continue;
+                }
+
+                $calc =PayrollCalculator::calculate($staff, $store, $start, $end, $settings);
+                unset($calc['rate_source']);   // kept in breakdown.rules
+                $attrs = $calc + ['status' => 'draft', 'released_at' => null, 'paid_at' => null];
+
+                if ($existing) {
+                    if ($existing->trashed()) {
+                        $existing->restore();
+                    }
+                    $existing->fill($attrs)->save();
+                } else {
+                    Payroll::create($attrs + [
+                        'store_id' => $store->id, 'user_id' => $staff->id, 'period_start' => $start, 'period_end' => $end,
+                    ]);
+                }
+                $made++;
             }
-            $made++;
-        }
+        });
 
         $msg = "Payroll generated for {$made} staff.";
+        if ($periodSkipped) {
+            $msg .= ' Not generated for: ' . implode(', ', $periodSkipped) . '.';
+        }
         if ($locked > 0) {
             $msg .= " {$locked} already released/paid — not changed.";
         }
