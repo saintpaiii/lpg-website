@@ -297,7 +297,7 @@ class RefundService
         }
 
         foreach ($original->items as $item) {
-            OrderItem::create([
+            $replacementItem = OrderItem::create([
                 'order_id'   => $replacement->id,
                 'product_id' => $item->product_id,
                 'quantity'   => $item->quantity,
@@ -306,15 +306,8 @@ class RefundService
                 'transaction_type' => $item->transaction_type ?? $original->transaction_type,
             ]);
 
-            Inventory::where('product_id', $item->product_id)->decrement('quantity', $item->quantity);
-            InventoryTransaction::create([
-                'product_id' => $item->product_id,
-                'type'       => 'order',
-                'quantity'   => $item->quantity,
-                'reference'  => $replacement->order_number,
-                'notes'      => "Replacement for {$original->order_number}",
-                'user_id'    => $actingUserId,
-            ]);
+            // J7: from usable stock, oldest batch first (same as an order confirm)
+            StockService::takeForItem($replacementItem, $actingUserId, $replacement->order_number, "Replacement for {$original->order_number}");
         }
 
         $delivery = Delivery::create([

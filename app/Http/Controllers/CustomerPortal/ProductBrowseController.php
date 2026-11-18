@@ -52,6 +52,14 @@ class ProductBrowseController extends Controller
             $query->where('brand', $brand);
         }
 
+        // J7: LPG tanks / accessories (same shop and cart) + accessory category chip
+        if (in_array($type = $request->get('type'), ['lpg', 'accessory'], true)) {
+            $query->where('product_type', $type);
+        }
+        if ($category = $request->get('category')) {
+            $query->where('product_type', 'accessory')->where('accessory_category', $category);
+        }
+
         // Size filter by number (old "?weight=11kg" links still work)
         if ($weight = $request->get('weight')) {
             if ($kg = \App\Support\LpgSize::parseKg($weight)) {
@@ -89,6 +97,8 @@ class ProductBrowseController extends Controller
             'brand'          => $p->brand,
             'weight'         => $p->weight,
             'weight_kg'      => (float) ($p->weight_kg ?? 0),
+            'product_type'   => $p->product_type ?? 'lpg',
+            'accessory_category' => $p->accessory_category,
             'max_per_order'  => $p->max_per_order,
             'description'    => $p->description,
             'refill_price'   => (float) $p->refill_price,
@@ -153,7 +163,10 @@ class ProductBrowseController extends Controller
 
         return Inertia::render('customer/products', [
             'products'       => $products,
-            'filters'        => (object) $request->only(['search', 'city', 'brand', 'weight', 'min_price', 'max_price', 'sort']),
+            'filters'        => (object) $request->only(['search', 'city', 'brand', 'weight', 'min_price', 'max_price', 'sort', 'type', 'category']),
+            // J7: accessory categories that have products right now (category chips)
+            'accessoryCategories' => Product::where('is_active', true)->where('product_type', 'accessory')->whereNotNull('accessory_category')
+                ->whereHas('store', fn ($q) => $q->visibleToCustomers())->distinct()->pluck('accessory_category')->values(),
             'cities'         => $cities,
             'brands'         => $brands,
             'weights'        => $weights,
@@ -259,6 +272,8 @@ class ProductBrowseController extends Controller
                 'brand'          => $product->brand,
                 'weight'         => $product->weight,
                 'weight_kg'      => (float) ($product->weight_kg ?? 0),
+                'product_type'   => $product->product_type ?? 'lpg',   // J7
+                'accessory_category' => $product->accessory_category,
                 'max_per_order'  => $product->max_per_order,
                 'description'    => $product->description,
                 'refill_price'   => (float) $product->refill_price,

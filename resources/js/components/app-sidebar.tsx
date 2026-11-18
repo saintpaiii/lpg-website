@@ -35,6 +35,8 @@ import {
     UserCog,
     Users,
     Warehouse,
+    Factory,
+    PackagePlus,
     MessageSquare,
     ScrollText,
     FileCheck,
@@ -109,6 +111,9 @@ export function AppSidebar() {
             isActualSeller                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
             (isActualSeller || can('invoices.view'))    && { title: 'Invoices',     href: '/seller/invoices',   icon: Receipt         },
             (isActualSeller || can('inventory.view'))   && { title: 'Inventory',    href: '/seller/inventory',  icon: Warehouse       },
+            // J7 — Supply: suppliers + purchase orders (Inventory module)
+            (isActualSeller || can('inventory.view'))   && { title: 'Suppliers',    href: '/seller/suppliers',  icon: Factory         },
+            (isActualSeller || can('inventory.view'))   && { title: 'Purchase Orders', href: '/seller/purchase-orders', icon: PackagePlus },
             isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog, ...badgeProps(sb['seller.staff']) },
             (isActualSeller || can('attendance.view'))  && { title: 'Attendance',   href: '/seller/attendance',      icon: CalendarDays      },
             selfClock                                  && { title: 'My Attendance',href: '/seller/my-attendance',  icon: CalendarDays      },

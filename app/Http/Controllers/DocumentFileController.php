@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendance;
+use App\Models\CylinderIncident;
 use App\Models\DeliveryProof;
 use App\Models\OrderItemAdjustment;
 use App\Models\StaffDocument;
@@ -32,6 +33,8 @@ class DocumentFileController extends Controller
         'handover-photo' => ['photo_path'],
         // J6: delivery proof photos (rider's Delivered / Failed photo)
         'delivery-proof' => ['photo_path'],
+        // J7: damaged / expired cylinder photos
+        'cylinder-incident' => ['photo_path'],
     ];
 
     public function show(Request $request, string $kind, int $id, string $field): StreamedResponse
@@ -54,6 +57,9 @@ class DocumentFileController extends Controller
             // The order's customer, the store owner, the delivery's rider and who took it (store staff with Orders / Deliveries: below)
             'delivery-proof' => [$dp = DeliveryProof::with(['delivery' => fn ($q) => $q->withTrashed()->with(['order' => fn ($o) => $o->withTrashed()->with(['customer', 'store' => fn ($s) => $s->withTrashed()])])])->find($id),
                 [$dp?->delivery?->order?->customer?->user_id, $dp?->delivery?->order?->store?->user_id, $dp?->delivery?->rider_id, $dp?->user_id]],
+            // The store owner and who recorded it (store staff with Inventory: below)
+            'cylinder-incident' => [$ci = CylinderIncident::find($id),
+                [$ci ? \App\Models\Store::withTrashed()->whereKey($ci->store_id)->value('user_id') : null, $ci?->recorded_by]],
         };
         abort_unless($record, 404);
 
@@ -66,7 +72,9 @@ class DocumentFileController extends Controller
             || ($kind === 'handover-photo' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->order?->store_id
                 && $user->hasPermission('orders.view'))
             || ($kind === 'delivery-proof' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->delivery?->order?->store_id
-                && ($user->hasPermission('orders.view') || $user->hasPermission('deliveries.view')));
+                && ($user->hasPermission('orders.view') || $user->hasPermission('deliveries.view')))
+            || ($kind === 'cylinder-incident' && $user->role === 'seller_staff' && (int) $user->store_id === (int) $record->store_id
+                && $user->hasPermission('inventory.view'));
         abort_unless($allowed, 403);
 
         $path = $record->{$field};

@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ImageIcon, MessageSquare, Package, Pencil, Play, Plus, Search, Trash2 } from 'lucide-react';
+import { AccessoryBadge, ACCESSORY_CATEGORIES } from '@/components/accessory-badge';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { PAUSED_BADGE, PlanLimitBar, type PlanLimit } from '@/components/plan-limit-bar';
@@ -31,6 +32,12 @@ type Product = {
     /** "11 kg" (built by the server from weight_kg) */
     weight: string;
     weight_kg: number | null;
+    /** J7 */
+    product_type?: 'lpg' | 'accessory';
+    accessory_category?: string | null;
+    unit_weight_kg?: number | null;
+    cost_price?: number;
+    exclude_auto_reorder?: boolean;
     max_per_order: number | null;
     limit_period?: 'order' | 'day' | 'week';
     description: string | null;
@@ -71,6 +78,11 @@ const TABS = [
 ] as const;
 
 type ProductForm = {
+    product_type: 'lpg' | 'accessory';
+    accessory_category: string;
+    unit_weight_kg: string;
+    cost_price: string;
+    exclude_auto_reorder: boolean;
     name: string;
     brand: string;
     weight_kg: string;
@@ -84,6 +96,7 @@ type ProductForm = {
 };
 
 const EMPTY_FORM: ProductForm = {
+    product_type: 'lpg', accessory_category: '', unit_weight_kg: '', cost_price: '', exclude_auto_reorder: false,
     name: '', brand: '', weight_kg: '', max_per_order: '', limit_period: 'order', description: '',
     refill_price: '', purchase_price: '', stock: '', reorder_level: '10',
 };
@@ -106,7 +119,8 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
 
     const { data, setData, post, processing, errors, reset, transform, progress } = useForm<ProductForm>(EMPTY_FORM);
     // Live price rule (the server checks too)
-    const refillTooHigh = data.refill_price !== '' && data.purchase_price !== '' && Number(data.refill_price) > Number(data.purchase_price);
+    const isAccessory = data.product_type === 'accessory';
+    const refillTooHigh = !isAccessory && data.refill_price !== '' && data.purchase_price !== '' && Number(data.refill_price) > Number(data.purchase_price);
     const mediaErrors = Object.entries(errors as Record<string, string>)
         .filter(([k]) => /^(media_order|new_files|new_posters|new_meta)/.test(k)).map(([, v]) => v);
 
@@ -146,6 +160,9 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
     function openEdit(p: Product) {
         setEditing(p);
         setData({
+            product_type: p.product_type ?? 'lpg', accessory_category: p.accessory_category ?? '',
+            unit_weight_kg: p.unit_weight_kg != null ? String(p.unit_weight_kg) : '', cost_price: p.cost_price != null ? String(p.cost_price) : '',
+            exclude_auto_reorder: !!p.exclude_auto_reorder,
             name: p.name, brand: p.brand,
             weight_kg: p.weight_kg != null ? String(p.weight_kg) : '',
             max_per_order: p.max_per_order != null ? String(p.max_per_order) : '',
@@ -327,7 +344,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                             </td>
                                             <td className="px-4 py-3">
                                                 <p className="font-medium">{p.name}</p>
-                                                <p className="text-xs text-muted-foreground">{p.brand} {p.weight && `· ${p.weight}`}</p>
+                                                <p className="text-xs text-muted-foreground">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} {p.weight && `· ${p.weight}`}</>}</p>
                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                     {p.max_per_order != null && (
                                                         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Max {p.max_per_order} / {p.limit_period ?? 'order'}</span>
@@ -422,6 +439,18 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                         <ProductMediaManager items={mediaItems} onChange={(fn) => setMediaItems(fn)} serverErrors={mediaErrors} />
 
                         {/* Name + Brand */}
+                        {/* J7: LPG tank or accessory */}
+                        <div className="grid gap-1.5">
+                            <Label>Type</Label>
+                            <div className="inline-flex w-fit rounded-md border p-0.5 text-sm" role="radiogroup" aria-label="Product type">
+                                {([['lpg', 'LPG tank'], ['accessory', 'Accessory']] as const).map(([v, label]) => (
+                                    <button key={v} type="button" role="radio" aria-checked={data.product_type === v} onClick={() => setData('product_type', v)}
+                                        className={`rounded px-3 py-1 font-medium ${data.product_type === v ? 'bg-blue-600 text-white' : 'text-muted-foreground'}`}>{label}</button>
+                                ))}
+                            </div>
+                            {isAccessory && <p className="text-xs text-muted-foreground">Regulators, hoses, clamps, stoves… sold in the same shop and cart — always a new purchase, no tank exchange.</p>}
+                        </div>
+
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
@@ -438,6 +467,25 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
 
                         {/* Tank size (kg) + Description */}
                         <div className="grid gap-4 sm:grid-cols-2">
+                            {isAccessory ? (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="accessory_category">Category <span className="text-red-500">*</span></Label>
+                                        <select id="accessory_category" value={data.accessory_category} onChange={(e) => setData('accessory_category', e.target.value)}
+                                            className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs dark:bg-input/30">
+                                            <option value="">Choose…</option>
+                                            {Object.entries(ACCESSORY_CATEGORIES).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                                        </select>
+                                        {errors.accessory_category && <p className="text-xs text-red-500">{errors.accessory_category}</p>}
+                                    </div>
+                                    <div className="grid gap-1.5">
+                                        <Label htmlFor="unit_weight_kg">Unit weight (kg) <span className="text-red-500">*</span></Label>
+                                        <Input id="unit_weight_kg" type="number" step="0.01" min="0.01" max="100" inputMode="decimal" value={data.unit_weight_kg}
+                                            onChange={(e) => setData('unit_weight_kg', e.target.value)} placeholder="e.g. 0.6" />
+                                        {errors.unit_weight_kg && <p className="text-xs text-red-500">{errors.unit_weight_kg}</p>}
+                                    </div>
+                                </div>
+                            ) : (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="weight_kg">Tank size (kg) <span className="text-red-500">*</span></Label>
                                 <Input id="weight_kg" type="number" step="0.1" min="0.5" max="100" inputMode="decimal"
@@ -454,6 +502,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                 </div>
                                 {errors.weight_kg && <p className="text-xs text-red-500">{errors.weight_kg}</p>}
                             </div>
+                            )}
                             <div className="grid gap-1.5">
                                 <Label htmlFor="description">Description</Label>
                                 <Input id="description" value={data.description} onChange={(e) => setData('description', e.target.value)}
@@ -463,6 +512,13 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
 
                         {/* Prices */}
                         <div className="grid gap-4 sm:grid-cols-2">
+                            {isAccessory ? (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="cost_price">Cost price (₱) <span className="text-red-500">*</span></Label>
+                                <Input id="cost_price" type="number" min="0" step="0.01" value={data.cost_price} onChange={(e) => setData('cost_price', e.target.value)} placeholder="0.00" />
+                                {errors.cost_price && <p className="text-xs text-red-500">{errors.cost_price}</p>}
+                            </div>
+                            ) : (
                             <div className="grid gap-1.5">
                                 <Label htmlFor="refill_price">Refill Price (₱) <span className="text-red-500">*</span></Label>
                                 <Input id="refill_price" type="number" min="0" step="0.01" value={data.refill_price}
@@ -471,13 +527,20 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                     ? <p className="text-xs text-red-500">{REFILL_MSG}</p>
                                     : errors.refill_price && <p className="text-xs text-red-500">{errors.refill_price}</p>}
                             </div>
+                            )}
                             <div className="grid gap-1.5">
-                                <Label htmlFor="purchase_price">New Purchase Price (₱) <span className="text-red-500">*</span></Label>
+                                <Label htmlFor="purchase_price">{isAccessory ? 'Selling price (₱)' : 'New Purchase Price (₱)'} <span className="text-red-500">*</span></Label>
                                 <Input id="purchase_price" type="number" min="0" step="0.01" value={data.purchase_price}
                                     onChange={(e) => setData('purchase_price', e.target.value)} placeholder="0.00" />
                                 {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
                             </div>
                         </div>
+
+                        {/* J7 E3: auto-reorder drafts skip this product */}
+                        <label className="flex items-center gap-2 text-sm">
+                            <input type="checkbox" checked={data.exclude_auto_reorder} onChange={(e) => setData('exclude_auto_reorder', e.target.checked)} />
+                            Exclude from auto-reorder <span className="text-xs text-muted-foreground">(the DSS won't draft purchase orders for it)</span>
+                        </label>
 
                         {/* Max per customer (optional) — per order / per day / per week */}
                         <div className="grid gap-1.5">

@@ -76,15 +76,24 @@ export function fullTankKg(gasKg: number | null | undefined): number {
     return FULL_TANK_KG[String(gas)] ?? Math.round(gas * 2 * 10) / 10;
 }
 
-/** Load of order lines: kg = Σ full-tank weight × qty, tanks = qty of lines with a size, by_size = tanks per size. */
-export function orderLoad(lines: { weight_kg?: number | null; quantity: number }[]): Load {
+/** J7: an accessory weighs its own unit weight (1 kg when not set) and is not a "tank". */
+export type LoadLine = { weight_kg?: number | null; quantity: number; product_type?: 'lpg' | 'accessory' | null; unit_weight_kg?: number | null };
+
+/** DeliveryFeeService::itemKg — accessories: unit weight (default 1 kg); LPG: full-tank weight of the gas size. */
+export function itemKg(l: LoadLine): number {
+    if (l.product_type === 'accessory') return Number(l.unit_weight_kg ?? 0) || 1;
+    return fullTankKg(l.weight_kg);
+}
+
+/** Load of order lines: kg = Σ item weight × qty, tanks = qty of LPG lines with a size, by_size = tanks per size. */
+export function orderLoad(lines: LoadLine[]): Load {
     let kg = 0;
     let tanks = 0;
     const by_size: Record<string, number> = {};
     for (const l of lines) {
         const w = Number(l.weight_kg ?? 0);
-        kg += fullTankKg(w) * l.quantity;
-        const key = sizeKey(w);
+        kg += itemKg(l) * l.quantity;
+        const key = l.product_type === 'accessory' ? null : sizeKey(w);
         if (key) {
             tanks += l.quantity;
             by_size[key] = (by_size[key] ?? 0) + l.quantity;

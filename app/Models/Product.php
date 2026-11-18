@@ -13,8 +13,18 @@ class Product extends Model
 {
     use HasFactory, SoftDeletes;
 
+    /** J7: accessory categories (regulators, hoses…) — accessories share the shop, cart and stock, never a tank exchange */
+    public const ACCESSORY_CATEGORIES = [
+        'regulator' => 'Regulator', 'hose' => 'Hose', 'clamp' => 'Hose clamp', 'stove' => 'Stove',
+        'burner' => 'Burner', 'valve_seal' => 'Valve seal', 'other' => 'Other',
+    ];
+
     protected $fillable = [
         'store_id',
+        'product_type',          // J7: lpg | accessory
+        'accessory_category',
+        'unit_weight_kg',        // accessories' shipping weight (LPG uses weight_kg → full-tank weight)
+        'exclude_auto_reorder',
         'name',
         'brand',
         'weight_kg',
@@ -42,6 +52,8 @@ class Product extends Model
             'refill_price'   => 'decimal:2',
             'purchase_price' => 'decimal:2',
             'is_active'      => 'boolean',
+            'unit_weight_kg' => 'decimal:2',
+            'exclude_auto_reorder' => 'boolean',
             'paused_by_plan' => 'boolean',
         ];
     }
@@ -90,6 +102,27 @@ class Product extends Model
         if ($this->image !== $cover) {
             $this->forceFill(['image' => $cover])->saveQuietly();
         }
+    }
+
+    /** J7: an accessory (regulator, hose…) — no gas size, no refill / tank exchange, not a "tank" for vehicles. */
+    public function isAccessory(): bool
+    {
+        return $this->product_type === 'accessory';
+    }
+
+    public function isLpg(): bool
+    {
+        return ! $this->isAccessory();
+    }
+
+    public function supplierProducts(): HasMany
+    {
+        return $this->hasMany(SupplierProduct::class);
+    }
+
+    public function batches(): HasMany
+    {
+        return $this->hasMany(CylinderBatch::class);
     }
 
     public function inventory(): HasOne

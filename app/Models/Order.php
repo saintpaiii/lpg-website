@@ -218,6 +218,8 @@ class Order extends Model
             ]);
         }
         $this->forceFill(['empty_tanks_collected_at' => now(), 'empty_tanks_collected_by' => $userId])->save();
+        // J7: the empties are now in the store (only the refill tanks still on the order — refused ones stayed with the customer)
+        \App\Services\StockService::emptiesCollected($this, $userId);
     }
 
     /** "Street, Barangay, City" for the delivery address. */

@@ -622,6 +622,43 @@ class DemoSeeder extends Seeder
         }
 
         // ══════════════════════════════════════════════════════════════════════
+        // 8a. ACCESSORIES (J7) — same shop and cart, always a new purchase, own shipping weight
+        // ══════════════════════════════════════════════════════════════════════
+        // [name, category, price, cost, unit kg, stock]
+        $accessoryDefs = [
+            ['LPG Regulator',     'regulator', 450.00, 320.00, 0.60, 30],
+            ['LPG Hose 1.5 m',    'hose',      180.00, 110.00, 0.40, 40],
+            ['Hose Clamp',        'clamp',      25.00,  12.00, 0.05, 100],
+        ];
+        foreach ([[$store1Id, 88], [$store2Id, 58]] as [$sid, $ageDays]) {
+            foreach ($accessoryDefs as [$name, $category, $price, $cost, $kg, $stock]) {
+                $id = DB::table('products')->insertGetId([
+                    'store_id'           => $sid,
+                    'product_type'       => 'accessory',
+                    'accessory_category' => $category,
+                    'name'               => $name,
+                    'brand'              => null,
+                    'weight_kg'          => null,
+                    'weight'             => null,
+                    'unit_weight_kg'     => $kg,
+                    'selling_price'      => $price,
+                    'cost_price'         => $cost,
+                    'refill_price'       => $price,   // accessories have one price (no refill) — mirrored for old code
+                    'purchase_price'     => $price,
+                    'description'        => "{$name} — fits standard Philippine LPG cylinders.",
+                    'image'              => null,
+                    'is_active'          => true,
+                    'created_at'         => $this->now->copy()->subDays($ageDays),
+                    'updated_at'         => $this->now,
+                ]);
+                DB::table('inventories')->insert([
+                    'product_id' => $id, 'quantity' => $stock, 'reorder_level' => 5,
+                    'created_at' => $this->now->copy()->subDays($ageDays), 'updated_at' => $this->now,
+                ]);
+            }
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
         // 8b. DELIVERY VEHICLES + FEES PER VEHICLE TYPE (config defaults)
         // ══════════════════════════════════════════════════════════════════════
         // Store 1: a motorcycle for small orders, a multicab for big ones. Store 2: a tricycle.

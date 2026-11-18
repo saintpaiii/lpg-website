@@ -91,7 +91,8 @@ class DeliveryFeeService
             $qty     = (int) (is_array($item) ? ($item['quantity'] ?? 0) : $item->quantity);
             $w       = (float) ($product?->weight_kg ?? 0);
             $kg += static::itemKg($product) * $qty;
-            if ($w > 0) {
+            // J7: accessories weigh something but are not "tanks" (no tank count / per-size limit used up by a hose)
+            if ($w > 0 && ! static::isAccessory($product)) {
                 $tanks += $qty;
                 $key = static::sizeKey($w);
                 $bySize[$key] = ($bySize[$key] ?? 0) + $qty;
@@ -177,7 +178,18 @@ class DeliveryFeeService
      */
     public static function itemKg($product): float
     {
+        // J7: an accessory's own shipping weight (1 kg when not set); LPG → the full-tank weight of its gas size
+        if (static::isAccessory($product)) {
+            return round((float) ($product->unit_weight_kg ?? 0) ?: 1.0, 2);
+        }
+
         return static::fullTankKg((float) ($product?->weight_kg ?? 0));
+    }
+
+    /** Works for a Product model or a plain array/object with product_type. */
+    public static function isAccessory($product): bool
+    {
+        return ($product->product_type ?? null) === 'accessory';
     }
 
     /**

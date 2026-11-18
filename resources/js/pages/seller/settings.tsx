@@ -61,6 +61,7 @@ interface StoreData {
     attendance_radius: number;
     allow_cod: boolean;
     allow_half_payment?: boolean;
+    auto_reorder_enabled?: boolean;
     allow_pickup: boolean;
     pickup_instructions: string;
 }
@@ -213,6 +214,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         max_delivery_radius_km: string;
         allow_cod: boolean;
         allow_half_payment: boolean;
+        auto_reorder_enabled: boolean;
         allow_pickup: boolean;
         pickup_instructions: string;
         logo: File | null;
@@ -228,6 +230,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         max_delivery_radius_km: String(store.max_delivery_radius_km ?? 20),
         allow_cod:                store.allow_cod,
         allow_half_payment:       !!store.allow_half_payment,
+        auto_reorder_enabled:     store.auto_reorder_enabled ?? true,
         allow_pickup:             !!store.allow_pickup,
         pickup_instructions:      store.pickup_instructions ?? '',
         logo:                   null,
@@ -271,6 +274,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
         fd.append('max_delivery_radius_km', data.max_delivery_radius_km || '20');
         fd.append('allow_cod',                data.allow_cod ? '1' : '0');
         fd.append('allow_half_payment',       data.allow_half_payment ? '1' : '0');
+        fd.append('auto_reorder_enabled',     data.auto_reorder_enabled ? '1' : '0');
         fd.append('allow_pickup',             data.allow_pickup ? '1' : '0');
         fd.append('pickup_instructions',      data.pickup_instructions);
         // Location fields — sent as numeric strings or empty (→ null on backend)
@@ -458,6 +462,16 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                 checked={data.allow_half_payment}
                                 onChange={(v) => setData('allow_half_payment', v)}
                             />
+                            {/* J7 — Inventory */}
+                            <div className="border-t pt-4">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Inventory</p>
+                                <ToggleRow
+                                    label="Auto-reorder drafts"
+                                    hint="When stock reaches the reorder point, the DSS drafts a purchase order to the preferred supplier. It is never sent automatically — you review and send it."
+                                    checked={data.auto_reorder_enabled}
+                                    onChange={(v) => setData('auto_reorder_enabled', v)}
+                                />
+                            </div>
                             {/* Consignment lives in the Loyalty Program (owner only; Pro plan) */}
                             <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground">
                                 Consignment (pay later) is part of the Loyalty Program.

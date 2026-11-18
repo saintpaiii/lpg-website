@@ -52,6 +52,10 @@ type ReorderAlert = {
     recommended_order: number | null;
     days_to_order: string;
     severity: Severity;
+    /** J7: the auto-reorder formula + a draft PO to open */
+    reorder?: { text: string; suggested_qty: number } | null;
+    draft_po?: { id: number; po_number: string } | null;
+    has_supplier?: boolean;
 };
 
 type TopProduct = {
@@ -130,6 +134,19 @@ type Props = {
     generatedAt: string;
     /** J6 Vehicle DSS — Fleet */
     fleet?: Fleet;
+    /** J7 */
+    supplierDss?: SupplierDss;
+};
+
+type SupplierDss = {
+    days: number;
+    thresholds: { inspect_rate: number; switch_rate: number; late_pct: number; min_received: number };
+    suppliers: { id: number; name: string; lead_days: number; received: number; damaged: number; damage_rate: number | null; avg_delay: number | null; on_time_pct: number | null; pos_received: number; advice: string[]; ok: boolean }[];
+    expiry: { qty: number; text: string } | null;
+    by_product: { name: string | null; qty: number; text: string }[];
+    handover: { qty: number; text: string } | null;
+    empties: { product_id: number; qty: number; text: string }[];
+    no_supplier: { product_id: number; text: string }[];
 };
 
 type Fleet = {
@@ -152,7 +169,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const FORECAST_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-type Tab = 'overview' | 'forecast' | 'trends' | 'fleet';
+type Tab = 'overview' | 'forecast' | 'trends' | 'fleet' | 'suppliers';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -223,6 +240,18 @@ function AlertCard({ alert }: { alert: ReorderAlert }) {
                     <p className="text-gray-600 dark:text-gray-300">Order <span className="font-bold text-gray-900 dark:text-white">{alert.recommended_order} units</span> <span className="font-semibold">{alert.days_to_order}</span>.</p>
                 ) : (
                     <p className="text-gray-500">Insufficient data — monitor and reorder soon.</p>
+                )}
+                {alert.reorder && <p className="mt-1 text-[11px] text-gray-500" title="How it decides">{alert.reorder.text}</p>}
+            </div>
+            {/* J7: Create PO / Open draft */}
+            <div className="mt-2">
+                {alert.draft_po ? (
+                    <a href={`/seller/purchase-orders/${alert.draft_po.id}`} className="text-xs font-semibold text-blue-600 hover:underline" data-testid="open-draft-po">Open draft {alert.draft_po.po_number}</a>
+                ) : alert.has_supplier ? (
+                    <button type="button" className="text-xs font-semibold text-blue-600 hover:underline" data-testid="create-po"
+                        onClick={() => router.post(`/seller/purchase-orders/from-alert/${alert.product_id}`)}>Create PO</button>
+                ) : (
+                    <a href="/seller/suppliers" className="text-xs text-amber-700 hover:underline">No supplier set — add one to enable auto-reorder</a>
                 )}
             </div>
         </div>
@@ -646,7 +675,7 @@ function RecommendationsCard({ recs }: { recs: Recommendation[] }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt, fleet }: Props) {
+export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt, fleet, supplierDss }: Props) {
     const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
     const warningCount  = reorderAlerts.filter((a) => a.severity === 'warning').length;
     const [tab, setTab]  = useState<Tab>('overview');
@@ -656,6 +685,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
         { key: 'forecast',  label: 'Forecast & Alerts',   icon: AlertTriangle },
         { key: 'trends',    label: 'Trends & Products',   icon: TrendingUp },
         { key: 'fleet',     label: 'Fleet',               icon: Brain },
+        { key: 'suppliers', label: 'Suppliers & Cylinders', icon: Brain },
     ];
 
     return (
@@ -891,6 +921,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
 
                 {/* ── Tab 4: Fleet (J6) ── */}
                 {tab === 'fleet' && fleet && <FleetSection fleet={fleet} />}
+                {tab === 'suppliers' && supplierDss && <SupplierSection data={supplierDss} />}
 
                 {/* Footer note */}
                 <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-3 text-center text-xs text-gray-400 mt-2">
@@ -951,6 +982,52 @@ function FleetSection({ fleet }: { fleet: Fleet }) {
                     </table>
                 </CardContent>
             </Card>
+        </div>
+    );
+}
+/** J7 — "Suppliers & Cylinders": damage rate, delays, expiry, per-product damage, customer handover rejections, empties. Rule-based. */
+function SupplierSection({ data }: { data: SupplierDss }) {
+    const t = data.thresholds;
+    const note = (items: { text: string }[], tone: string) => items.map((x, i) => <li key={i} className={`rounded-md px-3 py-2 text-sm ${tone}`}>{x.text}</li>);
+    return (
+        <div className="space-y-4" data-testid="dss-suppliers">
+            <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-sm">Suppliers — last {data.days} days</CardTitle></CardHeader>
+                <CardContent className="overflow-x-auto p-0">
+                    <table className="w-full text-sm">
+                        <thead><tr className="border-b text-left text-xs text-gray-500">
+                            <th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Received</th><th className="px-4 py-2 text-right">Damaged / expired</th>
+                            <th className="px-4 py-2 text-right">Damage rate</th><th className="px-4 py-2 text-right">Avg delay</th><th className="px-4 py-2 text-right">On time</th><th className="px-4 py-2">Advice</th>
+                        </tr></thead>
+                        <tbody className="divide-y">
+                            {data.suppliers.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No suppliers yet.</td></tr>}
+                            {data.suppliers.map((s) => (
+                                <tr key={s.id} data-testid={`dss-supplier-${s.id}`}>
+                                    <td className="px-4 py-2 font-medium">{s.name}<span className="block text-[11px] text-gray-400">lead time {s.lead_days} d</span></td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.received}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.damaged}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.damage_rate === null ? <span className="text-gray-400" title={`Needs ${t.min_received}+ cylinders received`}>—</span> : `${s.damage_rate}%`}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.avg_delay === null ? '—' : `${s.avg_delay} d`}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.on_time_pct === null ? '—' : `${s.on_time_pct}%`}</td>
+                                    <td className={`px-4 py-2 text-xs ${s.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{s.advice.join(' ')}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    <p className="border-t px-4 py-2 text-[11px] text-gray-500">
+                        Damage rate = damaged/expired cylinders traced to the supplier ÷ cylinders received from them (customer tanks refused at handover are not counted).
+                        Advice: ≥ {t.inspect_rate}% inspect deliveries · ≥ {t.switch_rate}% consider another supplier · late on ≥ {t.late_pct}% of orders → order earlier.
+                        Delay = received date − (sent date + lead time).
+                    </p>
+                </CardContent>
+            </Card>
+            <ul className="space-y-2">
+                {data.expiry && note([data.expiry], 'bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200')}
+                {note(data.empties, 'bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-200')}
+                {note(data.by_product, 'bg-red-50 text-red-900 dark:bg-red-950/40 dark:text-red-200')}
+                {data.handover && note([data.handover], 'bg-gray-50 text-gray-700 dark:bg-gray-900 dark:text-gray-300')}
+                {note(data.no_supplier, 'bg-violet-50 text-violet-900 dark:bg-violet-950/40 dark:text-violet-200')}
+            </ul>
         </div>
     );
 }

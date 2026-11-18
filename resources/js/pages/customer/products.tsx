@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { FeaturedBadge } from '@/components/featured-badge';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
+import { AccessoryBadge, ACCESSORY_CATEGORIES } from '@/components/accessory-badge';
 import { StarRating } from '@/components/ui/star-rating';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -27,6 +28,9 @@ type Product = {
     brand: string;
     weight: string;
     weight_kg: number;
+    /** J7: accessories share the shop and cart (no refill / exchange) */
+    product_type?: 'lpg' | 'accessory';
+    accessory_category?: string | null;
     description: string | null;
     refill_price: number;
     purchase_price: number;
@@ -76,6 +80,8 @@ type Filters = {
     min_price?: string;
     max_price?: string;
     sort?: string;
+    type?: string;
+    category?: string;
 };
 
 type BannerItem = {
@@ -98,12 +104,14 @@ type Props = {
     cities: string[];
     brands: string[];
     weights: string[];
+    /** J7: accessory categories with products (chips) */
+    accessoryCategories?: string[];
     banners: BannerItem[];
     adminBanners?: AdminBannerItem[];
     isAdminPreview?: boolean;
 };
 
-export default function ProductsPage({ products, filters, cities, brands, weights, banners, adminBanners = [], isAdminPreview = false }: Props) {
+export default function ProductsPage({ products, filters, cities, brands, weights, accessoryCategories = [], banners, adminBanners = [], isAdminPreview = false }: Props) {
     const [filterOpen, setFilterOpen] = useState(false);
     const [search, setSearch] = useState(filters.search ?? '');
     const [sort, setSort]     = useState(filters.sort ?? 'newest');
@@ -136,7 +144,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
     function openCartDialog(product: Product) {
         setCartDialog({ open: true, product });
         setQty(1);
-        setTxType('refill');
+        setTxType(product.product_type === 'accessory' ? 'new_purchase' : 'refill');
     }
 
     function addToCart() {
@@ -411,6 +419,22 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                     </Card>
                 )}
 
+                {/* J7: LPG tanks / Accessories + accessory category chips */}
+                <div className="flex flex-wrap gap-2" data-testid="type-chips">
+                    {([['', 'All'], ['lpg', 'LPG tanks'], ['accessory', 'Accessories']] as const).map(([v, label]) => (
+                        <button key={v || 'all'} type="button" onClick={() => applyFilters({ type: v || undefined, category: undefined })}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium ${(filters.type ?? '') === v ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 text-gray-600 hover:border-blue-300 dark:border-gray-700 dark:text-gray-300'}`}>
+                            {label}
+                        </button>
+                    ))}
+                    {filters.type === 'accessory' && accessoryCategories.map((c) => (
+                        <button key={c} type="button" onClick={() => applyFilters({ category: filters.category === c ? undefined : c })}
+                            className={`rounded-full border px-3 py-1 text-xs font-medium ${filters.category === c ? 'border-violet-600 bg-violet-600 text-white' : 'border-violet-200 text-violet-700 hover:border-violet-400 dark:border-violet-800 dark:text-violet-300'}`}>
+                            {ACCESSORY_CATEGORIES[c] ?? c}
+                        </button>
+                    ))}
+                </div>
+
                 {/* Active filter chips */}
                 {activeFilters.length > 0 && (
                     <div className="flex flex-wrap gap-2">
@@ -461,7 +485,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                 </ProductCardImage>
                                 <CardContent className="p-4 flex flex-col flex-1">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
-                                    <p className="text-xs text-gray-500 mb-2">{p.brand} · {p.weight}</p>
+                                    <p className="text-xs text-gray-500 mb-2">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} · {p.weight}</>}</p>
                                     <div className="flex items-center gap-1 text-xs text-gray-400 mb-1.5">
                                         <StoreAvatar name={p.store_name} logoUrl={p.store_logo_url} size={18} />
                                         <button
@@ -564,8 +588,8 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                 </div>
                             </div>
 
-                            {/* Transaction type */}
-                            <div>
+                            {/* Transaction type — accessories are always a new purchase (J7) */}
+                            {cartDialog.product.product_type !== 'accessory' && <div>
                                 <p className="text-xs font-medium text-gray-500 mb-1.5">Transaction Type</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map(t => (
@@ -585,7 +609,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         </button>
                                     ))}
                                 </div>
-                            </div>
+                            </div>}
 
                             {/* Quantity */}
                             <div>

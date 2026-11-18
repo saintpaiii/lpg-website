@@ -108,6 +108,52 @@ trait BuildsLpgWorld
         return $p;
     }
 
+    /** J7: an accessory (regulator, hose…) */
+    protected function makeAccessory(Store $store, string $name = 'LPG Hose 1.5 m', float $price = 180, float $unitKg = 0.4, int $stock = 40): Product
+    {
+        $p = Product::forceCreate([
+            'store_id' => $store->id, 'product_type' => 'accessory', 'accessory_category' => 'hose', 'name' => $name, 'unit_weight_kg' => $unitKg,
+            'selling_price' => $price, 'cost_price' => $price - 60, 'refill_price' => $price, 'purchase_price' => $price, 'is_active' => true,
+        ]);
+        Inventory::forceCreate(['product_id' => $p->id, 'quantity' => $stock, 'reorder_level' => 5]);
+
+        return $p;
+    }
+
+    /** J7: a supplier (with an optional product link) */
+    protected function makeSupplier(Store $store, array $attrs = []): \App\Models\Supplier
+    {
+        return \App\Models\Supplier::create($attrs + ['store_id' => $store->id, 'name' => 'Supplier ' . Str::random(4), 'email' => Str::random(6) . '@supplier.test',
+            'lead_time_days' => 2, 'is_active' => true]);
+    }
+
+    protected function linkSupplier(\App\Models\Supplier $supplier, Product $product, float $cost = 700, int $min = 1, bool $preferred = true): \App\Models\SupplierProduct
+    {
+        $link = \App\Models\SupplierProduct::create(['supplier_id' => $supplier->id, 'product_id' => $product->id, 'unit_cost' => $cost, 'min_order_qty' => $min]);
+        if ($preferred) {
+            \App\Services\PurchaseOrderService::setPreferred($link);
+        }
+
+        return $link->fresh();
+    }
+
+    /** J7: a batch already in stock (adds to the filled quantity like a Stock In) */
+    protected function makeBatch(Product $product, int $qty, string $dueOn, array $attrs = []): \App\Models\CylinderBatch
+    {
+        Inventory::where('product_id', $product->id)->increment('quantity', $qty);
+
+        return \App\Models\CylinderBatch::create($attrs + [
+            'store_id' => $product->store_id, 'product_id' => $product->id, 'batch_code' => 'B-' . Str::random(5), 'source' => 'stock_in',
+            'quantity_received' => $qty, 'quantity_remaining' => $qty, 'requalification_due_on' => $dueOn, 'received_on' => now()->toDateString(),
+        ]);
+    }
+
+    /** 1×1 JPEG upload (GD isn't needed) */
+    protected function jpegUpload(string $name = 'photo.jpg'): \Illuminate\Http\UploadedFile
+    {
+        return \Illuminate\Http\UploadedFile::fake()->createWithContent($name, base64_decode('/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA='));
+    }
+
     protected function makeVehicle(Store $store, string $type, float $kg, int $tanks, ?array $limits = null, string $status = 'available'): Vehicle
     {
         DB::table('store_delivery_rates')->updateOrInsert(['store_id' => $store->id, 'vehicle_type' => $type], ['base_fee' => 50, 'fee_per_km' => 10, 'created_at' => now(), 'updated_at' => now()]);

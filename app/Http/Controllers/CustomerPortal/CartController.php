@@ -68,11 +68,14 @@ class CartController extends Controller
                 // Delivery weight of ONE unit (DeliveryFeeService::itemKg — the same number checkout uses)
                 'unit_kg'          => \App\Services\DeliveryFeeService::itemKg($product),
                 // Gas size key ("11") for the vehicles' per-size limits (J6)
-                'size_key'         => \App\Services\DeliveryFeeService::sizeKey((float) $product->weight_kg),
+                'size_key'         => $product->isAccessory() ? null : \App\Services\DeliveryFeeService::sizeKey((float) $product->weight_kg),
+                // J7: accessories (regulator, hose…) — no refill / exchange, no empty tank
+                'product_type'     => $product->product_type ?? 'lpg',
+                'accessory_category' => $product->accessory_category,
                 'image_url'        => $product->image ? Storage::url($product->image) : null,
                 'refill_price'     => (float) $product->refill_price,
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),
-                'transaction_type' => $ci->transaction_type,
+                'transaction_type' => $product->isAccessory() ? 'new_purchase' : $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $stock,
                 // Seller's limit per customer (null = no limit) per order / day / week; over it when the seller

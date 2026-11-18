@@ -34,6 +34,9 @@ type CartItem = {
     refill_price: number;
     purchase_price: number;
     transaction_type: 'refill' | 'new_purchase';
+    /** J7: accessory — own unit weight, never a refill */
+    product_type?: 'lpg' | 'accessory';
+    unit_weight_kg?: number | null;
     quantity: number;
     stock: number;
     max_per_order?: number | null;
@@ -769,7 +772,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.name}</p>
-                                                    <p className="text-xs text-gray-500">{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</p>
+                                                    <p className="text-xs text-gray-500">{item.product_type === 'accessory' ? 'Accessory' : <>{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</>}</p>
                                                     {item.over_max && (
                                                         <p className="text-xs font-medium text-red-600">{overLimitText(item, 'reduce the quantity in your cart to continue')}</p>
                                                     )}

@@ -39,13 +39,39 @@ return [
         ],
         'inventory' => [
             'label'       => 'Inventory',
-            'description' => 'Stock levels and history. Full access can record stock-in / stock-out and reorder levels.',
-            'permissions' => ['inventory.view', 'inventory.stock_in', 'inventory.stock_out', 'inventory.adjust'],
+            'description' => 'Stock levels and history, suppliers and purchase orders. Full access can record stock-in / stock-out, damaged cylinders and reorder levels, manage suppliers, draft and receive purchase orders.',
+            'permissions' => ['inventory.view', 'inventory.stock_in', 'inventory.stock_out', 'inventory.adjust',
+                // J7: suppliers + purchase orders (sending / cancelling a PO needs inventory.po_send — the Purchase approvals module)
+                'inventory.suppliers', 'inventory.po_create', 'inventory.po_receive'],
             'actions'     => [
                 'seller.inventory.stock-in'      => 'inventory.stock_in',
                 'seller.inventory.stock-out'     => 'inventory.stock_out',
                 'seller.inventory.reorder-level' => 'inventory.adjust',
+                // J7
+                'seller.inventory.damaged'          => 'inventory.adjust',
+                'seller.inventory.damaged.batch'    => 'inventory.adjust',
+                'seller.inventory.dispose'          => 'inventory.adjust',
+                'seller.suppliers.store'            => 'inventory.suppliers',
+                'seller.suppliers.update'           => 'inventory.suppliers',
+                'seller.suppliers.destroy'          => 'inventory.suppliers',
+                'seller.suppliers.products'         => 'inventory.suppliers',
+                'seller.suppliers.products.destroy' => 'inventory.suppliers',
+                'seller.purchase-orders.store'      => 'inventory.po_create',
+                'seller.purchase-orders.update'     => 'inventory.po_create',
+                'seller.purchase-orders.from-alert' => 'inventory.po_create',
+                'seller.purchase-orders.send'       => 'inventory.po_send',
+                'seller.purchase-orders.cancel'     => 'inventory.po_send',
+                'seller.purchase-orders.receive'    => 'inventory.po_receive',
+                'seller.supplier-returns.store'     => 'inventory.adjust',
+                'seller.supplier-returns.outcome'   => 'inventory.adjust',
             ],
+        ],
+        // J7: approving purchase orders (Send / Cancel). Separate so the Warehouse starter can draft and receive but not send.
+        'purchasing' => [
+            'label'       => 'Purchase approvals',
+            'description' => 'Send purchase orders to suppliers (and cancel them). Needs the Inventory module to open the pages.',
+            'permissions' => ['inventory.po_send'],
+            'actions'     => [],
         ],
         'orders' => [
             'label'       => 'Orders & Refunds',
@@ -133,6 +159,10 @@ return [
         'payroll.manage'          => ['Payroll',          'Generate payroll'],
         'customer_reports.view'   => ['Customer Reports', 'View reports from customers and riders'],
         'loyalty_customers.view'  => ['Loyalty',          'View the loyal customers list'],
+        'inventory.suppliers'     => ['Inventory',        'Manage suppliers and what they supply'],
+        'inventory.po_create'     => ['Inventory',        'Create and edit draft purchase orders'],
+        'inventory.po_send'       => ['Inventory',        'Send (approve) and cancel purchase orders'],
+        'inventory.po_receive'    => ['Inventory',        'Receive purchase order deliveries'],
     ],
 
     // The 4 starter roles every store gets (hard-coded levels)

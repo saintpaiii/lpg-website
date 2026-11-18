@@ -2,6 +2,7 @@ import MessageButton from '@/components/chat/message-button';
 import { FeaturedBadge } from '@/components/featured-badge';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ArrowLeft, ShoppingCart, Star } from 'lucide-react';
+import { AccessoryBadge } from '@/components/accessory-badge';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { StarRating } from '@/components/ui/star-rating';
@@ -21,6 +22,9 @@ import { PhotoPicker, PhotoThumbs, ReviewEditDialog, ReviewOwnerActions, photoEr
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Product = {
+    /** J7 */
+    product_type?: 'lpg' | 'accessory';
+    accessory_category?: string | null;
     id: number;
     name: string;
     brand: string;
@@ -166,7 +170,9 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
     const maxAdd = maxAddOf(product);
     const limitReached = limitReachedText(product);
     const limitInfo = limitStatus(product);
-    const [txType, setTxType] = useState<'refill' | 'new_purchase'>('refill');
+    // J7: an accessory is always a new purchase (no refill / tank exchange)
+    const isAccessory = product.product_type === 'accessory';
+    const [txType, setTxType] = useState<'refill' | 'new_purchase'>(isAccessory ? 'new_purchase' : 'refill');
     const [adding, setAdding] = useState(false);
 
     // Rating form
@@ -327,8 +333,8 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                         {/* Add to cart controls */}
                         {product.stock > 0 && (
                             <div className="space-y-3">
-                                {/* Transaction type */}
-                                <div className="grid grid-cols-2 gap-2">
+                                {/* Transaction type (not for accessories) */}
+                                {isAccessory ? <AccessoryBadge category={product.accessory_category} /> : <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map(t => (
                                         <button
                                             key={t}
@@ -345,7 +351,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                             </p>
                                         </button>
                                     ))}
-                                </div>
+                                </div>}
 
                                 {/* Quantity */}
                                 <div className="flex items-center gap-3">

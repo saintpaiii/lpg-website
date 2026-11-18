@@ -27,6 +27,12 @@ use Illuminate\Validation\ValidationException;
  */
 class HandoverAdjustmentService
 {
+    /** J4 "tank not accepted" reasons → cylinder_incidents reasons (J7) */
+    public const INCIDENT_REASONS = [
+        'wrong_brand' => 'other', 'dented' => 'dented_rusty', 'leaking' => 'leaking', 'valve' => 'bad_valve',
+        'requalification' => 'failed_requalification', 'other' => 'other',
+    ];
+
     public const CHOICES = ['new_purchase' => 'Switched to New Purchase', 'cancel' => 'Item cancelled'];
 
     /** Validation for the "A tank was not accepted" rows sent with Delivered / Picked up. */
@@ -101,15 +107,8 @@ class HandoverAdjustmentService
                 if ($remaining === 0) {
                     $item->delete();   // soft delete — the adjustment keeps pointing at it
                 }
-                // The cancelled tanks go back to stock (stock was taken when the order was confirmed)
-                if ($inventory = Inventory::where('product_id', $item->product_id)->first()) {
-                    $inventory->increment('quantity', $qty);
-                    InventoryTransaction::create([
-                        'product_id' => $item->product_id, 'type' => 'cancelled', 'quantity' => $qty,
-                        'reference'  => $order->order_number, 'notes' => 'Tank not accepted at handover — item cancelled, stock restored',
-                        'user_id'    => $userId,
-                    ]);
-                }
+                // The cancelled tanks go back to stock — to the batches they came from (stock was taken at confirm; J7 StockService)
+                StockService::returnForItem($item, $qty, $userId, $order->order_number, 'Tank not accepted at handover — item cancelled, stock restored');
             }
 
             $adjustments[] = OrderItemAdjustment::create([
@@ -118,6 +117,19 @@ class HandoverAdjustmentService
                 'choice' => $row['choice'], 'unit_price_before' => $before, 'unit_price_after' => $after,
                 'amount_change' => $change, 'stage' => $stage, 'recorded_by' => $userId,
             ]);
+            // J7 (D2): the refused tank is the CUSTOMER'S OWN empty — it stays with the customer (both choices: "switch to
+            // New Purchase" sells them a filled tank, "cancel" drops the item). Recorded for the DSS only: no stock effect,
+            // status 'disposed' (= not ours), never in a supplier's damage rate.
+            \App\Models\CylinderIncident::create([
+                'store_id' => $order->store_id, 'product_id' => $item->product_id, 'quantity' => $qty,
+                'reason' => self::INCIDENT_REASONS[$row['reason']] ?? 'other', 'source' => 'customer_handover', 'was_empty' => true,
+                'order_id' => $order->id, 'order_item_adjustment_id' => end($adjustments)->id, 'note' => ($row['note'] ?? null) ?: null,
+                'status' => 'disposed', 'recorded_by' => $userId,
+            ]);
+            // Empties were already counted as collected for this order → the refused ones never came in
+            if ($order->empty_tanks_collected_at) {
+                StockService::emptiesOut($item->product_id, $qty, $userId, $order->order_number, 'Tank refused at handover — it stayed with the customer');
+            }
             $net += $change;
             $lines[] = self::line($item->product?->name ?? 'Item', $qty, $row['choice'], $change);
         }

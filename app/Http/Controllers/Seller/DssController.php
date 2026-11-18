@@ -62,6 +62,12 @@ class DssController extends Controller
                     'recommended_order'   => $recommendedOrder,
                     'days_to_order'       => $daysToOrder,
                     'severity'            => $severity,
+                    // J7: "Create PO" / "Open draft PO-000012" (and the formula behind the suggestion)
+                    'reorder'             => \App\Services\ReorderService::forProduct($product),
+                    'draft_po'            => ($pref = \App\Services\PurchaseOrderService::preferredFor($product->id))
+                        ? \App\Models\PurchaseOrder::where('store_id', $store->id)->where('supplier_id', $pref->supplier_id)->where('status', 'draft')->latest()->first(['id', 'po_number'])?->only(['id', 'po_number'])
+                        : null,
+                    'has_supplier'        => $pref !== null,
                 ];
             })
             ->sortBy(fn ($a) => match ($a['severity']) { 'critical' => 0, 'warning' => 1, default => 2 })
@@ -124,6 +130,8 @@ class DssController extends Controller
              'product_id' => $item->product_id,
              'name'       => $item->product?->name ?? '—',
              'brand'      => $item->product?->brand ?? '',
+             // J7: accessories are grouped apart from LPG sizes
+             'group'      => $item->product?->isAccessory() ? 'Accessories' : 'LPG',
              'units_sold' => (int) $item->units_sold,
              'revenue'    => (float) $item->revenue,
          ])->values();
@@ -149,6 +157,7 @@ class DssController extends Controller
                 'product_id' => $tp['product_id'],
                 'name'       => $tp['name'],
                 'brand'      => $tp['brand'],
+                'group'      => $tp['group'],
                 'forecast'   => $forecast,
                 'total'      => array_sum($forecast),
             ];
@@ -176,6 +185,8 @@ class DssController extends Controller
             'topProducts'    => $topProducts,
             'demandForecast' => $demandForecast,
             'insights'       => $this->computeInsights($store),
+            // J7: Suppliers & Cylinders (damage rates, delays, expiry, empties, customer handover rejections)
+            'supplierDss'    => \App\Services\SupplierDssService::forStore($store),
             // J6: Fleet — capacity misses, waits, peak vs vehicles, per-vehicle use + rule-based advice
             'fleet'          => \App\Services\VehicleDssService::fleet($store),
             'generatedAt'    => now()->format('M d, Y g:i A'),

@@ -164,10 +164,13 @@ class CheckoutController extends Controller
                 'brand'            => $product->brand ?? '',
                 'weight'           => $product->weight ?? (($product->weight_kg ?? '') . 'kg'),
                 'weight_kg'        => (float) ($product->weight_kg ?? 0),   // load for the vehicle choice
+                // J7: accessories weigh their own unit weight and are never a refill
+                'product_type'     => $product->product_type ?? 'lpg',
+                'unit_weight_kg'   => $product->unit_weight_kg !== null ? (float) $product->unit_weight_kg : null,
                 'image_url'        => $product->image ? Storage::url($product->image) : null,
                 'refill_price'     => (float) $product->refill_price,
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),
-                'transaction_type' => $ci->transaction_type,
+                'transaction_type' => $product->isAccessory() ? 'new_purchase' : $ci->transaction_type,
                 'quantity'         => $ci->quantity,
                 'stock'            => $product->inventory?->quantity ?? 0,
                 // Over the seller's max per customer (per order / day / week) → this line blocks checkout
@@ -437,7 +440,7 @@ class CheckoutController extends Controller
                     'product_id'       => $ci->product_id,
                     'name'             => $ci->product?->name ?? 'Product',
                     'quantity'         => $ci->quantity,
-                    'transaction_type' => $ci->transaction_type,
+                    'transaction_type' => $ci->product?->isAccessory() ? 'new_purchase' : $ci->transaction_type,   // J7
                 ];
             }
             // Stores that are hidden right now (plan ended, permit expired…) are left out; the checkout page shows
@@ -568,7 +571,8 @@ class CheckoutController extends Controller
                             throw new CheckoutRuleException($why);
                         }
 
-                        $txType = $cartItem['transaction_type'] ?? 'refill';
+                        // J7: an accessory is always a new purchase (no refill, no empty tank)
+                        $txType = $product->isAccessory() ? 'new_purchase' : ($cartItem['transaction_type'] ?? 'refill');
                         $price  = $txType === 'refill'
                             ? (float) $product->refill_price
                             : (float) ($product->purchase_price ?? $product->refill_price);
@@ -648,7 +652,7 @@ class CheckoutController extends Controller
                     }
 
                     // Refill tanks (products with a size) = empty tanks to hand over
-                    $emptyTanks = collect($orderedItems)->filter(fn ($i) => $i['transaction_type'] === 'refill' && (float) $i['product']->weight_kg > 0)->sum('quantity');
+                    $emptyTanks = collect($orderedItems)->filter(fn ($i) => $i['transaction_type'] === 'refill' && $i['product']->isLpg() && (float) $i['product']->weight_kg > 0)->sum('quantity');
 
                     $prepared[$store->id] = compact('store', 'subtotal', 'orderedItems', 'txTypeFinal', 'distKm', 'finalFee', 'storeCoupon', 'discount', 'isPickup', 'emptyTanks', 'vehicleType');
                 }

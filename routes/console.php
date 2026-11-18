@@ -31,3 +31,9 @@ Schedule::command('staff:check-documents')->dailyAt('06:05')->withoutOverlapping
 
 // Store plans: reminders in the last 3 days, end-of-plan notices (stores are hidden the moment a plan ends), stale checkouts
 Schedule::command('subscriptions:process')->hourly()->withoutOverlapping();
+
+// J7: cylinder batches nearing / past their requalification date → owner + inventory staff (once per batch per threshold)
+Schedule::command('cylinders:check-expiry')->dailyAt('06:10')->withoutOverlapping();
+
+// J7: auto-reorder — DRAFT purchase orders for products at/below their reorder point (never sent automatically)
+Schedule::command('inventory:auto-reorder')->dailyAt('06:20')->withoutOverlapping();

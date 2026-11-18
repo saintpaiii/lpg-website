@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Seller\DashboardController;
+use App\Http\Controllers\Seller\PurchaseOrderController;
+use App\Http\Controllers\Seller\SupplierController;
 use App\Http\Controllers\Seller\ReportsController;
 use App\Http\Controllers\Seller\DeliveryController;
 use App\Http\Controllers\Seller\DssController;
@@ -119,6 +121,31 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             Route::post('inventory/{product}/stock-in', [InventoryController::class, 'stockIn'])->name('inventory.stock-in');
             Route::post('inventory/{product}/stock-out', [InventoryController::class, 'stockOut'])->name('inventory.stock-out');
             Route::patch('inventory/{product}/reorder-level', [InventoryController::class, 'updateReorderLevel'])->name('inventory.reorder-level');
+
+            // J7: damaged / expired cylinders + supplier returns
+            Route::post('inventory/{product}/damaged', [InventoryController::class, 'damaged'])->name('inventory.damaged');
+            Route::post('inventory/batches/{batch}/expire', [InventoryController::class, 'expireBatch'])->name('inventory.damaged.batch');
+            Route::post('inventory/incidents/{incident}/dispose', [InventoryController::class, 'dispose'])->name('inventory.dispose');
+            Route::post('supplier-returns', [InventoryController::class, 'createReturn'])->name('supplier-returns.store');
+            Route::post('supplier-returns/{supplierReturn}/outcome', [InventoryController::class, 'returnOutcome'])->name('supplier-returns.outcome');
+            Route::get('supplier-returns/{supplierReturn}/slip', [InventoryController::class, 'returnSlip'])->name('supplier-returns.slip');
+
+            // J7: suppliers + purchase orders (Supply)
+            Route::get('suppliers', [SupplierController::class, 'index'])->name('suppliers');
+            Route::post('suppliers', [SupplierController::class, 'storeSupplier'])->name('suppliers.store');
+            Route::put('suppliers/{supplier}', [SupplierController::class, 'update'])->name('suppliers.update');
+            Route::delete('suppliers/{supplier}', [SupplierController::class, 'destroy'])->name('suppliers.destroy');
+            Route::post('suppliers/{supplier}/products', [SupplierController::class, 'products'])->name('suppliers.products');
+            Route::delete('suppliers/{supplier}/products/{link}', [SupplierController::class, 'removeProduct'])->name('suppliers.products.destroy');
+            Route::get('purchase-orders', [PurchaseOrderController::class, 'index'])->name('purchase-orders');
+            Route::post('purchase-orders', [PurchaseOrderController::class, 'store'])->name('purchase-orders.store');
+            Route::post('purchase-orders/from-alert/{product}', [PurchaseOrderController::class, 'fromAlert'])->name('purchase-orders.from-alert');
+            Route::get('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'show'])->name('purchase-orders.show');
+            Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->name('purchase-orders.update');
+            Route::post('purchase-orders/{purchaseOrder}/send', [PurchaseOrderController::class, 'send'])->name('purchase-orders.send');
+            Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
+            Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
+            Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase-orders.pdf');
         });
 
         // ── Staff (seller owner only — seller_staff cannot manage staff) ─────

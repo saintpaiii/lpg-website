@@ -38,6 +38,7 @@ class SettingsController extends Controller
                 'attendance_radius'        => $store->attendance_radius ?? 500,
                 'allow_cod'                => (bool) ($store->allow_cod ?? true),
                 'allow_half_payment'       => (bool) $store->allow_half_payment,   // J5
+                'auto_reorder_enabled'     => (bool) ($store->auto_reorder_enabled ?? true),   // J7
                 'allow_pickup'             => (bool) $store->allow_pickup,
                 'pickup_instructions'      => $store->pickup_instructions ?? '',
             ],
@@ -199,6 +200,7 @@ class SettingsController extends Controller
             'attendance_radius' => 'nullable|integer|min:50|max:5000',
             'allow_cod'                => 'nullable|boolean',
             'allow_half_payment'       => 'nullable|boolean',
+            'auto_reorder_enabled'     => 'nullable|boolean',
             'allow_pickup'             => 'nullable|boolean',
             'pickup_instructions'      => 'nullable|string|max:255',
         ], [
@@ -248,6 +250,8 @@ class SettingsController extends Controller
             'allow_cod'                => $request->has('allow_cod') ? $request->boolean('allow_cod') : $store->allow_cod,
             // J5: half payment (50% online now, the rest before delivery or cash to the rider)
             'allow_half_payment'       => $request->has('allow_half_payment') ? $request->boolean('allow_half_payment') : (bool) $store->allow_half_payment,
+            // J7: the DSS drafts purchase orders (never sends them)
+            'auto_reorder_enabled'     => $request->has('auto_reorder_enabled') ? $request->boolean('auto_reorder_enabled') : (bool) ($store->auto_reorder_enabled ?? true),
             // Consignment (allow / deadline) is edited on the Loyalty Program page
             'allow_pickup'             => $request->has('allow_pickup') ? $request->boolean('allow_pickup') : (bool) $store->allow_pickup,
             'pickup_instructions'      => $request->has('pickup_instructions') ? ($data['pickup_instructions'] ?? null) : $store->pickup_instructions,

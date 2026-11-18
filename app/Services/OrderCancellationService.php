@@ -21,21 +21,8 @@ class OrderCancellationService
         DB::transaction(function () use ($order, $reason, $notes, $userId) {
             // Restore stock if order was already confirmed (stock was deducted)
             if ($order->status === 'confirmed') {
-                $order->load('items');
-                foreach ($order->items as $item) {
-                    $inventory = Inventory::where('product_id', $item->product_id)->first();
-                    if ($inventory) {
-                        $inventory->increment('quantity', $item->quantity);
-                        InventoryTransaction::create([
-                            'product_id' => $item->product_id,
-                            'type'       => 'cancelled',
-                            'quantity'   => $item->quantity,
-                            'reference'  => $order->order_number,
-                            'notes'      => 'Order cancelled by customer — stock restored',
-                            'user_id'    => $userId,
-                        ]);
-                    }
-                }
+                // Back to the same cylinder batches (J7)
+                StockService::returnForOrder($order, $userId, 'Order cancelled by customer — stock restored');
             }
 
             $cancelUpdates = [

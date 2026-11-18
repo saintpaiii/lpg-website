@@ -58,6 +58,7 @@ class Store extends Model
         'allow_cod',
         'allow_consignment',
         'allow_half_payment',   // J5
+        'auto_reorder_enabled', // J7: the DSS drafts purchase orders (never sends)
         'allow_pickup',
         'pickup_instructions',
         'opening_hours',        // J4 — per weekday; null = open 24 hours (StoreHours)
@@ -108,6 +109,7 @@ class Store extends Model
             'allow_cod'                => 'boolean',
             'allow_consignment'        => 'boolean',
             'allow_half_payment'       => 'boolean',
+            'auto_reorder_enabled'     => 'boolean',
             'allow_pickup'             => 'boolean',
             'opening_hours'            => 'array',
             'closed_today_until'       => 'datetime',

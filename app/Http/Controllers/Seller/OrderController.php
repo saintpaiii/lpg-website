@@ -518,49 +518,17 @@ class OrderController extends Controller
             }
 
             if ($newStatus === 'confirmed' && $oldStatus === 'pending') {
-                $order->load('items.product.inventory');
-
-                foreach ($order->items as $item) {
-                    $inventory = Inventory::where('product_id', $item->product_id)->first();
-                    if (! $inventory) abort(422, "No inventory record for {$item->product?->name}.");
-                    if ($inventory->quantity < $item->quantity) {
-                        abort(422, "Insufficient stock for {$item->product?->name}. Available: {$inventory->quantity}.");
-                    }
-                }
-
-                foreach ($order->items as $item) {
-                    $inventory = Inventory::where('product_id', $item->product_id)->first();
-                    $inventory->decrement('quantity', $item->quantity);
-                    InventoryTransaction::create([
-                        'product_id' => $item->product_id,
-                        'type'       => 'order',
-                        'quantity'   => $item->quantity,
-                        'reference'  => $order->order_number,
-                        'notes'      => 'Order confirmed',
-                        'user_id'    => auth()->id(),
-                    ]);
-                }
+                // J7: usable stock only (expired batches never sell), oldest requalification date first (FIFO batches)
+                \App\Services\StockService::takeForOrder($order, auth()->id());
 
                 // The store's own invoice series + VAT snapshot (locks the order + store rows; one invoice per order)
                 \App\Services\InvoiceService::issue($order);
             }
 
             if ($newStatus === 'cancelled' && ! in_array($oldStatus, ['cancelled', 'pending'])) {
-                $order->load('items');
-                foreach ($order->items as $item) {
-                    $inventory = Inventory::where('product_id', $item->product_id)->first();
-                    if ($inventory) {
-                        $inventory->increment('quantity', $item->quantity);
-                        InventoryTransaction::create([
-                            'product_id' => $item->product_id,
-                            'type'       => 'cancelled',
-                            'quantity'   => $item->quantity,
-                            'reference'  => $order->order_number,
-                            'notes'      => 'Order cancelled — stock restored',
-                            'user_id'    => auth()->id(),
-                        ]);
-                    }
-                }
+                // Back to the same batches (J7). Empties already collected stay in the store (they're physically here).
+                \App\Services\StockService::returnForOrder($order, auth()->id(), 'Order cancelled — stock restored'
+                    . ($order->empty_tanks_collected_at ? ' (the empty tanks already collected stay in the store)' : ''));
             }
 
             $updates = ['status' => $newStatus];
@@ -593,6 +561,17 @@ class OrderController extends Controller
                 }
             }
         });
+
+        // J7: stock went down → maybe draft a purchase order (never sent automatically; never undoes the confirm)
+        if ($newStatus === 'confirmed' && $oldStatus === 'pending') {
+            try {
+                foreach ($order->items()->with('product')->get()->pluck('product')->filter()->unique('id') as $p) {
+                    \App\Services\ReorderService::checkProduct($p);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Auto-reorder check failed', ['order' => $order->id, 'error' => $e->getMessage()]);
+            }
+        }
 
         if ($adjusted['cancelled_all']) {
             return back()->with('success', 'Every tank was not accepted — all items were cancelled, so the order was cancelled.');

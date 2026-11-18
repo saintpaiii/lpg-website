@@ -19,6 +19,7 @@ import type { SharedData } from '@/types';
 import StoreAvatar from '@/components/store-avatar';
 import { ClosedNote, PickupOnlyBadge, StoreHoursBadge, type StoreHoursStatus } from '@/components/store-badges';
 import { Scale } from 'lucide-react';
+import { AccessoryBadge } from '@/components/accessory-badge';
 import { fits, type VehicleCapacity } from '@/lib/delivery-fee';
 
 type CartItem = {
@@ -34,6 +35,9 @@ type CartItem = {
     refill_price: number;
     purchase_price: number;
     transaction_type: 'refill' | 'new_purchase';
+    /** J7: accessories (regulator, hose…) are always a new purchase */
+    product_type?: 'lpg' | 'accessory';
+    accessory_category?: string | null;
     quantity: number;
     stock: number;
     max_per_order?: number | null;
@@ -298,7 +302,7 @@ export default function CartPage({ cart }: Props) {
                                                                 <div className="flex items-start justify-between gap-2">
                                                                     <div>
                                                                         <p className="font-semibold text-sm text-gray-900 dark:text-white">{item.name}</p>
-                                                                        <p className="text-xs text-gray-500">{item.brand} · {item.weight}</p>
+                                                                        <p className="text-xs text-gray-500">{item.product_type === 'accessory' ? <AccessoryBadge category={item.accessory_category} /> : <>{item.brand} · {item.weight}</>}</p>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => removeItem(item.product_id)}
@@ -308,9 +312,11 @@ export default function CartPage({ cart }: Props) {
                                                                     </button>
                                                                 </div>
 
-                                                                {/* Transaction type toggle */}
+                                                                {/* Transaction type toggle — not for accessories (no tank exchange) */}
                                                                 <div className="flex gap-2 mt-2">
-                                                                    {(['refill', 'new_purchase'] as const).map(t => (
+                                                                    {item.product_type === 'accessory' ? (
+                                                                        <span className="text-xs text-gray-500" data-testid="accessory-price">₱{item.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })} each</span>
+                                                                    ) : (['refill', 'new_purchase'] as const).map(t => (
                                                                         <button
                                                                             key={t}
                                                                             onClick={() => updateItem(item.product_id, item.quantity, t)}

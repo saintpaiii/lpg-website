@@ -1,5 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Minus, Plus, Search, Warehouse } from 'lucide-react';
+import { Layers, Minus, PackageX, Plus, Search, Warehouse } from 'lucide-react';
+import { BatchesDialog, DamagedDialog, HeldCylindersCard, ReturnsCard, type Batch, type Incident, type ReturnRow } from '@/components/inventory-cylinders';
 import { useState } from 'react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -25,9 +26,18 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 type InventoryRow = {
     id: number;
+    /** FILLED (sellable incl. expired batches) */
     quantity: number;
     reorder_level: number;
-    product: { id: number; name: string; brand: string; is_active: boolean };
+    /** J7: filled minus expired batches */
+    usable?: number;
+    empty_quantity?: number;
+    damaged_quantity?: number;
+    expired?: number;
+    expiring?: { qty: number; days: number } | null;
+    batches?: Batch[];
+    reorder?: { text: string; due: boolean; suggested_qty: number; supplier_name: string | null } | null;
+    product: { id: number; name: string; brand: string; is_active: boolean; product_type?: 'lpg' | 'accessory' };
 };
 
 type Transaction = {
@@ -49,9 +59,14 @@ type Props = {
     transactions?: { data: Transaction[]; current_page: number; last_page: number; total: number };
     productList: ProductOption[];
     filters: Record<string, string>;
+    /** J7 */
+    incidents?: Incident[];
+    returns?: ReturnRow[];
+    suppliers?: { id: number; name: string }[];
+    reasons?: Record<string, string>;
 };
 
-type StockFormData = { quantity: string; notes: string };
+type StockFormData = { quantity: string; notes: string; requalification_due_on: string; manufactured_on: string; batch_code: string };
 
 const TX_COLORS: Record<string, string> = {
     in:         'text-green-600',
@@ -59,16 +74,25 @@ const TX_COLORS: Record<string, string> = {
     order:      'text-orange-600',
     cancelled:  'text-blue-600',
     adjustment: 'text-gray-600',
+    empty_in:   'text-sky-600',
+    empty_out:  'text-sky-700',
+    damaged:    'text-red-700',
+    expired:    'text-red-700',
+    returned_to_supplier: 'text-purple-600',
 };
 
-export default function SellerInventory({ tab, inventories, transactions, productList, filters }: Props) {
+export default function SellerInventory({ tab, inventories, transactions, productList, filters, incidents = [], returns = [], suppliers = [], reasons = {} }: Props) {
+    // J7: batches drawer (also opened from an expiry notification: ?batches=<product id>) + damaged dialog
+    const [batchesFor, setBatchesFor] = useState<InventoryRow | null>(() => inventories?.data.find((i) => String(i.product.id) === filters.batches) ?? null);
+    const [damagedFor, setDamagedFor] = useState<InventoryRow | null>(null);
     const [search, setSearch]       = useState(filters.search ?? '');
     const [stockTarget, setStockTarget] = useState<InventoryRow | null>(null);
     const [stockType, setStockType]     = useState<'in' | 'out'>('in');
     const [reorderTarget, setReorderTarget] = useState<InventoryRow | null>(null);
     const [reorderVal, setReorderVal]       = useState('');
 
-    const { data, setData, post, processing, reset, errors } = useForm<StockFormData>({ quantity: '', notes: '' });
+    const { data, setData, post, processing, reset, errors } = useForm<StockFormData>({ quantity: '', notes: '', requalification_due_on: '', manufactured_on: '', batch_code: '' });
+    const isLpg = (inv: InventoryRow | null) => (inv?.product?.product_type ?? 'lpg') === 'lpg';
 
     function goTab(t: string) {
         router.get('/seller/inventory', { tab: t }, { preserveState: true, replace: true });
@@ -141,19 +165,26 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
-                                            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Stock</th>
+                                            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Filled</th>
+                                            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground" title="Empty cylinders collected on refills">Empty</th>
+                                            <th className="text-center px-4 py-2.5 font-medium text-muted-foreground" title="Held aside — not sellable">Damaged</th>
                                             <th className="text-center px-4 py-2.5 font-medium text-muted-foreground">Reorder Level</th>
                                             <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {inventories.data.length === 0 ? (
-                                            <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">No products found.</td></tr>
+                                            <tr><td colSpan={6} className="text-center py-12 text-muted-foreground">No products found.</td></tr>
                                         ) : inventories.data.map((inv) => (
                                             <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
                                                 <td className="px-4 py-3">
                                                     <p className="font-medium">{inv.product?.name ?? '—'}</p>
-                                                    <p className="text-xs text-muted-foreground">{inv.product?.brand ?? ''}</p>
+                                                    <p className="text-xs text-muted-foreground">{inv.product?.product_type === 'accessory' ? 'Accessory' : inv.product?.brand ?? ''}</p>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {inv.expiring && <span className="rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-800" data-testid="expiring-badge">Expiring soon: {inv.expiring.qty} (in {inv.expiring.days} days)</span>}
+                                                        {!!inv.expired && <span className="rounded bg-red-100 px-1.5 py-px text-[10px] font-semibold text-red-700" data-testid="expired-badge">Expired: {inv.expired}</span>}
+                                                    </div>
+                                                    {inv.reorder && <p className={`mt-1 text-[11px] ${inv.reorder.due ? 'text-violet-700' : 'text-muted-foreground'}`} title="How auto-reorder decides">{inv.reorder.text}</p>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`font-bold text-lg ${inv.quantity === 0 ? 'text-red-600' : inv.quantity <= inv.reorder_level ? 'text-amber-600' : 'text-foreground'}`}>
@@ -162,7 +193,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     {inv.quantity <= inv.reorder_level && (
                                                         <p className="text-xs text-amber-600">Low stock</p>
                                                     )}
+                                                    {inv.usable !== undefined && inv.usable !== inv.quantity && <p className="text-[11px] text-red-600">{inv.usable} usable</p>}
                                                 </td>
+                                                <td className="px-4 py-3 text-center tabular-nums">{isLpg(inv) ? inv.empty_quantity ?? 0 : '—'}</td>
+                                                <td className={`px-4 py-3 text-center tabular-nums ${inv.damaged_quantity ? 'font-semibold text-red-600' : ''}`}>{isLpg(inv) ? inv.damaged_quantity ?? 0 : '—'}</td>
                                                 <td className="px-4 py-3 text-center text-muted-foreground">
                                                     {inv.product?.id ? (
                                                         <button
@@ -185,6 +219,14 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                                 onClick={() => { setStockTarget(inv); setStockType('out'); }}>
                                                                 <Minus className="h-3 w-3 mr-1" /> Out
                                                             </Button>
+                                                            {isLpg(inv) && <>
+                                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setBatchesFor(inv)} aria-label={`Batches of ${inv.product.name}`}>
+                                                                    <Layers className="h-3 w-3 mr-1" /> Batches
+                                                                </Button>
+                                                                <Button size="sm" variant="outline" className="h-7 text-xs text-red-600" onClick={() => setDamagedFor(inv)} aria-label={`Record damaged ${inv.product.name}`}>
+                                                                    <PackageX className="h-3 w-3 mr-1" /> Damaged
+                                                                </Button>
+                                                            </>}
                                                         </div>
                                                     ) : (
                                                         <span className="text-xs text-muted-foreground">—</span>
@@ -213,6 +255,9 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                     </Card>
                 )}
 
+                {tab === 'overview' && <HeldCylindersCard incidents={incidents} suppliers={suppliers} />}
+                {tab === 'overview' && <ReturnsCard returns={returns} />}
+
                 {tab === 'transactions' && transactions && (
                     <Card>
                         <CardContent className="p-0">
@@ -228,7 +273,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                 <Select value={filters.type ?? 'all'} onValueChange={(v) => router.get('/seller/inventory', { tab: 'transactions', ...filters, type: v === 'all' ? undefined : v }, { preserveState: true, replace: true })}>
                                     <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="All types" /></SelectTrigger>
                                     <SelectContent>
-                                        {['all', 'in', 'out', 'order', 'cancelled', 'adjustment'].map((t) => (
+                                        {['all', 'in', 'out', 'order', 'cancelled', 'adjustment', 'empty_in', 'empty_out', 'damaged', 'expired', 'returned_to_supplier'].map((t) => (
                                             <SelectItem key={t} value={t} className="text-xs capitalize">{t === 'all' ? 'All types' : t}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -255,10 +300,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     <p className="text-xs text-muted-foreground">{tx.product?.brand ?? ''}</p>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`text-xs font-medium capitalize ${TX_COLORS[tx.type] ?? 'text-gray-600'}`}>{tx.type}</span>
+                                                    <span className={`text-xs font-medium capitalize ${TX_COLORS[tx.type] ?? 'text-gray-600'}`}>{tx.type.replace(/_/g, ' ')}</span>
                                                 </td>
                                                 <td className={`px-4 py-3 text-center font-bold ${TX_COLORS[tx.type] ?? ''}`}>
-                                                    {['out', 'order'].includes(tx.type) ? `−${tx.quantity}` : `+${tx.quantity}`}
+                                                    {['out', 'order', 'empty_out', 'damaged', 'expired', 'returned_to_supplier'].includes(tx.type) ? `−${tx.quantity}` : `+${tx.quantity}`}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
                                                     {tx.reference && <span className="font-mono">{tx.reference}</span>}
@@ -292,6 +337,18 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                             <Input type="number" min="1" value={data.quantity} onChange={(e) => setData('quantity', e.target.value)} placeholder="0" />
                             {errors.quantity && <p className="text-xs text-red-500">{errors.quantity}</p>}
                         </div>
+                        {stockType === 'in' && isLpg(stockTarget) && (
+                            <div className="grid gap-2 sm:grid-cols-3" data-testid="stock-in-batch">
+                                <div className="grid gap-1.5">
+                                    <Label>Requalification date <span className="text-red-500">*</span></Label>
+                                    <Input type="date" value={data.requalification_due_on} onChange={(e) => setData('requalification_due_on', e.target.value)} />
+                                    {errors.requalification_due_on && <p className="text-xs text-red-500">{errors.requalification_due_on}</p>}
+                                </div>
+                                <div className="grid gap-1.5"><Label>Manufactured</Label><Input type="date" value={data.manufactured_on} onChange={(e) => setData('manufactured_on', e.target.value)} /></div>
+                                <div className="grid gap-1.5"><Label>Batch code</Label><Input value={data.batch_code} placeholder="auto" onChange={(e) => setData('batch_code', e.target.value)} /></div>
+                                <p className="text-xs text-muted-foreground sm:col-span-3">The date stamped on the cylinder collar. Orders sell the oldest batch first; expired cylinders are never sold.</p>
+                            </div>
+                        )}
                         <div className="grid gap-1.5">
                             <Label>Notes</Label>
                             <NotePicker
@@ -312,6 +369,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                     </form>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* J7: batches + damaged */}
+            <BatchesDialog open={!!batchesFor} onClose={() => setBatchesFor(null)} productName={batchesFor?.product.name ?? ''} batches={batchesFor?.batches ?? []} />
+            <DamagedDialog open={!!damagedFor} onClose={() => setDamagedFor(null)} product={damagedFor?.product ?? null} batches={damagedFor?.batches ?? []} reasons={reasons} />
 
             {/* Reorder level dialog */}
             <AlertDialog open={!!reorderTarget} onOpenChange={(o) => { if (!o) setReorderTarget(null); }}>

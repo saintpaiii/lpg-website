@@ -15,6 +15,16 @@ class CartItem extends Model
         'transaction_type',
     ];
 
+    protected static function booted(): void
+    {
+        // J7: an accessory is always a new purchase — never a refill / tank exchange, never an empty tank
+        static::saving(function (CartItem $ci) {
+            if (Product::whereKey($ci->product_id)->value('product_type') === 'accessory') {
+                $ci->transaction_type = 'new_purchase';
+            }
+        });
+    }
+
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);

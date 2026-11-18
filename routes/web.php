@@ -36,7 +36,7 @@ Route::get('/invoices/{invoice}/print', [InvoicePrintController::class, 'show'])
 Route::middleware(['auth', 'verified'])->group(function () {
     // Private documents (IDs, selfies, permits) — owner or document reviewers only
     Route::get('/documents/{kind}/{id}/{field}', [\App\Http\Controllers\DocumentFileController::class, 'show'])
-        ->whereIn('kind', ['user', 'verification', 'store', 'store-document', 'staff-document', 'attendance', 'handover-photo', 'delivery-proof'])->whereNumber('id')
+        ->whereIn('kind', ['user', 'verification', 'store', 'store-document', 'staff-document', 'attendance', 'handover-photo', 'delivery-proof', 'cylinder-incident'])->whereNumber('id')
         ->middleware('throttle:120,1')->name('documents.show');
 
     // J6: chat photos are private — participants of the conversation + admin only

@@ -23,6 +23,12 @@ class ProductController extends Controller
             'name'             => $p->name,
             'brand'            => $p->brand ?? '',
             'weight'           => $p->weight ?? '',
+            // J7: LPG tank or accessory
+            'product_type'     => $p->product_type ?? 'lpg',
+            'accessory_category' => $p->accessory_category,
+            'unit_weight_kg'   => $p->unit_weight_kg !== null ? (float) $p->unit_weight_kg : null,
+            'cost_price'       => (float) ($p->cost_price ?? 0),
+            'exclude_auto_reorder' => (bool) $p->exclude_auto_reorder,
             // Number for the form: weight_kg, or parsed from the old free text
             'weight_kg'        => $p->weight_kg !== null && (float) $p->weight_kg > 0 ? (float) $p->weight_kg : LpgSize::parseKg($p->weight),
             'max_per_order'    => $p->max_per_order,
@@ -114,16 +120,26 @@ class ProductController extends Controller
         };
     }
 
-    /** Fields shared by create + edit. Tank size is a number in kg; refill can't cost more than a new tank. */
-    private static function productRules(): array
+    /**
+     * Fields shared by create + edit. LPG: tank size in kg, refill can't cost more than a new tank.
+     * Accessory (J7): category + unit weight + selling price (purchase_price) + cost price — no gas size, no refill price.
+     */
+    private static function productRules(?Request $request = null): array
     {
+        $accessory = ($request ?? request())->input('product_type') === 'accessory';
+
         return [
+            'product_type'   => 'nullable|in:lpg,accessory',
             'name'           => 'required|string|max:255',
             'brand'          => 'nullable|string|max:100',
-            'weight_kg'      => 'required|numeric|min:0.5|max:100',
+            'weight_kg'      => $accessory ? 'nullable' : 'required|numeric|min:0.5|max:100',
             'description'    => 'nullable|string|max:1000',
-            'refill_price'   => 'required|numeric|min:0|lte:purchase_price',
+            'refill_price'   => $accessory ? 'nullable' : 'required|numeric|min:0|lte:purchase_price',
             'purchase_price' => 'required|numeric|min:1',
+            'accessory_category' => $accessory ? 'required|in:' . implode(',', array_keys(Product::ACCESSORY_CATEGORIES)) : 'nullable',
+            'unit_weight_kg' => $accessory ? 'required|numeric|min:0.01|max:100' : 'nullable',
+            'cost_price'     => $accessory ? 'required|numeric|min:0' : 'nullable|numeric|min:0',
+            'exclude_auto_reorder' => 'nullable|boolean',
             'max_per_order'  => 'nullable|integer|min:1|max:999',
             'limit_period'   => 'nullable|in:order,day,week',
             'reorder_level'  => 'required|integer|min:0',
@@ -141,15 +157,35 @@ class ProductController extends Controller
             'weight_kg.min'      => $size,
             'weight_kg.max'      => $size,
             'refill_price.lte'   => "Refill price can't be higher than the new tank price.",
+            'accessory_category.required' => 'Choose the accessory category.',
+            'unit_weight_kg.required' => 'Enter the weight of one piece in kg (e.g. 0.6).',
         ];
     }
 
-    /** weight_kg (1 decimal) + the "11 kg" text that older pages still read. */
+    /** weight_kg (1 decimal) + the "11 kg" text that older pages still read. Accessories: no gas size (J7). */
     private static function sizeAttributes(array $data): array
     {
+        if (($data['product_type'] ?? 'lpg') === 'accessory') {
+            return ['weight_kg' => null, 'weight' => null];
+        }
         $kg = round((float) $data['weight_kg'], 1);
 
         return ['weight_kg' => $kg, 'weight' => LpgSize::label($kg)];
+    }
+
+    /** J7: type + accessory fields; an accessory has ONE price (selling = "new"), no refill — refill_price mirrors it for old code. */
+    private static function typeAttributes(array $data): array
+    {
+        if (($data['product_type'] ?? 'lpg') === 'accessory') {
+            return ['product_type' => 'accessory', 'accessory_category' => $data['accessory_category'], 'unit_weight_kg' => $data['unit_weight_kg'],
+                'refill_price' => $data['purchase_price'], 'purchase_price' => $data['purchase_price'], 'selling_price' => $data['purchase_price'],
+                'cost_price' => $data['cost_price'], 'exclude_auto_reorder' => (bool) ($data['exclude_auto_reorder'] ?? false)];
+        }
+
+        return ['product_type' => 'lpg', 'accessory_category' => null, 'unit_weight_kg' => null,
+            'refill_price' => $data['refill_price'], 'purchase_price' => $data['purchase_price'],
+            'exclude_auto_reorder' => (bool) ($data['exclude_auto_reorder'] ?? false)]
+            + (isset($data['cost_price']) && $data['cost_price'] !== null ? ['cost_price' => $data['cost_price']] : []);
     }
 
     public function store(Request $request): RedirectResponse
@@ -175,10 +211,11 @@ class ProductController extends Controller
                 'max_per_order'  => $data['max_per_order'] ?? null,
                 'limit_period'   => $data['limit_period'] ?? 'order',
                 'description'    => $data['description'] ?? null,
-                'refill_price'   => $data['refill_price'],
+                'refill_price'   => $data['refill_price'] ?? $data['purchase_price'],
                 'purchase_price' => $data['purchase_price'],
                 'selling_price'  => $data['purchase_price'],
-                'cost_price'     => $data['purchase_price'],
+                'cost_price'     => $data['cost_price'] ?? $data['purchase_price'],
+                ...self::typeAttributes($data),
                 'is_active'      => $publish,
                 'image'          => null,   // set from the first photo by the media sync
             ]);
@@ -225,8 +262,7 @@ class ProductController extends Controller
             'max_per_order'  => $data['max_per_order'] ?? null,
             'limit_period'   => $data['limit_period'] ?? 'order',
             'description'    => $data['description'] ?? null,
-            'refill_price'   => $data['refill_price'],
-            'purchase_price' => $data['purchase_price'],
+            ...self::typeAttributes($data),
         ];
 
         $product->update($updates);
