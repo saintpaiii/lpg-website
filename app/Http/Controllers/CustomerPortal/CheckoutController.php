@@ -90,6 +90,7 @@ class CheckoutController extends Controller
             ->where('user_id', $userId)
             ->whereIn('product_id', $selectedProductIds)
             ->get();
+        \App\Services\StockService::prime($cartItems->pluck('product_id'));   // K6: sellable stock (no expired batches)
 
         // Bought earlier today / this week, for products limited per day / per week (one query)
         $bought = PurchaseLimitService::boughtForMany($userId, $cartItems->pluck('product')->filter());
@@ -172,7 +173,7 @@ class CheckoutController extends Controller
                 'purchase_price'   => (float) ($product->purchase_price ?? $product->refill_price),
                 'transaction_type' => $product->isAccessory() ? 'new_purchase' : $ci->transaction_type,
                 'quantity'         => $ci->quantity,
-                'stock'            => $product->inventory?->quantity ?? 0,
+                'stock'            => \App\Services\StockService::sellable($product),
                 // Over the seller's max per customer (per order / day / week) → this line blocks checkout
                 'max_per_order'    => $product->max_per_order,
                 'limit_period'     => PurchaseLimitService::period($product),
@@ -563,9 +564,12 @@ class CheckoutController extends Controller
                             throw new \RuntimeException("Product '{$cartItem['name']}' is no longer available.");
                         }
 
-                        $stock = $product->inventory?->quantity ?? 0;
+                        // K6: sellable stock only — expired cylinders are never sold (fresh, not the page's memo)
+                        $stock = \App\Services\StockService::usableFilled($product->id, $product->inventory);
                         if ($stock < $cartItem['quantity']) {
-                            throw new CheckoutRuleException("Insufficient stock for {$product->name}. Only {$stock} unit(s) left.");
+                            throw new CheckoutRuleException($stock > 0
+                                ? "Insufficient stock for {$product->name}. Only {$stock} unit(s) left."
+                                : "{$product->name} is out of stock.");
                         }
                         if (($why = static::maxPerOrderError($product, (int) $cartItem['quantity'], $boughtNow[$product->id] ?? 0)) !== null) {
                             throw new CheckoutRuleException($why);

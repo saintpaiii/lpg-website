@@ -18,9 +18,11 @@ use Illuminate\Support\Facades\DB;
  *  avg_daily      = units sold in the last 30 days (orders not cancelled) ÷ 30
  *  lead           = the preferred supplier's lead time (no supplier → config default)
  *  safety_stock   = ceil(avg_daily × safety_days)
- *  reorder_point  = ceil(avg_daily × lead) + safety_stock   (the manual reorder level wins when higher)
- *  suggested_qty  = max(min_order_qty, ceil(avg_daily × cover_days) + safety_stock − usable_filled − already_on_order),
- *                   rounded UP to a multiple of min_order_qty
+ *  reorder_point  = max(manual reorder level, ceil(avg_daily × lead) + safety_stock)
+ *  target_stock   = reorder_point + max(ceil(avg_daily × cover_days), 1)      ("order up to" level — K6)
+ *  suggested_qty  = max(min_order_qty, target_stock − usable_filled − already_on_order), rounded UP to a multiple of
+ *                   min_order_qty. Due only when usable + on_order ≤ reorder_point, so receiving it lifts stock above
+ *                   the reorder point (no re-trigger).
  * usable_filled excludes expired batches; already_on_order = remaining qty of sent / partially received POs.
  */
 class ReorderService
@@ -36,18 +38,18 @@ class ReorderService
             $point = $manualLevel;
             $pointSource = 'manual';
         }
-        $min  = max(1, $minOrder);
-        $need = (int) ceil($avgDaily * (int) $cfg['cover_days']) + $safety - $usable - $onOrder;
-        $qty  = max($min, $need);
-        $qty  = (int) (ceil($qty / $min) * $min);
-        $due  = $usable + $onOrder <= $point;
+        $min    = max(1, $minOrder);
+        $target = $point + max((int) ceil($avgDaily * (int) $cfg['cover_days']), 1);   // K6: "order up to" level
+        $qty    = max($min, $target - $usable - $onOrder);
+        $qty    = (int) (ceil($qty / $min) * $min);
+        $due    = $usable + $onOrder <= $point;
 
         $text = 'Sold ' . rtrim(rtrim(number_format($avgDaily, 1, '.', ''), '0'), '.') . "/day · lead {$lead} " . ($lead === 1 ? 'day' : 'days')
-            . " · safety {$safety} → reorder at {$point}" . ($pointSource === 'manual' ? ' (your reorder level)' : '')
+            . " · safety {$safety} → reorder at {$point}" . ($pointSource === 'manual' ? ' (your reorder level)' : '') . ", order up to {$target}"
             . "; you have {$usable}" . ($onOrder ? " + {$onOrder} on order" : '') . ($due ? " → order {$qty}" : ' → no order needed yet');
 
         return ['avg_daily' => round($avgDaily, 2), 'lead' => $lead, 'safety_stock' => $safety, 'reorder_point' => $point, 'point_source' => $pointSource,
-            'usable' => $usable, 'on_order' => $onOrder, 'min_order_qty' => $min, 'suggested_qty' => $qty, 'due' => $due, 'text' => $text];
+            'target_stock' => $target, 'usable' => $usable, 'on_order' => $onOrder, 'min_order_qty' => $min, 'suggested_qty' => $qty, 'due' => $due, 'text' => $text];
     }
 
     /** Units sold in the last N days (not cancelled) — the same query the DSS reorder alerts use. */

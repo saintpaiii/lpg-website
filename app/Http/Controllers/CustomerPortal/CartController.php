@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CartItem;
 use App\Models\Product;
 use App\Services\PurchaseLimitService;
+use App\Services\StockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,7 @@ class CartController extends Controller
         if ($items->isEmpty()) {
             return null;
         }
+        StockService::prime($items->pluck('product_id'));   // K6: sellable stock (expired batches excluded), 2 queries
 
         // Bought earlier today / this week, for products limited per day / per week (one query)
         $bought = PurchaseLimitService::boughtForMany($userId, $items->pluck('product')->filter());
@@ -59,7 +61,7 @@ class CartController extends Controller
                 ];
             }
 
-            $stock = $product->inventory?->quantity ?? 0;
+            $stock = StockService::sellable($product);
             $stores[$storeId]['items'][] = [
                 'product_id'       => $product->id,
                 'name'             => $product->name,
@@ -126,8 +128,8 @@ class CartController extends Controller
             return back()->with('error', 'You cannot purchase products from your own store.');
         }
 
-        $stock = $product->inventory?->quantity ?? 0;
-        if ($stock === 0) {
+        $stock = StockService::sellable($product);   // K6: expired cylinders can't be bought
+        if ($stock <= 0) {
             return back()->with('error', "{$product->name} is out of stock.");
         }
 
@@ -196,7 +198,7 @@ class CartController extends Controller
             $cartItem->delete();
         } else {
             $product = Product::with('inventory')->find($request->product_id);
-            $stock   = $product?->inventory?->quantity ?? PHP_INT_MAX;
+            $stock   = $product ? max(1, StockService::sellable($product)) : PHP_INT_MAX;   // K6: checkout refuses beyond sellable stock
 
             // Max the cart line may hold: the seller's limit minus what was bought earlier today / this week
             $bought  = $product && $product->max_per_order !== null

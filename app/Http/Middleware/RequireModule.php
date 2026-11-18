@@ -49,7 +49,10 @@ class RequireModule
 
         $message = match (true) {
             // J7: a missing per-action permission (e.g. Warehouse can draft / receive purchase orders but not send them)
-            $action === 'inventory.po_send' => 'Only the owner or someone with Purchase approvals can send or cancel purchase orders.',
+            $action === 'inventory.po_send' => str_contains((string) $request->route()?->getName(), 'payments') || str_ends_with((string) $request->route()?->getName(), 'due-date')
+                ? 'Only the owner or someone with Purchase approvals can record supplier payments.'
+                : 'Only the owner or someone with Purchase approvals can send or cancel purchase orders.',
+            $action === 'inventory.suppliers' => 'Only the owner or someone with Purchase approvals can add or change suppliers.',
             $level === 'full' && $action !== null => "You don't have permission for this action in {$label}.",
             (bool) $level => "You have view-only access to {$label}.",
             default => "You don't have access to {$label}.",

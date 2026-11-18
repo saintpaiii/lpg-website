@@ -8,10 +8,10 @@ use App\Services\ReorderService;
 
 uses(Tests\Concerns\BuildsLpgWorld::class);
 
-test('the formula: Sold 3.2/day · lead 2 days · safety 7 → reorder at 14; you have 9 → order 45', function () {
+test('the formula (K6 order-up-to): reorder at 14, order up to 59; you have 9 → order 50', function () {
     $r = ReorderService::compute(3.2, 2, 9, 0, 5, 10);
-    expect($r)->toMatchArray(['safety_stock' => 7, 'reorder_point' => 14, 'suggested_qty' => 45, 'due' => true])
-        ->and($r['text'])->toBe('Sold 3.2/day · lead 2 days · safety 7 → reorder at 14; you have 9 → order 45');
+    expect($r)->toMatchArray(['safety_stock' => 7, 'reorder_point' => 14, 'target_stock' => 59, 'suggested_qty' => 50, 'due' => true])
+        ->and($r['text'])->toBe('Sold 3.2/day · lead 2 days · safety 7 → reorder at 14, order up to 59; you have 9 → order 50');
 
     // A higher manual reorder level wins; stock on order counts
     expect(ReorderService::compute(3.2, 2, 9, 0, 1, 20)['reorder_point'])->toBe(20)
@@ -36,13 +36,13 @@ beforeEach(function () {
 test('forProduct uses the real sales history and the preferred supplier', function () {
     $r = ReorderService::forProduct($this->p11->fresh());
     expect($r['avg_daily'])->toBe(3.2)->and($r['lead'])->toBe(2)->and($r['reorder_point'])->toBe(14)
-        ->and($r['usable'])->toBe(9)->and($r['suggested_qty'])->toBe(45)->and($r['supplier_name'])->toBe($this->supplier->name);
+        ->and($r['usable'])->toBe(9)->and($r['suggested_qty'])->toBe(50)->and($r['supplier_name'])->toBe($this->supplier->name);
 });
 
 test('one auto draft per supplier; lines updated not duplicated; never sent', function () {
     $po = ReorderService::checkProduct($this->p11->fresh());
     expect($po->status)->toBe('draft')->and($po->source)->toBe('auto')->and($po->items)->toHaveCount(1)
-        ->and($po->items->first()->quantity_ordered)->toBe(45)->and($po->sent_at)->toBeNull();
+        ->and($po->items->first()->quantity_ordered)->toBe(50)->and($po->sent_at)->toBeNull();
 
     // Stock drops more → same draft, same line, new quantity
     Inventory::where('product_id', $this->p11->id)->update(['quantity' => 4]);
@@ -50,7 +50,7 @@ test('one auto draft per supplier; lines updated not duplicated; never sent', fu
     ReorderService::checkStore($this->store->fresh());
     expect(PurchaseOrder::count())->toBe(1)
         ->and($po->fresh()->items)->toHaveCount(1)
-        ->and($po->fresh()->items->first()->quantity_ordered)->toBe(50)   // 45 + 7 − 4 = 48 → rounded up to the min of 5
+        ->and($po->fresh()->items->first()->quantity_ordered)->toBe(55)   // order up to 59 − 4 = 55 (a multiple of the min 5)
         ->and($po->fresh()->status)->toBe('draft');
 
     // The other product of the same supplier joins the SAME draft when it drops

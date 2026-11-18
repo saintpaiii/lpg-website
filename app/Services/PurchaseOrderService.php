@@ -103,6 +103,10 @@ class PurchaseOrderService
         if ($po->items->isEmpty()) {
             throw ValidationException::withMessages(['lines' => 'Add at least one product first.']);
         }
+        // K6: the supplier's minimum order quantity — a draft may be below it, sending isn't allowed
+        if ($below = static::belowMinimum($po)) {
+            throw ValidationException::withMessages(['lines' => collect($below)->map(fn ($b) => "{$b['name']}: the minimum order from {$po->supplier?->name} is {$b['min']} (this PO has {$b['qty']}).")->implode(' ')]);
+        }
         $po->update([
             'status' => 'sent', 'sent_at' => now(), 'sent_by' => $by->id,
             'expected_on' => $po->expected_on ?? now()->addDays((int) ($po->supplier?->lead_time_days ?? 2))->toDateString(),
@@ -125,6 +129,26 @@ class PurchaseOrderService
         }
 
         return $result;
+    }
+
+    /**
+     * K6: lines below the supplier's min_order_qty (supplier_products of this PO's supplier).
+     *
+     * @return array<int, array{name: string, qty: int, min: int}>  keyed by purchase_order_item id
+     */
+    public static function belowMinimum(PurchaseOrder $po): array
+    {
+        $po->loadMissing('items.product');
+        $mins = SupplierProduct::where('supplier_id', $po->supplier_id)->whereIn('product_id', $po->items->pluck('product_id'))->pluck('min_order_qty', 'product_id');
+        $out = [];
+        foreach ($po->items as $item) {
+            $min = (int) ($mins[$item->product_id] ?? 1);
+            if ($min > 1 && (int) $item->quantity_ordered < $min) {
+                $out[$item->id] = ['name' => $item->product?->name ?? 'A product', 'qty' => (int) $item->quantity_ordered, 'min' => $min];
+            }
+        }
+
+        return $out;
     }
 
     public static function cancel(PurchaseOrder $po): void
@@ -190,6 +214,7 @@ class PurchaseOrderService
         });
 
         $po = $po->fresh(['supplier', 'items.product']);
+        SupplierPaymentService::afterReceive($po);   // K6: due date (first receive) + payment status (owed grew)
         NotificationService::send((int) Store::whereKey($po->store_id)->value('user_id'), 'purchase_order',
             "Purchase order {$po->po_number} " . ($po->status === 'received' ? 'received' : 'partly received'),
             "{$by->name} received stock from {$po->supplier?->name} ({$po->po_number}).", ['link' => "/seller/purchase-orders/{$po->id}"]);

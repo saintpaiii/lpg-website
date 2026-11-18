@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\StockUnavailableException;
 use App\Models\CylinderBatch;
 use App\Models\Inventory;
 use App\Models\InventoryTransaction;
@@ -19,7 +20,8 @@ use Illuminate\Validation\ValidationException;
  *  unbatched                     quantity − Σ remaining (stock from before J7) — still sells, never blocks an order
  *  usable                        quantity − remaining of EXPIRED batches (never sold)
  *
- * Confirm takes from the oldest non-expired batch first (FIFO by requalification date) and records order_item_batches;
+ * Confirm takes unbatched stock first (it's the oldest — K6), then the non-expired batches by requalification date
+ * (FIFO) and records order_item_batches; "Add dates to old stock" turns unbatched stock into an 'opening' batch.
  * a cancel gives the cylinders back to the same batches. Empties (refills) and the damaged count live on the inventory row.
  */
 class StockService
@@ -40,7 +42,69 @@ class StockService
     }
 
     /**
-     * Throws (422 message) unless every line can be served from usable stock.
+     * K6 — sellable stock for MANY products in two queries (customer pages: product grid, store page, cart, checkout).
+     * Products without an inventory row → 0.
+     *
+     * @param  iterable<int>  $productIds
+     * @return array<int, int>  product_id → usable filled
+     */
+    public static function usableMap(iterable $productIds): array
+    {
+        $ids = collect($productIds)->map(fn ($id) => (int) $id)->filter()->unique()->values();
+        if ($ids->isEmpty()) {
+            return [];
+        }
+        $qty = Inventory::whereIn('product_id', $ids)->pluck('quantity', 'product_id');
+        $expired = CylinderBatch::whereIn('product_id', $ids)->where('quantity_remaining', '>', 0)->whereNotNull('requalification_due_on')
+            ->whereDate('requalification_due_on', '<', now()->toDateString())->groupBy('product_id')
+            ->selectRaw('product_id, SUM(quantity_remaining) AS n')->pluck('n', 'product_id');
+
+        return $ids->mapWithKeys(fn ($id) => [$id => max(0, (int) ($qty[$id] ?? 0) - (int) ($expired[$id] ?? 0))])->all();
+    }
+
+    /**
+     * K6 — preload sellable stock for a page of products (two queries), read with sellable(). Memo per request
+     * (request attributes, like StaffAccess), so a later request never sees stale numbers.
+     *
+     * @param  iterable<int|Product>  $products
+     */
+    public static function prime(iterable $products): void
+    {
+        $ids = collect($products)->map(fn ($p) => $p instanceof Product ? $p->id : (int) $p)->all();
+        $bag = request()->attributes;
+        $bag->set('stock.usable', static::usableMap($ids) + ($bag->get('stock.usable') ?? []));
+    }
+
+    /** What customers can buy: usable filled stock (expired batches never count). Uses prime()'s memo when present. */
+    public static function sellable(Product|int $product): int
+    {
+        $id = $product instanceof Product ? $product->id : $product;
+        $map = request()->attributes->get('stock.usable') ?? [];
+        if (array_key_exists($id, $map)) {
+            return $map[$id];
+        }
+        $inventory = $product instanceof Product && $product->relationLoaded('inventory') ? $product->inventory : null;
+
+        return static::usableFilled($id, $inventory);
+    }
+
+    /** Forget the memo (after stock changed in the same request). */
+    public static function forgetPrimed(): void
+    {
+        request()->attributes->remove('stock.usable');
+    }
+
+    /** Filled stock with no batch (pre-J7 stock): quantity − Σ remaining of all batches. */
+    public static function unbatched(int $productId, ?Inventory $inventory = null): int
+    {
+        $inventory ??= Inventory::where('product_id', $productId)->first();
+
+        return max(0, (int) ($inventory?->quantity ?? 0) - (int) CylinderBatch::where('product_id', $productId)->sum('quantity_remaining'));
+    }
+
+    /**
+     * Throws unless every line can be served from usable stock — a StockUnavailableException (K6): a red toast on the
+     * page for web requests, a 422 JSON message for API callers.
      * "Only expired cylinders left for 11kg Petron — record them as expired or restock." when expired stock is all that's left.
      *
      * @param  iterable<OrderItem>  $items
@@ -55,20 +119,23 @@ class StockService
             $inventory = Inventory::where('product_id', $productId)->lockForUpdate()->first();
             $name = Product::withTrashed()->whereKey($productId)->value('name') ?? 'this product';
             if (! $inventory) {
-                abort(422, "No inventory record for {$name}.");
+                throw new StockUnavailableException("No inventory record for {$name}.");
             }
             $usable = static::usableFilled($productId, $inventory);
             if ($usable >= $qty) {
                 continue;
             }
             if ((int) $inventory->quantity >= $qty) {
-                abort(422, "Only expired cylinders left for {$name} — record them as expired or restock.");
+                throw new StockUnavailableException("Only expired cylinders left for {$name} — record them as expired or restock.");
             }
-            abort(422, "Insufficient stock for {$name}. Available: {$usable}.");
+            throw new StockUnavailableException("Insufficient stock for {$name}. Available: {$usable}.");
         }
     }
 
-    /** Take one order line out of stock: FIFO batches first, the rest from unbatched stock. */
+    /**
+     * Take one order line out of stock. K6: unbatched (pre-J7) stock is the OLDEST, so it goes first; then batches by
+     * the earliest requalification date (FIFO). Batch allocations are recorded in order_item_batches.
+     */
     public static function takeForItem(OrderItem $item, ?int $userId, string $reference, string $note = 'Order confirmed', string $type = 'order'): void
     {
         $qty = (int) $item->quantity;
@@ -79,7 +146,7 @@ class StockService
         if (! $inventory) {
             return;
         }
-        $left = $qty;
+        $left = $qty - min($qty, static::unbatched($item->product_id, $inventory));   // the rest comes from batches
         $batches = CylinderBatch::where('product_id', $item->product_id)->where('quantity_remaining', '>', 0)
             ->where(fn ($q) => $q->whereNull('requalification_due_on')->orWhereDate('requalification_due_on', '>=', now()->toDateString()))
             ->orderByRaw('requalification_due_on IS NULL, requalification_due_on ASC')->orderBy('received_on')->orderBy('id')
@@ -93,7 +160,7 @@ class StockService
             OrderItemBatch::create(['order_item_id' => $item->id, 'cylinder_batch_id' => $batch->id, 'quantity' => $take]);
             $left -= $take;
         }
-        // $left > 0 → unbatched (pre-J7) stock: just the inventory count
+        // The unbatched part is just the inventory count
         $inventory->decrement('quantity', $qty);
         InventoryTransaction::create(['product_id' => $item->product_id, 'type' => $type, 'quantity' => $qty, 'reference' => $reference, 'notes' => $note, 'user_id' => $userId]);
     }
@@ -241,11 +308,80 @@ class StockService
         return $qty;
     }
 
-    /** Validation helper for forms: the batch date fields are required for LPG stock coming in. */
+    /**
+     * Validation helper for forms: the batch date fields of LPG stock coming in (PO receive, Stock In, supplier
+     * replacement, dating old stock). Friendly sentences, keyed "{$prefix}field" (e.g. "rows.12.manufactured_on").
+     */
     public static function requireBatchDates(Product $product, array $data, string $prefix = ''): void
     {
         if ($product->isLpg() && empty($data['requalification_due_on'])) {
             throw ValidationException::withMessages([$prefix . 'requalification_due_on' => 'Enter the requalification (expiry) date stamped on the cylinder collar.']);
         }
+        static::checkBatchDates($data, $prefix);
+    }
+
+    /** manufactured_on: not in the future, and before the requalification date (K6). */
+    public static function checkBatchDates(array $data, string $prefix = ''): void
+    {
+        $made = $data['manufactured_on'] ?? null;
+        if (! $made) {
+            return;
+        }
+        $madeOn = \Illuminate\Support\Carbon::parse($made)->startOfDay();
+        if ($madeOn->isAfter(now()->startOfDay())) {
+            throw ValidationException::withMessages([$prefix . 'manufactured_on' => static::BATCH_DATE_MESSAGES['manufactured_on.before_or_equal']]);
+        }
+        $due = $data['requalification_due_on'] ?? null;
+        if ($due && ! $madeOn->isBefore(\Illuminate\Support\Carbon::parse($due)->startOfDay())) {
+            throw ValidationException::withMessages([$prefix . 'manufactured_on' => 'Manufactured date must be before the requalification date.']);
+        }
+    }
+
+    /** Friendly messages for the batch date rules ("{prefix}field.rule" — use with a "rows.*." prefix for row forms). */
+    public const BATCH_DATE_MESSAGES = [
+        'manufactured_on.date'                 => 'Enter a valid manufactured date.',
+        'manufactured_on.before_or_equal'      => "Manufactured date can't be in the future.",
+        'requalification_due_on.date'          => 'Enter a valid requalification date.',
+        'requalification_due_on.required'      => 'Enter the requalification (expiry) date stamped on the cylinder collar.',
+        'requalification_due_on.required_if'   => 'Enter the requalification date of the replacement cylinders.',
+        'requalification_due_on.after'         => 'The requalification date must be in the future — expired cylinders are recorded with "Record damaged / expired".',
+        'batch_code.max'                       => 'The batch code can be at most 40 characters.',
+    ];
+
+    public static function batchDateMessages(string $prefix = ''): array
+    {
+        return collect(static::BATCH_DATE_MESSAGES)->mapWithKeys(fn ($m, $k) => [$prefix . $k => $m])->all();
+    }
+
+    /**
+     * K6 — "Add dates to old stock": turn $qty of the unbatched (pre-J7) filled stock into a batch with source 'opening'.
+     * No stock number changes — the cylinders were already counted in inventories.quantity.
+     */
+    public static function dateOldStock(Product $product, int $qty, array $data, ?int $userId): CylinderBatch
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($product, $qty, $data, $userId) {
+            $inventory = Inventory::where('product_id', $product->id)->lockForUpdate()->first();
+            $undated = static::unbatched($product->id, $inventory);
+            if ($qty < 1 || $qty > $undated) {
+                throw ValidationException::withMessages(['quantity' => $undated > 0
+                    ? "You can date at most {$undated} undated cylinder(s) of {$product->name}."
+                    : "{$product->name} has no undated stock."]);
+            }
+            static::requireBatchDates($product, $data);
+
+            return CylinderBatch::create([
+                'store_id'               => $product->store_id,
+                'product_id'             => $product->id,
+                'batch_code'             => trim((string) ($data['batch_code'] ?? '')) ?: CylinderBatch::nextCode($product->store_id),
+                'source'                 => 'opening',
+                'quantity_received'      => $qty,
+                'quantity_remaining'     => $qty,
+                'manufactured_on'        => $data['manufactured_on'] ?? null,
+                'requalification_due_on' => $data['requalification_due_on'],
+                // Old stock: received before the batches existed — sorted with the other batches by requalification date
+                'received_on'            => $data['received_on'] ?? now()->toDateString(),
+                'notes'                  => 'Opening stock dated by ' . (\App\Models\User::whereKey($userId)->value('name') ?? 'the store'),
+            ]);
+        });
     }
 }

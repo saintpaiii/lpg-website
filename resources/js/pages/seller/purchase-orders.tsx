@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { PackagePlus, Plus, Sparkles } from 'lucide-react';
+import { AlertTriangle, PackagePlus, Plus, Sparkles, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,11 +10,29 @@ import type { BreadcrumbItem } from '@/types';
 
 export type CatalogProduct = { product_id: number; name: string; unit_cost: number; min_order_qty: number; suggested: number };
 export type CatalogSupplier = { id: number; name: string; email: string | null; lead_time_days: number; products: CatalogProduct[] };
-type Row = { id: number; po_number: string; status: string; status_label: string; source: 'manual' | 'auto'; supplier: string | null; items: number; quantity: number; received: number; subtotal: number; expected_on: string | null; created_at: string };
+type Row = { id: number; po_number: string; status: string; status_label: string; source: 'manual' | 'auto'; supplier: string | null; items: number; quantity: number; received: number; subtotal: number; expected_on: string | null; created_at: string } & PaymentInfo;
+/** K6: supplier payment columns of a PO */
+export type PaymentInfo = {
+    payment_status: 'unpaid' | 'partial' | 'paid'; payment_label: string; received_value: number; amount_paid: number; balance: number;
+    payment_due_on: string | null; payment_due_label: string | null; overdue: boolean; payable: boolean;
+};
+type Payables = { owed: number; count: number; overdue: number; overdue_count: number };
 type Paginated = { data: Row[]; current_page: number; last_page: number; links: { url: string | null; label: string; active: boolean }[] };
-export type PoAbilities = { create: boolean; send: boolean; receive: boolean; suppliers: boolean };
+export type PoAbilities = { create: boolean; send: boolean; receive: boolean; suppliers: boolean; pay: boolean; owner: boolean };
 
-const TABS = [['draft', 'Draft'], ['sent', 'Sent'], ['receiving', 'Receiving'], ['done', 'Done'], ['cancelled', 'Cancelled']] as const;
+const TABS = [['draft', 'Draft'], ['sent', 'Sent'], ['receiving', 'Receiving'], ['done', 'Done'], ['cancelled', 'Cancelled'], ['unpaid', 'Unpaid to suppliers']] as const;
+export const PAYMENT_STYLE: Record<string, string> = { unpaid: 'bg-gray-100 text-gray-700', partial: 'bg-amber-100 text-amber-800', paid: 'bg-emerald-100 text-emerald-700' };
+
+/** "Unpaid" / "Partial" / "Paid" + a red "Overdue" — nothing to pay before anything is received. */
+export function PaymentBadge({ p }: { p: PaymentInfo }) {
+    if (!p.payable) return <span className="text-xs text-muted-foreground">—</span>;
+    return (
+        <span className="inline-flex flex-wrap items-center gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PAYMENT_STYLE[p.payment_status]}`}>{p.payment_label}</span>
+            {p.overdue && <span className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white" data-testid="overdue-badge">Overdue</span>}
+        </span>
+    );
+}
 const STATUS_STYLE: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700', sent: 'bg-blue-100 text-blue-700', partially_received: 'bg-amber-100 text-amber-800',
     received: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-700',
@@ -23,7 +41,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Inventory', href: '/seller/inve
 const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
 /** J7 — purchase orders to suppliers: Draft | Sent | Receiving | Done | Cancelled. */
-export default function PurchaseOrdersPage({ orders, tab, counts, suppliers, can }: { orders: Paginated; tab: string; counts: Record<string, number>; suppliers: CatalogSupplier[]; can: PoAbilities }) {
+export default function PurchaseOrdersPage({ orders, tab, counts, payables, suppliers, can }: { orders: Paginated; tab: string; counts: Record<string, number>; payables: Payables; suppliers: CatalogSupplier[]; can: PoAbilities }) {
     const [open, setOpen] = useState(false);
     const [supplierId, setSupplierId] = useState('');
     const [qty, setQty] = useState<Record<number, string>>({});
@@ -65,6 +83,14 @@ export default function PurchaseOrdersPage({ orders, tab, counts, suppliers, can
                     )}
                 </div>
 
+                {/* K6: what the store owes its suppliers (received value − paid) */}
+                <button type="button" onClick={() => router.get('/seller/purchase-orders', { tab: 'unpaid' }, { preserveState: true })} data-testid="payables-card"
+                    className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-4 py-3 text-left text-sm sm:w-auto ${payables.overdue_count > 0 ? 'border-red-200 bg-red-50' : 'bg-card'}`}>
+                    <Wallet className={`h-5 w-5 ${payables.overdue_count > 0 ? 'text-red-600' : 'text-blue-600'}`} />
+                    <span>Unpaid to suppliers: <strong className="tabular-nums">{peso(payables.owed)}</strong></span>
+                    {payables.overdue_count > 0 && <span className="inline-flex items-center gap-1 font-medium text-red-700"><AlertTriangle className="h-4 w-4" /> {payables.overdue_count} overdue ({peso(payables.overdue)})</span>}
+                </button>
+
                 <div className="flex gap-1 overflow-x-auto border-b" role="tablist">
                     {TABS.map(([key, label]) => (
                         <button key={key} role="tab" aria-selected={tab === key} onClick={() => router.get('/seller/purchase-orders', { tab: key }, { preserveState: true })}
@@ -77,9 +103,9 @@ export default function PurchaseOrdersPage({ orders, tab, counts, suppliers, can
                 <Card>
                     <CardContent className="overflow-x-auto p-0">
                         <table className="w-full text-sm">
-                            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="px-4 py-2">PO</th><th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Items</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2">Expected</th><th className="px-4 py-2">Status</th></tr></thead>
+                            <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="px-4 py-2">PO</th><th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Items</th><th className="px-4 py-2 text-right">Total</th><th className="px-4 py-2">{tab === 'unpaid' ? 'Due' : 'Expected'}</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Payment</th></tr></thead>
                             <tbody className="divide-y">
-                                {orders.data.length === 0 && <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">Nothing here.</td></tr>}
+                                {orders.data.length === 0 && <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">{tab === 'unpaid' ? 'Nothing owed to suppliers.' : 'Nothing here.'}</td></tr>}
                                 {orders.data.map((o) => (
                                     <tr key={o.id} className="hover:bg-muted/30">
                                         <td className="px-4 py-2 font-mono text-xs">
@@ -89,9 +115,10 @@ export default function PurchaseOrdersPage({ orders, tab, counts, suppliers, can
                                         </td>
                                         <td className="px-4 py-2">{o.supplier}</td>
                                         <td className="px-4 py-2 text-right tabular-nums">{o.items} · {o.received}/{o.quantity}</td>
-                                        <td className="px-4 py-2 text-right tabular-nums">{peso(o.subtotal)}</td>
-                                        <td className="px-4 py-2">{o.expected_on ?? '—'}</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{peso(o.subtotal)}{o.payable && o.balance > 0 && <span className="block text-[11px] text-muted-foreground">Balance {peso(o.balance)}</span>}</td>
+                                        <td className="px-4 py-2">{tab === 'unpaid' ? (o.payment_due_label ?? '—') : (o.expected_on ?? '—')}</td>
                                         <td className="px-4 py-2"><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[o.status]}`}>{o.status_label}</span></td>
+                                        <td className="px-4 py-2"><PaymentBadge p={o} /></td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -109,12 +136,16 @@ export default function PurchaseOrdersPage({ orders, tab, counts, suppliers, can
                         </select>
                         {supplier && supplier.products.length === 0 && <p className="text-sm text-muted-foreground">This supplier has no products yet — add them on the Suppliers page.</p>}
                         {supplier?.products.map((p) => (
-                            <div key={p.product_id} className="grid grid-cols-[1fr_5rem_6rem] items-center gap-2 text-sm">
+                            <div key={p.product_id} className="grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-2 text-sm">
                                 <span>{p.name}{p.suggested > 0 && <span className="ml-1 text-[11px] text-violet-700">DSS: {p.suggested}</span>}<span className="block text-[11px] text-muted-foreground">min {p.min_order_qty}</span></span>
                                 <Input aria-label={`Quantity of ${p.name}`} type="number" min="0" className="h-8 text-right" value={qty[p.product_id] ?? ''} placeholder="0"
                                     onChange={(e) => setQty((m) => ({ ...m, [p.product_id]: e.target.value }))} />
                                 <Input aria-label={`Unit cost of ${p.name}`} type="number" min="0" step="0.01" className="h-8 text-right" value={cost[p.product_id] ?? ''}
                                     onChange={(e) => setCost((m) => ({ ...m, [p.product_id]: e.target.value }))} />
+                                {/* K6: a draft may be below the supplier's minimum — sending it isn't allowed */}
+                                {Number(qty[p.product_id]) > 0 && Number(qty[p.product_id]) < p.min_order_qty && (
+                                    <p className="col-span-3 -mt-1 rounded bg-amber-50 px-2 py-1 text-[11px] text-amber-800" data-testid="min-warning">Minimum order from this supplier is {p.min_order_qty}</p>
+                                )}
                             </div>
                         ))}
                         {supplier && <p className="text-right text-sm font-semibold">Total {peso(total)}</p>}

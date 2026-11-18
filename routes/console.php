@@ -37,3 +37,6 @@ Schedule::command('cylinders:check-expiry')->dailyAt('06:10')->withoutOverlappin
 
 // J7: auto-reorder — DRAFT purchase orders for products at/below their reorder point (never sent automatically)
 Schedule::command('inventory:auto-reorder')->dailyAt('06:20')->withoutOverlapping();
+
+// K6: supplier payments due tomorrow / overdue → the store owner (once per PO per kind)
+Schedule::command('purchase-orders:payment-reminders')->dailyAt('07:00')->withoutOverlapping();

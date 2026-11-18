@@ -9,8 +9,9 @@ return [
     // many days before the date — and once more on the day it expires (0).
     'warn_days' => [90, 30],
 
-    // Auto-reorder (ReorderService): reorder point = ceil(avg_daily × lead) + safety stock;
-    // suggested qty = ceil(avg_daily × cover_days) + safety − usable filled − already on order (rounded up to the min qty).
+    // Auto-reorder (ReorderService): reorder point = max(manual reorder level, ceil(avg_daily × lead) + safety stock);
+    // order up to = reorder point + max(ceil(avg_daily × cover_days), 1); suggested qty = order up to − usable − on order,
+    // at least the supplier's min qty and rounded up to a multiple of it.
     'reorder' => [
         'sales_days'        => 30,   // average daily sales over this many days
         'safety_days'       => 2,    // safety stock = ceil(avg_daily × safety_days)

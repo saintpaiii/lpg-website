@@ -31,6 +31,8 @@ type InventoryRow = {
     reorder_level: number;
     /** J7: filled minus expired batches */
     usable?: number;
+    /** K6: filled stock with no batch (from before J7) — "Add dates to old stock" */
+    undated?: number;
     empty_quantity?: number;
     damaged_quantity?: number;
     expired?: number;
@@ -371,7 +373,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
             </AlertDialog>
 
             {/* J7: batches + damaged */}
-            <BatchesDialog open={!!batchesFor} onClose={() => setBatchesFor(null)} productName={batchesFor?.product.name ?? ''} batches={batchesFor?.batches ?? []} />
+            {/* The row is re-read from the page props so the drawer updates after "Mark as expired" / "Add dates to old stock" */}
+            <BatchesDialog open={!!batchesFor} onClose={() => setBatchesFor(null)} productId={batchesFor?.product.id ?? 0} productName={batchesFor?.product.name ?? ''}
+                batches={(inventories?.data.find((i) => i.id === batchesFor?.id) ?? batchesFor)?.batches ?? []}
+                undated={(inventories?.data.find((i) => i.id === batchesFor?.id) ?? batchesFor)?.undated ?? 0} />
             <DamagedDialog open={!!damagedFor} onClose={() => setDamagedFor(null)} product={damagedFor?.product ?? null} batches={damagedFor?.batches ?? []} reasons={reasons} />
 
             {/* Reorder level dialog */}

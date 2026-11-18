@@ -1,6 +1,9 @@
 import { Head, router } from '@inertiajs/react';
-import { Factory, Pencil, Plus, Star, Trash2 } from 'lucide-react';
+import { AlertTriangle, Factory, Lock, Pencil, Plus, Star, Trash2, Wallet } from 'lucide-react';
 import { useState } from 'react';
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -25,7 +28,13 @@ const blank = { name: '', contact_person: '', phone: '', email: '', address: '',
 const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
 
 /** J7 — suppliers (LPG refillers / distributors, accessory wholesalers) and what each supplies. */
-export default function SuppliersPage({ suppliers, products }: { suppliers: Supplier[]; products: ProductOption[] }) {
+export default function SuppliersPage({ suppliers, products, canManage, balances }: {
+    suppliers: Supplier[]; products: ProductOption[];
+    /** K6: only the owner (or a role with Purchase approvals) adds / edits suppliers and unit costs — the rest see them read-only */
+    canManage: boolean;
+    balances: Record<number, { owed: number; overdue: number }>;
+}) {
+    const [removeTarget, setRemoveTarget] = useState<Supplier | null>(null);
     const [editing, setEditing] = useState<Supplier | null>(null);
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(blank);
@@ -69,8 +78,13 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                         <h1 className="flex items-center gap-2 text-2xl font-bold"><Factory className="h-6 w-6 text-blue-600" /> Suppliers</h1>
                         <p className="text-sm text-muted-foreground">Who you buy LPG and accessories from — costs, lead times and the preferred supplier per product (auto-reorder uses it).</p>
                     </div>
-                    <Button onClick={() => openForm(null)} className="gap-1 bg-blue-600 text-white hover:bg-blue-700"><Plus className="h-4 w-4" /> Add supplier</Button>
+                    {canManage && <Button onClick={() => openForm(null)} className="gap-1 bg-blue-600 text-white hover:bg-blue-700"><Plus className="h-4 w-4" /> Add supplier</Button>}
                 </div>
+                {!canManage && (
+                    <p className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="suppliers-read-only">
+                        <Lock className="h-4 w-4 shrink-0" /> View only — the store owner manages suppliers and unit costs.
+                    </p>
+                )}
 
                 {suppliers.length === 0 && (
                     <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">No suppliers yet. Add your LPG supplier to create purchase orders and enable auto-reorder.</CardContent></Card>
@@ -84,18 +98,24 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                                 <p className="text-xs text-muted-foreground">
                                     {[s.contact_person, s.phone, s.email].filter(Boolean).join(' · ') || 'No contact details'} · lead time {s.lead_time_days} day(s){s.payment_terms ? ` · ${s.payment_terms}` : ''}
                                 </p>
+                                {/* K6: received value − paid on this supplier's purchase orders */}
+                                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm" data-testid="supplier-balance">
+                                    <Wallet className="h-3.5 w-3.5 text-muted-foreground" /> Balance owed: <strong className="tabular-nums">{peso(balances[s.id]?.owed ?? 0)}</strong>
+                                    {(balances[s.id]?.overdue ?? 0) > 0 && <span className="font-medium text-red-700">({peso(balances[s.id].overdue)} overdue)</span>}
+                                </p>
                             </div>
-                            <div className="flex gap-1">
-                                <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => openForm(s)}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
-                                <Button size="sm" variant="ghost" className="h-8 text-red-600" aria-label={`Remove ${s.name}`}
-                                    onClick={() => { if (confirm(`Remove ${s.name}? Past purchase orders keep their history.`)) router.delete(`/seller/suppliers/${s.id}`, { preserveScroll: true }); }}>
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                            </div>
+                            {canManage && (
+                                <div className="flex gap-1">
+                                    <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => openForm(s)}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+                                    <Button size="sm" variant="ghost" className="h-8 text-red-600" aria-label={`Remove ${s.name}`} onClick={() => setRemoveTarget(s)}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent className="overflow-x-auto p-0">
                             <table className="w-full text-sm">
-                                <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Product supplied</th><th className="px-4 py-2 text-right">Unit cost</th><th className="px-4 py-2 text-right">Min qty</th><th className="px-4 py-2 text-center">Preferred</th><th /></tr></thead>
+                                <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Product supplied</th><th className="px-4 py-2 text-right">Unit cost</th><th className="px-4 py-2 text-right">Min qty</th><th className="px-4 py-2 text-center">Preferred</th>{canManage && <th />}</tr></thead>
                                 <tbody className="divide-y">
                                     {s.products.map((l) => (
                                         <tr key={l.id}>
@@ -103,17 +123,20 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                                             <td className="px-4 py-2 text-right tabular-nums">{peso(l.unit_cost)}</td>
                                             <td className="px-4 py-2 text-right tabular-nums">{l.min_order_qty}</td>
                                             <td className="px-4 py-2 text-center">
-                                                <button type="button" aria-label={l.is_preferred ? 'Preferred supplier' : 'Make preferred'} title={l.is_preferred ? 'Preferred supplier for this product' : 'Make preferred'}
+                                                {!canManage ? (l.is_preferred ? <Star className="mx-auto h-4 w-4 fill-amber-400 text-amber-500" aria-label="Preferred supplier" /> : null) : <button type="button" aria-label={l.is_preferred ? 'Preferred supplier' : 'Make preferred'} title={l.is_preferred ? 'Preferred supplier for this product' : 'Make preferred'}
                                                     onClick={() => router.post(`/seller/suppliers/${s.id}/products`, { product_id: l.product_id, unit_cost: l.unit_cost, min_order_qty: l.min_order_qty, is_preferred: !l.is_preferred }, { preserveScroll: true })}>
                                                     <Star className={`h-4 w-4 ${l.is_preferred ? 'fill-amber-400 text-amber-500' : 'text-gray-300'}`} />
-                                                </button>
+                                                </button>}
                                             </td>
-                                            <td className="px-2 py-2 text-right">
-                                                <button type="button" className="text-xs text-red-600" onClick={() => router.delete(`/seller/suppliers/${s.id}/products/${l.id}`, { preserveScroll: true })}>Remove</button>
-                                            </td>
+                                            {canManage && (
+                                                <td className="px-2 py-2 text-right">
+                                                    <button type="button" className="text-xs text-red-600" onClick={() => router.delete(`/seller/suppliers/${s.id}/products/${l.id}`, { preserveScroll: true })}>Remove</button>
+                                                </td>
+                                            )}
                                         </tr>
                                     ))}
-                                    <tr className="bg-muted/30">
+                                    {s.products.length === 0 && !canManage && <tr><td colSpan={4} className="px-4 py-3 text-center text-muted-foreground">No products linked yet.</td></tr>}
+                                    {canManage && <tr className="bg-muted/30">
                                         <td className="px-4 py-2">
                                             <select aria-label="Product" value={link[s.id]?.product_id ?? ''} className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
                                                 onChange={(e) => { const p = products.find((x) => String(x.id) === e.target.value); setLink((m) => ({ ...m, [s.id]: { product_id: e.target.value, unit_cost: p ? String(p.cost_price) : '', min_order_qty: m[s.id]?.min_order_qty ?? '1' } })); }}>
@@ -124,7 +147,7 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                                         <td className="px-4 py-2"><Input aria-label="Unit cost" type="number" min="0" step="0.01" className="h-8 text-right" value={link[s.id]?.unit_cost ?? ''} onChange={(e) => setLink((m) => ({ ...m, [s.id]: { ...(m[s.id] ?? { product_id: '', min_order_qty: '1' }), unit_cost: e.target.value } }))} /></td>
                                         <td className="px-4 py-2"><Input aria-label="Min order qty" type="number" min="1" className="h-8 text-right" value={link[s.id]?.min_order_qty ?? '1'} onChange={(e) => setLink((m) => ({ ...m, [s.id]: { ...(m[s.id] ?? { product_id: '', unit_cost: '' }), min_order_qty: e.target.value } }))} /></td>
                                         <td colSpan={2} className="px-4 py-2 text-right"><Button size="sm" className="h-8" disabled={!link[s.id]?.product_id} onClick={() => addLink(s)}>Add</Button></td>
-                                    </tr>
+                                    </tr>}
                                 </tbody>
                             </table>
                         </CardContent>
@@ -140,7 +163,7 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                         {field('name', 'Name *', { placeholder: 'e.g. Petron Cavite Refilling Plant' })}
                         <div className="grid gap-3 sm:grid-cols-2">
                             {field('contact_person', 'Contact person')}
-                            {field('phone', 'Phone', { placeholder: '09XXXXXXXXX or (046) 483-5678' })}
+                            {field('phone', 'Phone', { placeholder: '09… or (046) 483-5678' })}
                         </div>
                         {field('email', 'Email (POs are emailed here)', { type: 'email' })}
                         {field('address', 'Address')}
@@ -157,6 +180,23 @@ export default function SuppliersPage({ suppliers, products }: { suppliers: Supp
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* K6: the app's confirmation instead of the browser's confirm() */}
+            <AlertDialog open={!!removeTarget} onOpenChange={(o) => { if (!o) setRemoveTarget(null); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-500" /> Remove {removeTarget?.name}?</AlertDialogTitle>
+                        <AlertDialogDescription>Past purchase orders keep their history.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep</AlertDialogCancel>
+                        <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700"
+                            onClick={() => { if (removeTarget) router.delete(`/seller/suppliers/${removeTarget.id}`, { preserveScroll: true }); setRemoveTarget(null); }}>
+                            Remove supplier
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </AppLayout>
     );
 }

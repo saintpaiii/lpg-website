@@ -168,6 +168,10 @@ class CylinderService
                 ?? throw ValidationException::withMessages(['outcome' => 'Choose replaced, credited or rejected.']);
             CylinderIncident::where('supplier_return_id', $return->id)->update(['status' => $status]);
             $return->update(['status' => $outcome, 'credited_amount' => $outcome === 'credited' ? round((float) ($data['credited_amount'] ?? 0), 2) : null]);
+            // K6: the credit lowers what the store owes this supplier (payments "Credit RT-…" on the oldest unpaid POs)
+            if ($outcome === 'credited') {
+                SupplierPaymentService::applyCredit($return->fresh(), $userId);
+            }
         });
 
         return $return->fresh('incidents');

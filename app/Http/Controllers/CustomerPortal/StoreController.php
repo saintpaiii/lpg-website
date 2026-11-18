@@ -38,6 +38,7 @@ class StoreController extends Controller
         }
 
         $products = $query->latest()->paginate(20)->withQueryString();
+        \App\Services\StockService::prime($products->getCollection());   // K6: sellable stock for the page
         // Max per customer: period, what is left for this customer and what is in their cart (2 queries for the page)
         $limits   = PurchaseLimitService::payloadForMany($request->user()?->id, $products->getCollection());
         $products = $products->through(fn ($p) => [
@@ -50,9 +51,10 @@ class StoreController extends Controller
             'description'    => $p->description,
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
+            'product_type'   => $p->product_type ?? 'lpg',   // K6: accessories show one price
             'image_url'      => $p->image ? Storage::url($p->image) : null,
             ...$p->cardMedia(),
-            'stock'          => $p->inventory?->quantity ?? 0,
+            'stock'          => \App\Services\StockService::sellable($p),   // K6: expired batches never count
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),
             'review_count'   => (int) ($p->ratings_count ?? 0),

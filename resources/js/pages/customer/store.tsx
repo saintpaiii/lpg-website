@@ -60,6 +60,8 @@ type Product = {
     description: string | null;
     refill_price: number;
     purchase_price: number;
+    /** J7/K6: accessories — one price, always a new purchase */
+    product_type?: 'lpg' | 'accessory';
     image_url: string | null;
     hover_url?: string | null;
     photo_count?: number;
@@ -133,7 +135,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
     function openCartDialog(product: Product) {
         setCartDialog({ open: true, product });
         setQty(1);
-        setTxType('refill');
+        setTxType(product.product_type === 'accessory' ? 'new_purchase' : 'refill');
     }
 
     function addToCart() {
@@ -321,20 +323,27 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                                     </div>
                                     <div className="mt-auto">
-                                        <div className="flex items-end justify-between gap-2 mb-3">
-                                            <div>
-                                                <p className="text-[10px] text-gray-400">Refill</p>
-                                                <p className="font-bold text-blue-600 text-base">
-                                                    ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                                </p>
+                                        {/* K6: an accessory has ONE price (no refill / exchange) */}
+                                        {p.product_type === 'accessory' ? (
+                                            <p className="mb-3 font-bold text-blue-600 text-base" data-testid="accessory-card-price">
+                                                ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        ) : (
+                                            <div className="flex items-end justify-between gap-2 mb-3">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400">Refill</p>
+                                                    <p className="font-bold text-blue-600 text-base">
+                                                        ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-gray-400">New purchase</p>
+                                                    <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                                                        ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-gray-400">New purchase</p>
-                                                <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
-                                                    ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
-                                        </div>
+                                        )}
                                         <Button
                                             className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm h-9"
                                             disabled={p.stock === 0}
@@ -419,7 +428,8 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     <p className="text-xs text-gray-500">{cartDialog.product.brand} · {cartDialog.product.weight}</p>
                                 </div>
                             </div>
-                            <div>
+                            {/* Transaction type — accessories are always a new purchase */}
+                            {cartDialog.product.product_type !== 'accessory' && <div>
                                 <p className="text-xs font-medium text-gray-500 mb-1.5">Transaction Type</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map((t) => (
@@ -439,7 +449,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         </button>
                                     ))}
                                 </div>
-                            </div>
+                            </div>}
                             <div>
                                 <p className="text-xs font-medium text-gray-500 mb-1.5">Quantity</p>
                                 <div className="flex items-center gap-3">

@@ -271,6 +271,7 @@ class OrderController extends Controller
             ->with('inventory')
             ->orderBy('name')
             ->get()
+            ->tap(fn ($c) => \App\Services\StockService::prime($c))   // K6: sellable stock (expired batches never sell)
             ->map(fn ($p) => [
                 'id'             => $p->id,
                 'name'           => $p->name,
@@ -278,7 +279,8 @@ class OrderController extends Controller
                 'weight'         => $p->weight,
                 'refill_price'   => (float) ($p->refill_price ?? 0),
                 'purchase_price' => (float) ($p->purchase_price ?? 0),
-                'stock'          => $p->inventory?->quantity ?? 0,
+                'product_type'   => $p->product_type ?? 'lpg',   // K6: an accessory has one price, never a refill
+                'stock'          => \App\Services\StockService::sellable($p),
             ]);
 
         return Inertia::render('seller/order-create', [
@@ -316,7 +318,8 @@ class OrderController extends Controller
 
             foreach ($data['items'] as $item) {
                 $product   = Product::findOrFail($item['product_id']);
-                $unitPrice = $data['transaction_type'] === 'refill'
+                // K6: an accessory is always a new purchase (one price, no empty tank)
+                $unitPrice = $data['transaction_type'] === 'refill' && ! $product->isAccessory()
                     ? (float) ($product->refill_price ?? $product->selling_price)
                     : (float) ($product->purchase_price ?? $product->selling_price);
                 $subtotal    = $unitPrice * $item['quantity'];
@@ -345,7 +348,7 @@ class OrderController extends Controller
                 'created_by'       => auth()->id(),
                 // Delivery, or pick-up / walk-in at the counter
                 'fulfillment'          => $data['fulfillment'] ?? 'delivery',
-                'empty_tanks_required' => $data['transaction_type'] === 'refill' ? (int) collect($lineItems)->sum('quantity') : 0,
+                'empty_tanks_required' => $data['transaction_type'] === 'refill' ? (int) collect($lineItems)->reject(fn ($l) => $l['product']->isAccessory())->sum('quantity') : 0,
             ]);
 
             foreach ($lineItems as $line) {
@@ -354,7 +357,7 @@ class OrderController extends Controller
                     'quantity'         => $line['quantity'],
                     'unit_price'       => $line['unit_price'],
                     'subtotal'         => $line['subtotal'],
-                    'transaction_type' => $data['transaction_type'],
+                    'transaction_type' => $line['product']->isAccessory() ? 'new_purchase' : $data['transaction_type'],
                 ]);
             }
 

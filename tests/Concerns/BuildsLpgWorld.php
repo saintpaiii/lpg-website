@@ -137,6 +137,17 @@ trait BuildsLpgWorld
         return $link->fresh();
     }
 
+    /** K6: a Warehouse starter-role staff member, clocked in */
+    protected function makeWarehouse(Store $store): User
+    {
+        \App\Services\StoreRoleService::seedStarters($store);
+        $u = $this->makeUser(['name' => 'Pedro Warehouse', 'role' => 'seller_staff', 'sub_role' => 'warehouse', 'store_id' => $store->id]);
+        \App\Services\StoreRoleService::assign($u, [\App\Models\StoreRole::where('store_id', $store->id)->where('starter_key', 'warehouse')->value('id')]);
+        $this->clockIn($u, null);
+
+        return $u;
+    }
+
     /** J7: a batch already in stock (adds to the filled quantity like a Stock In) */
     protected function makeBatch(Product $product, int $qty, string $dueOn, array $attrs = []): \App\Models\CylinderBatch
     {

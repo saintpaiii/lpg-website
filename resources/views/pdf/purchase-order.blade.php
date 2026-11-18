@@ -51,6 +51,7 @@
     @if($po->supplier?->contact_person) · {{ $po->supplier->contact_person }}@endif
     <div class="muted">{{ collect([$po->supplier?->address, $po->supplier?->phone, $po->supplier?->email])->filter()->implode(' · ') }}</div>
     @if($po->supplier?->payment_terms)<div class="muted">Payment terms: {{ $po->supplier->payment_terms }}</div>@endif
+    @if($po->payment_due_on)<div class="muted">Due: {{ $po->payment_due_on->format('M j, Y') }}</div>@endif
 </div>
 
 <table class="items">

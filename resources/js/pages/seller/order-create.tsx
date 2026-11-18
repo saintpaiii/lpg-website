@@ -29,6 +29,8 @@ type ProductOption = {
     weight_kg: number | null;
     refill_price: number;
     purchase_price: number;
+    /** K6: an accessory has one price (never a refill) */
+    product_type?: 'lpg' | 'accessory';
     stock: number;
 };
 
@@ -165,7 +167,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
 
     // Price per unit depends on transaction type
     function getPrice(product: ProductOption) {
-        return data.transaction_type === 'refill' ? product.refill_price : product.purchase_price;
+        return data.transaction_type === 'refill' && product.product_type !== 'accessory' ? product.refill_price : product.purchase_price;
     }
 
     function addLine() {

@@ -146,6 +146,12 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             Route::post('purchase-orders/{purchaseOrder}/cancel', [PurchaseOrderController::class, 'cancel'])->name('purchase-orders.cancel');
             Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive'])->name('purchase-orders.receive');
             Route::get('purchase-orders/{purchaseOrder}/pdf', [PurchaseOrderController::class, 'pdf'])->name('purchase-orders.pdf');
+            // K6: supplier payments
+            Route::post('purchase-orders/{purchaseOrder}/payments', [PurchaseOrderController::class, 'recordPayment'])->name('purchase-orders.payments');
+            Route::delete('purchase-orders/{purchaseOrder}/payments/{payment}', [PurchaseOrderController::class, 'deletePayment'])->name('purchase-orders.payments.destroy');
+            Route::patch('purchase-orders/{purchaseOrder}/due-date', [PurchaseOrderController::class, 'setDueDate'])->name('purchase-orders.due-date');
+            // K6: "Add dates to old stock" (unbatched → an opening batch)
+            Route::post('inventory/{product}/date-old-stock', [InventoryController::class, 'dateOldStock'])->name('inventory.date-old-stock');
         });
 
         // ── Staff (seller owner only — seller_staff cannot manage staff) ─────

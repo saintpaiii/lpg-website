@@ -43,6 +43,20 @@ class SupplierDssService
         })->values()->all();
 
         $suppliers = static::advise($suppliers, $cfg);
+        // K6: what the store owes each supplier (received value − paid) and how much of it is overdue
+        $payables = SupplierPaymentService::bySupplier($store->id);
+        foreach ($suppliers as &$s) {
+            $s['owed'] = $payables[$s['id']]['owed'] ?? 0.0;
+            $s['overdue'] = $payables[$s['id']]['overdue'] ?? 0.0;
+        }
+        unset($s);
+
+        // K6: batches ALREADY past their requalification date and still in stock (never sold) — shown first, in red
+        $expired = CylinderBatch::with('product')->where('store_id', $store->id)->where('quantity_remaining', '>', 0)->whereNotNull('requalification_due_on')
+            ->whereDate('requalification_due_on', '<', now()->toDateString())->orderBy('requalification_due_on')->get()
+            ->map(fn (CylinderBatch $b) => ['batch_id' => $b->id, 'product_id' => $b->product_id, 'qty' => (int) $b->quantity_remaining,
+                'text' => "{$b->quantity_remaining} cylinder(s) already expired (batch {$b->batch_code}, {$b->product?->name}) — mark them as expired and return them.",
+                'link' => "/seller/inventory?batches={$b->product_id}"])->values()->all();
 
         // Expiry: filled cylinders reaching their requalification date within N days (not yet expired)
         $soon = CylinderBatch::with('product')->where('store_id', $store->id)->where('quantity_remaining', '>', 0)
@@ -83,6 +97,7 @@ class SupplierDssService
             'days'          => (int) $cfg['days'],
             'thresholds'    => $cfg,
             'suppliers'     => $suppliers,
+            'expired'       => $expired,
             'expiry'        => $expiry,
             'by_product'    => $byProduct,
             'handover'      => $handoverStat,

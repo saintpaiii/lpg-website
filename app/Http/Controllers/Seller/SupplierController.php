@@ -45,6 +45,9 @@ class SupplierController extends Controller
             'suppliers' => $suppliers,
             'products'  => Product::where('store_id', $store->id)->orderBy('name')->get(['id', 'name', 'product_type', 'cost_price'])
                 ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name, 'product_type' => $p->product_type ?? 'lpg', 'cost_price' => (float) $p->cost_price]),
+            // K6: owner-only by default (inventory.suppliers is in the Purchase approvals module); the rest see it read-only
+            'canManage' => PurchaseOrderController::abilities($request->user())['suppliers'],
+            'balances'  => (object) \App\Services\SupplierPaymentService::bySupplier($store->id),
         ]);
     }
 

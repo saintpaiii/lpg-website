@@ -501,20 +501,27 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                                     </div>
                                     <div className="mt-auto">
-                                        <div className="flex items-end justify-between gap-2 mb-3">
-                                            <div>
-                                                <p className="text-[10px] text-gray-400">Refill</p>
-                                                <p className="font-bold text-blue-600 text-base">
-                                                    ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                                </p>
+                                        {/* K6: an accessory has ONE price (no refill / exchange) */}
+                                        {p.product_type === 'accessory' ? (
+                                            <p className="mb-3 font-bold text-blue-600 text-base" data-testid="accessory-card-price">
+                                                ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </p>
+                                        ) : (
+                                            <div className="flex items-end justify-between gap-2 mb-3">
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400">Refill</p>
+                                                    <p className="font-bold text-blue-600 text-base">
+                                                        ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-[10px] text-gray-400">New purchase</p>
+                                                    <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
+                                                        ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-gray-400">New purchase</p>
-                                                <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
-                                                    ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
-                                        </div>
+                                        )}
                                         {p.pickup_only ? (
                                             <PickupOnlyBadge short className="mb-1" />
                                         ) : p.delivery_from != null ? (

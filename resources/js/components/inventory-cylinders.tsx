@@ -1,6 +1,9 @@
 import { router } from '@inertiajs/react';
-import { AlertTriangle, ArrowUpDown, FileText, PackageX, Truck } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { AlertTriangle, ArrowUpDown, CalendarPlus, FileText, PackageX, Truck } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -14,12 +17,55 @@ export type Incident = {
     id: number; product_id: number; product: string | null; quantity: number; reason: string; status: string; batch: string | null;
     supplier_id: number | null; supplier: string | null; was_empty: boolean; note: string | null; return_number: string | null; photo_url: string | null; created_at: string;
 };
-export type ReturnRow = { id: number; return_number: string; status: string; supplier: string | null; quantity: number; credited_amount: number | null; created_at: string };
+export type ReturnRow = {
+    id: number; return_number: string; status: string; supplier: string | null; quantity: number; credited_amount: number | null; created_at: string;
+    /** K6: part of the credit recorded against this supplier's unpaid purchase orders */
+    credit_applied?: number | null;
+};
 
-/** "Batches" drawer: remaining qty + dates, sortable; expired batches get "Mark as expired". */
-export function BatchesDialog({ open, onClose, productName, batches }: { open: boolean; onClose: () => void; productName: string; batches: Batch[] }) {
+const peso = (n: number) => '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
+/** K6: the app's confirmation (instead of the browser's confirm()). */
+function Confirm({ open, onOpenChange, title, children, action, onConfirm }: {
+    open: boolean; onOpenChange: (o: boolean) => void; title: string; children: ReactNode; action: string; onConfirm: () => void;
+}) {
+    return (
+        <AlertDialog open={open} onOpenChange={onOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-amber-500" /> {title}</AlertDialogTitle>
+                    <AlertDialogDescription>{children}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Keep</AlertDialogCancel>
+                    <AlertDialogAction className="bg-red-600 text-white hover:bg-red-700" onClick={onConfirm}>{action}</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+}
+
+/**
+ * "Batches" drawer: remaining qty + dates, sortable; expired batches get "Mark as expired".
+ * K6: "Undated stock: N" (pre-J7 stock — sold FIRST) and "Add dates to old stock" (turns it into an opening batch).
+ */
+export function BatchesDialog({ open, onClose, productId, productName, batches, undated = 0 }: {
+    open: boolean; onClose: () => void; productId: number; productName: string; batches: Batch[]; undated?: number;
+}) {
     const [sort, setSort] = useState<'requalification_due_on' | 'remaining' | 'received_on'>('requalification_due_on');
     const [dir, setDir] = useState<1 | -1>(1);
+    const [expireTarget, setExpireTarget] = useState<Batch | null>(null);
+    const [dating, setDating] = useState(false);
+    const [form, setForm] = useState({ quantity: '', requalification_due_on: '', manufactured_on: '', batch_code: '' });
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [busy, setBusy] = useState(false);
+    const openDating = () => { setErrors({}); setForm({ quantity: String(undated), requalification_due_on: '', manufactured_on: '', batch_code: '' }); setDating(true); };
+    const saveDating = () => {
+        setBusy(true);
+        router.post(`/seller/inventory/${productId}/date-old-stock`, form, {
+            preserveScroll: true, preserveState: true, onSuccess: () => setDating(false), onError: (e) => setErrors(e), onFinish: () => setBusy(false),
+        });
+    };
     const rows = useMemo(() => [...batches].sort((a, b) => {
         const x = a[sort] ?? '', y = b[sort] ?? '';
         return (x < y ? -1 : x > y ? 1 : 0) * dir;
@@ -36,13 +82,43 @@ export function BatchesDialog({ open, onClose, productName, batches }: { open: b
             <DialogContent className="flex max-h-[90dvh] max-w-3xl flex-col gap-0 p-0">
                 <DialogHeader className="border-b px-6 pt-6 pb-3"><DialogTitle>Batches — {productName}</DialogTitle></DialogHeader>
                 <div className="min-h-0 flex-1 overflow-auto" data-testid="batches-drawer">
+                    {undated > 0 && (
+                        <div className="space-y-2 border-b bg-amber-50/60 px-4 py-3 text-sm dark:bg-amber-950/20" data-testid="undated-stock">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p><strong>Undated stock: {undated}</strong> <span className="text-muted-foreground">— cylinders from before batches. They are sold first (oldest).</span></p>
+                                {!dating && <Button size="sm" variant="outline" className="h-8 gap-1" onClick={openDating}><CalendarPlus className="h-3.5 w-3.5" /> Add dates to old stock</Button>}
+                            </div>
+                            {dating && (
+                                <div className="grid gap-2 rounded-md border bg-background p-3 sm:grid-cols-2" data-testid="date-old-stock-form">
+                                    <label className="grid gap-1 text-xs">How many (max {undated})
+                                        <Input type="number" min="1" max={undated} value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} />
+                                    </label>
+                                    <label className="grid gap-1 text-xs">Requalification date *
+                                        <Input type="date" value={form.requalification_due_on} onChange={(e) => setForm((f) => ({ ...f, requalification_due_on: e.target.value }))} />
+                                    </label>
+                                    <label className="grid gap-1 text-xs">Manufactured (optional)
+                                        <Input type="date" value={form.manufactured_on} onChange={(e) => setForm((f) => ({ ...f, manufactured_on: e.target.value }))} />
+                                    </label>
+                                    <label className="grid gap-1 text-xs">Batch code (optional)
+                                        <Input value={form.batch_code} placeholder="auto" maxLength={40} onChange={(e) => setForm((f) => ({ ...f, batch_code: e.target.value }))} />
+                                    </label>
+                                    {Object.values(errors).map((e) => <p key={e} className="text-xs text-red-600 sm:col-span-2">{e}</p>)}
+                                    <p className="text-[11px] text-muted-foreground sm:col-span-2">No stock numbers change — this only records the date on the collar.</p>
+                                    <div className="flex justify-end gap-2 sm:col-span-2">
+                                        <Button size="sm" variant="outline" onClick={() => setDating(false)}>Cancel</Button>
+                                        <Button size="sm" disabled={busy} onClick={saveDating}>{busy ? 'Saving…' : 'Save dates'}</Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <table className="w-full text-sm">
                         <thead className="text-xs text-muted-foreground"><tr className="border-b">
                             <th className="px-3 py-2 text-left">Batch</th>{th('remaining', 'Left')}{th('requalification_due_on', 'Requalification')}{th('received_on', 'Received')}
                             <th className="px-3 py-2 text-left">Supplier</th><th className="px-3 py-2" />
                         </tr></thead>
                         <tbody className="divide-y">
-                            {rows.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">No batches with stock. Older stock (before batches) still sells.</td></tr>}
+                            {rows.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">No batches with stock.{undated > 0 ? ' The undated stock above still sells.' : ''}</td></tr>}
                             {rows.map((b) => (
                                 <tr key={b.id} className={b.expired ? 'bg-red-50 dark:bg-red-950/30' : ''}>
                                     <td className="px-3 py-2 font-mono text-xs">{b.batch_code}<span className="block text-[10px] text-muted-foreground">{b.source}</span></td>
@@ -56,7 +132,7 @@ export function BatchesDialog({ open, onClose, productName, batches }: { open: b
                                     <td className="px-3 py-2 text-right">
                                         {b.expired && (
                                             <Button size="sm" variant="outline" className="h-7 text-xs text-red-600"
-                                                onClick={() => { if (confirm(`Mark the ${b.remaining} cylinder(s) of batch ${b.batch_code} as expired? They are held aside (not sellable).`)) router.post(`/seller/inventory/batches/${b.id}/expire`, {}, { preserveScroll: true }); }}>
+                                                onClick={() => setExpireTarget(b)}>
                                                 Mark as expired
                                             </Button>
                                         )}
@@ -66,6 +142,10 @@ export function BatchesDialog({ open, onClose, productName, batches }: { open: b
                         </tbody>
                     </table>
                 </div>
+                <Confirm open={!!expireTarget} onOpenChange={(o) => { if (!o) setExpireTarget(null); }} title={`Mark batch ${expireTarget?.batch_code ?? ''} as expired?`} action="Mark as expired"
+                    onConfirm={() => { if (expireTarget) router.post(`/seller/inventory/batches/${expireTarget.id}/expire`, {}, { preserveScroll: true, preserveState: true }); setExpireTarget(null); }}>
+                    The {expireTarget?.remaining} cylinder(s) are held aside (not sellable) until you return them to the supplier or dispose of them.
+                </Confirm>
             </DialogContent>
         </Dialog>
     );
@@ -129,6 +209,7 @@ export function HeldCylindersCard({ incidents, suppliers }: { incidents: Inciden
     const [picked, setPicked] = useState<number[]>([]);
     const [supplierId, setSupplierId] = useState('');
     const [returning, setReturning] = useState(false);
+    const [disposeTarget, setDisposeTarget] = useState<Incident | null>(null);
     const held = incidents.filter((i) => i.status === 'held');
     if (incidents.length === 0) return null;
     // Default supplier = the batch's supplier of the first ticked cylinder
@@ -154,7 +235,7 @@ export function HeldCylindersCard({ incidents, suppliers }: { incidents: Inciden
                                 <td className="px-4 py-2 text-xs">{i.status === 'held' ? 'Held' : `Sent back (${i.return_number})`}</td>
                                 <td className="px-4 py-2 text-right">
                                     {i.status === 'held' && (
-                                        <button type="button" className="text-xs text-red-600 underline" onClick={() => { if (confirm('Dispose of these cylinders? They leave your stock for good.')) router.post(`/seller/inventory/incidents/${i.id}/dispose`, {}, { preserveScroll: true }); }}>Dispose</button>
+                                        <button type="button" className="text-xs text-red-600 underline" onClick={() => setDisposeTarget(i)}>Dispose</button>
                                     )}
                                 </td>
                             </tr>
@@ -170,6 +251,10 @@ export function HeldCylindersCard({ incidents, suppliers }: { incidents: Inciden
                     </div>
                 )}
             </CardContent>
+            <Confirm open={!!disposeTarget} onOpenChange={(o) => { if (!o) setDisposeTarget(null); }} title="Dispose of these cylinders?" action="Dispose"
+                onConfirm={() => { if (disposeTarget) router.post(`/seller/inventory/incidents/${disposeTarget.id}/dispose`, {}, { preserveScroll: true }); setDisposeTarget(null); }}>
+                {disposeTarget?.quantity} × {disposeTarget?.product} leave your stock for good.
+            </Confirm>
             {returning && picked.length > 0 && (
                 <ReturnConfirm ids={picked} suppliers={suppliers} supplierId={supplierId} setSupplierId={setSupplierId} onDone={() => { setPicked([]); setReturning(false); }} />
             )}
@@ -212,7 +297,19 @@ export function ReturnsCard({ returns }: { returns: ReturnRow[] }) {
                                 <td className="px-4 py-2 font-mono text-xs">{r.return_number}<span className="block font-sans text-[11px] text-muted-foreground">{r.created_at}</span></td>
                                 <td className="px-4 py-2">{r.supplier}</td>
                                 <td className="px-4 py-2 text-right tabular-nums">{r.quantity} cyl.</td>
-                                <td className="px-4 py-2 capitalize">{r.status}{r.credited_amount !== null && ` · ₱${r.credited_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}`}</td>
+                                <td className="px-4 py-2">
+                                    <span className="capitalize">{r.status}</span>{r.credited_amount !== null && ` · ${peso(r.credited_amount)}`}
+                                    {/* K6: the credit lowers the supplier balance (recorded on the oldest unpaid POs) */}
+                                    {r.credited_amount !== null && r.credited_amount > 0 && (
+                                        <span className="block text-[11px] text-muted-foreground" data-testid="credit-applied">
+                                            {(r.credit_applied ?? 0) >= r.credited_amount - 0.005
+                                                ? 'Applied to unpaid purchase orders'
+                                                : (r.credit_applied ?? 0) > 0
+                                                    ? `${peso(r.credit_applied ?? 0)} applied to unpaid POs · ${peso(r.credited_amount - (r.credit_applied ?? 0))} not applied (no unpaid PO left)`
+                                                    : 'Not applied — no unpaid purchase order from this supplier'}
+                                        </span>
+                                    )}
+                                </td>
                                 <td className="px-4 py-2 text-right">
                                     <a href={`/seller/supplier-returns/${r.id}/slip`} target="_blank" rel="noopener noreferrer" className="mr-3 inline-flex items-center gap-1 text-xs text-blue-600 underline"><FileText className="h-3 w-3" /> Slip</a>
                                     {['open', 'sent'].includes(r.status) && <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setErrors({}); setTarget(r); }}>Record outcome</Button>}
@@ -234,10 +331,13 @@ export function ReturnsCard({ returns }: { returns: ReturnRow[] }) {
                         </div>
                         {form.outcome === 'replaced' && <>
                             <label className="grid gap-1 text-sm">Requalification date of the replacements *<Input type="date" value={form.requalification_due_on} onChange={(e) => setForm((f) => ({ ...f, requalification_due_on: e.target.value }))} /></label>
-                            <label className="grid gap-1 text-sm">Manufactured (optional)<Input type="date" value={form.manufactured_on} onChange={(e) => setForm((f) => ({ ...f, manufactured_on: e.target.value }))} /></label>
+                            <label className="grid gap-1 text-sm">Manufactured (optional)<Input type="date" max={new Date().toISOString().slice(0, 10)} value={form.manufactured_on} onChange={(e) => setForm((f) => ({ ...f, manufactured_on: e.target.value }))} /></label>
                             <label className="grid gap-1 text-sm">Batch code (optional)<Input value={form.batch_code} onChange={(e) => setForm((f) => ({ ...f, batch_code: e.target.value }))} /></label>
                         </>}
-                        {form.outcome === 'credited' && <label className="grid gap-1 text-sm">Credited amount (₱)<Input type="number" min="0" step="0.01" value={form.credited_amount} onChange={(e) => setForm((f) => ({ ...f, credited_amount: e.target.value }))} /></label>}
+                        {form.outcome === 'credited' && <>
+                            <label className="grid gap-1 text-sm">Credited amount (₱)<Input type="number" min="0" step="0.01" value={form.credited_amount} onChange={(e) => setForm((f) => ({ ...f, credited_amount: e.target.value }))} /></label>
+                            <p className="text-xs text-muted-foreground">The credit is recorded as a payment on this supplier's oldest unpaid purchase order(s), lowering what you owe.</p>
+                        </>}
                         {form.outcome === 'rejected' && <p className="text-sm text-muted-foreground">The cylinders stay held as damaged — you can dispose of them afterwards.</p>}
                         {Object.values(errors).map((e) => <p key={e} className="text-xs text-red-600">{e}</p>)}
                     </div>

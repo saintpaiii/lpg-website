@@ -109,7 +109,9 @@ class InventoryController extends Controller
                 ])->values(),
             'returns'     => SupplierReturn::with(['supplier:id,name', 'incidents'])->where('store_id', $store->id)->latest()->take(30)->get()
                 ->map(fn (SupplierReturn $r) => ['id' => $r->id, 'return_number' => $r->return_number, 'status' => $r->status, 'supplier' => $r->supplier?->name,
-                    'quantity' => $r->quantity(), 'credited_amount' => $r->credited_amount !== null ? (float) $r->credited_amount : null, 'created_at' => $r->created_at->format('M j, Y')])->values(),
+                    'quantity' => $r->quantity(), 'credited_amount' => $r->credited_amount !== null ? (float) $r->credited_amount : null, 'created_at' => $r->created_at->format('M j, Y'),
+                    // K6: how much of the credit went against unpaid purchase orders of this supplier
+                    'credit_applied' => $r->credited_amount !== null ? \App\Services\SupplierPaymentService::creditApplied($r) : null])->values(),
             'suppliers'   => Supplier::where('store_id', $store->id)->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'reasons'     => CylinderIncident::REASONS,
             'warn_days'   => config('inventory.warn_days'),
@@ -130,6 +132,7 @@ class InventoryController extends Controller
             'id'               => $i->id,
             'quantity'         => $i->quantity,
             'usable'           => $p ? StockService::usableFilled($p->id, $i) : 0,
+            'undated'          => $p && $p->isLpg() ? max(0, (int) $i->quantity - (int) $batches->sum('quantity_remaining')) : 0,   // K6
             'empty_quantity'   => (int) $i->empty_quantity,
             'damaged_quantity' => (int) $i->damaged_quantity,
             'reorder_level'    => $i->reorder_level,
@@ -163,8 +166,8 @@ class InventoryController extends Controller
             'requalification_due_on' => [$product->isLpg() ? 'required' : 'nullable', 'date', 'after:today'],
             'manufactured_on'        => 'nullable|date|before_or_equal:today',
             'batch_code'             => 'nullable|string|max:40',
-        ], ['requalification_due_on.required' => 'Enter the requalification (expiry) date stamped on the cylinder collar.',
-            'requalification_due_on.after' => 'The requalification date must be in the future — expired cylinders are recorded with "Record damaged / expired".']);
+        ], StockService::batchDateMessages());
+        StockService::checkBatchDates($data);   // K6: manufactured date not in the future + before the requalification date
 
         $batch = \Illuminate\Support\Facades\DB::transaction(fn () => StockService::receive($product, (int) $data['quantity'], $data, auth()->id(), null, $data['notes'] ?? 'Stock in'));
 
@@ -198,6 +201,25 @@ class InventoryController extends Controller
         ]);
 
         return back()->with('success', "Removed {$data['quantity']} unit(s) from {$product->name}.");
+    }
+
+    /** K6: "Add dates to old stock" — part of the unbatched (pre-J7) stock becomes an 'opening' batch. No stock change. */
+    public function dateOldStock(Request $request, Product $product): RedirectResponse
+    {
+        abort_unless($product->store_id === $request->attributes->get('seller_store')->id, 403);
+        if (! $product->isLpg()) {
+            return back()->with('error', 'Only LPG cylinders have requalification dates.');
+        }
+        $data = $request->validate([
+            'quantity'               => 'required|integer|min:1|max:99999',
+            'requalification_due_on' => 'required|date',
+            'manufactured_on'        => 'nullable|date|before_or_equal:today',
+            'batch_code'             => 'nullable|string|max:40',
+        ], StockService::batchDateMessages() + ['quantity.required' => 'Enter how many cylinders to date.', 'quantity.min' => 'Enter at least 1 cylinder.']);
+        $batch = StockService::dateOldStock($product, (int) $data['quantity'], $data, $request->user()->id);
+
+        return back()->with('success', "Batch {$batch->batch_code}: {$batch->quantity_remaining} cylinder(s) of {$product->name} dated"
+            . ($batch->isExpired() ? ' — already past the requalification date, so they won\'t be sold. Mark them as expired.' : '.'));
     }
 
     public function updateReorderLevel(Request $request, Product $product): RedirectResponse
@@ -272,7 +294,10 @@ class InventoryController extends Controller
             'manufactured_on'        => 'nullable|date|before_or_equal:today',
             'batch_code'             => 'nullable|string|max:40',
             'credited_amount'        => 'required_if:outcome,credited|nullable|numeric|min:0|max:9999999',
-        ]);
+        ], StockService::batchDateMessages() + ['credited_amount.required_if' => 'Enter the amount the supplier credited.']);
+        if ($data['outcome'] === 'replaced') {
+            StockService::checkBatchDates($data);
+        }
         CylinderService::outcome($supplierReturn, $data['outcome'], $data, $request->user()->id);
 
         return back()->with('success', "Return {$supplierReturn->return_number}: " . ['replaced' => 'replacement received — stock updated.',

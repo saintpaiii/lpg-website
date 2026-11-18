@@ -348,7 +348,8 @@ function FullScreenViewer({ media, name, startAt, reduced, onClose }: {
     return (
         <Dialog open onOpenChange={(o) => { if (!o) onClose(active); }}>
             <DialogContent
-                className="h-[100dvh] w-screen max-w-none gap-0 rounded-none border-0 bg-black/95 p-0 sm:max-w-none [&>[data-slot=dialog-close]]:hidden"
+                className="h-[100dvh] w-screen max-w-none gap-0 rounded-none border-0 bg-black/95 p-0 sm:max-w-none"
+                showCloseButton={false}
                 onKeyDown={(e) => {
                     if (e.key === 'ArrowRight') { e.preventDefault(); go(active + 1); }
                     if (e.key === 'ArrowLeft') { e.preventDefault(); go(active - 1); }

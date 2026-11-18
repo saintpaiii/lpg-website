@@ -87,6 +87,7 @@ class ProductBrowseController extends Controller
         };
 
         $products = $query->paginate(20)->withQueryString();
+        \App\Services\StockService::prime($products->getCollection());   // K6: sellable stock for the page (2 queries)
         // Max per customer: period, what is left for this customer and what is in their cart (2 queries for the page)
         $limits   = PurchaseLimitService::payloadForMany($request->user()?->id, $products->getCollection());
         // J4: stores without a rider / vehicle are listed as PICK-UP ONLY (one query for the page)
@@ -105,7 +106,7 @@ class ProductBrowseController extends Controller
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
             'image_url'      => $p->image ? Storage::url($p->image) : null,
             ...$p->cardMedia(),
-            'stock'          => $p->inventory?->quantity ?? 0,
+            'stock'          => \App\Services\StockService::sellable($p),   // K6: expired batches never count
             'store_id'       => $p->store_id,
             'store_name'     => $p->store?->store_name ?? '',
             'store_featured' => (bool) $p->store?->is_featured,
@@ -244,6 +245,7 @@ class ProductBrowseController extends Controller
             ->where('is_active', true)
             ->limit(4)
             ->get()
+            ->tap(fn ($c) => \App\Services\StockService::prime($c))
             ->map(fn ($p) => $this->mapRelated($p));
 
         // Related: similar weight from other stores (up to 4)
@@ -259,6 +261,7 @@ class ProductBrowseController extends Controller
             ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->limit(4)
             ->get()
+            ->tap(fn ($c) => \App\Services\StockService::prime($c))
             ->map(fn ($p) => $this->mapRelated($p));
 
         return Inertia::render('customer/product-show', [
@@ -280,7 +283,7 @@ class ProductBrowseController extends Controller
                 'purchase_price' => (float) ($product->purchase_price ?? $product->refill_price),
                 'image_url'      => $product->image ? Storage::url($product->image) : null,
                 'media'          => $product->mediaPayload(),
-                'stock'          => $product->inventory?->quantity ?? 0,
+                'stock'          => \App\Services\StockService::sellable($product),   // K6
                 'store_id'       => $product->store_id,
                 'store_name'     => $product->store?->store_name ?? '',
                 'store_featured' => (bool) $product->store?->is_featured,
@@ -315,9 +318,10 @@ class ProductBrowseController extends Controller
             'weight'         => $p->weight,
             'refill_price'   => (float) $p->refill_price,
             'purchase_price' => (float) ($p->purchase_price ?? $p->refill_price),
+            'product_type'   => $p->product_type ?? 'lpg',
             'image_url'      => $p->image ? Storage::url($p->image) : null,
             ...$p->cardMedia(),
-            'stock'          => $p->inventory?->quantity ?? 0,
+            'stock'          => \App\Services\StockService::sellable($p),   // K6: expired batches never count
             'store_name'     => $p->store?->store_name ?? '',
             'store_featured' => (bool) $p->store?->is_featured,
             'store_id'       => $p->store_id,

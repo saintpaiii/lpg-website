@@ -1,4 +1,4 @@
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     BarChart,
     Bar,
@@ -141,7 +141,9 @@ type Props = {
 type SupplierDss = {
     days: number;
     thresholds: { inspect_rate: number; switch_rate: number; late_pct: number; min_received: number };
-    suppliers: { id: number; name: string; lead_days: number; received: number; damaged: number; damage_rate: number | null; avg_delay: number | null; on_time_pct: number | null; pos_received: number; advice: string[]; ok: boolean }[];
+    suppliers: { id: number; name: string; lead_days: number; received: number; damaged: number; damage_rate: number | null; avg_delay: number | null; on_time_pct: number | null; pos_received: number; advice: string[]; ok: boolean; owed?: number; overdue?: number }[];
+    /** K6: batches already past their requalification date, still in stock */
+    expired?: { batch_id: number; product_id: number; qty: number; text: string; link: string }[];
     expiry: { qty: number; text: string } | null;
     by_product: { name: string | null; qty: number; text: string }[];
     handover: { qty: number; text: string } | null;
@@ -991,16 +993,28 @@ function SupplierSection({ data }: { data: SupplierDss }) {
     const note = (items: { text: string }[], tone: string) => items.map((x, i) => <li key={i} className={`rounded-md px-3 py-2 text-sm ${tone}`}>{x.text}</li>);
     return (
         <div className="space-y-4" data-testid="dss-suppliers">
+            {/* K6: already expired — first, in red, with a link to the product's Batches drawer */}
+            {(data.expired ?? []).length > 0 && (
+                <ul className="space-y-2" data-testid="dss-expired">
+                    {(data.expired ?? []).map((x) => (
+                        <li key={x.batch_id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                            <span>{x.text}</span>
+                            <Link href={x.link} className="text-xs font-semibold underline">Open batches</Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
             <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Suppliers — last {data.days} days</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto p-0">
                     <table className="w-full text-sm">
                         <thead><tr className="border-b text-left text-xs text-gray-500">
                             <th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Received</th><th className="px-4 py-2 text-right">Damaged / expired</th>
-                            <th className="px-4 py-2 text-right">Damage rate</th><th className="px-4 py-2 text-right">Avg delay</th><th className="px-4 py-2 text-right">On time</th><th className="px-4 py-2">Advice</th>
+                            <th className="px-4 py-2 text-right">Damage rate</th><th className="px-4 py-2 text-right">Avg delay</th><th className="px-4 py-2 text-right">On time</th>
+                            <th className="px-4 py-2 text-right">Owed</th><th className="px-4 py-2 text-right">Overdue</th><th className="px-4 py-2">Advice</th>
                         </tr></thead>
                         <tbody className="divide-y">
-                            {data.suppliers.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-gray-400">No suppliers yet.</td></tr>}
+                            {data.suppliers.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-400">No suppliers yet.</td></tr>}
                             {data.suppliers.map((s) => (
                                 <tr key={s.id} data-testid={`dss-supplier-${s.id}`}>
                                     <td className="px-4 py-2 font-medium">{s.name}<span className="block text-[11px] text-gray-400">lead time {s.lead_days} d</span></td>
@@ -1009,6 +1023,8 @@ function SupplierSection({ data }: { data: SupplierDss }) {
                                     <td className="px-4 py-2 text-right tabular-nums">{s.damage_rate === null ? <span className="text-gray-400" title={`Needs ${t.min_received}+ cylinders received`}>—</span> : `${s.damage_rate}%`}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.avg_delay === null ? '—' : `${s.avg_delay} d`}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.on_time_pct === null ? '—' : `${s.on_time_pct}%`}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.owed ? '₱' + s.owed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</td>
+                                    <td className={`px-4 py-2 text-right tabular-nums ${s.overdue ? 'font-semibold text-red-600' : ''}`}>{s.overdue ? '₱' + s.overdue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</td>
                                     <td className={`px-4 py-2 text-xs ${s.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{s.advice.join(' ')}</td>
                                 </tr>
                             ))}
@@ -1017,7 +1033,7 @@ function SupplierSection({ data }: { data: SupplierDss }) {
                     <p className="border-t px-4 py-2 text-[11px] text-gray-500">
                         Damage rate = damaged/expired cylinders traced to the supplier ÷ cylinders received from them (customer tanks refused at handover are not counted).
                         Advice: ≥ {t.inspect_rate}% inspect deliveries · ≥ {t.switch_rate}% consider another supplier · late on ≥ {t.late_pct}% of orders → order earlier.
-                        Delay = received date − (sent date + lead time).
+                        Delay = received date − (sent date + lead time). Owed = received value − payments (and return credits) on their purchase orders.
                     </p>
                 </CardContent>
             </Card>

@@ -39,10 +39,11 @@ return [
         ],
         'inventory' => [
             'label'       => 'Inventory',
-            'description' => 'Stock levels and history, suppliers and purchase orders. Full access can record stock-in / stock-out, damaged cylinders and reorder levels, manage suppliers, draft and receive purchase orders.',
+            'description' => 'Stock levels and history, suppliers (view) and purchase orders. Full access can record stock-in / stock-out, damaged cylinders and reorder levels, draft and receive purchase orders.',
             'permissions' => ['inventory.view', 'inventory.stock_in', 'inventory.stock_out', 'inventory.adjust',
-                // J7: suppliers + purchase orders (sending / cancelling a PO needs inventory.po_send — the Purchase approvals module)
-                'inventory.suppliers', 'inventory.po_create', 'inventory.po_receive'],
+                // J7: purchase orders. K6: managing suppliers (inventory.suppliers) and sending / cancelling / paying POs
+                // (inventory.po_send) are in the separate Purchase approvals module — a role must be given it explicitly.
+                'inventory.po_create', 'inventory.po_receive'],
             'actions'     => [
                 'seller.inventory.stock-in'      => 'inventory.stock_in',
                 'seller.inventory.stock-out'     => 'inventory.stock_out',
@@ -62,15 +63,20 @@ return [
                 'seller.purchase-orders.send'       => 'inventory.po_send',
                 'seller.purchase-orders.cancel'     => 'inventory.po_send',
                 'seller.purchase-orders.receive'    => 'inventory.po_receive',
+                'seller.purchase-orders.due-date'   => 'inventory.po_send',
+                'seller.purchase-orders.payments'   => 'inventory.po_send',
+                'seller.purchase-orders.payments.destroy' => 'inventory.po_send',
+                'seller.inventory.date-old-stock'   => 'inventory.adjust',
                 'seller.supplier-returns.store'     => 'inventory.adjust',
                 'seller.supplier-returns.outcome'   => 'inventory.adjust',
             ],
         ],
         // J7: approving purchase orders (Send / Cancel). Separate so the Warehouse starter can draft and receive but not send.
+        // K6: also managing suppliers (owner-only by default) and recording supplier payments.
         'purchasing' => [
             'label'       => 'Purchase approvals',
-            'description' => 'Send purchase orders to suppliers (and cancel them). Needs the Inventory module to open the pages.',
-            'permissions' => ['inventory.po_send'],
+            'description' => 'Manage suppliers and unit costs, send and cancel purchase orders, and record payments to suppliers. Needs the Inventory module to open the pages.',
+            'permissions' => ['inventory.suppliers', 'inventory.po_send'],
             'actions'     => [],
         ],
         'orders' => [
@@ -161,7 +167,7 @@ return [
         'loyalty_customers.view'  => ['Loyalty',          'View the loyal customers list'],
         'inventory.suppliers'     => ['Inventory',        'Manage suppliers and what they supply'],
         'inventory.po_create'     => ['Inventory',        'Create and edit draft purchase orders'],
-        'inventory.po_send'       => ['Inventory',        'Send (approve) and cancel purchase orders'],
+        'inventory.po_send'       => ['Inventory',        'Send (approve), cancel and record payments of purchase orders'],
         'inventory.po_receive'    => ['Inventory',        'Receive purchase order deliveries'],
     ],
 

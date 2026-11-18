@@ -81,6 +81,8 @@ type RelatedProduct = {
     weight: string;
     refill_price: number;
     purchase_price: number;
+    /** K6: accessories show one price */
+    product_type?: 'lpg' | 'accessory';
     image_url: string | null;
     hover_url?: string | null;
     photo_count?: number;
@@ -150,7 +152,7 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
                     <p className="text-[10px] text-gray-500 mb-1">{p.brand} · {p.weight}</p>
                     <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                     <p className="mt-1.5 font-bold text-blue-600 text-sm">
-                        ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                        ₱{(p.product_type === 'accessory' ? p.purchase_price : p.refill_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </p>
                     {p.stock === 0 && (
                         <span className="text-[10px] text-red-500 font-medium">Out of stock</span>
@@ -259,20 +261,27 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                         <StarRating value={product.avg_rating} count={product.review_count} size="sm" />
 
                         {/* Pricing */}
-                        <div className="flex gap-6">
-                            <div>
-                                <p className="text-xs text-gray-400 mb-0.5">Refill</p>
-                                <p className="text-2xl font-bold text-blue-600">
-                                    ₱{product.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                </p>
+                        {/* K6: an accessory has ONE price (no refill / exchange) */}
+                        {isAccessory ? (
+                            <p className="text-2xl font-bold text-blue-600" data-testid="accessory-price">
+                                ₱{product.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                            </p>
+                        ) : (
+                            <div className="flex gap-6">
+                                <div>
+                                    <p className="text-xs text-gray-400 mb-0.5">Refill</p>
+                                    <p className="text-2xl font-bold text-blue-600">
+                                        ₱{product.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-gray-400 mb-0.5">New Purchase</p>
+                                    <p className="text-2xl font-semibold text-gray-700 dark:text-gray-300">
+                                        ₱{product.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-xs text-gray-400 mb-0.5">New Purchase</p>
-                                <p className="text-2xl font-semibold text-gray-700 dark:text-gray-300">
-                                    ₱{product.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                        </div>
+                        )}
 
                         {/* Stock */}
                         <p className="text-sm text-gray-500">
@@ -316,7 +325,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 </p>
                             )}
                             {product.hours && <p className="pl-6"><StoreHoursBadge hours={product.hours} className="text-xs" /></p>}
-                            {product.exchange_policy && (
+                            {product.exchange_policy && !isAccessory && (
                                 <p className="text-gray-500 pl-6">
                                     Refill: bring an empty tank that meets the store's exchange policy · <ExchangePolicyLink policy={product.exchange_policy} storeName={product.store_name} />
                                 </p>

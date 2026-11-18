@@ -257,7 +257,8 @@ class RefundService
 
         foreach ($original->items as $item) {
             $inventory = Inventory::where('product_id', $item->product_id)->lockForUpdate()->first();
-            if (! $inventory || $inventory->quantity < $item->quantity) {
+            // K6: usable stock only — a replacement never goes out from an expired batch
+            if (! $inventory || StockService::usableFilled($item->product_id, $inventory) < $item->quantity) {
                 throw new \RuntimeException('Not enough stock to send a replacement for ' . ($item->product?->name ?? 'this item') . '.');
             }
         }

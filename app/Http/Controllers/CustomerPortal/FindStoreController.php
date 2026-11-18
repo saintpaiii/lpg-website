@@ -138,6 +138,9 @@ class FindStoreController extends Controller
             ->whereHas('inventory', fn ($q) => $q->where('quantity', '>=', $qty))
             ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId))
             ->get();
+        // K6: only SELLABLE stock counts (expired batches never sell) — 2 queries for all candidates
+        \App\Services\StockService::prime($products);
+        $products = $products->filter(fn ($p) => \App\Services\StockService::sellable($p) >= $qty)->values();
 
         // J4: stores without a rider / delivery vehicle are still listed — as pick-up only (no fee, no range check)
         $canDeliver = Store::deliveryMap($products->pluck('store_id'));
@@ -263,7 +266,7 @@ class FindStoreController extends Controller
             'delivery_fee' => $r['pickupOnly'] ? null : round($r['fee'], 2),
             'total'        => $r['total'],
             'distance_km'  => round($r['distance'], 1),
-            'stock_left'   => (int) ($p->inventory?->quantity ?? 0),
+            'stock_left'   => \App\Services\StockService::sellable($p),
             'avg_rating'   => $rating ? round((float) $rating->avg_rating, 1) : null,
             'rating_count' => (int) ($rating->rating_count ?? 0),
             'badges'       => array_values(array_filter([
