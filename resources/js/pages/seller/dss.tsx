@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { SeasonalSection, type SalesImport, type Seasonal } from '@/components/dss-seasonal';
 import {
     BarChart,
     Bar,
@@ -136,6 +137,10 @@ type Props = {
     fleet?: Fleet;
     /** J7 */
     supplierDss?: SupplierDss;
+    /** J8: seasonal (month-of-year) forecast + past sales imports */
+    seasonal?: Seasonal;
+    salesImports?: SalesImport[];
+    seasonalCan?: { import: boolean; owner: boolean };
 };
 
 type SupplierDss = {
@@ -171,7 +176,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const FORECAST_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
-type Tab = 'overview' | 'forecast' | 'trends' | 'fleet' | 'suppliers';
+type Tab = 'overview' | 'forecast' | 'trends' | 'fleet' | 'suppliers' | 'seasonal';
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -677,7 +682,7 @@ function RecommendationsCard({ recs }: { recs: Recommendation[] }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
-export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt, fleet, supplierDss }: Props) {
+export default function SellerDss({ reorderAlerts, salesTrend, topProducts, demandForecast, insights, generatedAt, fleet, supplierDss, seasonal, salesImports = [], seasonalCan = { import: false, owner: false } }: Props) {
     const criticalCount = reorderAlerts.filter((a) => a.severity === 'critical').length;
     const warningCount  = reorderAlerts.filter((a) => a.severity === 'warning').length;
     const [tab, setTab]  = useState<Tab>('overview');
@@ -688,6 +693,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
         { key: 'trends',    label: 'Trends & Products',   icon: TrendingUp },
         { key: 'fleet',     label: 'Fleet',               icon: Brain },
         { key: 'suppliers', label: 'Suppliers & Cylinders', icon: Brain },
+        { key: 'seasonal',  label: 'Seasonal',            icon: CalendarDays },
     ];
 
     return (
@@ -750,11 +756,11 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
 
             {/* Tab bar */}
             <div className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 sm:px-6">
-                <div className="flex gap-0.5 -mb-px">
+                <div className="scrollbar-none flex gap-0.5 -mb-px overflow-x-auto">
                     {tabs.map(({ key, label, icon: Icon }) => (
                         <button
                             key={key}
-                            onClick={() => setTab(key)}
+                            onClick={(e) => { setTab(key); e.currentTarget.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }}
                             className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                                 tab === key
                                     ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
@@ -924,6 +930,8 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                 {/* ── Tab 4: Fleet (J6) ── */}
                 {tab === 'fleet' && fleet && <FleetSection fleet={fleet} />}
                 {tab === 'suppliers' && supplierDss && <SupplierSection data={supplierDss} />}
+                {/* J8: Seasonal (month-of-year) forecast */}
+                {tab === 'seasonal' && seasonal && <SeasonalSection data={seasonal} imports={salesImports} can={seasonalCan} />}
 
                 {/* Footer note */}
                 <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-3 text-center text-xs text-gray-400 mt-2">

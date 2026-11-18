@@ -297,6 +297,14 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
         Route::get('dss', [DssController::class, 'index'])
             ->middleware(['module:dss', 'plan.feature:dss'])
             ->name('dss');
+        // J8: Seasonal tab — past sales (CSV import) + demo history
+        Route::middleware(['module:dss', 'plan.feature:dss'])->prefix('dss/sales-history')->name('dss.sales-history.')->group(function () {
+            Route::get('template', [\App\Http\Controllers\Seller\SeasonalController::class, 'template'])->name('template');
+            Route::post('preview', [\App\Http\Controllers\Seller\SeasonalController::class, 'preview'])->name('preview');
+            Route::post('import', [\App\Http\Controllers\Seller\SeasonalController::class, 'import'])->name('import');
+            Route::delete('imports/{batch}', [\App\Http\Controllers\Seller\SeasonalController::class, 'destroyImport'])->name('imports.destroy');
+            Route::delete('demo', [\App\Http\Controllers\Seller\SeasonalController::class, 'destroyDemo'])->name('demo.destroy');
+        });
 
         // ── Store Documents (permit renewals, extra documents) — owner only ──
         Route::middleware('seller_owner')->group(function () {

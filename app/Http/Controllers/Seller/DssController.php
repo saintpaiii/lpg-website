@@ -189,6 +189,10 @@ class DssController extends Controller
             'supplierDss'    => \App\Services\SupplierDssService::forStore($store),
             // J6: Fleet — capacity misses, waits, peak vs vehicles, per-vehicle use + rule-based advice
             'fleet'          => \App\Services\VehicleDssService::fleet($store),
+            // J8: Seasonal (month-of-year) forecast + past sales imports — advice only (auto-reorder is unchanged)
+            'seasonal'       => \App\Services\SeasonalForecastService::forStore($store),
+            'salesImports'   => \App\Services\SalesHistoryImportService::imports($store),
+            'seasonalCan'    => SeasonalController::abilities($request->user()),
             'generatedAt'    => now()->format('M d, Y g:i A'),
         ]);
     }

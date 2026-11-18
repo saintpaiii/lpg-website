@@ -56,6 +56,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // J8 (K6 follow-up): "Only expired cylinders left…" is an expected message to the seller, not an error — don't log it
+        $exceptions->dontReport(\App\Exceptions\StockUnavailableException::class);
+
         // Upload bigger than post_max_size: thrown before the session starts, so answer with a plain 413 message
         $exceptions->render(fn (\Illuminate\Http\Exceptions\PostTooLargeException $e) => response()->json(
             ['message' => 'The files are too large to upload at once. Try a shorter video or fewer photos.'],
