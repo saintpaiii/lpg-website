@@ -147,7 +147,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                         <p className="text-muted-foreground text-sm mt-0.5">Stock levels and transaction history for your products.</p>
                     </div>
                     {tab === 'overview' && (
-                        <form onSubmit={doSearch} className="flex gap-2">
+                        <form onSubmit={doSearch} className="flex max-w-full flex-wrap gap-2">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="Search products…" className="pl-9 w-48" value={search}

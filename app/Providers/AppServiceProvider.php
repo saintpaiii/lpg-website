@@ -25,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
 
+        // K10: the UI audit (scripts/ui-audit.cjs) and screenshot runs measure the BUILT assets (public/build) even while
+        // `npm run dev` is running (public/hot) — they set VITE_IGNORE_HOT=1 on their own test server only
+        if (env('VITE_IGNORE_HOT')) {
+            \Illuminate\Support\Facades\Vite::useHotFile(storage_path('framework/vite-hot-ignored'));
+        }
+
         // Chat auto-messages follow order / delivery changes from any controller, API or job
         \App\Models\Order::observe(\App\Observers\OrderObserver::class);
         \App\Models\Delivery::observe(\App\Observers\DeliveryObserver::class);

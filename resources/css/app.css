@@ -257,17 +257,23 @@ input::-ms-clear {
 }
 
 /*
- * J10 — phone card lists: a <table class="rt-cards"> shows each row as a card below 640px (the table stays from sm up).
- * Every cell gets its column name (data-label, filled from the <th> by resources/js/lib/responsive-tables.ts) on the
- * left; a cell whose header is empty (the actions column) shows its buttons full-width, wrapping, 40px tall.
- * Columns hidden on small screens (hidden md:table-cell) are shown in the card — every field stays reachable.
+ * J10 / K10 — phone card lists: a <table class="rt-cards"> shows each row as a card below 640px (the table stays from sm
+ * up). resources/js/lib/responsive-tables.ts labels the cells:
+ *   data-label        the column name, shown on the left of the value
+ *   data-rt-title     the card's heading (product name + brand, order number…) — full width at the top, no label
+ *   data-rt-stack     a long value (reorder explanation, address) — label above, value below, full width
+ *   data-rt-actions   the buttons — their own row, wrapping, 40px touch targets
+ * Summary rows in <tfoot> (Subtotal, Delivery fee, Total) are label-left / value-right. Columns hidden on small screens
+ * (hidden md:table-cell) are shown in the card — every field stays reachable. Words never break in the middle unless a
+ * single word is wider than the whole card.
  */
 @media (max-width: 639.98px) {
     table.rt-cards { min-width: 0 !important; width: 100%; display: block; }
     table.rt-cards thead { display: none; }
     table.rt-cards tbody, table.rt-cards tfoot { display: block; }
-    table.rt-cards tr {
-        display: block;
+    table.rt-cards tbody tr {
+        display: flex;
+        flex-direction: column;
         margin: 0.625rem 0.5rem;
         padding: 0.5rem 0.75rem;
         border: 1px solid var(--border);
@@ -275,42 +281,115 @@ input::-ms-clear {
         background: var(--card);
     }
     table.rt-cards tr[data-rt-empty] { border: 0; background: transparent; }
-    table.rt-cards td {
-        display: flex !important;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 0.75rem;
+    /* A cell: the label in the left column (at most 40%), EVERY piece of the value stacked in the right column
+       (customer name above the address, rider above the phone…) — never squeezed side by side */
+    table.rt-cards tbody td {
+        display: grid !important;
+        grid-template-columns: fit-content(40%) minmax(0, 1fr);
+        column-gap: 0.75rem;
+        row-gap: 0;
+        justify-items: end;
+        align-items: start;
         padding: 0.3rem 0 !important;
         border: 0 !important;
         text-align: right !important;
         min-width: 0;
-        overflow-wrap: anywhere;
+        overflow-wrap: break-word;
+        word-break: normal;
+        /* a table-only width cap / one-line truncation (max-w-[180px] truncate) doesn't apply to a card cell */
+        max-width: none !important;
+        white-space: normal !important;
+        overflow: visible !important;
     }
-    table.rt-cards td::before {
+    table.rt-cards tbody td > * { grid-column: 2; min-width: 0; max-width: 100%; }
+    table.rt-cards tbody td::before {
         content: attr(data-label);
-        flex: 0 0 auto;
-        max-width: 45%;
+        grid-column: 1;
+        grid-row: 1 / span 12;
+        justify-self: start;
         text-align: left;
         font-size: 0.75rem;
         font-weight: 500;
         color: var(--muted-foreground);
         padding-top: 0.125rem;
     }
+    table.rt-cards tbody td:is([data-label=""], :not([data-label])) { grid-template-columns: minmax(0, 1fr); }
+    table.rt-cards tbody td:is([data-label=""], :not([data-label])) > * { grid-column: 1; }
     table.rt-cards td[data-label=""]::before,
     table.rt-cards td:not([data-label])::before { display: none; }
-    table.rt-cards td[colspan] { justify-content: center; text-align: center !important; }
+    table.rt-cards tbody td[colspan] { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center !important; }
+    /* The heading: first in the card, full width, left-aligned, no label */
+    table.rt-cards tbody td[data-rt-title] {
+        order: -1;
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: start;
+        text-align: left !important;
+        font-weight: 500;
+        padding-bottom: 0.4rem !important;
+    }
+    table.rt-cards tbody td[data-rt-title] > * { grid-column: 1; }
+    table.rt-cards tbody td[data-rt-title]::before { display: none; }
+    /* A long value: the label above, the value full width below */
+    table.rt-cards tbody td[data-rt-stack] {
+        grid-template-columns: minmax(0, 1fr);
+        justify-items: start;
+        text-align: left !important;
+    }
+    table.rt-cards tbody td[data-rt-stack] > *, table.rt-cards tbody td[data-rt-stack]::before { grid-column: 1; grid-row: auto; }
+    /* Chips / badges inside a value wrap as whole chips onto the next line, right-aligned */
+    table.rt-cards tbody td > div { flex-wrap: wrap; justify-content: flex-end; }
+    table.rt-cards tbody td[data-rt-title] > div,
+    table.rt-cards tbody td[data-rt-stack] > div { justify-content: flex-start; }
     /* The actions cell: buttons wrap, full row, big touch targets */
     table.rt-cards td[data-rt-actions] {
+        display: flex !important;
         justify-content: flex-start;
         flex-wrap: wrap;
         padding-top: 0.5rem !important;
         margin-top: 0.25rem;
         border-top: 1px solid var(--border) !important;
     }
+    table.rt-cards td[data-rt-actions]::before { display: none; }
     table.rt-cards td[data-rt-actions] > div { flex-wrap: wrap; justify-content: flex-start; width: 100%; }
     table.rt-cards td[data-rt-actions] button,
     table.rt-cards td[data-rt-actions] a { min-height: 40px; min-width: 40px; }
     /* every button in a card is a comfortable touch target (text links stay inline) */
-    table.rt-cards td button { min-height: 40px; min-width: 40px; }
-    table.rt-cards td > div { min-width: 0; }
+    table.rt-cards tbody td button { min-height: 40px; min-width: 40px; }
+    /* Summary rows (tfoot): label left, value right */
+    table.rt-cards tfoot tr { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: 0.35rem 1.25rem; }
+    table.rt-cards tfoot td { display: block !important; padding: 0 !important; text-align: left !important; }
+    table.rt-cards tfoot td:last-child { text-align: right !important; white-space: nowrap; }
 }
+
+/* K10 — pills / chips / badges never break in the middle of a word ("Deliv / ery") */
+span[class*="rounded-full"][class*="px-"],
+[data-slot="badge"] { white-space: nowrap; }
+
+/*
+ * K10 — phone dialogs: the footer (Cancel / Save) sticks to the bottom of a long dialog and spans exactly the dialog's
+ * width (its negative margins equal the default p-4 padding). Dialogs with their own layout (p-0 + their own sticky
+ * footer) are left alone. Footer buttons are 40px touch targets.
+ */
+@media (max-width: 639.98px) {
+    [data-slot="dialog-content"]:not(.p-0) [data-slot="dialog-footer"] {
+        position: sticky;
+        bottom: -1rem;
+        z-index: 10;
+        margin: 0 -1rem -1rem;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid var(--border);
+        background: var(--background);
+    }
+    [data-slot="dialog-footer"] > button,
+    [data-slot="dialog-footer"] > a { min-height: 40px; }
+}
+
+/* K10 — in any dialog (all widths): grid / select content may shrink and wrap instead of widening the dialog */
+:is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) .grid > * { min-width: 0; }
+:is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) [data-slot="select-trigger"] { min-width: 0; width: 100%; }
+:is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+:is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) :is(p, li, label, h2, h3, dd, dt) { overflow-wrap: anywhere; }
+
+/* K10 — page layout grids (sm/md/lg/xl:grid-cols-*): a column is never widened by its content (a wide table, a long
+   label) — on phones the single column stays the screen's width and the content wraps / scrolls inside it */
+[class*="sm:grid-cols-"] > *, [class*="md:grid-cols-"] > *, [class*="lg:grid-cols-"] > *, [class*="xl:grid-cols-"] > * { min-width: 0; }

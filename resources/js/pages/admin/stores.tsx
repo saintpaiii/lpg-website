@@ -173,7 +173,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                             Review and manage seller stores on the platform.
                         </p>
                     </div>
-                    <form onSubmit={doSearch} className="flex gap-2">
+                    <form onSubmit={doSearch} className="flex max-w-full flex-wrap gap-2">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input

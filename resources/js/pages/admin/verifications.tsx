@@ -283,7 +283,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                             Review uploaded IDs and riders' licenses. When the live selfie matches, they are approved automatically — you can still check and revoke them.
                         </p>
                     </div>
-                    <form onSubmit={doSearch} className="flex gap-2">
+                    <form onSubmit={doSearch} className="flex max-w-full flex-wrap gap-2">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input

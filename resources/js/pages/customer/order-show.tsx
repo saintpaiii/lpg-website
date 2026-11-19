@@ -267,8 +267,33 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
         );
     }
 
+    const labelOf = (key: string, label: string) => (order.fulfillment === 'pickup' ? (key === 'pending' ? 'Placed' : orderStatusLabel(key, 'pickup')) : label);
+
     return (
-        <div className="flex items-center w-full overflow-x-auto pb-2">
+        <>
+        {/* K10: phones — a vertical list (dot + label on one line), so long labels never overlap */}
+        <ol className="space-y-0 sm:hidden" data-testid="stepper-vertical">
+            {ORDER_STEPS.map((step, idx) => {
+                const done    = idx < currentIdx;
+                const current = idx === currentIdx;
+                return (
+                    <li key={step.key} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+                                done ? 'border-emerald-500 bg-emerald-500' : current ? 'border-blue-600 bg-blue-600' : 'border-border bg-card'
+                            }`}>
+                                {done ? <CheckCircle2 className="h-3.5 w-3.5 text-white" /> : current ? <Clock className="h-3.5 w-3.5 text-white" /> : <Circle className="h-3.5 w-3.5 text-muted-foreground" />}
+                            </div>
+                            {idx < ORDER_STEPS.length - 1 && <div className={`w-0.5 flex-1 min-h-4 ${done ? 'bg-emerald-500' : 'bg-muted'}`} />}
+                        </div>
+                        <span className={`pb-3 pt-1 text-sm font-medium ${done || current ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {labelOf(step.key, step.label)}{current && <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">now</span>}
+                        </span>
+                    </li>
+                );
+            })}
+        </ol>
+        <div className="hidden w-full items-center overflow-x-auto pb-2 sm:flex">
             {ORDER_STEPS.map((step, idx) => {
                 const done    = idx < currentIdx;
                 const current = idx === currentIdx;
@@ -291,7 +316,7 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
                             <span className={`mt-1.5 text-xs font-medium text-center whitespace-nowrap ${
                                 done || current ? 'text-gray-900 dark:text-white' : 'text-muted-foreground'
                             }`}>
-                                {order.fulfillment === 'pickup' ? (step.key === 'pending' ? 'Placed' : orderStatusLabel(step.key, 'pickup')) : step.label}
+                                {labelOf(step.key, step.label)}
                             </span>
                         </div>
                         {idx < ORDER_STEPS.length - 1 && (
@@ -301,6 +326,7 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
                 );
             })}
         </div>
+        </>
     );
 }
 
@@ -576,13 +602,13 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
             <div className="space-y-6">
                 {/* Back + header */}
                 <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                         <Link href="/customer/orders">
                             <Button variant="ghost" size="sm" className="gap-1.5">
                                 <ArrowLeft className="h-4 w-4" /> Orders
                             </Button>
                         </Link>
-                        <h1 className="text-xl font-bold text-gray-900 dark:text-white font-mono">{order.order_number}</h1>
+                        <h1 className="whitespace-nowrap text-xl font-bold text-foreground font-mono">{order.order_number}</h1>
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] ?? 'bg-muted'}`}>
                             {order.status.replace('_', ' ')}
                         </span>
@@ -806,7 +832,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                     </CardContent>
                 </Card>
 
-                <div className="grid gap-6 lg:grid-cols-3">
+                <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
                     {/* Items */}
                     <div className="lg:col-span-2">
                         <Card>
@@ -815,10 +841,10 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 {(order.adjustments?.length ?? 0) > 0 && <p className="text-xs text-amber-700 dark:text-amber-300">Adjusted at handover — see below.</p>}
                             </CardHeader>
                             <CardContent className="p-0">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                            <th className="px-4 py-3">Product</th>
+                                            <th className="px-4 py-3" data-rt-title>Product</th>
                                             <th className="px-4 py-3 text-center">Qty</th>
                                             <th className="px-4 py-3 text-right">Unit Price</th>
                                             <th className="px-4 py-3 text-right">Subtotal</th>

@@ -211,7 +211,7 @@ export function NewTransferDialog({ open, onClose, preset }: {
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="grid gap-1">
                                 <Label htmlFor="tr-from">From</Label>
-                                <select id="tr-from" className="h-9 rounded-md border bg-background px-2 text-sm" value={fromId ?? ''}
+                                <select id="tr-from" className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm" value={fromId ?? ''}
                                     onChange={(e) => { setFromId(Number(e.target.value)); setLines([{ from_product_id: '', to_product_id: '', quantity: '', empties: false }]); }}>
                                     {opts.stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
@@ -219,7 +219,7 @@ export function NewTransferDialog({ open, onClose, preset }: {
                             </div>
                             <div className="grid gap-1">
                                 <Label htmlFor="tr-to">To</Label>
-                                <select id="tr-to" className="h-9 rounded-md border bg-background px-2 text-sm" value={toId ?? ''}
+                                <select id="tr-to" className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm" value={toId ?? ''}
                                     onChange={(e) => { setToId(Number(e.target.value) || null); setLines((ls) => ls.map((l) => ({ ...l, to_product_id: '' }))); }}>
                                     <option value="">Choose a store…</option>
                                     {opts.stores.filter((s) => s.id !== fromId).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -235,11 +235,11 @@ export function NewTransferDialog({ open, onClose, preset }: {
                                 return (
                                     <div key={i} className="space-y-2 rounded-md border p-3">
                                         <div className="grid gap-2 sm:grid-cols-[1fr_1fr_6rem_auto]">
-                                            <select aria-label="Product to send" className="h-9 rounded-md border bg-background px-2 text-sm" value={l.from_product_id} onChange={(e) => pickFrom(i, e.target.value)}>
+                                            <select aria-label="Product to send" className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm" value={l.from_product_id} onChange={(e) => pickFrom(i, e.target.value)}>
                                                 <option value="">Product…</option>
                                                 {opts.from.map((fp) => <option key={fp.id} value={fp.id}>{fp.name} ({fp.usable} usable)</option>)}
                                             </select>
-                                            <select aria-label="Product in the receiving store" className="h-9 rounded-md border bg-background px-2 text-sm" value={l.to_product_id} disabled={!toId}
+                                            <select aria-label="Product in the receiving store" className="h-9 w-full min-w-0 rounded-md border bg-background px-2 text-sm" value={l.to_product_id} disabled={!toId}
                                                 onChange={(e) => setLine(i, { to_product_id: e.target.value })}>
                                                 <option value="">{toId ? 'Receiving product…' : 'Choose "To" first'}</option>
                                                 {opts.to.filter((tp) => !p || tp.type === p.type).map((tp) => <option key={tp.id} value={tp.id}>{tp.name}{tp.active === false ? ' (inactive)' : ''}</option>)}

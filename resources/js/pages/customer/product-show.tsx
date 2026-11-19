@@ -301,10 +301,10 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
 
                         {/* Store */}
                         <div className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 space-y-1.5 text-sm">
-                            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
+                            <div className="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300">
                                 <StoreAvatar name={product.store_name} logoUrl={product.store_logo_url} size={28} />
                                 <button
-                                    className="font-semibold hover:text-blue-600 hover:underline transition-colors"
+                                    className="min-w-0 text-left font-semibold hover:text-blue-600 hover:underline transition-colors"
                                     onClick={() => router.visit(`/customer/store/${product.store_id}`)}
                                 >
                                     {product.store_name}

@@ -468,7 +468,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         </Button>
                     </div>
                 ) : (
-                    <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-4 grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
                         {products.data.map(p => (
                             <Card
                                 key={p.id}
@@ -486,15 +486,15 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                 <CardContent className="p-4 flex flex-col flex-1">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
                                     <p className="text-xs text-muted-foreground mb-2">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} · {p.weight}</>}</p>
-                                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
+                                    <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground mb-1.5" title={`${p.store_name} · ${formatCity(p.store_city)}`}>
                                         <StoreAvatar name={p.store_name} logoUrl={p.store_logo_url} size={18} />
                                         <button
-                                            className="hover:text-blue-600 hover:underline transition-colors text-left"
+                                            className="min-w-0 truncate hover:text-blue-600 hover:underline transition-colors text-left"
                                             onClick={(e) => { e.stopPropagation(); router.visit(`/customer/store/${p.store_id}`); }}
                                         >
                                             {p.store_name}
                                         </button>
-                                        <span>· {formatCity(p.store_city)}</span>
+                                        <span className="shrink-0 whitespace-nowrap">· {formatCity(p.store_city)}</span>
                                     </div>
                                     {p.store_featured && <FeaturedBadge className="mb-1.5" />}
                                     <div className="mb-2">
@@ -507,15 +507,15 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                                 ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </p>
                                         ) : (
-                                            <div className="flex items-end justify-between gap-2 mb-3">
-                                                <div>
+                                            <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1 mb-3">
+                                                <div className="min-w-0">
                                                     <p className="text-xs text-muted-foreground">Refill</p>
                                                     <p className="font-bold text-blue-600 text-base">
                                                         ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>
                                                 </div>
-                                                <div className="text-right">
-                                                    <p className="text-xs text-muted-foreground">New purchase</p>
+                                                <div className="min-w-0 text-right">
+                                                    <p className="whitespace-nowrap text-xs text-muted-foreground">New purchase</p>
                                                     <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
                                                         ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>

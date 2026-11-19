@@ -223,6 +223,11 @@ export default function Landing({ products, stats, plans }: Props) {
                     -webkit-backdrop-filter: blur(8px);
                     border: 1px solid rgba(226,232,240,0.8);
                 }
+                /* K10: the light glass card in dark mode — a faint light layer on the dark page, light border */
+                .dark .glass-card-light {
+                    background: rgba(255,255,255,0.04);
+                    border-color: rgba(255,255,255,0.10);
+                }
             `}</style>
 
             <div className="min-h-screen bg-card text-foreground antialiased">
@@ -361,7 +366,7 @@ export default function Landing({ products, stats, plans }: Props) {
                     </div>
 
                     {/* Bottom fade */}
-                    <div className="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-white to-transparent" />
+                    <div className="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-card to-transparent" />
                 </section>
 
                 {/* ══════════════ STATS BAR ══════════════ */}
@@ -389,7 +394,7 @@ export default function Landing({ products, stats, plans }: Props) {
                 <section id="how-it-works" className="bg-muted py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
-                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Simple Process</span>
+                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">Simple Process</span>
                             <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">How It Works</h2>
                             <p className="mt-3 text-muted-foreground max-w-lg mx-auto">
                                 Get your LPG order in three simple steps
@@ -444,7 +449,7 @@ export default function Landing({ products, stats, plans }: Props) {
                 <section id="for-buyers" className="bg-card py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
-                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Buyers</span>
+                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">Buyers</span>
                             <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">Everything You Need as a Buyer</h2>
                             <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
                                 Order LPG with confidence from trusted distributors in Cavite
@@ -453,12 +458,12 @@ export default function Landing({ products, stats, plans }: Props) {
 
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                             {[
-                                { icon: Store,   title: 'Multiple Distributors',   desc: 'Browse from verified LPG distributors across Cavite in one place.',                       color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
-                                { icon: Search,  title: 'Compare Prices',           desc: 'Compare refill and new purchase prices side by side before you order.',                    color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40' },
-                                { icon: CreditCard, title: 'Secure Payments',       desc: 'Pay via GCash, Maya, Card, or Cash on Delivery — whichever works for you.',               color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
-                                { icon: Truck,   title: 'Delivery Tracking',        desc: 'Track your order every step of the way with live status updates.',                         color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40' },
-                                { icon: Shield,  title: 'Photo Proof Delivery',     desc: 'Riders submit photo proof at each step so you always know your order is safe.',            color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40' },
-                                { icon: Package, title: 'Order History',            desc: 'View all past orders, invoices, and payment records from your personal dashboard.',        color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/40' },
+                                { icon: Store,   title: 'Multiple Distributors',   desc: 'Browse from verified LPG distributors across Cavite in one place.',                       color: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/40' },
+                                { icon: Search,  title: 'Compare Prices',           desc: 'Compare refill and new purchase prices side by side before you order.',                    color: 'text-indigo-600 bg-indigo-50 dark:text-indigo-400 dark:bg-indigo-950/40' },
+                                { icon: CreditCard, title: 'Secure Payments',       desc: 'Pay via GCash, Maya, Card, or Cash on Delivery — whichever works for you.',               color: 'text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40' },
+                                { icon: Truck,   title: 'Delivery Tracking',        desc: 'Track your order every step of the way with live status updates.',                         color: 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-950/40' },
+                                { icon: Shield,  title: 'Photo Proof Delivery',     desc: 'Riders submit photo proof at each step so you always know your order is safe.',            color: 'text-purple-600 bg-purple-50 dark:text-purple-400 dark:bg-purple-950/40' },
+                                { icon: Package, title: 'Order History',            desc: 'View all past orders, invoices, and payment records from your personal dashboard.',        color: 'text-cyan-600 bg-cyan-50 dark:text-cyan-400 dark:bg-cyan-950/40' },
                             ].map(({ icon: Icon, title, desc, color }, i) => (
                                 <Reveal key={title} delay={i * 80}>
                                     <div className="glass-card-light group rounded-2xl p-6 transition-all duration-300 hover:shadow-md hover:-translate-y-1">
@@ -566,7 +571,7 @@ export default function Landing({ products, stats, plans }: Props) {
                 <section className="bg-muted py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
-                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Platform</span>
+                            <span className="text-sm font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400">Platform</span>
                             <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">Built for the Whole Marketplace</h2>
                             <p className="mt-3 text-muted-foreground max-w-lg mx-auto">
                                 A complete platform for buyers, sellers, and platform administrators

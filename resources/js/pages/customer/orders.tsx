@@ -292,13 +292,13 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                 <td className="px-4 py-3">
                                                     <Link
                                                         href={`/customer/orders/${order.id}`}
-                                                        className="font-mono text-blue-600 hover:underline text-xs font-semibold"
+                                                        className="whitespace-nowrap font-mono text-blue-600 hover:underline text-xs font-semibold"
                                                     >
                                                         {order.order_number}
                                                     </Link>
                                                     <SeenPill flags={seen.get(order.id)} className="ml-1.5" />
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-foreground/80 font-medium">{order.store_name}</td>
+                                                <td className="min-w-32 px-4 py-3 text-xs text-foreground/80 font-medium">{order.store_name}</td>
                                                 <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(order.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <p className="text-xs text-muted-foreground">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
@@ -342,7 +342,8 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <div className="flex items-center justify-end gap-1">
+                                                    {/* K10: the buttons wrap (two lines) instead of widening the table past its card */}
+                                                    <div className="flex flex-wrap items-center justify-end gap-1">
                                                         <Link href={`/customer/orders/${order.id}`}>
                                                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
                                                                 View

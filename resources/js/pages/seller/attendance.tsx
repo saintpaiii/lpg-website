@@ -197,9 +197,10 @@ function ClockInButton({ row, date, vehicles = [] }: { row: AttendanceRow; date:
     // Riders clock in with a vehicle (held until clock-out)
     if (row.sub_role === 'rider') {
         return (
-            <span className="inline-flex items-center gap-1">
+            // K10: a long vehicle label never widens the table — the select is capped (full text in the list), the row wraps
+            <span className="inline-flex max-w-full flex-wrap items-center justify-end gap-1">
                 <select value={data.vehicle_id} onChange={(e) => setData('vehicle_id', e.target.value)}
-                    className="h-7 rounded-md border border-input bg-background px-1.5 text-xs" aria-label="Vehicle">
+                    className="h-7 w-44 max-w-full min-w-0 truncate rounded-md border border-input bg-background px-1.5 text-xs" aria-label="Vehicle">
                     <option value="">Vehicle…</option>
                     {vehicles.map((v) => (
                         <option key={v.id} value={v.id} disabled={!!v.in_use_by}>

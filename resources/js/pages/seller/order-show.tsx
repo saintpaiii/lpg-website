@@ -350,7 +350,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                             <CardTitle className="text-base">Order Items</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2 font-medium text-muted-foreground">Product</th>
@@ -662,7 +662,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         <p className="text-sm text-muted-foreground text-center py-4">No riders available. Add a rider in Staff Management.</p>
                     ) : (
                         <Select value={selectedRider} onValueChange={setSelectedRider}>
-                            <SelectTrigger><SelectValue placeholder="Select rider…" /></SelectTrigger>
+                            <SelectTrigger className="w-full"><SelectValue placeholder="Select rider…" /></SelectTrigger>
                             <SelectContent>
                                 {riders.map((r) => (
                                     <SelectItem key={r.id} value={String(r.id)} disabled={riderOptionDisabled(r, order.load ?? null)}>
