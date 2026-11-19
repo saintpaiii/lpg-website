@@ -42,6 +42,8 @@ export function StoreVisibilityBanner() {
     if (reasons.length === 0) return null;
 
     const isOwner = auth.user?.role === 'seller';
+    // K9: a Branch Manager adds riders and vehicles in their branch too (plans stay with the owner)
+    const canFix = isOwner || !!auth.is_branch_manager;
     const full = reasons.some((r) => r.code === 'no_rider') && storeVisibility.staff_full;
 
     return (
@@ -51,7 +53,7 @@ export function StoreVisibilityBanner() {
                 <span>
                     <strong>Customers can only PICK UP from your store</strong> until you add an approved rider and a delivery vehicle.
                     {full && ' Your staff limit is full — deactivate someone or upgrade your plan.'}
-                    {!isOwner && ' Ask your store owner to fix this.'}
+                    {!canFix && ' Ask your store owner to fix this.'}
                 </span>
             </p>
             <ul className="mt-2 space-y-1.5 pl-6">
@@ -60,7 +62,7 @@ export function StoreVisibilityBanner() {
                     return (
                         <li key={r.code} className="flex flex-wrap items-center gap-2">
                             <span>• {r.text}</span>
-                            {isOwner && (
+                            {canFix && !(fix.href === '/seller/plan' && !isOwner) && (
                                 <Link href={fix.href} className="rounded-md bg-amber-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-amber-700">
                                     {fix.label}
                                 </Link>

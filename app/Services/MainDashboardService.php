@@ -14,10 +14,12 @@ use Illuminate\Support\Facades\DB;
  * charts and rule-based DSS notes. Every number is ONE grouped SQL query over the owner's store ids (GROUP BY store_id),
  * never per store. Cached per owner for 5 minutes (the key changes with a new order / stock move).
  *
- *  sales          = Σ total_amount of DELIVERED + PAID orders created in the period (same as the Revenue page)
+ *  sales          = RevenueService (K9: what customers paid — items + delivery fee — for DELIVERED + PAID orders,
+ *                   by delivery date): the same number as the seller Dashboard, Revenue, Reports and the receipts
  *  cancel rate    = cancelled ÷ all orders created in the period
  *  delivery time  = average minutes from assigned to delivered (deliveries delivered in the period)
- *  stock value    = Σ usable filled stock × cost price (expired batches never count)
+ *  stock value    = Σ usable filled stock × unit cost (K9: the product's cost price, else the latest received PO
+ *                   unit cost, else the selling price — those are counted and labelled; expired batches never count)
  *  low stock      = active products whose usable stock ≤ their reorder level
  */
 class MainDashboardService
@@ -84,15 +86,14 @@ class MainDashboardService
         // 1. Orders by store + status (period)
         $byStatus = DB::table('orders')->whereIn('store_id', $ids)->whereNull('deleted_at')->whereBetween('created_at', [$f, $t])
             ->groupBy('store_id', 'status')->selectRaw('store_id, status, COUNT(*) AS n')->get();
-        // 2. Sales: delivered + paid — this period and the previous one (one query)
-        $sales = DB::table('orders')->whereIn('store_id', $ids)->whereNull('deleted_at')->where('status', 'delivered')->where('payment_status', 'paid')
-            ->whereBetween('created_at', [$pf, $t])->groupBy('store_id')
-            ->selectRaw('store_id, SUM(CASE WHEN created_at >= ? THEN total_amount ELSE 0 END) AS cur, SUM(CASE WHEN created_at < ? THEN total_amount ELSE 0 END) AS prev,
-                SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) AS cur_n', [$f, $f, $f])->get()->keyBy('store_id');
+        // 2. Sales (K9: RevenueService — items + delivery fee, delivered + paid, by delivery date): this period and the previous one
+        $salesCur = RevenueService::byStore($ids, $from, $to);
+        $salesPrev = RevenueService::byStore($ids, CarbonImmutable::parse($pf), CarbonImmutable::parse($pt));
         // 3. Daily sales + orders per store (charts)
+        $salesByDay = RevenueService::byDay($ids, $from, $to);
         $daily = DB::table('orders')->whereIn('store_id', $ids)->whereNull('deleted_at')->whereBetween('created_at', [$f, $t])
             ->groupBy('store_id', DB::raw('DATE(created_at)'))
-            ->selectRaw("store_id, DATE(created_at) AS d, COUNT(*) AS n, SUM(CASE WHEN status = 'delivered' AND payment_status = 'paid' THEN total_amount ELSE 0 END) AS s")->get();
+            ->selectRaw('store_id, DATE(created_at) AS d, COUNT(*) AS n')->get();
         // 4. Delivery time (assigned → delivered)
         $deliv = DB::table('deliveries')->whereIn('store_id', $ids)->whereNull('deleted_at')->where('status', 'delivered')
             ->whereNotNull('assigned_at')->whereBetween('delivered_at', [$f, $t])->groupBy('store_id')
@@ -120,10 +121,9 @@ class MainDashboardService
             $st = $byStatus->where('store_id', $s->id);
             $orders = (int) $st->sum('n');
             $cancelled = (int) ($st->firstWhere('status', 'cancelled')->n ?? 0);
-            $sale = $sales->get($s->id);
-            $cur = (float) ($sale->cur ?? 0);
-            $prev = (float) ($sale->prev ?? 0);
-            $paidOrders = (int) ($sale->cur_n ?? 0);
+            $cur = (float) ($salesCur[$s->id]['sales'] ?? 0);
+            $prev = (float) ($salesPrev[$s->id]['sales'] ?? 0);
+            $paidOrders = (int) ($salesCur[$s->id]['orders'] ?? 0);
             $stk = $stock->where('store_id', $s->id);
             $low = $stk->filter(fn ($r) => $r->is_active && $r->usable <= $r->reorder_level)->count();
             $rows[] = [
@@ -132,6 +132,7 @@ class MainDashboardService
                 'short'         => $s->isBranch() ? $s->branch_name : 'Main',
                 'is_main'       => ! $s->isBranch(),
                 'sales'         => round($cur, 2),
+                'delivery_fees' => (float) ($salesCur[$s->id]['delivery_fees'] ?? 0),
                 'prev_sales'    => round($prev, 2),
                 'growth'        => $prev > 0 ? round(($cur - $prev) / $prev * 100, 1) : null,
                 'orders'        => $orders,
@@ -145,7 +146,9 @@ class MainDashboardService
                 'refunds'       => (int) ($refunds[$s->id]->n ?? 0),
                 'refund_amount' => round((float) ($refunds[$s->id]->a ?? 0), 2),
                 'rating'        => isset($ratings[$s->id]) ? round((float) $ratings[$s->id]->r, 1) : null,
-                'stock_value'   => round((float) $stk->sum(fn ($r) => $r->usable * (float) $r->cost_price), 2),
+                'stock_value'   => round((float) $stk->sum(fn ($r) => $r->usable * $r->unit_cost), 2),
+                // K9: products with stock but no known cost (valued at the selling price)
+                'no_cost'       => $stk->filter(fn ($r) => $r->usable > 0 && $r->cost_source === 'selling')->count(),
                 'low_stock'     => $low,
                 'expiring'      => (int) ($expiring[$s->id] ?? 0),
                 'on_duty'       => (int) ($onDuty[$s->id] ?? 0),
@@ -161,6 +164,7 @@ class MainDashboardService
         $allDeliv = $deliv->sum('n');
         $totals = [
             'sales'        => round($sum('sales'), 2),
+            'delivery_fees'=> round($sum('delivery_fees'), 2),
             'orders'       => $sum('orders'),
             'by_status'    => $byStatus->groupBy('status')->map(fn ($g) => (int) $g->sum('n'))->all(),
             'delivered'    => $sum('delivered'),
@@ -171,6 +175,7 @@ class MainDashboardService
             'expiring'     => $sum('expiring'),
             'on_duty'      => $sum('on_duty'),
             'stock_value'  => round($sum('stock_value'), 2),
+            'no_cost'      => $sum('no_cost'),
         ];
 
         // Charts: one row per day, one key per store
@@ -188,9 +193,15 @@ class MainDashboardService
         }
         foreach ($daily as $r) {
             $k = substr((string) $r->d, 0, 10);
-            if (isset($sales[$k])) {
-                $sales[$k]["s{$r->store_id}"] = round((float) $r->s, 2);
+            if (isset($orders[$k])) {
                 $orders[$k]["s{$r->store_id}"] = (int) $r->n;
+            }
+        }
+        foreach ($salesByDay as $k => $perStore) {
+            foreach ($perStore as $sid => $v) {
+                if (isset($sales[$k])) {
+                    $sales[$k]["s{$sid}"] = $v;
+                }
             }
         }
 
@@ -212,17 +223,39 @@ class MainDashboardService
         $rows = DB::table('products')->join('inventories', 'inventories.product_id', '=', 'products.id')
             ->whereIn('products.store_id', $ids)->whereNull('products.deleted_at')->whereNull('inventories.deleted_at')
             ->select('products.id', 'products.store_id', 'products.name', 'products.product_type', 'products.weight_kg', 'products.brand',
-                'products.cost_price', 'products.is_active', 'inventories.quantity', 'inventories.reorder_level')->get();
+                'products.cost_price', 'products.purchase_price', 'products.selling_price', 'products.is_active', 'inventories.quantity', 'inventories.reorder_level')->get();
         $expired = DB::table('cylinder_batches')->whereIn('store_id', $ids)->where('quantity_remaining', '>', 0)->whereNotNull('requalification_due_on')
             ->where('requalification_due_on', '<', now()->toDateString())->groupBy('product_id')->selectRaw('product_id, SUM(quantity_remaining) AS n')->pluck('n', 'product_id');
 
-        return $rows->map(function ($r) use ($expired) {
+        $poCost = static::latestPoCosts($rows->pluck('id')->all());
+
+        return $rows->map(function ($r) use ($expired, $poCost) {
             $r->usable = max(0, (int) $r->quantity - (int) ($expired[$r->id] ?? 0));
+            [$r->unit_cost, $r->cost_source] = match (true) {
+                // An LPG cost equal to its new-purchase price is the old default (the selling price), not a real cost
+                (float) $r->cost_price > 0 && ! ($r->product_type !== 'accessory' && (float) $r->cost_price === (float) $r->purchase_price) => [(float) $r->cost_price, 'cost'],
+                isset($poCost[$r->id])     => [(float) $poCost[$r->id], 'po'],
+                default                    => [(float) ($r->purchase_price ?: $r->selling_price), 'selling'],
+            };
             $r->reorder_level = (int) $r->reorder_level;
             $r->is_active = (bool) $r->is_active;
 
             return $r;
         });
+    }
+
+    /** K9: the unit cost of the latest RECEIVED purchase order line per product (one query). */
+    public static function latestPoCosts(array $productIds): array
+    {
+        if (! $productIds) {
+            return [];
+        }
+        $latest = DB::table('purchase_order_items')->join('purchase_orders', 'purchase_orders.id', '=', 'purchase_order_items.purchase_order_id')
+            ->whereIn('purchase_order_items.product_id', $productIds)->where('purchase_order_items.quantity_received', '>', 0)
+            ->groupBy('purchase_order_items.product_id')->selectRaw('purchase_order_items.product_id AS pid, MAX(purchase_order_items.id) AS id');
+
+        return DB::table('purchase_order_items')->joinSub($latest, 'l', 'l.id', '=', 'purchase_order_items.id')
+            ->pluck('purchase_order_items.unit_cost', 'l.pid')->map(fn ($v) => (float) $v)->all();
     }
 
     /**

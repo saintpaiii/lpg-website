@@ -110,16 +110,82 @@ class StoreContext
      */
     public static function applyRequested(?User $user, Request $request): void
     {
-        if (! $user || $user->role !== 'seller' || ! $request->hasSession() || ($wanted = (int) $request->query('store')) <= 0) {
+        if (! $user || $user->role !== 'seller' || ! $request->hasSession()) {
             return;
         }
-        if ((int) $request->session()->get(self::SESSION_KEY) === $wanted) {
+        // K9: …or the URL is about a record of another of the owner's stores (bookmark, email, notification, a main
+        // dashboard list) → work in THAT store ("Switched to Imus Branch"). Staff never switch (they keep the 403).
+        $wanted = (int) $request->query('store') ?: static::recordStoreId($request);
+        if (! $wanted) {
+            return;
+        }
+        $active = static::for($user, $request);
+        if ($active && (int) $active->id === $wanted) {
             return;
         }
         $target = Store::find($wanted);
-        if ($target) {
-            static::switchTo($user, $target, $request);
+        if ($target && (int) $target->user_id === (int) $user->id && static::switchTo($user, $target, $request)) {
+            $request->session()->now('info', "Switched to {$target->store_name}");
         }
+    }
+
+    /**
+     * K9: the store of the record a seller URL is about — the route's bound models (orders, invoices, receipts,
+     * deliveries, payroll, purchase orders, suppliers, supplier returns, products, staff, vehicles, refunds, customer
+     * reports, batches …) or ?c= (a conversation) / ?batches= (a product). Null when the URL names no store record.
+     */
+    public static function recordStoreId(Request $request): ?int
+    {
+        $route = $request->route();
+        foreach ($route ? $route->parameters() : [] as $name => $value) {
+            $model = $value instanceof \Illuminate\Database\Eloquent\Model ? $value : static::resolveParam((string) $name, $value);
+            if (! $model) {
+                continue;
+            }
+            $id = match (true) {
+                $model instanceof User => $model->role === 'seller_staff' ? $model->store_id : null,
+                $model instanceof \App\Models\UserReport => $model->reported_store_id ?? null,
+                $model instanceof Store => null,
+                default => $model->getAttribute('store_id'),
+            };
+            if ($id) {
+                return (int) $id;
+            }
+        }
+        if (($c = (int) $request->query('c')) > 0) {
+            return ($id = \App\Models\Conversation::whereKey($c)->value('store_id')) ? (int) $id : null;
+        }
+        if (($p = (int) $request->query('batches')) > 0) {
+            return ($id = \App\Models\Product::withTrashed()->whereKey($p)->value('store_id')) ? (int) $id : null;
+        }
+
+        return null;
+    }
+
+    /** A route parameter that isn't bound yet (middleware order) → its record, for the usual seller parameter names. */
+    private static function resolveParam(string $name, mixed $value): ?\Illuminate\Database\Eloquent\Model
+    {
+        if (! is_numeric($value)) {
+            return null;
+        }
+        $class = [
+            'order' => \App\Models\Order::class, 'invoice' => \App\Models\Invoice::class, 'receipt' => \App\Models\PaymentReceipt::class,
+            'delivery' => \App\Models\Delivery::class, 'payroll' => \App\Models\Payroll::class, 'purchaseOrder' => \App\Models\PurchaseOrder::class,
+            'supplier' => \App\Models\Supplier::class, 'supplierReturn' => \App\Models\SupplierReturn::class, 'product' => \App\Models\Product::class,
+            'user' => User::class, 'vehicle' => \App\Models\Vehicle::class, 'refund' => \App\Models\RefundRequest::class,
+            'refundRequest' => \App\Models\RefundRequest::class, 'userReport' => \App\Models\UserReport::class,
+            'batch' => \App\Models\CylinderBatch::class, 'conversation' => \App\Models\Conversation::class,
+            'incident' => \App\Models\CylinderIncident::class, 'document' => \App\Models\StaffDocument::class,
+        ][$name] ?? null;
+        if (! $class) {
+            return null;
+        }
+        $q = $class::query();
+        if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($class), true)) {
+            $q->withTrashed();
+        }
+
+        return $q->find((int) $value);
     }
 
     /** Does the owner have at least one branch (any status)? */

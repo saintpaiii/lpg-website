@@ -59,7 +59,7 @@ class BranchController extends Controller
         $data = $request->validate(BranchService::rules($main), BranchService::messages());
         $branch = BranchService::create($main, $owner, $data, $request);
 
-        return redirect('/seller/branches')->with('success', "{$branch->branch_name} was sent for review. We'll notify you when it is approved.");
+        return redirect('/seller/branches')->with('success', "{$branch->branch_name} sent for review. We'll notify you when it's approved.");
     }
 
     /** POST seller/switch-store {store_id} — the store switcher (owner only). 0 / the main store = back to the main store. */

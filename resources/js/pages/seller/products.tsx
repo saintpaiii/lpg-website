@@ -534,6 +534,15 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                     onChange={(e) => setData('purchase_price', e.target.value)} placeholder="0.00" />
                                 {errors.purchase_price && <p className="text-xs text-red-500">{errors.purchase_price}</p>}
                             </div>
+                            {/* K9: optional cost for LPG (stock value at cost; receiving a purchase order updates it) */}
+                            {!isAccessory && (
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="cost_price_lpg">Cost price (₱) <span className="text-xs font-normal text-muted-foreground">optional</span></Label>
+                                <Input id="cost_price_lpg" type="number" min="0" step="0.01" value={data.cost_price} onChange={(e) => setData('cost_price', e.target.value)} placeholder="What you pay the supplier per tank" />
+                                <p className="text-xs text-muted-foreground">Updated automatically when you receive a purchase order.</p>
+                                {errors.cost_price && <p className="text-xs text-red-500">{errors.cost_price}</p>}
+                            </div>
+                            )}
                         </div>
 
                         {/* J7 E3: auto-reorder drafts skip this product */}

@@ -53,20 +53,26 @@ class ReportsController extends Controller
         ]);
     }
 
-    /** Orders (not cancelled) and revenue per day. */
+    /**
+     * Per day: orders placed (not cancelled, by order date) and SALES — K9: RevenueService (delivered + paid, items +
+     * delivery fee, by delivery date), the same number as the Dashboard, Revenue and the Main dashboard.
+     */
     private function dailyRows(int $storeId, Carbon $from, Carbon $to)
     {
-        return Order::select(
-                DB::raw('DATE(created_at) as date'),
-                DB::raw('COUNT(*) as orders_count'),
-                DB::raw('SUM(total_amount) as gross_revenue')
-            )
+        $orders = Order::select(DB::raw('DATE(created_at) as date'), DB::raw('COUNT(*) as orders_count'))
             ->where('store_id', $storeId)
             ->whereNotIn('status', ['cancelled'])
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('date')
-            ->orderBy('date')
-            ->get();
+            ->pluck('orders_count', 'date');
+        $sales = \App\Services\RevenueService::byDay($storeId, $from, $to);
+        $dates = collect(array_keys($sales))->merge($orders->keys()->map(fn ($d) => substr((string) $d, 0, 10)))->unique()->sort()->values();
+
+        return $dates->map(fn ($d) => (object) [
+            'date'          => $d,
+            'orders_count'  => (int) ($orders[$d] ?? 0),
+            'gross_revenue' => (float) ($sales[$d][$storeId] ?? 0),
+        ]);
     }
 
     public function export(Request $request)

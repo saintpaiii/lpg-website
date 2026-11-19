@@ -396,7 +396,7 @@ class Store extends Model
         return $this->isBranch() ? 'Branch of ' . $this->mainStore()->store_name : null;
     }
 
-    public function scopeMainStores(IlluminateDatabaseEloquentBuilder $query): IlluminateDatabaseEloquentBuilder
+    public function scopeMainStores(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->whereNull('stores.parent_store_id');
     }

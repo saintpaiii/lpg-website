@@ -23,26 +23,20 @@ class DashboardController extends Controller
         $totalOrders   = $store->orders()->count();
         $pendingOrders = $store->orders()->where('status', 'pending')->count();
 
-        // Sales this month (delivered orders) — the store keeps the full amount
-        $deliveredThisMonth = $store->orders()
-            ->where('status', 'delivered')
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year);
-        $revenueThisMonth   = (float) (clone $deliveredThisMonth)->sum('total_amount');
-        $deliveredCount     = (clone $deliveredThisMonth)->count();
+        // K9: sales = what customers paid (items + delivery fee) for delivered + paid orders — RevenueService, the
+        // same number as Revenue, Reports, the receipts and the Main dashboard
+        $month              = \App\Services\RevenueService::summary($store->id, now()->startOfMonth(), now()->endOfMonth());
+        $revenueThisMonth   = $month['sales'];
+        $deliveredCount     = $month['orders'];
         $averageOrderValue  = $deliveredCount > 0 ? round($revenueThisMonth / $deliveredCount, 2) : 0;
 
-        $revenueAllTime = (float) $store->orders()
-            ->where('status', 'delivered')
-            ->sum('total_amount');
+        $revenueAllTime = \App\Services\RevenueService::salesFor($store->id);
+        $byDay = \App\Services\RevenueService::byDay($store->id, Carbon::today()->subDays(29), Carbon::today()->endOfDay());
 
         // ── Daily orders + revenue — last 30 days ─────────────────────────────
-        $ordersChart = collect(range(29, 0))->map(function (int $daysAgo) use ($store) {
+        $ordersChart = collect(range(29, 0))->map(function (int $daysAgo) use ($store, $byDay) {
             $date = Carbon::today()->subDays($daysAgo);
-            $revenue = (float) $store->orders()
-                ->where('status', 'delivered')
-                ->whereDate('created_at', $date)
-                ->sum('total_amount');
+            $revenue = (float) ($byDay[$date->toDateString()][$store->id] ?? 0);
             return [
                 'date'    => $date->format('M d'),
                 'short'   => $date->format('d'),
@@ -92,6 +86,8 @@ class DashboardController extends Controller
                 'totalOrders'         => $totalOrders,
                 'pendingOrders'       => $pendingOrders,
                 'revenueThisMonth'    => $revenueThisMonth,
+                // "of which delivery fees" (K9)
+                'deliveryFeesThisMonth' => $month['delivery_fees'],
                 'revenueAllTime'      => $revenueAllTime,
                 'deliveredThisMonth'  => $deliveredCount,
                 'averageOrderValue'   => $averageOrderValue,

@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
 type Row = {
-    id: number; name: string; short: string; is_main: boolean; sales: number; prev_sales: number; growth: number | null; orders: number;
+    id: number; name: string; short: string; is_main: boolean; sales: number; delivery_fees?: number; no_cost?: number; prev_sales: number; growth: number | null; orders: number;
     by_status: Record<string, number>; delivered: number; aov: number; cancel_rate: number; cancelled: number; delivery_min: number | null; deliveries: number;
     refunds: number; refund_amount: number; rating: number | null; stock_value: number; low_stock: number; expiring: number; on_duty: number; incoming: number;
     plan: string; plan_active: boolean; days_left: number; alerts: number;
@@ -20,7 +20,7 @@ type Note = { type: string; tone: 'good' | 'bad' | 'warn' | 'info'; store_id: nu
 type Dashboard = {
     stores: { id: number; name: string; short: string; is_main: boolean }[];
     rows: Row[];
-    totals: { sales: number; orders: number; by_status: Record<string, number>; delivered: number; delivery_min: number | null; refunds: number; refund_amount: number; low_stock: number; expiring: number; on_duty: number; stock_value: number } | null;
+    totals: { sales: number; delivery_fees?: number; no_cost?: number; orders: number; by_status: Record<string, number>; delivered: number; delivery_min: number | null; refunds: number; refund_amount: number; low_stock: number; expiring: number; on_duty: number; stock_value: number } | null;
     charts: { sales: Record<string, number | string>[]; orders: Record<string, number | string>[] };
     notes: Note[];
     suggestions: Suggestion[];
@@ -100,14 +100,15 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                 {/* Totals */}
                 {t && (
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4" data-testid="main-totals">
-                        <Stat icon={Wallet} label="Sales (paid, delivered)" value={peso(t.sales)} />
+                        <Stat icon={Wallet} label="Sales (delivered + paid)" value={peso(t.sales)} sub={`items + delivery fee · of which delivery fees ${peso(t.delivery_fees ?? 0)}`} />
                         <Stat icon={ShoppingCart} label="Orders" value={String(t.orders)} sub={`${t.delivered} delivered · ${t.by_status.cancelled ?? 0} cancelled · ${t.by_status.pending ?? 0} pending`} />
                         <Stat icon={Timer} label="Avg delivery time" value={t.delivery_min !== null ? `${t.delivery_min} min` : '—'} sub="assigned → delivered" />
                         <Stat icon={RefreshCcw} label="Refund requests" value={String(t.refunds)} sub={peso(t.refund_amount)} />
                         <Stat icon={PackageX} label="Low-stock items" value={String(t.low_stock)} />
                         <Stat icon={AlertTriangle} label="Cylinders expiring ≤ 30 days" value={String(t.expiring)} />
                         <Stat icon={UserCheck} label="Staff on duty now" value={String(t.on_duty)} />
-                        <Stat icon={Clock} label="Stock value (usable × cost)" value={peso(t.stock_value)} />
+                        <Stat icon={Clock} label="Stock value (at cost where known, else selling price)" value={peso(t.stock_value)}
+                            sub={t.no_cost ? `${t.no_cost} product${t.no_cost === 1 ? ' has' : 's have'} no cost yet — receive a purchase order or set a cost` : 'usable stock × unit cost'} />
                     </div>
                 )}
 
@@ -147,13 +148,13 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                                 <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
                                     <tr>
                                         {th('name', 'Store', false)}{th('sales', 'Sales')}{th('orders', 'Orders')}{th('aov', 'Avg order')}{th('cancel_rate', 'Cancel %')}
-                                        {th('delivery_min', 'Delivery')}{th('rating', 'Rating')}{th('stock_value', 'Stock value')}{th('days_left', 'Plan')}{th('alerts', 'Alerts')}
+                                        {th('delivery_min', 'Delivery')}{th('rating', 'Rating')}{th('stock_value', 'Stock value*')}{th('days_left', 'Plan')}{th('alerts', 'Alerts')}
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {rows.map((r) => (
                                         <tr key={r.id} className="cursor-pointer border-b last:border-0 hover:bg-muted/30" onClick={() => switchTo(r.id)} title={`Open ${r.name}`}>
-                                            <td className="px-3 py-2 font-medium">{r.short}{r.is_main && <span className="ml-1 text-[11px] text-blue-600">(main)</span>}</td>
+                                            <td className="px-3 py-2 font-medium">{r.is_main ? <>{r.name} <span className="text-[11px] text-blue-600">(main)</span></> : r.short}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{peso(r.sales)}{r.growth !== null && <span className={`block text-[11px] ${r.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.growth >= 0 ? '+' : ''}{r.growth}%</span>}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{r.orders}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{peso(r.aov)}</td>
@@ -168,6 +169,10 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                                 </tbody>
                             </table>
                         </div>
+                        <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+                            Sales = what customers paid (items + delivery fee) for delivered and paid orders — the same as Revenue and the receipts.
+                            {' '}*Stock value = usable stock × cost price (else the last purchase order cost, else the selling price).
+                        </p>
                     </CardContent>
                 </Card>
 
@@ -180,7 +185,7 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                             <YAxis tick={{ fontSize: 11 }} width={60} tickFormatter={(v) => `₱${Number(v).toLocaleString()}`} />
                             <Tooltip formatter={(v) => peso(Number(v))} />
                             <Legend wrapperStyle={{ fontSize: 12 }} />
-                            {dashboard.stores.map((s, i) => <Line key={s.id} type="monotone" dataKey={`s${s.id}`} name={s.short} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />)}
+                            {dashboard.stores.map((s, i) => <Line key={s.id} type="monotone" dataKey={`s${s.id}`} name={s.is_main ? `${s.name} (main)` : s.short} stroke={COLORS[i % COLORS.length]} strokeWidth={2} dot={false} />)}
                         </LineChart>
                     </ChartCard>
                     <ChartCard title="Orders per store">
@@ -190,7 +195,7 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                             <YAxis tick={{ fontSize: 11 }} width={36} allowDecimals={false} />
                             <Tooltip />
                             <Legend wrapperStyle={{ fontSize: 12 }} />
-                            {dashboard.stores.map((s, i) => <Bar key={s.id} dataKey={`s${s.id}`} name={s.short} fill={COLORS[i % COLORS.length]} />)}
+                            {dashboard.stores.map((s, i) => <Bar key={s.id} dataKey={`s${s.id}`} name={s.is_main ? `${s.name} (main)` : s.short} fill={COLORS[i % COLORS.length]} />)}
                         </BarChart>
                     </ChartCard>
                 </div>

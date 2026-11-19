@@ -157,7 +157,7 @@ class DemoSeeder extends Seeder
             'status'                  => 'approved',
             'subscription_plan'       => 'trial',
             'subscription_started_at' => $this->now,
-            'subscription_expires_at' => $this->now->copy()->addDays(30),
+            'subscription_expires_at' => $this->now->copy()->addDays(\App\Services\SubscriptionService::trialDays()),   // K9: config trial length
             'trial_used_at'           => $this->now,
             'is_featured'             => true,
             'approved_at'             => $this->now->copy()->subDays(58),
@@ -912,8 +912,8 @@ class DemoSeeder extends Seeder
             [
                 'store_id' => $store2Id, 'plan_key' => 'trial', 'amount' => 0, 'status' => 'paid', 'method' => 'trial',
                 'paymongo_checkout_id' => null, 'reference' => null, 'receipt_number' => "SUB-{$month}-003",
-                'period_start' => $this->now, 'period_end' => $this->now->copy()->addDays(30), 'days' => 30,
-                'paid_at' => $this->now, 'notes' => 'Free 30-day Premium trial',
+                'period_start' => $this->now, 'period_end' => $this->now->copy()->addDays(\App\Services\SubscriptionService::trialDays()), 'days' => \App\Services\SubscriptionService::trialDays(),
+                'paid_at' => $this->now, 'notes' => 'Free ' . \App\Services\SubscriptionService::trialDays() . '-day Premium trial',
                 'created_at' => $this->now, 'updated_at' => $this->now,
             ],
         ]);

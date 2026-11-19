@@ -23,6 +23,8 @@ type Stats = {
     totalOrders: number;
     pendingOrders: number;
     revenueThisMonth: number;
+    /** K9: part of revenueThisMonth that is delivery fees */
+    deliveryFeesThisMonth?: number;
     revenueAllTime: number;
     deliveredThisMonth: number;
     averageOrderValue: number;
@@ -162,7 +164,8 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Revenue (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(stats.revenueThisMonth)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{fmt(stats.revenueAllTime)} all time</p>
+                            <p className="text-xs text-muted-foreground mt-1">{fmt(stats.revenueAllTime)} all time{stats.deliveryFeesThisMonth ? ` · of which delivery fees ${fmt(stats.deliveryFeesThisMonth)}` : ''}</p>
+                            <p className="text-[11px] text-muted-foreground">Delivered and paid orders, items + delivery fee</p>
                         </CardContent>
                     </Card>
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-blue-500">

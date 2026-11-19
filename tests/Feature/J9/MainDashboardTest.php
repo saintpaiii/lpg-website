@@ -27,11 +27,12 @@ test('totals = the sum over the stores; one comparison row per store; all in a f
 
     $rows = collect($d['rows'])->keyBy('id');
     expect($rows)->toHaveCount(2)
-        ->and($rows[$this->main->id]['sales'])->toEqual(2100.0)->and($rows[$this->main->id]['orders'])->toBe(2)
-        ->and($rows[$this->branch->id]['sales'])->toEqual(2100.0)->and($rows[$this->branch->id]['orders'])->toBe(2)
+        // K9: sales = items + the ₱50 delivery fee of each delivered + paid order
+        ->and($rows[$this->main->id]['sales'])->toEqual(2200.0)->and($rows[$this->main->id]['orders'])->toBe(2)
+        ->and($rows[$this->branch->id]['sales'])->toEqual(2150.0)->and($rows[$this->branch->id]['orders'])->toBe(2)
         ->and($rows[$this->branch->id]['cancel_rate'])->toEqual(50.0)
         ->and($rows[$this->branch->id]['plan'])->toBe('Free trial')
-        ->and($d['totals']['sales'])->toEqual(4200.0)->and($d['totals']['orders'])->toBe(4)
+        ->and($d['totals']['sales'])->toEqual(4350.0)->and($d['totals']['delivery_fees'])->toEqual(150.0)->and($d['totals']['orders'])->toBe(4)
         ->and($d['totals']['delivered'])->toBe(3)->and($d['totals']['by_status']['cancelled'])->toBe(1)
         ->and($rows[$this->main->id]['stock_value'])->toEqual(30 * 600.0);
     expect($queries)->toBeLessThan(25);   // grouped SQL, not per store

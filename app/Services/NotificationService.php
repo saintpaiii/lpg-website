@@ -60,6 +60,22 @@ class NotificationService
     }
 
     /**
+     * K9: the owner + the store's staff who can open a MODULE (e.g. 'orders': cashiers, a Branch Manager…). Pure riders
+     * are left out — their rider app tells them about their own deliveries ("New delivery assigned").
+     */
+    public static function sendToStoreModule(int $storeId, string $module, string $type, string $title, string $message, array $data = []): void
+    {
+        $ids = Store::where('id', $storeId)->pluck('user_id')->map(fn ($v) => (int) $v)->all();
+        foreach (User::where('store_id', $storeId)->where('role', 'seller_staff')->where('is_active', true)->whereNull('deleted_at')->get() as $u) {
+            $riderOnly = $u->sub_role === 'rider' && ! StaffAccess::hasStorePortalRoles($u);
+            if (! $riderOnly && StaffAccess::levelFor($u, $module) !== null) {
+                $ids[] = (int) $u->id;
+            }
+        }
+        static::sendToMany($ids, $type, $title, $message, static::withStoreLink($storeId, $data));
+    }
+
+    /**
      * J9: "the store owner" of a store's event — the owner AND, for a branch, its Branch Manager. The link opens that
      * store for the owner (?store=ID, EnsureIsSeller switches) when the owner has more than one store.
      */

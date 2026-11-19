@@ -74,9 +74,11 @@ class DssController extends Controller
             ->values();
 
         // ── Sales Trend — last 30 days ────────────────────────────────────────
-        $chartData = collect(range(29, 0))->map(function ($daysAgo) use ($store, $now) {
+        // K9: sales = RevenueService (delivered + paid, items + delivery fee, by delivery date)
+        $salesByDay = \App\Services\RevenueService::byDay($store->id, $now->copy()->subDays(29)->startOfDay(), $now->copy()->endOfDay());
+        $chartData = collect(range(29, 0))->map(function ($daysAgo) use ($store, $now, $salesByDay) {
             $date        = $now->copy()->subDays($daysAgo);
-            $revenue     = (float) $store->orders()->whereDate('created_at', $date)->where('payment_status', 'paid')->sum('total_amount');
+            $revenue     = (float) ($salesByDay[$date->toDateString()][$store->id] ?? 0);
             $ordersCount = (int) $store->orders()->whereDate('created_at', $date)->count();
             return ['date' => $date->format('Y-m-d'), 'label' => $date->format('M d'), 'revenue' => $revenue, 'orders_count' => $ordersCount, 'trend' => 0.0];
         })->values()->toArray();
@@ -206,15 +208,9 @@ class DssController extends Controller
         $thirtyDaysAgo = $now->copy()->subDays(30);
 
         // ── Monthly revenue & orders ──────────────────────────────────────
-        $thisMoRevenue = (float) $store->orders()
-            ->where('created_at', '>=', $thisStart)
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('total_amount');
-
-        $lastMoRevenue = (float) $store->orders()
-            ->whereBetween('created_at', [$lastStart, $lastEnd])
-            ->whereNotIn('status', ['cancelled'])
-            ->sum('total_amount');
+        // K9: the one sales definition (RevenueService)
+        $thisMoRevenue = \App\Services\RevenueService::salesFor($store->id, $thisStart, $now->copy()->endOfDay());
+        $lastMoRevenue = \App\Services\RevenueService::salesFor($store->id, $lastStart, $lastEnd);
 
         $thisMoOrders = (int) $store->orders()
             ->where('created_at', '>=', $thisStart)->count();

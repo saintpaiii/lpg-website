@@ -920,8 +920,10 @@ class CheckoutController extends Controller
                 $ord       = $entry['order'];
                 $store     = $entry['store'];
                 $modeLabel = self::PAYMENT_MODE_LABELS[$entry['mode']];
-                NotificationService::sendToStore(
+                // K9: the owner, a Branch Manager and staff with the Orders module — not riders (they get "New delivery assigned")
+                NotificationService::sendToStoreModule(
                     $store->id,
+                    'orders',
                     'order_update',
                     'New Order Received',
                     "Order #{$ord->order_number} has been placed ({$modeLabel}). Total: ₱" . number_format($ord->grandTotal(), 2),

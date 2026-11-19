@@ -91,7 +91,7 @@ class StoreController extends Controller
 
         $stats = [
             'total_orders'    => $store->orders()->count(),
-            'total_revenue'   => (float) $store->orders()->where('payment_status', 'paid')->sum('total_amount'),
+            'total_revenue'   => \App\Services\RevenueService::salesFor($store->id),   // K9: the one sales definition
             'total_products'  => $store->products()->count(),
             'active_products' => $store->products()->where('is_active', true)->count(),
             'delivered_orders'=> $store->orders()->where('status', 'delivered')->count(),

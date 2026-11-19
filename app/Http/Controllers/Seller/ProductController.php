@@ -214,7 +214,9 @@ class ProductController extends Controller
                 'refill_price'   => $data['refill_price'] ?? $data['purchase_price'],
                 'purchase_price' => $data['purchase_price'],
                 'selling_price'  => $data['purchase_price'],
-                'cost_price'     => $data['cost_price'] ?? $data['purchase_price'],
+                // K9: an LPG product without a cost keeps 0 = "no cost yet" (never the selling price — that is not a cost);
+                // receiving a purchase order sets it (J7)
+                'cost_price'     => $data['cost_price'] ?? (($data['product_type'] ?? 'lpg') === 'accessory' ? $data['purchase_price'] : 0),
                 ...self::typeAttributes($data),
                 'is_active'      => $publish,
                 'image'          => null,   // set from the first photo by the media sync

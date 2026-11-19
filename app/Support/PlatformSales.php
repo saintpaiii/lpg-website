@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Platform sales (GMV): what customers paid stores for delivered orders — items + delivery fee.
  * A sale is dated by delivered_at (created_at for old orders without one).
+ * K9: the same definition as the stores' own sales (RevenueService): delivered AND paid orders.
  */
 class PlatformSales
 {
@@ -19,7 +20,7 @@ class PlatformSales
     public static function query(?CarbonInterface $from = null, ?CarbonInterface $to = null): Builder
     {
         return Order::query()
-            ->where('orders.status', 'delivered')
+            ->where('orders.status', 'delivered')->where('orders.payment_status', 'paid')   // K9: = RevenueService
             ->when($from, fn ($q) => $q->where(DB::raw(self::SALE_DATE), '>=', $from))
             ->when($to, fn ($q) => $q->where(DB::raw(self::SALE_DATE), '<=', $to));
     }

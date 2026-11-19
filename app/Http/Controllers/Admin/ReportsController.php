@@ -270,13 +270,12 @@ class ReportsController extends Controller
             ->values()
             ->all();
 
-        // Daily trend
-        $dailyTrend = Order::whereNull('deleted_at')
-            ->whereBetween('created_at', [$from, $to])
+        // Daily trend — K9: sales = PlatformSales (delivered + paid, items + delivery fee, by delivery date)
+        $dailyTrend = PlatformSales::query($from, $to)
             ->select(
-                DB::raw('DATE(created_at) as date'),
+                DB::raw('DATE(' . PlatformSales::SALE_DATE . ') as date'),
                 DB::raw('COUNT(*) as orders'),
-                DB::raw('SUM(total_amount) as gmv')
+                DB::raw('SUM(orders.total_amount + COALESCE(orders.shipping_fee, 0)) as gmv')
             )
             ->groupBy('date')
             ->orderBy('date')

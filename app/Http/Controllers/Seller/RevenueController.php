@@ -20,11 +20,12 @@ class RevenueController extends Controller
     use GeneratesExport;
 
     /** When a sale counts: delivered_at, or created_at for old orders without it */
-    private const SALE_DATE = 'COALESCE(orders.delivered_at, orders.created_at)';
+    private const SALE_DATE = \App\Services\RevenueService::SALE_DATE;
 
+    /** K9: delivered + paid orders — RevenueService (the one sales definition) */
     private function sales(int $storeId)
     {
-        return Order::where('store_id', $storeId)->where('status', 'delivered')->where('payment_status', 'paid');
+        return \App\Services\RevenueService::query($storeId);
     }
 
     private function filteredQuery(Request $request, int $storeId)
