@@ -459,10 +459,10 @@ class CheckoutController extends Controller
             }
 
             // Block checkout if any selected items are from the user's own store
-            $ownStoreId = Store::where('user_id', auth()->id())->value('id');
-            if ($ownStoreId) {
+            $ownStoreIds = \App\Support\StoreContext::ownedStoreIds(auth()->id());   // J9: main + branches
+            if ($ownStoreIds) {
                 foreach ($checkoutStores as $storeData) {
-                    if ((int) $storeData['store_id'] === (int) $ownStoreId) {
+                    if (in_array((int) $storeData['store_id'], $ownStoreIds, true)) {
                         return $error('You cannot place an order from your own store.');
                     }
                 }

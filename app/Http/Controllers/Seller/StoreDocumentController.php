@@ -118,6 +118,6 @@ class StoreDocumentController extends Controller
 
     private function ownStore(Request $request): Store
     {
-        return $request->attributes->get('seller_store') ?? Store::where('user_id', $request->user()->id)->firstOrFail();
+        return $request->attributes->get('seller_store') ?? \App\Support\StoreContext::for($request->user(), $request) ?? abort(404);
     }
 }

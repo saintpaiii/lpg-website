@@ -46,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'customer'   => EnsureIsCustomer::class,
             'seller'       => EnsureIsSeller::class,
             'seller_owner' => EnsureIsSellerOwner::class,
+            'store_manager' => \App\Http\Middleware\EnsureStoreManager::class,   // J9: owner or the branch's Branch Manager
             'guest'            => RedirectIfAuthenticated::class,
             'permission'       => RequirePermission::class,
             'password.changed' => EnsurePasswordChanged::class,

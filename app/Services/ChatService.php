@@ -147,7 +147,7 @@ class ChatService
     public static function storeIdFor(User $user): ?int
     {
         if ($user->role === 'seller') {
-            return Store::where('user_id', $user->id)->value('id');
+            return \App\Support\StoreContext::for($user)?->id;   // J9: the active store (inbox, unread count)
         }
         if ($user->role === 'seller_staff' && $user->sub_role !== 'rider') {
             return $user->store_id;
@@ -160,7 +160,9 @@ class ChatService
     {
         $own = static::storeIdFor($user);
         $storeId ??= $own;
-        if (! $storeId || $own !== $storeId) {
+        // J9: an owner may open the chats of ANY of their stores (main or branch); staff only their own store
+        $mine = $user->role === 'seller' ? in_array((int) $storeId, \App\Support\StoreContext::ownedStoreIds($user), true) : $own === $storeId;
+        if (! $storeId || ! $mine) {
             return false;
         }
 

@@ -42,8 +42,11 @@ import {
     FileCheck,
     FileText,
     IdCard,
+    Building2,
+    LayoutGrid,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
+import StoreSwitcher from '@/components/store-switcher';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import { usePermission } from '@/hooks/use-permission';
@@ -98,23 +101,27 @@ export function AppSidebar() {
     // ── Seller portal navigation ──────────────────────────────────────────────
     if (isSeller) {
         const isActualSeller = role === 'seller'; // store owner sees everything
+        // J9: the Branch Manager of a branch also manages its staff and vehicles
+        const canManageStore = isActualSeller || !!auth.is_branch_manager;
         // Riders in the store portal keep their own chat / reports in the rider app
         const notRider       = !riderUser;
         const selfClock      = !isActualSeller && !riderUser && auth.self_clock !== false;
 
         const sellerItems: NavItem[] = [
+            // J9: owners with branches — the main dashboard (all stores) and the Branches page
+            isActualSeller && !!auth.owned_stores?.length && { title: 'Main Dashboard', href: '/seller/main-dashboard', icon: LayoutGrid, ...(auth.can_main_dashboard ? {} : { lockedPlan: 'Premium', lockedFeature: 'branches' }) },
             (isActualSeller || can('dashboard.view'))   && { title: 'Dashboard',    href: '/seller/dashboard',  icon: LayoutDashboard },
             (isActualSeller || can('products.view'))    && { title: 'Products',     href: '/seller/products',   icon: Package         },
             (isActualSeller || can('orders.view'))      && { title: 'Orders',       href: '/seller/orders',     icon: ShoppingCart, ...badgeProps(sb['seller.orders']) },
             (isActualSeller || (can('messages.view') && notRider)) && { title: 'Messages',     href: '/seller/messages',   icon: MessageSquare, ...unreadBadge },
             (isActualSeller || can('deliveries.view'))  && { title: 'Deliveries',   href: '/seller/deliveries', icon: Truck, ...badgeProps(sb['seller.deliveries']) },
-            isActualSeller                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
+            canManageStore                              && { title: 'Vehicles',     href: '/seller/vehicles',   icon: Car             },
             (isActualSeller || can('invoices.view'))    && { title: 'Invoices',     href: '/seller/invoices',   icon: Receipt         },
             (isActualSeller || can('inventory.view'))   && { title: 'Inventory',    href: '/seller/inventory',  icon: Warehouse       },
             // J7 — Supply: suppliers + purchase orders (Inventory module)
             (isActualSeller || can('inventory.view'))   && { title: 'Suppliers',    href: '/seller/suppliers',  icon: Factory         },
             (isActualSeller || can('inventory.view'))   && { title: 'Purchase Orders', href: '/seller/purchase-orders', icon: PackagePlus },
-            isActualSeller                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog, ...badgeProps(sb['seller.staff']) },
+            canManageStore                              && { title: 'Staff',        href: '/seller/staff',      icon: UserCog, ...badgeProps(sb['seller.staff']) },
             (isActualSeller || can('attendance.view'))  && { title: 'Attendance',   href: '/seller/attendance',      icon: CalendarDays      },
             selfClock                                  && { title: 'My Attendance',href: '/seller/my-attendance',  icon: CalendarDays      },
             (!isActualSeller)                          && { title: 'My Documents', href: '/seller/my-documents',   icon: IdCard            },
@@ -133,6 +140,7 @@ export function AppSidebar() {
             isActualSeller                              && { title: 'Loyalty Program', href: '/seller/loyalty/settings', icon: Award, ...lock('loyalty') },
             (isActualSeller || can('loyalty_customers.view')) && { title: 'Customers',    href: '/seller/loyalty/customers', icon: Users, ...lock('loyalty') },
             (isActualSeller || can('settings.view'))    && { title: 'Settings',     href: '/seller/settings',   icon: Settings        },
+            isActualSeller                              && { title: 'Branches',     href: '/seller/branches', icon: Building2 },
             isActualSeller                              && { title: 'Store Documents', href: '/seller/documents', icon: FileText, ...badgeProps(sb['seller.store_documents']) },
             { title: 'Notifications', href: '/notifications', icon: Bell   },
             { title: 'Profile',       href: '/settings/profile', icon: User },
@@ -162,6 +170,8 @@ export function AppSidebar() {
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     </SidebarMenu>
+                    {/* J9: owners with branches switch the store they work in */}
+                    <StoreSwitcher />
                 </SidebarHeader>
 
                 <SidebarContent>

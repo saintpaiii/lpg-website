@@ -22,9 +22,8 @@ class ProductBrowseController extends Controller
     public function index(Request $request): Response
     {
         // Exclude own store's products (sellers should not buy from themselves)
-        $ownStoreId = $request->user()
-            ? Store::where('user_id', $request->user()->id)->value('id')
-            : null;
+        // J9: none of the owner's stores (main or branch)
+        $ownStoreIds = \App\Support\StoreContext::ownedStoreIds($request->user());
 
         $query = Product::with(['store.vehicles', 'store.deliveryRates', 'inventory', 'media' => fn ($q) => $q->select('id', 'product_id', 'type', 'path', 'sort_order')])
             ->withAvg('ratings', 'rating')
@@ -32,7 +31,7 @@ class ProductBrowseController extends Controller
             ->where('is_active', true)
             ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->whereNotNull('refill_price')
-            ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId));
+            ->when($ownStoreIds, fn ($q) => $q->whereNotIn('store_id', $ownStoreIds));
 
         // Search
         if ($search = $request->get('search')) {

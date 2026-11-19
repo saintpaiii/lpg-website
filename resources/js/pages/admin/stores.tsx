@@ -46,6 +46,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 type StoreRow = {
     id: number;
     store_name: string;
+    /** J9: a branch → its main store */
+    branch_of?: { id: number; name: string | null } | null;
     city: string;
     province: string;
     status: string;
@@ -68,6 +70,8 @@ type Props = {
     counts: Counts;
     tab: string;
     search: string;
+    /** J9: all / main stores / branches */
+    kind?: 'all' | 'main' | 'branches';
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,7 +93,7 @@ const TABS = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Stores({ stores, counts, tab, search }: Props) {
+export default function Stores({ stores, counts, tab, search, kind = 'all' }: Props) {
     // New / updated since the last visit (until the user leaves the page)
     const seen = useSeenRows(stores.data);
     const [searchVal, setSearchVal] = useState(search);
@@ -102,12 +106,12 @@ export default function Stores({ stores, counts, tab, search }: Props) {
     const suspendForm = useForm({ reason: '', notes: '' });
 
     function goTab(t: string) {
-        router.get('/admin/stores', { tab: t, search: searchVal }, { preserveState: true, replace: true });
+        router.get('/admin/stores', { tab: t, search: searchVal, kind }, { preserveState: true, replace: true });
     }
 
     function doSearch(e: React.FormEvent) {
         e.preventDefault();
-        router.get('/admin/stores', { tab, search: searchVal }, { preserveState: true, replace: true });
+        router.get('/admin/stores', { tab, search: searchVal, kind }, { preserveState: true, replace: true });
     }
 
     function approve(store: StoreRow) {
@@ -180,6 +184,13 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                             />
                         </div>
                         <Button type="submit" variant="secondary" size="sm">Search</Button>
+                        {/* J9: main stores / branches */}
+                        <select aria-label="Store kind" className="h-9 rounded-md border bg-background px-2 text-sm" value={kind}
+                            onChange={(e) => router.get('/admin/stores', { tab, search: searchVal, kind: e.target.value }, { preserveState: true, replace: true })}>
+                            <option value="all">All stores</option>
+                            <option value="main">Main stores</option>
+                            <option value="branches">Branches</option>
+                        </select>
                     </form>
                 </div>
 
@@ -244,6 +255,11 @@ export default function Stores({ stores, counts, tab, search }: Props) {
                                                             {store.store_name}
                                                         </Link>
                                                         <SeenPill flags={seen.get(store.id)} className="ml-1.5" />
+                                                        {store.branch_of && (
+                                                            <Link href={`/admin/stores/${store.branch_of.id}`} className="mt-0.5 block w-fit rounded bg-indigo-100 px-1.5 text-[11px] font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-tag">
+                                                                Branch of {store.branch_of.name}
+                                                            </Link>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>

@@ -53,6 +53,8 @@ import { ReasonPicker, ReasonTextPicker } from '@/components/reason-picker';
 type StoreDetail = {
     id: number;
     store_name: string;
+    /** J9: a branch → its main store */
+    branch_of?: { id: number; name: string | null } | null;
     description: string | null;
     address: string;
     city: string;
@@ -284,6 +286,7 @@ export default function StoreShow({
                             <div className="flex items-center gap-3">
                                 <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={40} />
                                 <h1 className="text-2xl font-bold tracking-tight">{store.store_name}</h1>
+                                {store.branch_of && <Link href={`/admin/stores/${store.branch_of.id}`} className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-of">Branch of {store.branch_of.name}</Link>}
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
                                     {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                 </span>

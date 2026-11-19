@@ -46,12 +46,11 @@ class EnsureIsSeller
             ]);
         }
 
-        // Resolve the store for this user
-        if ($isSeller) {
-            $store = Store::where('user_id', $user->id)->first();
-        } else {
-            $store = $user->store_id ? Store::find($user->store_id) : null;
-        }
+        // J9: an owner's link may name the store it is about (?store=ID, e.g. a branch's notification) → switch to it
+        \App\Support\StoreContext::applyRequested($user, $request);
+
+        // Resolve the store for this user — J9: StoreContext (owner: the active store, main by default; staff: their store)
+        $store = \App\Support\StoreContext::for($user, $request);
 
         // No store or not approved → redirect to pending page
         if (! $store || $store->status !== 'approved') {

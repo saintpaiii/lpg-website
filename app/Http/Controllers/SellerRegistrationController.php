@@ -59,7 +59,7 @@ class SellerRegistrationController extends Controller
     public function checkName(Request $request): \Illuminate\Http\JsonResponse
     {
         $name = mb_substr(trim((string) $request->query('name', '')), 0, 255);
-        $own  = $request->user() ? Store::where('user_id', $request->user()->id)->value('id') : null;
+        $own  = $request->user() ? \App\Support\StoreContext::mainIdFor($request->user()) : null;
 
         return response()->json(DuplicateStoreService::nameSummary($name, $own));
     }

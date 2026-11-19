@@ -17,6 +17,9 @@ class Store extends Model
 
     protected $fillable = [
         'user_id',
+        // J9: a branch = a store of the same owner whose parent_store_id is the MAIN store (main stores: NULL)
+        'parent_store_id',
+        'branch_name',
         // Tax & invoice (Settings → Tax & Invoice); invoice_next_number is only changed by InvoiceService
         'vat_status',
         'tin',
@@ -347,10 +350,78 @@ class Store extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    // ── J9: branches ──────────────────────────────────────────────────────────
+
+    /** The main store of a branch (null for a main store). */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Store::class, 'parent_store_id');
+    }
+
+    /** The branches of a main store. */
+    public function branches(): HasMany
+    {
+        return $this->hasMany(Store::class, 'parent_store_id');
+    }
+
+    public function isBranch(): bool
+    {
+        return $this->parent_store_id !== null;
+    }
+
+    /** Self for a main store, the parent for a branch. */
+    public function mainStore(): Store
+    {
+        return $this->isBranch() ? (Store::withTrashed()->find($this->parent_store_id) ?? $this) : $this;
+    }
+
+    /**
+     * "Bonifacio LPG Center — Imus Branch" for a branch, the store name otherwise. A branch's store_name column already
+     * holds this (kept in step by the saved hook below), so every page that shows store_name shows the branch name too.
+     */
+    public function displayName(): string
+    {
+        return (string) $this->store_name;
+    }
+
+    /** "Main name — Branch name". */
+    public static function branchDisplayName(string $mainName, string $branchName): string
+    {
+        return trim($mainName) . ' — ' . trim($branchName);
+    }
+
+    /** "Branch of Bonifacio LPG Center" (customer pages), null for a main store. */
+    public function branchOfLabel(): ?string
+    {
+        return $this->isBranch() ? 'Branch of ' . $this->mainStore()->store_name : null;
+    }
+
+    public function scopeMainStores(IlluminateDatabaseEloquentBuilder $query): IlluminateDatabaseEloquentBuilder
+    {
+        return $query->whereNull('stores.parent_store_id');
+    }
+
     protected static function booted(): void
     {
         // Every new store starts with the 4 starter staff roles (Cashier, Warehouse, Rider, HR)
         static::created(fn (Store $store) => \App\Services\StoreRoleService::seedStarters($store));
+
+        // J9: a branch's store_name is "Main — Branch"; renaming the main store or the branch keeps it in step
+        static::saving(function (Store $store) {
+            if ($store->parent_store_id && $store->branch_name && ($store->isDirty('branch_name') || $store->isDirty('parent_store_id') || ! $store->exists)) {
+                $main = Store::withTrashed()->whereKey($store->parent_store_id)->value('store_name');
+                if ($main) {
+                    $store->store_name = Store::branchDisplayName($main, $store->branch_name);
+                }
+            }
+        });
+        static::saved(function (Store $store) {
+            if (! $store->parent_store_id && $store->wasChanged('store_name')) {
+                foreach (Store::withTrashed()->where('parent_store_id', $store->id)->get() as $b) {
+                    $b->forceFill(['store_name' => Store::branchDisplayName($store->store_name, (string) $b->branch_name)])->saveQuietly();
+                }
+            }
+        });
 
         // Newly approved stores start with the default chat quick replies
         static::saved(function (Store $store) {

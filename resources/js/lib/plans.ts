@@ -35,6 +35,8 @@ export const FEATURE_INFO: Record<string, { label: string; plan: 'Pro' | 'Premiu
     custom_roles: { label: 'Custom staff roles', plan: 'Pro',     key: 'pro',     what: 'Create your own staff roles with the permissions you choose.' },
     dss:          { label: 'DSS insights',       plan: 'Premium', key: 'premium', what: 'Demand forecasts, restock suggestions and smart insights for your store.' },
     featured:     { label: 'Featured badge',     plan: 'Premium', key: 'premium', what: 'A Featured badge and top placement in Browse and Find a Store.' },
+    // J9: needs the MAIN store on a PAID Premium plan (the free trial doesn't include branches)
+    branches:     { label: 'Branches',           plan: 'Premium', key: 'premium', what: 'More outlets under one owner: a main dashboard comparing them and stock transfers between them (paid Premium on the main store; not in the free trial).' },
 };
 
 /** Open the upgrade dialog (mounted once in the seller layout). */

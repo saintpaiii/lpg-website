@@ -1,5 +1,6 @@
 import { Head, router, useForm } from '@inertiajs/react';
-import { Layers, Minus, PackageX, Plus, Search, Warehouse } from 'lucide-react';
+import { Layers, Lock, Minus, PackageX, Plus, Search, Truck, Warehouse } from 'lucide-react';
+import { NewTransferDialog, TransfersList, type TransferRow } from '@/components/stock-transfers';
 import { BatchesDialog, DamagedDialog, HeldCylindersCard, ReturnsCard, type Batch, type Incident, type ReturnRow } from '@/components/inventory-cylinders';
 import { useState } from 'react';
 import {
@@ -56,7 +57,7 @@ type Transaction = {
 type ProductOption = { id: number; name: string; brand: string };
 
 type Props = {
-    tab: 'overview' | 'transactions';
+    tab: 'overview' | 'transactions' | 'transfers';
     inventories?: { data: InventoryRow[]; current_page: number; last_page: number; total: number };
     transactions?: { data: Transaction[]; current_page: number; last_page: number; total: number };
     productList: ProductOption[];
@@ -66,6 +67,10 @@ type Props = {
     returns?: ReturnRow[];
     suppliers?: { id: number; name: string }[];
     reasons?: Record<string, string>;
+    /** J9: stock transfers in / out of this store */
+    transfers?: TransferRow[];
+    transferCan?: { send: boolean; reason: string | null };
+    storeId?: number;
 };
 
 type StockFormData = { quantity: string; notes: string; requalification_due_on: string; manufactured_on: string; batch_code: string };
@@ -81,9 +86,13 @@ const TX_COLORS: Record<string, string> = {
     damaged:    'text-red-700',
     expired:    'text-red-700',
     returned_to_supplier: 'text-purple-600',
+    transfer_out: 'text-violet-700',
+    transfer_in:  'text-violet-600',
 };
 
-export default function SellerInventory({ tab, inventories, transactions, productList, filters, incidents = [], returns = [], suppliers = [], reasons = {} }: Props) {
+export default function SellerInventory({ tab, inventories, transactions, productList, filters, incidents = [], returns = [], suppliers = [], reasons = {}, transfers = [], transferCan, storeId }: Props) {
+    // J9: New stock transfer dialog (Transfers tab)
+    const [newTransfer, setNewTransfer] = useState(false);
     // J7: batches drawer (also opened from an expiry notification: ?batches=<product id>) + damaged dialog
     const [batchesFor, setBatchesFor] = useState<InventoryRow | null>(() => inventories?.data.find((i) => String(i.product.id) === filters.batches) ?? null);
     const [damagedFor, setDamagedFor] = useState<InventoryRow | null>(null);
@@ -151,10 +160,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
 
                 {/* Tabs */}
                 <div className="flex gap-1 border-b">
-                    {['overview', 'transactions'].map((t) => (
+                    {['overview', 'transactions', 'transfers'].map((t) => (
                         <button key={t} onClick={() => goTab(t)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
-                            {t === 'overview' ? 'Stock Overview' : 'Transactions'}
+                            {t === 'overview' ? 'Stock Overview' : t === 'transactions' ? 'Transactions' : 'Transfers'}
                         </button>
                     ))}
                 </div>
@@ -260,6 +269,27 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                 {tab === 'overview' && <HeldCylindersCard incidents={incidents} suppliers={suppliers} />}
                 {tab === 'overview' && <ReturnsCard returns={returns} />}
 
+                {/* J9: stock transfers between the owner's stores */}
+                {tab === 'transfers' && (
+                    <Card>
+                        <CardContent className="p-0">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+                                <p className="text-sm text-muted-foreground">Stock sent to or received from the owner's other stores.</p>
+                                {transferCan?.send ? (
+                                    <Button size="sm" className="bg-blue-600 text-white hover:bg-blue-700" onClick={() => setNewTransfer(true)} data-testid="new-transfer">
+                                        <Truck className="mr-1.5 h-4 w-4" /> New transfer
+                                    </Button>
+                                ) : (
+                                    <Button size="sm" disabled title={transferCan?.reason ?? undefined}><Lock className="mr-1.5 h-4 w-4" /> New transfer</Button>
+                                )}
+                            </div>
+                            {!transferCan?.send && transferCan?.reason && <p className="border-b px-4 py-2 text-xs text-muted-foreground">{transferCan.reason}</p>}
+                            <TransfersList transfers={transfers} storeId={storeId} />
+                        </CardContent>
+                    </Card>
+                )}
+                {newTransfer && <NewTransferDialog open={newTransfer} onClose={() => setNewTransfer(false)} preset={{ from_store_id: storeId }} />}
+
                 {tab === 'transactions' && transactions && (
                     <Card>
                         <CardContent className="p-0">
@@ -275,7 +305,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                 <Select value={filters.type ?? 'all'} onValueChange={(v) => router.get('/seller/inventory', { tab: 'transactions', ...filters, type: v === 'all' ? undefined : v }, { preserveState: true, replace: true })}>
                                     <SelectTrigger className="w-36 h-8 text-xs"><SelectValue placeholder="All types" /></SelectTrigger>
                                     <SelectContent>
-                                        {['all', 'in', 'out', 'order', 'cancelled', 'adjustment', 'empty_in', 'empty_out', 'damaged', 'expired', 'returned_to_supplier'].map((t) => (
+                                        {['all', 'in', 'out', 'order', 'cancelled', 'adjustment', 'empty_in', 'empty_out', 'damaged', 'expired', 'returned_to_supplier', 'transfer_out', 'transfer_in'].map((t) => (
                                             <SelectItem key={t} value={t} className="text-xs capitalize">{t === 'all' ? 'All types' : t}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -305,7 +335,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     <span className={`text-xs font-medium capitalize ${TX_COLORS[tx.type] ?? 'text-gray-600'}`}>{tx.type.replace(/_/g, ' ')}</span>
                                                 </td>
                                                 <td className={`px-4 py-3 text-center font-bold ${TX_COLORS[tx.type] ?? ''}`}>
-                                                    {['out', 'order', 'empty_out', 'damaged', 'expired', 'returned_to_supplier'].includes(tx.type) ? `−${tx.quantity}` : `+${tx.quantity}`}
+                                                    {['out', 'order', 'empty_out', 'damaged', 'expired', 'returned_to_supplier', 'transfer_out'].includes(tx.type) ? `−${tx.quantity}` : `+${tx.quantity}`}
                                                 </td>
                                                 <td className="px-4 py-3 text-xs text-muted-foreground hidden md:table-cell">
                                                     {tx.reference && <span className="font-mono">{tx.reference}</span>}

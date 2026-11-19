@@ -146,7 +146,7 @@ class StoreDocumentController extends Controller
         StoreDocumentService::checkStore($store);   // lifts the hiding at once when nothing is expired any more
 
         $name = $this->name($submission);
-        NotificationService::send($store->user_id, 'system', 'Document approved', "Your {$name} was approved.", ['link' => '/seller/documents']);
+        NotificationService::sendToStoreOwner($store, 'system', 'Document approved', "Your {$name} was approved.", ['link' => '/seller/documents']);
 
         return back()->with('success', "{$name} approved for {$store->store_name}.");
     }
@@ -166,7 +166,7 @@ class StoreDocumentController extends Controller
         ]);
 
         $name = $this->name($submission);
-        NotificationService::send($submission->store->user_id, 'system', 'Document rejected',
+        NotificationService::sendToStoreOwner($submission->store, 'system', 'Document rejected',
             "Your {$name} was rejected: {$data['reason']}", ['link' => '/seller/documents']);
 
         return back()->with('success', "{$name} rejected.");

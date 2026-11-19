@@ -52,10 +52,10 @@ class HandleInertiaRequests extends Middleware
         // Resolve seller store for sidebar/layout context
         $store = null;
         if ($user && ($user->role === 'seller' || $user->role === 'seller_staff')) {
-            $store = $request->attributes->get('seller_store')
-                ?? ($user->role === 'seller'
-                    ? Store::where('user_id', $user->id)->select(self::STORE_COLUMNS)->first()
-                    : ($user->store_id ? Store::find($user->store_id, self::STORE_COLUMNS) : null));
+            // J9: shared props are built before the route middleware — apply a "?store=ID" switch here first
+            \App\Support\StoreContext::applyRequested($user, $request);
+            // J9: the ACTIVE store (StoreContext) — the owner's main store unless they switched to a branch
+            $store = $request->attributes->get('seller_store') ?? \App\Support\StoreContext::for($user, $request);
         }
 
         // Pending/rejected seller application — shown in customer portal for non-sellers
@@ -100,7 +100,20 @@ class HandleInertiaRequests extends Middleware
                     'documents_alert'      => \App\Support\StoreDocuments::alertFor($store),
                     // Stores without a pin: delivery fees fall back to the flat fee and staff cannot clock in
                     'has_location'         => $store->latitude !== null && $store->longitude !== null,
+                    // J9: a branch (display name already in store_name: "Main — Branch")
+                    'is_branch'            => $store->parent_store_id !== null,
+                    'branch_name'          => $store->branch_name,
                 ] : null,
+                // J9: the owner's stores for the store switcher (only when they have a branch) + main-dashboard access
+                'owned_stores'       => fn () => $user && $user->role === 'seller' && $store && \App\Support\StoreContext::hasBranches($user)
+                    ? \App\Support\StoreContext::approvedStores($user)->map(fn ($s) => [
+                        'id' => $s->id, 'name' => $s->store_name, 'short' => $s->branch_name ?: $s->store_name, 'is_main' => $s->parent_store_id === null,
+                    ])->values()->all()
+                    : null,
+                'can_main_dashboard' => fn () => $user && $user->role === 'seller' && $store
+                    && \App\Services\SubscriptionService::hasFeature($store->mainStore(), 'branches'),
+                // J9: the Branch Manager of a branch (Staff + Vehicles in the sidebar, like the owner)
+                'is_branch_manager'  => fn () => \App\Support\StoreContext::isBranchManager($user),
                 'seller_application' => $sellerApplication,
                 // A seller who can shop (applied through Start Selling) whose store is still under review / sent back:
                 // Customer Portal banner → /seller/pending (K2)
@@ -135,6 +148,8 @@ class HandleInertiaRequests extends Middleware
                 : null,
             // Plan comparison for the owner's "plan ends soon / ended" popup and the upgrade dialog (staff see it too)
             'planCatalog' => fn () => $store && in_array($user->role, ['seller', 'seller_staff'], true) ? \App\Services\SubscriptionService::publicPlans() : null,
+            // J9: length of the free trial (config plans.trial_days) — registration / landing / plan texts
+            'trial_days' => \App\Services\SubscriptionService::trialDays(),
             // Platform contact email (Admin → Settings → company_email); '' = hide the "contact us" lines (K2)
             'contact_email' => fn () => (string) \App\Models\Setting::get('company_email', ''),
             'sidebarOpen' =>! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

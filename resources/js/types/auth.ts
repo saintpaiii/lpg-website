@@ -39,7 +39,13 @@ export type SellerStore = {
     documents_alert?: { label: string; date: string; status: string; days_left: number } | null;
     /** The store is pinned on the map */
     has_location?: boolean;
+    /** J9: a branch (store_name is already "Main — Branch") */
+    is_branch?: boolean;
+    branch_name?: string | null;
 };
+
+/** J9: one of the owner's approved stores (store switcher) */
+export type OwnedStore = { id: number; name: string; short: string; is_main: boolean };
 
 export type SellerApplication = {
     status: 'pending' | 'rejected';
@@ -65,6 +71,12 @@ export type Auth = {
     store_portal_url?: string | null;
     /** Store staff who clock in themself (everyone except HR) */
     self_clock?: boolean;
+    /** J9: the owner's approved stores (only when they have a branch) */
+    owned_stores?: OwnedStore[] | null;
+    /** J9: the main store is on paid Premium (main dashboard / branches / transfers) */
+    can_main_dashboard?: boolean;
+    /** J9: the Branch Manager of this branch */
+    is_branch_manager?: boolean;
 };
 
 export type TwoFactorSetupData = {

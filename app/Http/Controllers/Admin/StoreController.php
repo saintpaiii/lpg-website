@@ -22,12 +22,15 @@ class StoreController extends Controller
     {
         $tab    = $request->get('tab', 'pending');
         $search = $request->get('search', '');
+        $kind   = in_array($request->get('kind'), ['main', 'branches'], true) ? $request->get('kind') : 'all';   // J9
 
         $query = Store::withTrashed()
-            ->with('owner')
+            ->with(['owner', 'parent:id,store_name'])
+            ->when($kind === 'main', fn ($q) => $q->whereNull('parent_store_id'))
+            ->when($kind === 'branches', fn ($q) => $q->whereNotNull('parent_store_id'))
             ->withExists('eligibleRiders')   // hidden from customers without a rider who can deliver
-            ->when($search, fn ($q) => $q->where('store_name', 'like', "%{$search}%")
-                ->orWhere('city', 'like', "%{$search}%"))
+            ->when($search, fn ($q) => $q->where(fn ($w) => $w->where('store_name', 'like', "%{$search}%")
+                ->orWhere('city', 'like', "%{$search}%")))
             ->latest();
 
         $stores = match ($tab) {
@@ -52,6 +55,8 @@ class StoreController extends Controller
                 'id'             => $s->id,
                 'seen'           => \App\Services\SectionVisitService::flagsFor($request, $s, newOnly: true),
                 'store_name'     => $s->store_name,
+                // J9: "Branch of …" tag
+                'branch_of'      => $s->parent_store_id ? ['id' => $s->parent_store_id, 'name' => $s->parent?->store_name] : null,
                 'city'           => $s->city,
                 'province'       => $s->province,
                 'status'         => $s->status,
@@ -68,6 +73,7 @@ class StoreController extends Controller
             'counts' => $counts,
             'tab'    => $tab,
             'search' => $search,
+            'kind'   => $kind,
         ]);
     }
 
@@ -140,6 +146,9 @@ class StoreController extends Controller
             'store' => [
                 'id'                     => $store->id,
                 'store_name'             => $store->store_name,
+                // J9: a branch — its main store (the inherited documents were reviewed there)
+                'branch_of'              => $store->parent_store_id ? ['id' => $store->parent_store_id,
+                    'name' => Store::withTrashed()->whereKey($store->parent_store_id)->value('store_name')] : null,
                 'description'            => $store->description,
                 'address'                => $store->address,
                 'city'                   => $store->city,
@@ -319,8 +328,16 @@ class StoreController extends Controller
                 'reviewed_at' => now(),
             ]);
 
-        // The one-time 30-day Premium trial (never a second time)
+        // The one-time free Premium trial (never a second time) — J9: a branch gets its OWN trial (it is its own store)
         \App\Services\SubscriptionService::startTrial($store->fresh());
+
+        if ($store->isBranch()) {
+            \App\Services\NotificationService::send((int) $store->user_id, 'system', 'Branch approved',
+                "{$store->store_name} was approved. Its free " . \App\Services\SubscriptionService::trialDays() . '-day Premium trial has started.',
+                ['link' => "/seller/branches"]);
+
+            return back()->with('success', "{$store->store_name} has been approved.");
+        }
 
         $this->welcomeSeller($store);
 
@@ -384,6 +401,9 @@ class StoreController extends Controller
         $documents = collect(StoreReviewService::documents($store))->keyBy('key');
         abort_unless($documents->has($key) || in_array($key, StoreDocuments::REVIEW_ITEMS, true), 404);
         $doc = $documents->get($key);
+        if ($doc['inherited'] ?? false) {
+            return back()->with('error', 'This document comes from the main store and is already accepted.');   // J9
+        }
 
         $accept = $request->input('decision') === 'accept';
         $data = $request->validate([

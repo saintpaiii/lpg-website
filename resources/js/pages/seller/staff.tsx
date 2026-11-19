@@ -227,8 +227,10 @@ function StaffFormDialog({
     // K7: no role is pre-selected (an owner adding a rider must never give cashier access by accident). Only the
     // explicit "Add a rider" link (store hidden banner, ?add=rider) starts with the Rider starter role ticked.
     const [defaultRoles] = useState<number[]>(() => {
-        if (typeof window === 'undefined' || new URLSearchParams(window.location.search).get('add') !== 'rider') return [];
-        const r = roles.find((x) => x.starter_key === 'rider');
+        const add = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('add');
+        // J9: "Add manager" on the Branches page → the Branch Manager role (exists only in branches)
+        if (add !== 'rider' && add !== 'branch_manager') return [];
+        const r = roles.find((x) => x.starter_key === add);
         return r ? [r.id] : [];
     });
 
@@ -578,7 +580,9 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
 
     // From the "hidden from customers" banner: open Add Staff with Rider selected
     useEffect(() => {
-        if (new URLSearchParams(window.location.search).get('add') === 'rider' && (!planLimit || planLimit.can_add)) setFormOpen(true);
+        // J9: also "Add manager" from the Branches page (?add=branch_manager)
+        const add = new URLSearchParams(window.location.search).get('add') ?? '';
+        if (['rider', 'branch_manager'].includes(add) && (!planLimit || planLimit.can_add)) setFormOpen(true);
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const isArchived = tab === 'archived';

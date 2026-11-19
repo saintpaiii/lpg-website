@@ -74,6 +74,8 @@ interface OrderRow {
 }
 
 interface Props {
+    /** J9: the owner's stores (main + branches) */
+    ownedStores?: { id: number; name: string; is_branch: boolean; status: string; plan: string }[];
     user: UserDetail;
     store: StoreInfo | null;
     orders: OrderRow[];
@@ -128,7 +130,7 @@ function RoleBadge({ user }: { user: UserDetail }) {
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function UserShow({ user, store, orders, legalAcceptances, identity }: Props) {
+export default function UserShow({ user, store, orders, legalAcceptances, identity, ownedStores = [] }: Props) {
     // Platform staff with Users but not Stores: no "View Store" (403)
     const canStores = useAdminAccess().canOpen('/admin/stores');
     const breadcrumbs: BreadcrumbItem[] = [
@@ -252,6 +254,22 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* J9: every store of this owner (main + branches) */}
+                {ownedStores.length > 1 && (
+                    <Card data-testid="owned-stores">
+                        <CardHeader><CardTitle className="text-base flex items-center gap-2"><Store className="h-4 w-4 text-emerald-500" /> Stores ({ownedStores.length})</CardTitle></CardHeader>
+                        <CardContent className="divide-y p-0">
+                            {ownedStores.map((s) => (
+                                <Link key={s.id} href={`/admin/stores/${s.id}`} className="flex flex-wrap items-center gap-2 px-6 py-2 text-sm hover:bg-muted/30">
+                                    <span className="font-medium">{s.name}</span>
+                                    <span className="rounded bg-muted px-1.5 text-[11px]">{s.is_branch ? 'Branch' : 'Main'}</span>
+                                    <span className="text-xs capitalize text-muted-foreground">{s.status} · {s.plan}</span>
+                                </Link>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Store info (sellers) */}
                 {store && (

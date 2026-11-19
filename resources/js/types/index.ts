@@ -44,6 +44,8 @@ export type SharedData = {
         created_role_id?: number | null;
     };
     cart_count: number;
+    /** J9: length of the free trial (config plans.trial_days) */
+    trial_days?: number;
     unreadNotifications: number;
     /** Unread chat messages across all of the user's conversations */
     unreadMessages?: number;

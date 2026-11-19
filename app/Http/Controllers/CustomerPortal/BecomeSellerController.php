@@ -40,7 +40,7 @@ class BecomeSellerController extends Controller
         $previousDocs  = null;
 
         if ($application?->status === 'rejected') {
-            $store = Store::where('user_id', $user->id)->first();
+            $store = \App\Support\StoreContext::mainFor($user);
             if ($store) {
                 $previousStore = [
                     'store_name'  => $store->store_name,
@@ -69,7 +69,7 @@ class BecomeSellerController extends Controller
         }
 
         // Extra documents sent with an earlier application (shown read-only; new ones can be added)
-        $ownStore     = Store::where('user_id', $user->id)->first();
+        $ownStore     = \App\Support\StoreContext::mainFor($user);
         $previousOther = $ownStore
             ? \App\Models\StoreDocumentSubmission::where('store_id', $ownStore->id)->where('doc_type', 'other')->latest()->get()
                 ->map(fn ($d) => [
@@ -169,7 +169,7 @@ class BecomeSellerController extends Controller
         ], StoreDocuments::otherDocumentMessages() + \App\Support\UploadMessages::for(['bir_permit', 'business_permit', 'fsic_permit', 'doe_lpg_license', 'dti_sec_registration']) + StoreDocuments::dtiSecMessages() + \App\Support\UploadMessages::for(['logo'], false) + ['latitude.required' => "Please pin your store's location on the map.", 'longitude.required' => "Please pin your store's location on the map."]);
 
         // The user's existing store (resubmission) — never compared with itself
-        $ownStore  = Store::where('user_id', $user->id)->first();
+        $ownStore  = \App\Support\StoreContext::mainFor($user);
         $otherRows = StoreDocuments::filledOtherRows($request);
         StoreDocuments::assertOtherRowsAllowed($otherRows, $ownStore?->id);
 
@@ -214,7 +214,7 @@ class BecomeSellerController extends Controller
         // Logo is public; on resubmission the old one is kept unless a new one is uploaded
         $logoPath = $request->hasFile('logo')
             ? $request->file('logo')->store('store-logos', 'public')
-            : Store::where('user_id', $user->id)->value('logo');
+            : \App\Support\StoreContext::mainFor($user)?->logo;
 
         // Re-uploaded documents: their earlier auto-read result no longer applies
         $ocr = (array) ($ownStore?->document_ocr ?? []);

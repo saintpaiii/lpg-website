@@ -109,7 +109,7 @@ class StaffController extends Controller
                 'view_only' => (bool) ($m['view_only'] ?? false), 'feature' => $m['feature'] ?? null,
             ])->values(),
             // "Start from" choices of a new role = the starter role definitions
-            'templates'      => collect(config('staff_modules.starters'))->map(fn ($t, $k) => [
+            'templates'      => collect(config('staff_modules.starters'))->reject(fn ($t) => $t['branch_only'] ?? false)->map(fn ($t, $k) => [
                 'key' => $k, 'name' => $t['name'], 'is_rider' => (bool) $t['is_rider'], 'modules' => (object) $t['modules'],
             ])->values(),
         ]);
@@ -247,6 +247,10 @@ class StaffController extends Controller
             if (! is_array($ids)) {
                 return;
             }
+            // J9: at most ONE active Branch Manager per branch
+            if (static::branchManagerTaken($store, array_map('intval', $ids), $user?->id)) {
+                $v->errors()->add('role_ids', 'This branch already has a Branch Manager.');
+            }
             $rates = (array) $request->input('role_rates', []);
             foreach ($this->rolesNeedingRate($store, $ids, $user) as $role) {
                 $rate = $rates[$role->id] ?? null;
@@ -282,6 +286,29 @@ class StaffController extends Controller
     }
 
     /** 12 characters, letters + digits, no look-alikes (0/O, 1/l/I). */
+    /**
+     * J9: would these roles add a SECOND active Branch Manager to the store? ($exceptUserId = the person being edited)
+     *
+     * @param  int[]  $roleIds
+     */
+    public static function branchManagerTaken(Store $store, array $roleIds, ?int $exceptUserId = null): bool
+    {
+        $bm = \App\Models\StoreRole::where('store_id', $store->id)->where('starter_key', 'branch_manager')->value('id');
+        if (! $bm || ! in_array((int) $bm, $roleIds, true)) {
+            return false;
+        }
+
+        return \Illuminate\Support\Facades\DB::table('store_role_user')->join('users', 'users.id', '=', 'store_role_user.user_id')
+            ->where('store_role_user.store_role_id', $bm)->whereNull('users.deleted_at')->where('users.is_active', true)
+            ->when($exceptUserId, fn ($q) => $q->where('users.id', '!=', $exceptUserId))->exists();
+    }
+
+    /** J9: re-activating / restoring someone who is a Branch Manager while another one is active → refused. */
+    private static function branchManagerConflict(Store $store, User $user): bool
+    {
+        return static::branchManagerTaken($store, StaffAccess::roles($user)->pluck('id')->map(fn ($v) => (int) $v)->all(), $user->id);
+    }
+
     public static function randomPassword(int $length = 12): string
     {
         $letters = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -539,6 +566,10 @@ class StaffController extends Controller
             return back()->with('error', SubscriptionService::limitMessage($store, 'staff'));
         }
 
+        if (static::branchManagerConflict($store, $user)) {
+            return back()->with('error', 'This branch already has a Branch Manager.');
+        }
+
         $user->restore();
         $user->update([
             'is_active'           => true,
@@ -596,6 +627,9 @@ class StaffController extends Controller
         // A paused account doesn't count until it is un-paused
         if (! $user->paused_by_plan && ! SubscriptionService::canAdd($store, 'staff')) {
             return back()->with('error', SubscriptionService::limitMessage($store, 'staff'));
+        }
+        if (static::branchManagerConflict($store, $user)) {
+            return back()->with('error', 'This branch already has a Branch Manager.');
         }
 
         $user->update([

@@ -580,7 +580,7 @@ export default function Landing({ products, stats, plans }: Props) {
                                 { icon: Truck,    title: 'Delivery Tracking',     desc: 'Real-time status updates with photo proof at every delivery milestone.',      color: 'bg-orange-600' },
                                 { icon: Brain,    title: 'Decision Support',      desc: 'Smart analytics dashboard to help sellers make better inventory decisions.',  color: 'bg-purple-600' },
                                 { icon: UserCog,  title: 'Role Management',       desc: 'Granular staff permissions — cashiers, warehouse, riders, and more.',         color: 'bg-indigo-600' },
-                                { icon: BarChart3, title: 'Transparent Fees',     desc: 'Simple monthly plans with a free 30-day trial. Sellers keep 100% of their sales.', color: 'bg-cyan-600'   },
+                                { icon: BarChart3, title: 'Transparent Fees',     desc: `Simple monthly plans with a free ${plans?.trial_days ?? 14}-day trial. Sellers keep 100% of their sales.`, color: 'bg-cyan-600'   },
                             ].map(({ icon: Icon, title, desc, color }, i) => (
                                 <Reveal key={title} delay={i * 70}>
                                     <div className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">

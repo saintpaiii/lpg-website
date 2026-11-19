@@ -154,8 +154,8 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             Route::post('inventory/{product}/date-old-stock', [InventoryController::class, 'dateOldStock'])->name('inventory.date-old-stock');
         });
 
-        // ── Staff (seller owner only — seller_staff cannot manage staff) ─────
-        Route::middleware('seller_owner')->group(function () {
+        // ── Staff (the owner; J9: also a branch's Branch Manager for that branch — never roles / themself) ─────
+        Route::middleware('store_manager')->group(function () {
             Route::get('staff', [StaffController::class, 'index'])->name('staff');
             Route::post('staff', [StaffController::class, 'store'])->name('staff.store');
             Route::get('staff/{user}', [StaffController::class, 'show'])->name('staff.show');
@@ -171,7 +171,7 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
                 ->withTrashed()->name('staff.force-delete');
 
             // Staff roles (Off / View only / Full access per module) — creating / editing / deleting is a Pro feature
-            Route::middleware('plan.feature:custom_roles')->group(function () {
+            Route::middleware(['seller_owner', 'plan.feature:custom_roles'])->group(function () {
                 Route::post('roles', [\App\Http\Controllers\Seller\StoreRoleController::class, 'store'])->name('roles.store');
                 Route::put('roles/{role}', [\App\Http\Controllers\Seller\StoreRoleController::class, 'update'])->name('roles.update');
                 Route::delete('roles/{role}', [\App\Http\Controllers\Seller\StoreRoleController::class, 'destroy'])->name('roles.destroy');
@@ -313,6 +313,32 @@ Route::middleware(['auth', 'verified', 'seller', 'password.changed', 'clocked.in
             // Staff / rider documents (driver's license etc.) — the owner reviews them
             Route::post('staff-documents/{document}/approve', [\App\Http\Controllers\Seller\StaffDocumentReviewController::class, 'approve'])->name('staff-documents.approve');
             Route::post('staff-documents/{document}/reject', [\App\Http\Controllers\Seller\StaffDocumentReviewController::class, 'reject'])->name('staff-documents.reject');
+        });
+
+        // ── J9: Branches, store switcher, main dashboard (owner only) ────────
+        Route::middleware('seller_owner')->group(function () {
+            Route::get('branches', [\App\Http\Controllers\Seller\BranchController::class, 'index'])->name('branches');
+            Route::post('switch-store', [\App\Http\Controllers\Seller\BranchController::class, 'switch'])->name('switch-store');
+            // The MAIN store must be on a paid Premium plan (the free trial doesn't include branches)
+            Route::middleware('plan.feature:branches')->group(function () {
+                Route::get('branches/create', [\App\Http\Controllers\Seller\BranchController::class, 'create'])->name('branches.create');
+                Route::post('branches', [\App\Http\Controllers\Seller\BranchController::class, 'store'])->middleware('throttle:10,1')->name('branches.store');
+                Route::get('main-dashboard', [\App\Http\Controllers\Seller\MainDashboardController::class, 'index'])->name('main-dashboard');
+                Route::get('main-dashboard/export', [\App\Http\Controllers\Seller\MainDashboardController::class, 'export'])->name('main-dashboard.export');
+            });
+        });
+
+        // ── J9: Stock transfers between the owner's stores (Inventory module; writes need inventory.transfer) ──
+        Route::middleware('module:inventory')->group(function () {
+            Route::middleware('plan.feature:branches')->group(function () {
+                Route::get('transfers/options', [\App\Http\Controllers\Seller\StockTransferController::class, 'choices'])->name('transfers.choices');
+                Route::post('transfers', [\App\Http\Controllers\Seller\StockTransferController::class, 'store'])->name('transfers.store');
+                Route::post('transfers/create-product', [\App\Http\Controllers\Seller\StockTransferController::class, 'createProduct'])->name('transfers.create-product');
+            });
+            // Already on the way: receiving / cancelling always works (stock is never stuck because a plan lapsed)
+            Route::post('transfers/{transfer}/receive', [\App\Http\Controllers\Seller\StockTransferController::class, 'receive'])->whereNumber('transfer')->name('transfers.receive');
+            Route::post('transfers/{transfer}/cancel', [\App\Http\Controllers\Seller\StockTransferController::class, 'cancel'])->whereNumber('transfer')->name('transfers.cancel');
+            Route::get('transfers/{transfer}/pdf', [\App\Http\Controllers\Seller\StockTransferController::class, 'pdf'])->whereNumber('transfer')->name('transfers.pdf');
         });
 
         // ── Settings ─────────────────────────────────────────────────────────

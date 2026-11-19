@@ -17,9 +17,11 @@ class RequirePlanFeature
     public function handle(Request $request, Closure $next, string $feature): Response
     {
         $user  = $request->user();
-        $store = $request->attributes->get('seller_store')
-            ?? ($user?->role === 'seller' ? Store::where('user_id', $user->id)->first()
-                : ($user?->store_id ? Store::find($user->store_id) : null));
+        $store = $request->attributes->get('seller_store') ?? \App\Support\StoreContext::for($user, $request);
+        // J9: branches are decided by the MAIN store's plan (paid Premium), whichever store is active
+        if ($feature === 'branches' && $store) {
+            $store = $store->mainStore();
+        }
 
         if (! $store || SubscriptionService::hasFeature($store, $feature)) {
             return $next($request);

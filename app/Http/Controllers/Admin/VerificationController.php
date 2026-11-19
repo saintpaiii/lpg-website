@@ -62,7 +62,7 @@ class VerificationController extends Controller
 
         // Preload stores for all paginated results (avoids N+1)
         $userIds = $vrRows->pluck('user_id');
-        $stores  = Store::whereIn('user_id', $userIds)->get()->keyBy('user_id');
+        $stores  = Store::whereIn('user_id', $userIds)->whereNull('parent_store_id')->get()->keyBy('user_id');   // J9: the application = main store
 
         // Preload soft-deleted rejected applications to detect resubmissions (avoids N+1)
         $docFields = [
@@ -306,7 +306,7 @@ class VerificationController extends Controller
     {
         // Seller applications are approved only on the store page, where the checklist is required
         if ($verification->type === 'seller_application') {
-            $storeId = Store::where('user_id', $verification->user_id)->value('id');
+            $storeId = \App\Support\StoreContext::mainIdFor((int) $verification->user_id);
 
             return ($storeId ? redirect("/admin/stores/{$storeId}") : back())
                 ->with('error', 'Review seller applications on the store page — accept or reject each document there.');
@@ -336,7 +336,7 @@ class VerificationController extends Controller
     {
         // Seller applications are reviewed only on the store page (Accept / Reject per document, then send back) — J3
         if ($verification->type === 'seller_application') {
-            $storeId = Store::where('user_id', $verification->user_id)->value('id');
+            $storeId = \App\Support\StoreContext::mainIdFor((int) $verification->user_id);
 
             return ($storeId ? redirect("/admin/stores/{$storeId}") : back())
                 ->with('error', 'Review seller applications on the store page — accept or reject each document there.');
@@ -361,7 +361,7 @@ class VerificationController extends Controller
 
         // Mark the seller's store as rejected too
         if ($verification->type === 'seller_application') {
-            Store::where('user_id', $verification->user_id)->update(['status' => 'rejected']);
+            Store::where('user_id', $verification->user_id)->whereNull('parent_store_id')->update(['status' => 'rejected']);   // J9: main store only
 
             if ($verification->user_id) {
                 NotificationService::send(

@@ -365,10 +365,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->belongsTo(Store::class);
     }
 
-    /** Store that this user owns (seller role) */
+    /** Store that this user owns (seller role) — J9: the MAIN store (branches have the same user_id) */
     public function ownedStore(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
-        return $this->hasOne(Store::class, 'user_id');
+        return $this->hasOne(Store::class, 'user_id')->whereNull('parent_store_id');
+    }
+
+    /** J9: every store this user owns (main + branches) */
+    public function ownedStores(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Store::class, 'user_id');
     }
 
     private ?bool $customerHistoryCache = null;

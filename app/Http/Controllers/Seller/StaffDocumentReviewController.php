@@ -72,7 +72,7 @@ class StaffDocumentReviewController extends Controller
 
     private function ownStore(Request $request, StaffDocument $document): void
     {
-        $storeId = $request->attributes->get('seller_store')?->id ?? Store::where('user_id', $request->user()->id)->value('id');
+        $storeId = $request->attributes->get('seller_store')?->id ?? \App\Support\StoreContext::for($request->user(), $request)?->id;
         abort_unless($storeId && (int) $document->store_id === (int) $storeId, 403);
     }
 

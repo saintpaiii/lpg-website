@@ -26,7 +26,7 @@ class InvoicePrintController extends Controller
         }
 
         return match ($user->role) {
-            'seller'       => Store::where('user_id', $user->id)->where('id', $invoice->store_id)->exists(),
+            'seller'       => in_array((int) $invoice->store_id, \App\Support\StoreContext::ownedStoreIds($user), true),   // J9: any of their stores
             'seller_staff' => $user->store_id !== null && (int) $user->store_id === (int) $invoice->store_id
                 && StaffAccess::levelFor($user, 'invoices') !== null,
             'customer'     => ! $user->isLockedNewcomer()

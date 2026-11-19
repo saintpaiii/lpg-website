@@ -1,4 +1,4 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { PlansDialogLink } from '@/components/plans-dialog-link';
 import type { PlanCatalog } from '@/types/plans';
 import {
@@ -116,6 +116,8 @@ const STEP_LABELS = ['Store Info', 'Documents', 'Terms & Conditions'];
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function BecomeSellerPage({ application, has_valid_id, verified_id_url = null, previous_store, previous_docs, seller_terms, plan_catalog, limit_message, attempt, max_attempts, previous_other_docs = [], other_slots = 5, exchange_options }: Props) {
+    // J9: the free trial length comes from config (plans.trial_days)
+    const trialDays = (usePage().props as { trial_days?: number }).trial_days ?? plan_catalog?.trial_days ?? 14;
     // J4 (optional): store hours (default open 24 hours) + tank exchange policy — prefilled on resubmission
     const [hoursPolicy, setHoursPolicy] = useState<{ alwaysOpen: boolean; week: ReturnType<typeof toWeek>; policy: ExchangePolicyData }>(() => ({
         alwaysOpen: !previous_store?.opening_hours, week: toWeek(previous_store?.opening_hours ?? null),
@@ -554,7 +556,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                                 onChange={setAgreePlan}
                                                 id="agree_plan"
                                             >
-                                                I understand that my store gets a free 30-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
+                                                I understand that my store gets a free {trialDays}-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
                                             </AgreementCheckbox>
                                             <PlansDialogLink catalog={plan_catalog} />
                                         </div>

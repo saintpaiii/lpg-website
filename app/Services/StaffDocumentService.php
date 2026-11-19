@@ -172,7 +172,7 @@ class StaffDocumentService
 
         if ($ownerId = $doc->store?->user_id ?? \App\Models\Store::whereKey($doc->store_id)->value('user_id')) {
             $until = $doc->fresh()->expires_at?->format('M j, Y');
-            NotificationService::send($ownerId, 'system', "Rider's license approved",
+            NotificationService::sendToStoreOwner((int) $doc->store_id, 'system', "Rider's license approved",
                 "{$rider?->name}'s driver's license was " . ($by === null ? 'approved automatically (face match)' : 'approved by the platform admin')
                 . ($until ? ", valid until {$until}." : '.'), ['link' => "/seller/staff/{$doc->user_id}"]);
         }
@@ -194,7 +194,7 @@ class StaffDocumentService
             "Your driver's license was " . ($revoke ? 'revoked' : 'rejected') . ": {$reason}. Upload it again with a new selfie.", ['link' => '/rider/documents']);
 
         if ($ownerId = $doc->store?->user_id ?? \App\Models\Store::whereKey($doc->store_id)->value('user_id')) {
-            NotificationService::send($ownerId, 'system', $revoke ? "Rider's license revoked" : "Rider's license rejected",
+            NotificationService::sendToStoreOwner((int) $doc->store_id, 'system', $revoke ? "Rider's license revoked" : "Rider's license rejected",
                 "{$doc->user?->name}'s driver's license was " . ($revoke ? 'revoked' : 'rejected') . " by the platform admin: {$reason}. They can't make deliveries until a new license is approved.",
                 ['link' => "/seller/staff/{$doc->user_id}"]);
         }

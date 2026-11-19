@@ -76,7 +76,7 @@ class SubscriptionService
             'feature_labels' => config('plans.feature_labels'),
             'core_features'  => config('plans.core_features'),
             'days'           => (int) config('plans.days', 30),
-            'trial_days'     => (int) config('plans.trial_days', 30),
+            'trial_days'     => static::trialDays(),
         ];
     }
 
@@ -268,6 +268,10 @@ class SubscriptionService
     /** "{Feature label} is available on the {Pro|Premium} plan." */
     public static function featureMessage(string $feature): string
     {
+        // J9: the free trial has every Premium feature EXCEPT branches
+        if ($feature === 'branches') {
+            return 'Branches need your main store on a paid Premium plan (the free trial does not include branches).';
+        }
         $label = config('plans.feature_labels')[$feature] ?? ucfirst($feature);
 
         return "{$label} is available on the " . static::requiredPlanName($feature) . ' plan.';
@@ -471,7 +475,13 @@ class SubscriptionService
 
     // ── Trial ─────────────────────────────────────────────────────────────────
 
-    /** The one-time 30-day Premium trial, right after a store is approved. False if it already had one. */
+    /** Length of the free trial in days (config plans.trial_days — 14 since J9). */
+    public static function trialDays(): int
+    {
+        return (int) config('plans.trial_days', 14);
+    }
+
+    /** The one-time free Premium trial (config plans.trial_days), right after a store / branch is approved. False if it already had one. */
     public static function startTrial(Store $store): bool
     {
         if ($store->trial_used_at !== null) {
@@ -484,8 +494,8 @@ class SubscriptionService
             'amount'   => 0,
             'status'   => 'pending',
             'method'   => 'trial',
-            'days'     => (int) config('plans.trial_days', 30),
-            'notes'    => 'Free 30-day Premium trial',
+            'days'     => static::trialDays(),
+            'notes'    => 'Free ' . static::trialDays() . '-day Premium trial',
         ]);
         $result = static::apply($payment, 'trial', null, null);
         if (! $result) {
@@ -494,8 +504,8 @@ class SubscriptionService
         [, $store] = $result;
 
         static::notifyOwner($store, 'Your free trial has started',
-            "Your free 30-day Premium trial has started. It ends on {$store->subscription_expires_at->format('M j, Y')}.",
-            'Your free 30-day Premium trial has started', [
+            'Your free ' . static::trialDays() . "-day Premium trial has started. It ends on {$store->subscription_expires_at->format('M j, Y')}.",
+            'Your free ' . static::trialDays() . '-day Premium trial has started', [
                 'Your store is now visible to customers with all Premium features, including the Featured badge.',
                 "The trial ends on {$store->subscription_expires_at->format('M j, Y')}. Choose a plan before then so your products stay visible.",
             ], 'See plans');
@@ -1058,14 +1068,19 @@ class SubscriptionService
         if (! $store->user_id) {
             return;
         }
-        NotificationService::send($store->user_id, 'subscription', $title, $message, ['link' => '/seller/plan']);
+        // J9: billing stays with the owner (a Branch Manager can't buy plans); a branch's notice opens THAT branch's plan page
+        $planLink = '/seller/plan' . ($store->parent_store_id ? "?store={$store->id}" : '');
+        if ($store->parent_store_id) {
+            $title = "{$store->branch_name}: {$title}";
+        }
+        NotificationService::send($store->user_id, 'subscription', $title, $message, ['link' => $planLink]);
 
         $email = $store->owner?->email ?? User::whereKey($store->user_id)->value('email');
         if (! $email) {
             return;
         }
         try {
-            Mail::to($email)->send(new SubscriptionNotice($title, $heading, $lines, $button, url('/seller/plan')));
+            Mail::to($email)->send(new SubscriptionNotice($title, $heading, $lines, $button, url($planLink)));
         } catch (\Throwable $e) {
             Log::warning('Subscription email failed', ['store_id' => $store->id, 'error' => $e->getMessage()]);
         }

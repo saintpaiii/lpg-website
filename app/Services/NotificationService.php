@@ -56,7 +56,45 @@ class NotificationService
             ->pluck('id');
 
         $userIds = $ownerIds->merge($staffIds)->unique()->toArray();
-        static::sendToMany($userIds, $type, $title, $message, $data);
+        static::sendToMany($userIds, $type, $title, $message, static::withStoreLink($storeId, $data));
+    }
+
+    /**
+     * J9: "the store owner" of a store's event — the owner AND, for a branch, its Branch Manager. The link opens that
+     * store for the owner (?store=ID, EnsureIsSeller switches) when the owner has more than one store.
+     */
+    public static function sendToStoreOwner(Store|int $store, string $type, string $title, string $message, array $data = []): void
+    {
+        $store = $store instanceof Store ? $store : Store::withTrashed()->find($store);
+        if (! $store) {
+            return;
+        }
+        $ids = [(int) $store->user_id];
+        if ($store->isBranch()) {
+            $bm = \App\Models\StoreRole::where('store_id', $store->id)->where('starter_key', 'branch_manager')->value('id');
+            if ($bm) {
+                $ids = array_merge($ids, User::join('store_role_user', 'store_role_user.user_id', '=', 'users.id')
+                    ->where('store_role_user.store_role_id', $bm)->where('users.is_active', true)->whereNull('users.deleted_at')
+                    ->pluck('users.id')->map(fn ($v) => (int) $v)->all());
+            }
+        }
+        static::sendToMany($ids, $type, $title, $message, static::withStoreLink($store->id, $data));
+    }
+
+    /** J9: add "store=ID" to a /seller link of a store whose owner has several stores (no change otherwise). */
+    private static function withStoreLink(int $storeId, array $data): array
+    {
+        $link = $data['link'] ?? null;
+        if (! is_string($link) || ! str_starts_with($link, '/seller') || str_contains($link, 'store=')) {
+            return $data;
+        }
+        $store = Store::withTrashed()->select(['id', 'user_id', 'parent_store_id'])->find($storeId);
+        if (! $store || (! $store->parent_store_id && ! Store::where('parent_store_id', $store->id)->exists())) {
+            return $data;
+        }
+        $data['link'] = $link . (str_contains($link, '?') ? '&' : '?') . "store={$storeId}";
+
+        return $data;
     }
 
     /** Mark a single notification as read (only if it belongs to the user). */

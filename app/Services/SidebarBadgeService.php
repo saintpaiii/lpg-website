@@ -38,12 +38,15 @@ class SidebarBadgeService
             return [];
         }
 
-        return Cache::remember(static::key($user->id), self::TTL, fn () => array_filter(static::compute($user)));
+        // J9: an owner's counts are per ACTIVE store (they can switch between their main store and branches)
+        $storeId = $user->role === 'seller' ? \App\Support\StoreContext::for($user)?->id : null;
+
+        return Cache::remember(static::key($user->id, $storeId), self::TTL, fn () => array_filter(static::compute($user)));
     }
 
-    public static function key(int $userId): string
+    public static function key(int $userId, ?int $storeId = null): string
     {
-        return "sidebar-badges:{$userId}";
+        return "sidebar-badges:{$userId}" . ($storeId ? ":{$storeId}" : '');
     }
 
     /** Drop the cached counts of these users (call after creating/resolving a counted item). */
@@ -51,6 +54,9 @@ class SidebarBadgeService
     {
         foreach (array_filter(array_merge(...array_map(fn ($v) => (array) $v, $userIds))) as $id) {
             Cache::forget(static::key((int) $id));
+            foreach (\App\Support\StoreContext::ownedStoreIds((int) $id) as $sid) {   // J9: owners — every store's key
+                Cache::forget(static::key((int) $id, $sid));
+            }
         }
     }
 
@@ -145,7 +151,7 @@ class SidebarBadgeService
     private static function sellerQueries(User $u): array
     {
         $owner   = $u->role === 'seller';
-        $storeId = $owner ? Store::where('user_id', $u->id)->value('id') : $u->store_id;
+        $storeId = $owner ? \App\Support\StoreContext::for($u)?->id : $u->store_id;   // J9: the active store
         if (! $storeId) {
             return [];
         }

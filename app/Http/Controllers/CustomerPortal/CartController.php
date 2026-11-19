@@ -123,8 +123,7 @@ class CartController extends Controller
             ->firstOrFail();
 
         // Block purchasing from own store
-        $ownStoreId = \App\Models\Store::where('user_id', auth()->id())->value('id');
-        if ($ownStoreId && $product->store_id === $ownStoreId) {
+        if (in_array((int) $product->store_id, \App\Support\StoreContext::ownedStoreIds(auth()->id()), true)) {   // J9: any own store
             return back()->with('error', 'You cannot purchase products from your own store.');
         }
 

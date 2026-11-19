@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type Decision = { status: 'accepted' | 'rejected' | null; reason: string | null; note: string | null; by_name: string | null; at: string | null; expires_at: string | null; auto: string | null };
-type ReviewDoc = { key: string; label: string; url: string | null; is_pdf: boolean; needs_date: boolean; current_expires: string | null; required: boolean; submission_id: number | null; ocr_key: string; ocr: OcrResult; max_date?: string };
+type ReviewDoc = { key: string; label: string; url: string | null; is_pdf: boolean; needs_date: boolean; current_expires: string | null; required: boolean; submission_id: number | null; ocr_key: string; ocr: OcrResult; max_date?: string; /** J9: a branch reuses this from its main store */ inherited?: boolean };
 
 /** StoreController::review() */
 export type StoreReview = {
@@ -62,7 +62,9 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
         const dec = decided(d.key);
         return {
             key: d.key, label: d.label, url: d.url, is_pdf: d.is_pdf, needs_date: d.needs_date,
-            status: dec.status, reason: dec.reason, note: dec.note, auto: dec.auto, by_name: dec.by_name, at: dec.at,
+            status: d.inherited ? 'accepted' : dec.status, reason: dec.reason, note: d.inherited ? null : dec.note,
+            // J9: a branch's ID / BIR / DTI-SEC come from the main store — read-only, already accepted
+            auto: d.inherited ? 'From main store — already accepted' : dec.auto, by_name: dec.by_name, at: dec.at, locked: !!d.inherited,
             saved_date: dec.expires_at ?? d.current_expires, ocr_key: d.ocr_key, max_date: d.max_date,
             extra: d.key === 'valid_id' ? (
                 <div className="space-y-1.5 rounded-md border p-2">

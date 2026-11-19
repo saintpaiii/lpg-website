@@ -151,6 +151,12 @@ class UsersController extends Controller
         ];
 
         return Inertia::render('admin/user-show', [
+            // J9: an owner's stores (main + branches)
+            'ownedStores' => $user->role === 'seller'
+                ? \App\Models\Store::withTrashed()->where('user_id', $user->id)->orderByRaw('parent_store_id IS NOT NULL')->orderBy('id')->get()
+                    ->map(fn ($s) => ['id' => $s->id, 'name' => $s->store_name, 'is_branch' => $s->isBranch(), 'status' => $s->trashed() ? 'archived' : $s->status,
+                        'plan' => \App\Services\SubscriptionService::planName(\App\Services\SubscriptionService::currentKey($s))])->values()
+                : [],
             'user' => [
                 'id'          => $user->id,
                 'name'        => $user->name,

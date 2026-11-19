@@ -126,7 +126,7 @@ class FindStoreController extends Controller
         }
         $rawWeights = $used->pluck('raw')->flatten()->all();
 
-        $ownStoreId = Store::where('user_id', $request->user()->id)->value('id');
+        $ownStoreIds = \App\Support\StoreContext::ownedStoreIds($request->user());   // J9: main + branches
 
         // 1. Candidate products (one query, store + inventory eager-loaded)
         $products = Product::with(['store.vehicles', 'store.deliveryRates', 'inventory'])
@@ -136,7 +136,7 @@ class FindStoreController extends Controller
             ->whereNotNull('refill_price')
             ->whereHas('store', fn ($q) => $q->visibleToCustomers())
             ->whereHas('inventory', fn ($q) => $q->where('quantity', '>=', $qty))
-            ->when($ownStoreId, fn ($q) => $q->where('store_id', '!=', $ownStoreId))
+            ->when($ownStoreIds, fn ($q) => $q->whereNotIn('store_id', $ownStoreIds))
             ->get();
         // K6: only SELLABLE stock counts (expired batches never sell) — 2 queries for all candidates
         \App\Services\StockService::prime($products);

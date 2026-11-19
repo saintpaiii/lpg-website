@@ -86,6 +86,8 @@ class StoreController extends Controller
             'store' => [
                 'id'            => $store->id,
                 'store_name'    => $store->store_name,
+                // J9: 'Branch of Bonifacio LPG Center' (null for a main store)
+                'branch_of'     => $store->branchOfLabel(),
                 'is_featured'   => (bool) $store->is_featured,
                 'logo_url'      => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
                 'description'   => $store->description,

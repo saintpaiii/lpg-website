@@ -128,7 +128,7 @@ class OtpController extends Controller
 
         // A seller whose store isn't approved yet: straight to the waiting page (not via the dashboard → the welcome
         // message would be lost in the second redirect)
-        if ($user->role === 'seller' && \App\Models\Store::where('user_id', $user->id)->where('status', '!=', 'approved')->exists()) {
+        if ($user->role === 'seller' && (($main = \App\Support\StoreContext::mainFor($user)) && $main->status !== 'approved')) {
             return redirect()->route('seller.pending')->with('success', 'Email verified! Your store application is being reviewed.');
         }
 

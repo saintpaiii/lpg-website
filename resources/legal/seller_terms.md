@@ -27,7 +27,8 @@ These Seller Terms apply to every store owner ("Seller") who sells LPG on {compa
 
 ## 6. Subscription plans
 - The Platform does not charge commission. You keep the full amount of your sales.
-- After your store is approved, it gets a free 30-day Premium trial (once per store).
+- After your store is approved, it gets a free 14-day Premium trial (once per store; each approved branch gets its own).
+- Branches (more outlets under the same owner) are available only while your main store is on a paid Premium plan. Each branch needs its own Business / Mayor's Permit, FSIC and DOE License to Operate, is reviewed by the Platform, and has its own plan.
 - After the trial, your store needs a monthly plan (Basic, Pro or Premium) for your products to be visible to customers. The price, limits and features of each plan are shown on the My Plan page. The Platform may change prices; a new price only applies to your next purchase.
 - Plans are prepaid for 30 days through PayMongo and do not renew automatically. You are reminded during the last 3 days.
 - When your plan ends without renewal, your products are hidden from customers right away. You can still log in and finish orders that were already placed.

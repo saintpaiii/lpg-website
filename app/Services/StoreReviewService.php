@@ -57,7 +57,10 @@ class StoreReviewService
                 default => PrivateDocument::urlIf($app?->{"{$key}_path"}, 'verification', (int) $app?->id, "{$key}_path"),
             };
             $col = $key === 'valid_id' ? null : StoreDocuments::expiryColumnFor($store, $key);
+            // J9: a branch reuses the main store's ID / BIR / DTI-SEC — shown read-only as "From main store — already accepted"
+            $inherited = $store->isBranch() && in_array($key, \App\Services\BranchService::INHERITED_DOCS, true);
             $out[] = [
+                'inherited'     => $inherited,
                 'key'           => $key,
                 'label'         => StoreDocuments::reviewLabel($key, $store->dti_sec_kind),
                 'url'           => $url,

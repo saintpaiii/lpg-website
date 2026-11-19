@@ -29,6 +29,27 @@ class InventoryController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'brand']);
 
+        // J9: stock transfers in / out of this store
+        if ($tab === 'transfers') {
+            $user = $request->user();
+            $q = \App\Models\StockTransfer::where(fn ($w) => $w->where('from_store_id', $store->id)->orWhere('to_store_id', $store->id));
+            $premium = \App\Services\SubscriptionService::hasFeature($store->mainStore(), 'branches');
+            $multi = \App\Support\StoreContext::approvedStores((int) $store->user_id)->count() > 1;
+
+            return Inertia::render('seller/inventory', [
+                'tab'         => 'transfers',
+                'productList' => $productList,
+                'filters'     => (object) $request->only('tab'),
+                'storeId'     => $store->id,
+                'transfers'   => \App\Services\StockTransferService::rows($q, $user),
+                'transferCan' => [
+                    'send'    => $premium && $multi && \App\Services\StockTransferService::canSendFrom($user, $store),
+                    'reason'  => ! $premium ? \App\Services\SubscriptionService::featureMessage('branches')
+                        : (! $multi ? 'Transfers need at least one approved branch.' : (! \App\Services\StockTransferService::canSendFrom($user, $store) ? "You don't have permission to send stock transfers." : null)),
+                ],
+            ]);
+        }
+
         if ($tab === 'transactions') {
             $query = InventoryTransaction::with([
                 'product' => fn ($q) => $q->withTrashed(),

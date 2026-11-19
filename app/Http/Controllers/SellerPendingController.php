@@ -30,7 +30,7 @@ class SellerPendingController extends Controller
         // Approved meanwhile (owner, or staff of that store) → the dashboard; the page also re-checks every 30 s (K2)
         $user = $request->user();
         $mine = $user && in_array($user->role, ['seller', 'seller_staff'], true)
-            ? ($user->role === 'seller' ? Store::where('user_id', $user->id)->first() : ($user->store_id ? Store::find($user->store_id) : null))
+            ? ($user->role === 'seller' ? \App\Support\StoreContext::mainFor($user) : ($user->store_id ? Store::find($user->store_id) : null))
             : null;
         if ($mine?->status === 'approved') {
             return redirect()->route('seller.dashboard')->with('success', 'Your store is approved — welcome!');
@@ -153,6 +153,8 @@ class SellerPendingController extends Controller
             return null;
         }
 
-        return Store::where('user_id', $user->id)->where('status', 'rejected')->first();
+        $main = \App\Support\StoreContext::mainFor($user);   // J9: the application is the MAIN store
+
+        return $main?->status === 'rejected' ? $main : null;
     }
 }

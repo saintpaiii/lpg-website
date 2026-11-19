@@ -27,7 +27,7 @@ class StoreDocumentService
             $store->forceFill(['documents_suspended' => true, 'documents_suspended_at' => now()])->save();
             $label = StoreDocuments::labelFor($store, $overdue['type']);
             $date  = StoreDocuments::expiry($store, $overdue['type'])->format('M d, Y');
-            NotificationService::send($store->user_id, 'system', 'Store hidden from customers',
+            NotificationService::sendToStoreOwner($store, 'system', 'Store hidden from customers',
                 "Your store is hidden from customers because your {$label} expired on {$date}. Upload the renewed document in Store Documents.",
                 ['link' => '/seller/documents']);
             static::notifyAdmins('Store hidden: expired permit',
@@ -39,7 +39,7 @@ class StoreDocumentService
 
         if (! $overdue && $store->documents_suspended) {
             $store->forceFill(['documents_suspended' => false, 'documents_suspended_at' => null])->save();
-            NotificationService::send($store->user_id, 'system', 'Store visible again',
+            NotificationService::sendToStoreOwner($store, 'system', 'Store visible again',
                 'Your store is visible to customers again.', ['link' => '/seller/documents']);
 
             return true;

@@ -15,9 +15,11 @@ class StoreRoleService
     {
         $storeId = $store instanceof Store ? $store->id : $store;
         $have    = StoreRole::where('store_id', $storeId)->whereNotNull('starter_key')->pluck('starter_key')->all();
+        // J9: the Branch Manager starter exists only in branch stores
+        $isBranch = $store instanceof Store ? $store->isBranch() : Store::whereKey($storeId)->whereNotNull('parent_store_id')->exists();
 
         foreach (config('staff_modules.starters') as $key => $def) {
-            if (in_array($key, $have, true)) {
+            if (in_array($key, $have, true) || (($def['branch_only'] ?? false) && ! $isBranch)) {
                 continue;
             }
             // A custom role may already use the starter's name (e.g. a store made "Cashier" itself)

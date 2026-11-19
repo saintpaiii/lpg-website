@@ -146,23 +146,41 @@ class StockService
         if (! $inventory) {
             return;
         }
-        $left = $qty - min($qty, static::unbatched($item->product_id, $inventory));   // the rest comes from batches
-        $batches = CylinderBatch::where('product_id', $item->product_id)->where('quantity_remaining', '>', 0)
+        foreach (static::takeFilled($inventory, $qty) as $batchId => $take) {
+            OrderItemBatch::create(['order_item_id' => $item->id, 'cylinder_batch_id' => $batchId, 'quantity' => $take]);
+        }
+        InventoryTransaction::create(['product_id' => $item->product_id, 'type' => $type, 'quantity' => $qty, 'reference' => $reference, 'notes' => $note, 'user_id' => $userId]);
+    }
+
+    /**
+     * Take $qty FILLED cylinders out of stock in the sales order: unbatched (pre-J7, the oldest) stock first, then the
+     * non-expired batches by the earliest requalification date. Decrements the batches and the inventory count (the
+     * caller locked the inventory row). Returns [cylinder_batch_id => quantity] of the batches used (orders, J9 transfers).
+     *
+     * @return array<int, int>
+     */
+    public static function takeFilled(Inventory $inventory, int $qty): array
+    {
+        $productId = (int) $inventory->product_id;
+        $left = $qty - min($qty, static::unbatched($productId, $inventory));   // the rest comes from batches
+        $batches = CylinderBatch::where('product_id', $productId)->where('quantity_remaining', '>', 0)
             ->where(fn ($q) => $q->whereNull('requalification_due_on')->orWhereDate('requalification_due_on', '>=', now()->toDateString()))
             ->orderByRaw('requalification_due_on IS NULL, requalification_due_on ASC')->orderBy('received_on')->orderBy('id')
             ->lockForUpdate()->get();
+        $used = [];
         foreach ($batches as $batch) {
             if ($left <= 0) {
                 break;
             }
             $take = min($left, (int) $batch->quantity_remaining);
             $batch->decrement('quantity_remaining', $take);
-            OrderItemBatch::create(['order_item_id' => $item->id, 'cylinder_batch_id' => $batch->id, 'quantity' => $take]);
+            $used[$batch->id] = $take;
             $left -= $take;
         }
         // The unbatched part is just the inventory count
         $inventory->decrement('quantity', $qty);
-        InventoryTransaction::create(['product_id' => $item->product_id, 'type' => $type, 'quantity' => $qty, 'reference' => $reference, 'notes' => $note, 'user_id' => $userId]);
+
+        return $used;
     }
 
     /**

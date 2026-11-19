@@ -32,7 +32,7 @@ class LoginResponse implements LoginResponseContract, TwoFactorLoginResponseCont
         // A seller who can shop (Start Selling) whose store is still under review / sent back: keep shopping meanwhile
         // (the Customer Portal shows "Your store application is under review"). Seller-only accounts → /seller/pending.
         if ($user->role === 'seller' && $user->can_shop !== false
-            && in_array(\App\Models\Store::where('user_id', $user->id)->value('status'), ['pending', 'rejected'], true)) {
+            && in_array(\App\Support\StoreContext::mainFor($user)?->status, ['pending', 'rejected'], true)) {
             $redirect = route('customer.products');
         }
 

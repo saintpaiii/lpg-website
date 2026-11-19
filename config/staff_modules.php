@@ -43,7 +43,9 @@ return [
             'permissions' => ['inventory.view', 'inventory.stock_in', 'inventory.stock_out', 'inventory.adjust',
                 // J7: purchase orders. K6: managing suppliers (inventory.suppliers) and sending / cancelling / paying POs
                 // (inventory.po_send) are in the separate Purchase approvals module — a role must be given it explicitly.
-                'inventory.po_create', 'inventory.po_receive'],
+                'inventory.po_create', 'inventory.po_receive',
+                // J9: stock transfers between the owner's stores (send from / receive into this store)
+                'inventory.transfer'],
             'actions'     => [
                 'seller.inventory.stock-in'      => 'inventory.stock_in',
                 'seller.inventory.stock-out'     => 'inventory.stock_out',
@@ -69,6 +71,11 @@ return [
                 'seller.inventory.date-old-stock'   => 'inventory.adjust',
                 'seller.supplier-returns.store'     => 'inventory.adjust',
                 'seller.supplier-returns.outcome'   => 'inventory.adjust',
+                // J9
+                'seller.transfers.store'            => 'inventory.transfer',
+                'seller.transfers.receive'          => 'inventory.transfer',
+                'seller.transfers.cancel'           => 'inventory.transfer',
+                'seller.transfers.create-product'   => 'inventory.transfer',
             ],
         ],
         // J7: approving purchase orders (Send / Cancel). Separate so the Warehouse starter can draft and receive but not send.
@@ -169,6 +176,7 @@ return [
         'inventory.po_create'     => ['Inventory',        'Create and edit draft purchase orders'],
         'inventory.po_send'       => ['Inventory',        'Send (approve), cancel and record payments of purchase orders'],
         'inventory.po_receive'    => ['Inventory',        'Receive purchase order deliveries'],
+        'inventory.transfer'      => ['Inventory',        "Send and receive stock transfers between the owner's stores"],
     ],
 
     // The 4 starter roles every store gets (hard-coded levels)
@@ -189,6 +197,16 @@ return [
         'hr' => [
             'name' => 'HR', 'is_rider' => false,
             'modules' => ['dashboard' => 'view', 'orders' => 'view', 'invoices' => 'full', 'reports' => 'view',
+                'attendance' => 'full', 'payroll' => 'full', 'loyalty_customers' => 'view'],
+        ],
+        // J9: created ONLY for branch stores (StoreRoleService::seedStarters) — every module at full level for THAT branch.
+        // Owner-only things (plan / billing, Branches, main dashboard, revenue, coupons, loyalty settings, store documents)
+        // stay owner-only; it may also manage the branch's staff (StoreContext::canManage). At most 1 active per branch.
+        'branch_manager' => [
+            'name' => 'Branch Manager', 'is_rider' => false, 'branch_only' => true,
+            'modules' => ['dashboard' => 'view', 'products' => 'full', 'inventory' => 'full', 'purchasing' => 'full',
+                'orders' => 'full', 'deliveries' => 'full', 'invoices' => 'full', 'customers' => 'full', 'messages' => 'full',
+                'customer_reports' => 'full', 'reports' => 'full', 'dss' => 'full', 'settings' => 'full',
                 'attendance' => 'full', 'payroll' => 'full', 'loyalty_customers' => 'view'],
         ],
     ],

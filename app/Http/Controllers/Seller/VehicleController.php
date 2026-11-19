@@ -17,7 +17,8 @@ class VehicleController extends Controller
 {
     private function ownerOnly(): void
     {
-        if (auth()->user()->role !== 'seller') {
+        // J9: the owner, or the Branch Manager of this branch
+        if (! \App\Support\StoreContext::canManage(auth()->user(), request()->attributes->get('seller_store'))) {
             abort(403);
         }
     }

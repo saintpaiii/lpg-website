@@ -31,13 +31,13 @@ class CheckStoreDocuments extends Command
                 $date  = StoreDocuments::expiry($store, $type)->format('M d, Y');
 
                 if (in_array($days, StoreDocuments::REMIND_DAYS, true)) {
-                    NotificationService::send($store->user_id, 'system', "{$label} expires soon",
+                    NotificationService::sendToStoreOwner($store, 'system', "{$label} expires soon",
                         "{$label} expires on {$date} ({$days} " . ($days === 1 ? 'day' : 'days') . '). Upload the renewed permit in Store Documents.',
                         ['link' => '/seller/documents']);
                     $reminders++;
                 } elseif ($days === -1) {   // expired yesterday
                     $msg = "{$label} expired. Your store will be hidden from customers in " . StoreDocuments::GRACE_DAYS . ' days unless the renewed permit is approved.';
-                    NotificationService::send($store->user_id, 'system', "{$label} expired", $msg, ['link' => '/seller/documents']);
+                    NotificationService::sendToStoreOwner($store, 'system', "{$label} expired", $msg, ['link' => '/seller/documents']);
                     StoreDocumentService::notifyAdmins("{$store->store_name}: {$label} expired", $msg, ['link' => "/admin/stores/{$store->id}", 'store_id' => $store->id]);
                     $expired++;
                 }

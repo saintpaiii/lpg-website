@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import { PlansDialogLink } from '@/components/plans-dialog-link';
 import type { PlanCatalog } from '@/types/plans';
 import axios from 'axios';
@@ -150,6 +150,8 @@ const BENEFITS = [
 type SignedIn = { email: string; first_name: string; middle_name: string; last_name: string; suffix: string };
 
 export default function SellerRegister({ seller_terms, plan_catalog, signed_in = null, exchange_options }: { seller_terms: SellerTerms; plan_catalog?: PlanCatalog | null; signed_in?: SignedIn | null; exchange_options?: ExchangeOptions }) {
+    // J9: the free trial length comes from config (plans.trial_days), never hard-coded
+    const trialDays = (usePage().props as { trial_days?: number }).trial_days ?? plan_catalog?.trial_days ?? 14;
     // J4 (optional): store hours (default open 24 hours) + refill tank exchange policy (default)
     const [hoursPolicy, setHoursPolicy] = useState<{ alwaysOpen: boolean; week: ReturnType<typeof toWeek>; policy: ExchangePolicyData }>(
         () => ({ alwaysOpen: true, week: toWeek(null), policy: defaultPolicy(exchange_options) }));
@@ -609,7 +611,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                             I confirm that all uploaded documents are authentic and valid
                                         </AgreementCheckbox>
                                         <AgreementCheckbox checked={agreePlan} onChange={setAgreePlan} id="reg_agree_plan">
-                                            I understand that my store gets a free 30-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
+                                            I understand that my store gets a free {trialDays}-day Premium trial after approval, and then needs a monthly subscription plan to stay visible to customers. I keep 100% of my sales.
                                         </AgreementCheckbox>
                                         <PlansDialogLink catalog={plan_catalog} />
                                     </div>
