@@ -79,9 +79,9 @@ type RecentAttendanceRow = {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SUB_ROLE_STYLES: Record<string, string> = {
-    cashier:   'bg-emerald-100 text-emerald-700',
-    warehouse: 'bg-amber-100 text-amber-700',
-    rider:     'bg-blue-100 text-blue-700',
+    cashier:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    warehouse: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    rider:     'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
 };
 
 const SUB_ROLE_LABELS: Record<string, string> = {
@@ -174,7 +174,7 @@ function PermissionManager({
                         </span>
                     </CardTitle>
                     <div className="flex gap-2">
-                        <Button size="sm" variant="outline" onClick={handleReset} disabled={resetting || saving} className="text-gray-600">
+                        <Button size="sm" variant="outline" onClick={handleReset} disabled={resetting || saving} className="text-muted-foreground">
                             <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                             {resetting ? 'Resetting…' : 'Only the roles (remove extra access)'}
                         </Button>
@@ -202,9 +202,9 @@ function PermissionManager({
                             return (
                                 <div key={group} className="space-y-2">
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">{group}</h4>
+                                        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group}</h4>
                                         {overriddenInGroup && (
-                                            <span className="rounded-full bg-purple-100 px-1.5 py-0.5 text-xs text-purple-600 font-medium">overridden</span>
+                                            <span className="rounded-full bg-purple-100 dark:bg-purple-900/40 px-1.5 py-0.5 text-xs text-purple-600 font-medium">overridden</span>
                                         )}
                                     </div>
                                     {perms.map((perm) => {
@@ -212,22 +212,22 @@ function PermissionManager({
                                         const isDefault   = roleDefaults.includes(perm.name);
                                         const isDifferent = isChecked !== isDefault;
                                         return (
-                                            <label key={perm.name} className="flex cursor-pointer items-start gap-2.5 rounded-md p-2 hover:bg-gray-50 transition-colors">
+                                            <label key={perm.name} className="flex cursor-pointer items-start gap-2.5 rounded-md p-2 hover:bg-muted transition-colors">
                                                 <input
                                                     type="checkbox"
                                                     checked={isChecked}
                                                     onChange={(e) => setChecked((prev) => ({ ...prev, [perm.name]: e.target.checked }))}
-                                                    className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 accent-blue-600"
+                                                    className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-blue-600"
                                                 />
                                                 <div className="min-w-0">
                                                     <p className={`text-xs font-medium leading-tight ${
-                                                        isDifferent ? 'text-purple-700' : isChecked ? 'text-gray-800' : 'text-gray-400'
+                                                        isDifferent ? 'text-purple-700 dark:text-purple-300' : isChecked ? 'text-foreground' : 'text-muted-foreground'
                                                     }`}>
                                                         {perm.name.split('.').pop()?.replace(/_/g, ' ')}
                                                         {isDifferent && <span className="ml-1 text-purple-500">★</span>}
                                                     </p>
                                                     {perm.description && (
-                                                        <p className="text-xs text-gray-400 leading-tight mt-0.5 truncate">{perm.description}</p>
+                                                        <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate">{perm.description}</p>
                                                     )}
                                                 </div>
                                             </label>
@@ -280,17 +280,17 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                     <CardContent className="pt-6">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-2xl font-bold uppercase shrink-0">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-2xl font-bold uppercase shrink-0">
                                     {staff.name.charAt(0)}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h1 className="text-xl font-bold">{staff.name}</h1>
-                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${staff.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${staff.is_active ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
                                             {staff.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                         {staff.paused_by_plan && <span className={PAUSED_BADGE}>Paused — over plan limit</span>}
-                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[staff.sub_role] ?? 'bg-gray-100 text-gray-600'}`}>
+                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[staff.sub_role] ?? 'bg-muted text-muted-foreground'}`}>
                                             {staff.role_names?.length ? staff.role_names.join(', ') : (SUB_ROLE_LABELS[staff.sub_role] ?? staff.sub_role)}
                                         </span>
                                     </div>
@@ -327,7 +327,7 @@ export default function SellerStaffShow({ staff, allPermissions, roleDefaults, u
                             <p className="text-sm text-muted-foreground">No clock-ins yet.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-xs text-muted-foreground">
                                             <th className="py-2 pr-3 font-medium">Date</th>

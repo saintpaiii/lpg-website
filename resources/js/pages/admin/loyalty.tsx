@@ -94,7 +94,7 @@ export default function AdminLoyalty({ stats, top_stores, records, stores, filte
                                 <button key={s.id} type="button" onClick={() => visit({ store_id: s.id, page: 1 })}
                                     className="rounded-lg border px-3 py-1.5 text-sm hover:bg-muted">
                                     <span className="text-muted-foreground">#{i + 1}</span> {s.store_name} · <strong>{s.customers}</strong>
-                                    {s.locked && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Locked (plan)</span>}
+                                    {s.locked && <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-xs font-semibold text-muted-foreground">Locked (plan)</span>}
                                 </button>
                             ))}
                         </CardContent>
@@ -129,7 +129,7 @@ export default function AdminLoyalty({ stats, top_stores, records, stores, filte
                             <p className="py-10 text-center text-sm text-muted-foreground">No loyalty records yet.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
                                             <th className="pb-3 pr-4 font-medium">Store</th>

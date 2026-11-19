@@ -53,10 +53,10 @@ const POSITION_LABELS: Record<string, string> = {
 };
 
 const POSITION_STYLES: Record<string, string> = {
-    manager:       'bg-purple-100 text-purple-700',
-    moderator:     'bg-blue-100 text-blue-700',
-    support_staff: 'bg-teal-100 text-teal-700',
-    accountant:    'bg-amber-100 text-amber-700',
+    manager:       'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    moderator:     'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    support_staff: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+    accountant:    'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
 };
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -102,10 +102,10 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: 'Platform Staff', href: '/admin/
 
 function PositionBadge({ subRole }: { subRole: string | null }) {
     if (!subRole) {
-        return <span className="text-xs text-gray-400">—</span>;
+        return <span className="text-xs text-muted-foreground">—</span>;
     }
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${POSITION_STYLES[subRole] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${POSITION_STYLES[subRole] ?? 'bg-muted text-muted-foreground'}`}>
             {POSITION_LABELS[subRole] ?? subRole}
         </span>
     );
@@ -113,12 +113,12 @@ function PositionBadge({ subRole }: { subRole: string | null }) {
 
 function StatusBadge({ active }: { active: boolean }) {
     return active ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Active
         </span>
     ) : (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
             Inactive
         </span>
@@ -129,7 +129,7 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     if (data.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-gray-500">Showing {data.from}–{data.to} of {data.total}</p>
+            <p className="text-sm text-muted-foreground">Showing {data.from}–{data.to} of {data.total}</p>
             <div className="flex gap-1">
                 {data.links.map((link, i) => (
                     <button
@@ -138,8 +138,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
                         onClick={() => link.url && onVisit(link.url!)}
                         className={`min-w-[32px] rounded px-2 py-1 text-sm ${
                             link.active ? 'bg-blue-600 text-white'
-                            : link.url  ? 'hover:bg-gray-100 text-gray-600'
-                            : 'text-gray-300 cursor-not-allowed'
+                            : link.url  ? 'hover:bg-muted text-muted-foreground'
+                            : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -318,7 +318,7 @@ function StaffFormDialog({
                     </div>
 
                     {!isEdit && (
-                        <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-950/40 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
                             After creating, you'll be taken to their profile to set permissions.
                         </div>
                     )}
@@ -465,8 +465,8 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Platform Staff</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <h1 className="text-2xl font-bold text-foreground">Platform Staff</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             Manage admin panel access for platform staff members.
                         </p>
                     </div>
@@ -497,7 +497,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                 <Archive className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-gray-400">{archivedCount}</div>
+                                <div className="text-2xl font-bold text-muted-foreground">{archivedCount}</div>
                                 <p className="text-xs text-muted-foreground">inactive accounts</p>
                             </CardContent>
                         </Card>
@@ -505,12 +505,12 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                 )}
 
                 {/* Tabs */}
-                <div className="border-b border-gray-200">
+                <div className="border-b border-border">
                     <nav className="-mb-px flex gap-6">
                         <button
                             onClick={() => switchTab('active')}
                             className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
-                                !isArchived ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                                !isArchived ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'
                             }`}
                         >
                             Active
@@ -518,12 +518,12 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                         <button
                             onClick={() => switchTab('archived')}
                             className={`flex items-center gap-1.5 border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
-                                isArchived ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                                isArchived ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'
                             }`}
                         >
                             Archived
                             {archivedCount > 0 && (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">
+                                <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
                                     {archivedCount}
                                 </span>
                             )}
@@ -536,7 +536,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                     <CardContent className="pt-4 pb-4">
                         <div className="flex flex-wrap items-center gap-3">
                             <div className="relative flex-1 min-w-[200px]">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     className="pl-8"
                                     placeholder="Search by name or email…"
@@ -549,7 +549,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                 Search
                             </Button>
                             {search && (
-                                <Button size="sm" variant="ghost" onClick={() => { setSearch(''); router.get('/admin/staff', { tab }); }} className="text-gray-500">
+                                <Button size="sm" variant="ghost" onClick={() => { setSearch(''); router.get('/admin/staff', { tab }); }} className="text-muted-foreground">
                                     Clear
                                 </Button>
                             )}
@@ -563,14 +563,14 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Users className="h-4 w-4 text-blue-600" />
                             {isArchived ? 'Archived Staff' : 'Staff Members'}
-                            <span className="ml-auto text-sm font-normal text-gray-400">
+                            <span className="ml-auto text-sm font-normal text-muted-foreground">
                                 {staff.total} record{staff.total !== 1 ? 's' : ''}
                             </span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {staff.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <UserCog className="mb-3 h-10 w-10" />
                                 <p className="font-medium">
                                     {isArchived ? 'No archived staff' : 'No platform staff yet'}
@@ -581,9 +581,9 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Name</th>
                                             <th className="px-4 py-3">Position</th>
                                             <th className="px-4 py-3">Status</th>
@@ -592,18 +592,18 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {staff.data.map((s) => (
-                                            <tr key={s.id} className="hover:bg-gray-50/60">
+                                            <tr key={s.id} className="hover:bg-muted/60">
                                                 <td className="px-4 py-3">
                                                     <button
                                                         onClick={() => router.visit(`/admin/staff/${s.id}`)}
                                                         className="text-left hover:underline"
                                                     >
-                                                        <p className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                                                        <p className="font-medium text-foreground hover:text-blue-600 transition-colors">
                                                             {s.name}
                                                         </p>
-                                                        <p className="text-xs text-gray-400">{s.email}</p>
+                                                        <p className="text-xs text-muted-foreground">{s.email}</p>
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -611,22 +611,22 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {isArchived ? (
-                                                        <span className="text-xs text-gray-400">Archived {s.deleted_at}</span>
+                                                        <span className="text-xs text-muted-foreground">Archived {s.deleted_at}</span>
                                                     ) : (
                                                         <StatusBadge active={s.is_active} />
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     {s.permission_count > 0 ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/40 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
                                                             <Shield className="h-3 w-3" />
                                                             {s.permission_count}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-xs text-gray-300">—</span>
+                                                        <span className="text-xs text-muted-foreground">—</span>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(s.created_at)}</td>
+                                                <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
                                                         {isArchived ? (
@@ -634,7 +634,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => handleRestore(s)}
-                                                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50"
+                                                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                                                     title="Restore"
                                                                 >
                                                                     <RotateCcw className="h-3.5 w-3.5" />
@@ -642,7 +642,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => setForceTarget(s)}
-                                                                    className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600"
+                                                                    className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600"
                                                                     title="Delete permanently"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5" />
@@ -653,7 +653,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => router.visit(`/admin/staff/${s.id}`)}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                                                     title="View & manage permissions"
                                                                 >
                                                                     <Eye className="h-3.5 w-3.5" />
@@ -661,7 +661,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => openEdit(s)}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                                                     title="Edit account"
                                                                 >
                                                                     <Shield className="h-3.5 w-3.5" />
@@ -669,7 +669,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => handleToggle(s)}
-                                                                    className={`h-7 w-7 p-0 ${s.is_active ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                                                                    className={`h-7 w-7 p-0 ${s.is_active ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-700 dark:hover:text-amber-300' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300'}`}
                                                                     title={s.is_active ? 'Deactivate' : 'Activate'}
                                                                 >
                                                                     {s.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
@@ -677,7 +677,7 @@ export default function StaffPage({ staff, tab, archivedCount, filters }: Props)
                                                                 <Button
                                                                     size="sm" variant="ghost"
                                                                     onClick={() => setArchiveTarget(s)}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                                                     title="Archive"
                                                                 >
                                                                     <Archive className="h-3.5 w-3.5" />

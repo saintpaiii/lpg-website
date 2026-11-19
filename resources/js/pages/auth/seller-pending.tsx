@@ -77,38 +77,38 @@ export default function SellerPending({ sent_back = null, status = null, suspens
                         {suspensionInfo ? 'Store Suspended' : sent_back ? 'Application Sent Back' : 'Application Under Review'}
                     </h1>
                     <p className="text-center text-sm text-gray-500 dark:text-gray-400 mb-8">
-                        {status === 'pending' && user && <span className="mb-1 block text-xs text-gray-400">This page updates by itself when your store is approved.</span>}
+                        {status === 'pending' && user && <span className="mb-1 block text-xs text-muted-foreground">This page updates by itself when your store is approved.</span>}
                         {suspensionInfo
                             ? 'Your store has been temporarily suspended by the platform administrator.'
                             : "Thank you for applying to the LPG Marketplace Cavite. Here's what happens next:"}
                     </p>
 
                     {flash?.success && (
-                        <div className="mb-6 rounded-xl border border-green-300 bg-green-50 p-3 text-sm text-green-900">{flash.success}</div>
+                        <div className="mb-6 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-3 text-sm text-green-900 dark:text-green-300">{flash.success}</div>
                     )}
                     {/* Sent back by the admin: each rejected document + re-upload just those (J3) */}
                     {sent_back && <SellerResubmitCard sentBack={sent_back} />}
 
                     {/* Not blocking: same store name elsewhere / another store pinned within 50 m */}
                     {flash?.warning && (
-                        <div className="mb-6 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div className="mb-6 flex items-start gap-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-900 dark:text-amber-300">
                             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                             <p>{flash.warning}</p>
                         </div>
                     )}
                     {suspensionInfo && (
-                        <div className="mb-6 rounded-xl bg-orange-50 border border-orange-200 p-4">
+                        <div className="mb-6 rounded-xl bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 p-4">
                             <div className="flex items-start gap-3">
                                 <AlertTriangle className="h-5 w-5 text-orange-600 shrink-0 mt-0.5" />
                                 <div>
-                                    <p className="text-sm font-semibold text-orange-800">Your store is suspended</p>
+                                    <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">Your store is suspended</p>
                                     {suspensionInfo.reason && (
-                                        <p className="mt-1 text-sm text-orange-700">
+                                        <p className="mt-1 text-sm text-orange-700 dark:text-orange-300">
                                             <span className="font-medium">Reason:</span> {suspensionInfo.reason}
                                         </p>
                                     )}
                                     {suspensionInfo.notes && (
-                                        <p className="mt-0.5 text-sm text-orange-700 italic">"{suspensionInfo.notes}"</p>
+                                        <p className="mt-0.5 text-sm text-orange-700 dark:text-orange-300 italic">"{suspensionInfo.notes}"</p>
                                     )}
                                     {contact_email && (
                                         <p className="mt-2 text-xs text-orange-600">
@@ -137,7 +137,7 @@ export default function SellerPending({ sent_back = null, status = null, suspens
                                     <p className={`text-sm font-semibold ${done ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}>
                                         {title}
                                     </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 leading-relaxed">
+                                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
                                         {desc}
                                     </p>
                                 </div>

@@ -125,14 +125,14 @@ export default function CustomerProfile({ profile }: Props) {
                         <form onSubmit={handleProfileSubmit} className="space-y-4">
                             {/* Email — read only */}
                             <div className="grid gap-1.5">
-                                <Label className="text-sm font-medium text-gray-700">Email address</Label>
+                                <Label className="text-sm font-medium text-foreground/80">Email address</Label>
                                 <Input
                                     type="email"
                                     value={profile.email}
                                     disabled
-                                    className="bg-gray-50 text-gray-500 cursor-not-allowed"
+                                    className="bg-muted text-muted-foreground cursor-not-allowed"
                                 />
-                                <p className="text-xs text-gray-400">Email cannot be changed. Contact support if needed.</p>
+                                <p className="text-xs text-muted-foreground">Email cannot be changed. Contact support if needed.</p>
                             </div>
 
                             {/* Name fields — first / middle / last / suffix */}
@@ -175,7 +175,7 @@ export default function CustomerProfile({ profile }: Props) {
                                     )}
                                 </div>
                                 <div className="grid gap-1.5">
-                                    <Label htmlFor="suffix" className="text-sm font-medium">Suffix <span className="font-normal text-gray-400">(optional)</span></Label>
+                                    <Label htmlFor="suffix" className="text-sm font-medium">Suffix <span className="font-normal text-muted-foreground">(optional)</span></Label>
                                     <SuffixSelect value={profileForm.data.suffix} onChange={(v) => profileForm.setData('suffix', v)} />
                                     {profileForm.errors.suffix && (
                                         <p className="text-xs text-red-500">{profileForm.errors.suffix}</p>
@@ -215,7 +215,7 @@ export default function CustomerProfile({ profile }: Props) {
 
                             <div className="grid gap-1.5">
                                 <Label className="text-sm font-medium">Delivery pin</Label>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-muted-foreground">
                                     Search your street or landmark, then drag the pin (or tap the map) to your exact house.
                                     This becomes your <strong>Home</strong> address at checkout.
                                 </p>
@@ -328,12 +328,12 @@ export default function CustomerProfile({ profile }: Props) {
                         <Link href="/settings/two-factor" className="flex items-center gap-3 px-6 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/60">
                             <ShieldCheck className="h-4 w-4 shrink-0 text-blue-600" />
                             <span className="flex-1 font-medium">Two-factor authentication</span>
-                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </Link>
                         <Link href="/settings/appearance" className="flex items-center gap-3 px-6 py-3 text-sm hover:bg-gray-50 dark:hover:bg-gray-800/60">
                             <Palette className="h-4 w-4 shrink-0 text-blue-600" />
                             <span className="flex-1 font-medium">Appearance (light / dark)</span>
-                            <ChevronRight className="h-4 w-4 text-gray-400" />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </Link>
                     </CardContent>
                 </Card>

@@ -44,8 +44,8 @@ type Props = {
 function Stars({ value }: { value: number }) {
     return (
         <span className="text-sm leading-none" aria-label={`${value} of 5 stars`}>
-            <span className="text-amber-400">{'★'.repeat(value)}</span>
-            <span className="text-gray-300">{'★'.repeat(5 - value)}</span>
+            <span className="text-amber-600 dark:text-amber-400">{'★'.repeat(value)}</span>
+            <span className="text-gray-500">{'★'.repeat(5 - value)}</span>
         </span>
     );
 }
@@ -100,7 +100,7 @@ export default function AdminReviews({ reviews, filters }: Props) {
             <Head title="Reviews" />
             <div className="space-y-4 p-4 md:p-6">
                 <div>
-                    <h1 className="flex items-center gap-2 text-xl font-bold"><Star className="h-5 w-5 text-amber-400" /> Reviews</h1>
+                    <h1 className="flex items-center gap-2 text-xl font-bold"><Star className="h-5 w-5 text-amber-600 dark:text-amber-400" /> Reviews</h1>
                     <p className="text-sm text-muted-foreground">Customer reviews across all stores. Remove photos or reviews that break the review rules — the customer is told.</p>
                 </div>
 
@@ -108,7 +108,7 @@ export default function AdminReviews({ reviews, filters }: Props) {
                 <div className="flex flex-wrap items-center gap-2">
                     <button
                         type="button" aria-pressed={filters.with_photos} onClick={() => apply({ with_photos: !filters.with_photos })}
-                        className={`rounded-full border px-3 py-1 text-xs font-medium ${filters.with_photos ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300'}`}
+                        className={`rounded-full border px-3 py-1 text-xs font-medium ${filters.with_photos ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-600 hover:bg-muted dark:border-gray-700 dark:text-gray-300'}`}
                     >
                         With photos
                     </button>
@@ -145,7 +145,7 @@ export default function AdminReviews({ reviews, filters }: Props) {
                                                 {r.photos_removed_by_admin > 0 && <> · <span className="text-red-600">{r.photos_removed_by_admin} photo{r.photos_removed_by_admin > 1 ? 's' : ''} removed before</span></>}
                                             </p>
                                         </div>
-                                        <Button size="sm" variant="outline" className="h-7 gap-1 border-red-200 px-2 text-xs text-red-600 hover:bg-red-50" onClick={() => { setReason(''); setDeleting(r); }}>
+                                        <Button size="sm" variant="outline" className="h-7 gap-1 border-red-200 dark:border-red-800 px-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { setReason(''); setDeleting(r); }}>
                                             <Trash2 className="h-3.5 w-3.5" /> Delete review
                                         </Button>
                                     </div>
@@ -178,7 +178,7 @@ export default function AdminReviews({ reviews, filters }: Props) {
                             <button
                                 key={i} disabled={!l.url} onClick={() => l.url && router.visit(l.url, { preserveScroll: true })}
                                 dangerouslySetInnerHTML={{ __html: l.label }}
-                                className={`min-w-[32px] rounded px-2 py-1 text-sm ${l.active ? 'bg-blue-600 text-white' : l.url ? 'text-gray-600 hover:bg-gray-100' : 'pointer-events-none text-gray-300'}`}
+                                className={`min-w-[32px] rounded px-2 py-1 text-sm ${l.active ? 'bg-blue-600 text-white' : l.url ? 'text-muted-foreground hover:bg-muted' : 'pointer-events-none text-muted-foreground'}`}
                             />
                         ))}
                     </div>

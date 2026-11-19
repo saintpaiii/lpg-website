@@ -60,7 +60,7 @@ function UpdateStatusButton({ stop, onUpdateStatus, isDisabled }: {
     return (
         <div className="grid gap-1">
             <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open}
-                className="inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-md border border-gray-300 px-2 text-xs font-semibold hover:bg-gray-50">
+                className="inline-flex min-h-9 w-full items-center justify-center gap-1 rounded-md border border-border px-2 text-xs font-semibold hover:bg-muted">
                 Update status <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
@@ -71,9 +71,9 @@ function UpdateStatusButton({ stop, onUpdateStatus, isDisabled }: {
                             <button key={s} type="button" role="menuitem" disabled={!!why} title={why ?? undefined}
                                 onClick={() => { setOpen(false); onUpdateStatus(stop, s); }}
                                 className={`min-h-9 rounded-md px-2 text-left text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${s === 'failed'
-                                    ? 'bg-red-50 text-red-700 hover:bg-red-100'
-                                    : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
-                                {NEXT_LABEL[s]}{why && <span className="ml-1 font-normal text-gray-500">({why})</span>}
+                                    ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40'
+                                    : 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40'}`}>
+                                {NEXT_LABEL[s]}{why && <span className="ml-1 font-normal text-muted-foreground">({why})</span>}
                             </button>
                         );
                     })}
@@ -182,7 +182,7 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
                         <Marker position={[route.store.lat, route.store.lng]} icon={pinIcon(PIN_COLORS.store, '🏪')}>
                             <Popup>
                                 <strong>Store — pickup</strong>
-                                {route.store.approximate && <div className="text-xs text-gray-500">Approximate (barangay centre)</div>}
+                                {route.store.approximate && <div className="text-xs text-muted-foreground">Approximate (barangay centre)</div>}
                             </Popup>
                         </Marker>
                     )}
@@ -195,19 +195,19 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
                                 <Popup minWidth={220}>
                                     <div className="space-y-1 text-sm">
                                         <p className="font-semibold">#{s.number} — {s.customer_name}</p>
-                                        <p className="text-xs text-gray-600">{s.address || 'No address on file'}</p>
+                                        <p className="text-xs text-muted-foreground">{s.address || 'No address on file'}</p>
                                         <CompactContact phone={s.customer_phone} email={s.customer_email} />
                                         <p className="text-xs">
                                             {peso(s.amount)} ({s.payment_label})
-                                            {s.amount_to_collect > 0 && <span className="font-semibold text-amber-700"> · collect {peso(s.amount_to_collect)}</span>}
+                                            {s.amount_to_collect > 0 && <span className="font-semibold text-amber-700 dark:text-amber-300"> · collect {peso(s.amount_to_collect)}</span>}
                                         </p>
                                         {!!s.empty_tanks_required && !s.empty_tanks_collected && (
-                                            <p className="text-xs font-semibold text-amber-700">♻ Collect {s.empty_tank_summary} empty</p>
+                                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">♻ Collect {s.empty_tank_summary} empty</p>
                                         )}
                                         <p className="text-xs">
                                             Status: <span className="font-semibold" style={{ color: st.color }}>{s.status === 'delivered' ? '✓ ' : s.status === 'failed' ? '✕ ' : ''}{st.label}</span>
                                         </p>
-                                        {s.order_number && <p className="font-mono text-[11px] text-gray-500">{s.order_number}</p>}
+                                        {s.order_number && <p className="font-mono text-xs text-muted-foreground">{s.order_number}</p>}
                                         {!isDone(s.status) && (
                                             <div className="grid gap-1.5 pt-1.5">
                                                 <div className="flex gap-1.5">
@@ -217,7 +217,7 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
                                                     </a>
                                                     {onMessage && (
                                                         <button type="button" onClick={() => onMessage(s)} aria-label={`Message ${s.customer_name}`} title="Message customer"
-                                                            className="inline-flex min-h-9 items-center justify-center rounded-md border border-gray-300 px-2.5 hover:bg-gray-50">
+                                                            className="inline-flex min-h-9 items-center justify-center rounded-md border border-border px-2.5 hover:bg-muted">
                                                             <MessageSquare className="h-3 w-3" />
                                                         </button>
                                                     )}
@@ -242,12 +242,12 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
             </div>
 
             {!paths.ok && (
-                <p className="rounded-md bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
+                <p className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-1.5 text-xs text-amber-800 dark:text-amber-300">
                     Road routing is unavailable right now, so stops are joined with straight lines. Use <strong>Navigate</strong> for turn-by-turn directions.
                 </p>
             )}
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 <Legend color={PIN_COLORS.store} label="Store" />
                 {(Object.keys(STOP_STATUS) as RouteStop['status'][]).map((k) => (
                     <Legend key={k} color={STOP_STATUS[k].color} label={STOP_STATUS[k].legend} />
@@ -256,11 +256,11 @@ export default function DeliveryMap({ route, riderPos, onUpdateStatus, statusDis
             </div>
 
             {route.stops.length === 0 && (
-                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-gray-500">No active deliveries — only the store is shown.</p>
+                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">No active deliveries — only the store is shown.</p>
             )}
 
             {unmapped.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-3 text-sm text-amber-800 dark:text-amber-300">
                     <p className="mb-1 flex items-center gap-1.5 font-semibold"><MapPinOff className="h-4 w-4" /> Location not available</p>
                     {unmapped.map((s) => (
                         <div key={s.id} className="flex items-center justify-between gap-2 py-0.5">

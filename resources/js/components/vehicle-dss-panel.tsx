@@ -38,11 +38,11 @@ export default function VehicleDssPanel({ dss, orderId, onUseRecommended }: { ds
                 <div className="flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200" data-testid="dss-recommended">
                     <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     <div className="flex-1">
-                        <span className="mr-1 rounded bg-emerald-600 px-1.5 py-px text-[10px] font-bold text-white">Recommended</span>
+                        <span className="mr-1 rounded bg-emerald-600 px-1.5 py-px text-xs font-bold text-white">Recommended</span>
                         {dss.recommended_text}
                     </div>
                     {onUseRecommended && dss.recommended_rider_id && (
-                        <button type="button" className="shrink-0 font-semibold text-emerald-700 underline" onClick={() => onUseRecommended(dss.recommended_rider_id!)}>Use</button>
+                        <button type="button" className="shrink-0 font-semibold text-emerald-700 dark:text-emerald-300 underline" onClick={() => onUseRecommended(dss.recommended_rider_id!)}>Use</button>
                     )}
                 </div>
             )}

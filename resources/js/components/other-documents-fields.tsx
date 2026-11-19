@@ -36,9 +36,9 @@ export function otherRowsPayload(rows: OtherDocRow[]) {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-    pending:  'bg-amber-100 text-amber-800',
-    approved: 'bg-emerald-100 text-emerald-700',
-    rejected: 'bg-red-100 text-red-700',
+    pending:  'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
+    approved: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    rejected: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
 };
 
 /**
@@ -66,7 +66,7 @@ export function OtherDocumentsFields({ rows, onChange, errors = {}, max = 5, pre
         <div className="space-y-3 rounded-xl border border-dashed border-gray-300 p-4 dark:border-gray-700">
             <div>
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Other documents (optional)</p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                     Extra proof helps the review — e.g. barangay clearance, a photo of the store front, the lease contract.
                     JPG, PNG, WEBP or PDF · max 5 MB each · up to {max}.
                 </p>
@@ -77,10 +77,10 @@ export function OtherDocumentsFields({ rows, onChange, errors = {}, max = 5, pre
                     <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Sent before</p>
                     {previous.map((d) => (
                         <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-md bg-gray-50 px-3 py-2 text-xs dark:bg-gray-800/60">
-                            <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                            <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                             <span className="min-w-0 flex-1 truncate font-medium text-gray-700 dark:text-gray-200">{d.label}</span>
-                            {d.expires_on && <span className="text-gray-500">valid until {d.expires_on}</span>}
-                            <span className={`rounded-full px-2 py-0.5 font-medium capitalize ${STATUS_STYLE[d.status] ?? 'bg-gray-100 text-gray-600'}`}>{d.status}</span>
+                            {d.expires_on && <span className="text-muted-foreground">valid until {d.expires_on}</span>}
+                            <span className={`rounded-full px-2 py-0.5 font-medium capitalize ${STATUS_STYLE[d.status] ?? 'bg-muted text-muted-foreground'}`}>{d.status}</span>
                             <a href={d.url} target="_blank" rel="noopener noreferrer" className="font-medium text-blue-600 hover:underline">View</a>
                         </div>
                     ))}
@@ -103,7 +103,7 @@ export function OtherDocumentsFields({ rows, onChange, errors = {}, max = 5, pre
                     <Plus className="h-4 w-4" /> Add another document
                 </Button>
             ) : (
-                <p className="text-xs text-gray-500">You can add up to {max} extra documents here.</p>
+                <p className="text-xs text-muted-foreground">You can add up to {max} extra documents here.</p>
             )}
         </div>
     );
@@ -124,8 +124,8 @@ function OtherDocRowFields({ row, n, onChange, onRemove, errors, minDate }: {
     return (
         <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-gray-500">Document {n}</p>
-                <button type="button" onClick={onRemove} aria-label={`Remove document ${n}`} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                <p className="text-xs font-semibold text-muted-foreground">Document {n}</p>
+                <button type="button" onClick={onRemove} aria-label={`Remove document ${n}`} className="rounded p-1 text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600">
                     <X className="h-4 w-4" />
                 </button>
             </div>
@@ -140,8 +140,8 @@ function OtherDocRowFields({ row, n, onChange, onRemove, errors, minDate }: {
                                 if (c === 'Other') { setTyping(true); if (OTHER_DOC_CHIPS.includes(row.label)) onChange({ label: '' }); }
                                 else { setTyping(false); onChange({ label: c }); }
                             }}
-                            className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-colors ${
-                                active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300'
+                            className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                                active ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 text-gray-600 hover:bg-muted dark:border-gray-600 dark:text-gray-300'
                             }`}
                         >
                             {c}
@@ -176,7 +176,7 @@ function OtherDocRowFields({ row, n, onChange, onRemove, errors, minDate }: {
                         <div className="flex min-w-0 items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs dark:border-blue-800 dark:bg-blue-950/30">
                             <FileText className="h-3.5 w-3.5 shrink-0 text-blue-600" />
                             <span className="min-w-0 flex-1 truncate">{row.file.name}</span>
-                            <button type="button" onClick={() => onChange({ file: null })} aria-label="Remove file" className="text-gray-400 hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
+                            <button type="button" onClick={() => onChange({ file: null })} aria-label="Remove file" className="text-muted-foreground hover:text-red-600"><X className="h-3.5 w-3.5" /></button>
                         </div>
                     ) : (
                         <Button type="button" variant="outline" size="sm" className="h-9 justify-start" onClick={() => fileRef.current?.click()}>

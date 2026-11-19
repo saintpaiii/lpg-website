@@ -313,7 +313,7 @@ export default function SellerPlan({ plan, catalog, usage, payments, choose, pau
                             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No payments yet.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-2.5">Receipt #</th>

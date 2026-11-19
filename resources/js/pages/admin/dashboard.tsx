@@ -339,7 +339,7 @@ export default function Dashboard({
                 </Card>
 
                 {/* Auth Activity card */}
-                <Card className={authStats.suspiciousCount > 0 ? 'border-orange-300' : authStats.failedToday > 10 ? 'border-red-300' : ''}>
+                <Card className={authStats.suspiciousCount > 0 ? 'border-orange-200 dark:border-orange-800' : authStats.failedToday > 10 ? 'border-red-200 dark:border-red-800' : ''}>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center justify-between gap-2">
                             <span className="flex items-center gap-2">
@@ -355,34 +355,34 @@ export default function Dashboard({
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <div className="grid grid-cols-2 gap-3">
-                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-center">
+                            <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 p-3 text-center">
                                 <div className="flex items-center justify-center gap-1.5 mb-1">
                                     <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                    <span className="text-2xl font-black text-emerald-700">{authStats.successToday}</span>
+                                    <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{authStats.successToday}</span>
                                 </div>
                                 <p className="text-xs text-emerald-600">Successful logins today</p>
                             </div>
-                            <div className={`rounded-lg border p-3 text-center ${authStats.failedToday > 10 ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}>
+                            <div className={`rounded-lg border p-3 text-center ${authStats.failedToday > 10 ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800' : 'bg-muted border-border'}`}>
                                 <div className="flex items-center justify-center gap-1.5 mb-1">
-                                    <XCircle className={`h-4 w-4 ${authStats.failedToday > 10 ? 'text-red-600' : 'text-gray-400'}`} />
-                                    <span className={`text-2xl font-black ${authStats.failedToday > 10 ? 'text-red-700' : 'text-gray-700'}`}>{authStats.failedToday}</span>
+                                    <XCircle className={`h-4 w-4 ${authStats.failedToday > 10 ? 'text-red-600' : 'text-muted-foreground'}`} />
+                                    <span className={`text-2xl font-black ${authStats.failedToday > 10 ? 'text-red-700 dark:text-red-300' : 'text-foreground/80'}`}>{authStats.failedToday}</span>
                                 </div>
-                                <p className={`text-xs ${authStats.failedToday > 10 ? 'text-red-600' : 'text-gray-500'}`}>Failed attempts today</p>
+                                <p className={`text-xs ${authStats.failedToday > 10 ? 'text-red-600' : 'text-muted-foreground'}`}>Failed attempts today</p>
                             </div>
                         </div>
                         {authStats.suspiciousCount > 0 && (
-                            <div className="flex items-center gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 px-3 py-2 text-sm">
                                 <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0" />
-                                <p className="text-orange-800 text-xs">
+                                <p className="text-orange-800 dark:text-orange-300 text-xs">
                                     <span className="font-bold">{authStats.suspiciousCount} IP(s)</span> with 5+ failed attempts in the last hour.{' '}
                                     {canOpen('/admin/auth-logs') && <Link href="/admin/auth-logs" className="underline">Review now</Link>}
                                 </p>
                             </div>
                         )}
                         {authStats.failedToday > 10 && authStats.suspiciousCount === 0 && (
-                            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                            <div className="flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2">
                                 <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
-                                <p className="text-xs text-red-700 font-medium">High number of failed login attempts today.</p>
+                                <p className="text-xs text-red-700 dark:text-red-300 font-medium">High number of failed login attempts today.</p>
                             </div>
                         )}
                     </CardContent>
@@ -392,7 +392,7 @@ export default function Dashboard({
                 <Card>
                     <CardHeader className="pb-2">
                         <CardTitle className="text-base flex items-center gap-2">
-                            <Activity className="h-4 w-4 text-gray-500" />
+                            <Activity className="h-4 w-4 text-muted-foreground" />
                             Recent Activity
                         </CardTitle>
                     </CardHeader>

@@ -42,7 +42,7 @@ export default function LegalShow({ type, label, document: doc, current_version,
                         {doc ? (
                             <>
                                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{doc.title}</h1>
-                                <p className="mt-1 text-sm text-gray-500">Version {doc.version} · Effective {doc.effective_date}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">Version {doc.version} · Effective {doc.effective_date}</p>
                                 {!doc.is_current && current_version !== null && (
                                     <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                                         You are viewing an older version.{' '}
@@ -59,7 +59,7 @@ export default function LegalShow({ type, label, document: doc, current_version,
                         )}
                     </div>
 
-                    <nav className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                    <nav className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                         {links.filter((l) => l.type !== type).map((l) => (
                             <Link key={l.type} href={l.url} className="hover:text-gray-900 hover:underline dark:hover:text-white">{l.label}</Link>
                         ))}

@@ -101,7 +101,7 @@ export default function Register() {
                 <div>
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-blue-600 transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Home
@@ -135,7 +135,7 @@ export default function Register() {
                                 className="rounded-xl border-2 border-gray-200 bg-white p-4 transition-colors hover:border-blue-400 hover:bg-blue-50/50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800">
                                 <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                                     <Store className="h-5 w-5 text-emerald-600" /> I only want to sell LPG
-                                    <span className="text-xs font-normal text-gray-500">(store owner)</span>
+                                    <span className="text-xs font-normal text-muted-foreground">(store owner)</span>
                                 </div>
                                 <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
                                     Seller-only accounts can't place orders. If you also want to buy, register as a customer and use Start Selling later.
@@ -187,7 +187,7 @@ export default function Register() {
 
                                 <div className="grid gap-2">
                                     <Label htmlFor="suffix" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                        Suffix <span className="font-normal text-gray-400">(optional)</span>
+                                        Suffix <span className="font-normal text-muted-foreground">(optional)</span>
                                     </Label>
                                     <SuffixSelect value={fields.suffix} onChange={(v) => set('suffix', v)} className="h-11" />
                                     <InputError message={errors.suffix} />
@@ -283,7 +283,7 @@ export default function Register() {
 
                         <div className="mt-5 flex items-center gap-3">
                             <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                            <span className="text-xs text-gray-400 dark:text-gray-500">or</span>
+                            <span className="text-xs text-muted-foreground">or</span>
                             <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
                         </div>
 
@@ -311,10 +311,10 @@ export default function Register() {
                             Want to sell on our platform? Register here, then apply from your customer account.
                         </p>
 
-                        <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
+                        <p className="mt-8 text-center text-xs text-muted-foreground">
                             LPG Marketplace &bull; Cavite
                         </p>
-                        <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                        <p className="mt-2 text-center text-xs text-muted-foreground">
                             <a href="/terms" className="hover:underline">Terms</a> &middot; <a href="/privacy" className="hover:underline">Privacy</a>
                         </p>
                     </div>

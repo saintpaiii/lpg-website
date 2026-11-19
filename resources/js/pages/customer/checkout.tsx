@@ -538,7 +538,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 <p>{customer.phone}</p>
                                 <p>{deliveryText || formatAddress(customer.address, customer.barangay, customer.city)}</p>
                                 {delivery.addressId !== null && (
-                                    <p className="text-xs text-gray-500">{addresses.find((a) => a.id === delivery.addressId)?.label ?? 'Saved address'}</p>
+                                    <p className="text-xs text-muted-foreground">{addresses.find((a) => a.id === delivery.addressId)?.label ?? 'Saved address'}</p>
                                 )}
                             </div>
                         ) : (
@@ -578,7 +578,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     Use My Current Location
                                 </Button>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-muted-foreground mt-1">
                                 {pin
                                     ? 'Your pin is auto-placed based on your address. Drag it or tap the map to adjust for accuracy.'
                                     : 'Search your address or tap the map to pin your delivery location, or use GPS.'}
@@ -626,7 +626,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                         <CardContent className="p-0">
                             {/* Distance & fee info per store */}
                             {pin && Object.keys(distFees).length > 0 && (
-                                <div className="mt-3 px-4 py-3 space-y-1.5 border-t border-gray-100 bg-blue-50/60 dark:bg-blue-900/10">
+                                <div className="mt-3 px-4 py-3 space-y-1.5 border-t border-border bg-blue-50/60 dark:bg-blue-900/10">
                                     {stores.filter((sg) => distFees[sg.store_id] && fulfillmentOf(sg) === 'delivery').map((sg) => {
                                         const df = distFees[sg.store_id];
                                         return (
@@ -634,7 +634,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                 <span className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
                                                     <MapPin className="h-3.5 w-3.5 text-blue-500 shrink-0" />
                                                     {sg.store_name}
-                                                    <span className="text-xs text-gray-400">
+                                                    <span className="text-xs text-muted-foreground">
                                                         {df.distKm.toFixed(1)} km
                                                         {osrmRoute && stores.length === 1 && ` road · ~${osrmRoute.durationMin} min`}
                                                     </span>
@@ -648,7 +648,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 </div>
                             )}
                             {!pin && (
-                                <div className="mt-3 px-4 py-3 text-xs text-gray-400 text-center border-t border-gray-100">
+                                <div className="mt-3 px-4 py-3 text-xs text-muted-foreground text-center border-t border-border">
                                     No pin set — the base delivery fee applies. Your order will still be placed at your barangay for the rider's map.
                                 </div>
                             )}
@@ -664,13 +664,13 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                     <Card key={sg.store_id} className="opacity-60">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Store className="h-4 w-4 text-gray-400" />
+                                <Store className="h-4 w-4 text-muted-foreground" />
                                 {sg.store_name}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-1 text-sm text-gray-600 dark:text-gray-300">
                             <p className="font-medium">This store is not available right now</p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                                 {sg.items.map((i) => `${i.quantity}× ${i.name}`).join(', ')} — not included in this order.
                             </p>
                         </CardContent>
@@ -724,7 +724,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                         <p className="mt-0.5">{blocked}</p>
                                         <p className="mt-1 text-xs">{deliveryHint(blockedCode, !!sg.allow_pickup)}</p>
                                         {sg.allow_pickup && (
-                                            <Button type="button" size="sm" variant="outline" className="mt-2 border-red-300 bg-white text-red-700 hover:bg-red-50 dark:bg-transparent"
+                                            <Button type="button" size="sm" variant="outline" className="mt-2 border-red-200 dark:border-red-800 bg-white text-red-700 dark:text-red-300 hover:bg-red-50 dark:bg-transparent"
                                                 onClick={() => setFulfillments((prev) => ({ ...prev, [sg.store_id]: 'pickup' }))}>
                                                 <Store className="mr-1 h-3.5 w-3.5" /> Switch to pick-up
                                             </Button>
@@ -772,7 +772,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                 )}
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{item.name}</p>
-                                                    <p className="text-xs text-gray-500">{item.product_type === 'accessory' ? 'Accessory' : <>{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</>}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.product_type === 'accessory' ? 'Accessory' : <>{item.brand} · {item.weight} · {item.transaction_type === 'refill' ? 'Refill' : 'New Purchase'}</>}</p>
                                                     {item.over_max && (
                                                         <p className="text-xs font-medium text-red-600">{overLimitText(item, 'reduce the quantity in your cart to continue')}</p>
                                                     )}
@@ -781,7 +781,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                     <p className="text-sm font-semibold text-gray-900 dark:text-white">
                                                         {peso(unitPrice * item.quantity)}
                                                     </p>
-                                                    <p className="text-xs text-gray-400">×{item.quantity}</p>
+                                                    <p className="text-xs text-muted-foreground">×{item.quantity}</p>
                                                 </div>
                                             </div>
                                         );
@@ -827,10 +827,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                                 type="checkbox"
                                                                 checked={checked}
                                                                 onChange={() => setSelectedCoupons((prev) => ({ ...prev, [sg.store_id]: checked ? null : c.id }))}
-                                                                className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                                                className="h-4 w-4 rounded border-border text-emerald-600 focus:ring-emerald-500"
                                                             />
                                                             <span className="font-mono text-xs">{c.code}</span>
-                                                            {c.expires_at && <span className="text-xs text-gray-400">until {c.expires_at}</span>}
+                                                            {c.expires_at && <span className="text-xs text-muted-foreground">until {c.expires_at}</span>}
                                                         </span>
                                                         <span className="font-semibold text-emerald-700 dark:text-emerald-400">−{peso(c.amount)}</span>
                                                     </label>
@@ -860,10 +860,10 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                                     }`}
                                                 >
                                                     <div className="mb-1 flex items-center gap-2">
-                                                        <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-gray-500'}`} />
+                                                        <Icon className={`h-4 w-4 ${active ? 'text-blue-600' : 'text-muted-foreground'}`} />
                                                         <span className={`text-sm font-semibold ${active ? 'text-blue-700 dark:text-blue-400' : 'text-gray-900 dark:text-white'}`}>{label}</span>
                                                     </div>
-                                                    <p className="text-xs text-gray-500">{m === 'cod' && pickup ? 'Pay in cash when you pick up your order' : m === 'half' ? halfDescription(total) : modeDescription(sg, m)}</p>
+                                                    <p className="text-xs text-muted-foreground">{m === 'cod' && pickup ? 'Pay in cash when you pick up your order' : m === 'half' ? halfDescription(total) : modeDescription(sg, m)}</p>
                                                     {m === 'consignment' && sg.loyalty.tier && (
                                                         <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
                                                             <TierBadge tier={sg.loyalty.tier} size="sm" />
@@ -876,7 +876,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                     </div>
 
                                     {sg.allow_consignment && sg.loyalty.blocked_reason === 'low_trust' && (
-                                        <p className="mt-2 text-xs text-gray-400">Consignment not available for this store.</p>
+                                        <p className="mt-2 text-xs text-muted-foreground">Consignment not available for this store.</p>
                                     )}
 
                                     {/* Consignment breakdown for THIS store */}
@@ -946,14 +946,14 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                             ✅ Coupon {promo.code} applied: −{peso(promoTotal)}
                                         </p>
                                     ) : (
-                                        <p className="font-semibold text-amber-700">Coupon {promo.code} doesn't reduce this order.</p>
+                                        <p className="font-semibold text-amber-700 dark:text-amber-300">Coupon {promo.code} doesn't reduce this order.</p>
                                     )}
                                     <p className="text-xs text-green-700 dark:text-green-400">
                                         {promo.label}{promo.type === 'store' && promo.store_name ? ` · ${promo.store_name} only` : ''}
                                     </p>
                                     <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">New total: <strong>{peso(grandTotal)}</strong></p>
                                 </div>
-                                <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" onClick={() => { setPromo(null); setCouponError(null); }}>
+                                <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => { setPromo(null); setCouponError(null); }}>
                                     Remove
                                 </Button>
                             </div>
@@ -1067,7 +1067,7 @@ export default function CheckoutPage({ stores: allStores, customer, savedAddress
                                 <input id="buyer-tin" inputMode="numeric" value={buyerTin} onChange={(e) => setBuyerTin(e.target.value)}
                                     placeholder="000-000-000-00000" maxLength={20}
                                     className={`w-full rounded-lg border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:max-w-xs dark:bg-gray-800 dark:text-white ${tinInvalid ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`} />
-                                <p className={`text-xs ${tinInvalid ? 'text-red-600' : 'text-gray-500'}`}>
+                                <p className={`text-xs ${tinInvalid ? 'text-red-600' : 'text-muted-foreground'}`}>
                                     {tinInvalid ? 'Use the format 000-000-000-00000.' : 'Printed on the invoice of every store in this order.'}
                                 </p>
                             </div>

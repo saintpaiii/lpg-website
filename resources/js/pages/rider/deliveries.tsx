@@ -169,11 +169,11 @@ const STATUS_LABELS: Record<DeliveryStatus, string> = {
 };
 
 const STATUS_STYLES: Record<DeliveryStatus, string> = {
-    assigned:   'bg-blue-100 text-blue-700',
-    picked_up:  'bg-indigo-100 text-indigo-700',
-    in_transit: 'bg-purple-100 text-purple-700',
-    delivered:  'bg-emerald-100 text-emerald-700',
-    failed:     'bg-red-100 text-red-700',
+    assigned:   'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    picked_up:  'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300',
+    in_transit: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    delivered:  'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    failed:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
 };
 
 // Next statuses a rider can move to
@@ -197,9 +197,9 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 const PAYMENT_STATUS_STYLES: Record<string, string> = {
-    paid:    'bg-emerald-100 text-emerald-700',
-    unpaid:  'bg-red-100 text-red-700',
-    partial: 'bg-amber-100 text-amber-700',
+    paid:    'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    unpaid:  'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    partial: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
 };
 
 // ── Small components ───────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     if (data.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
                 Showing {data.from}–{data.to} of {data.total}
             </p>
             <div className="flex gap-1">
@@ -229,8 +229,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
                             link.active
                                 ? 'bg-blue-600 text-white'
                                 : link.url
-                                ? 'hover:bg-gray-100 text-gray-600'
-                                : 'text-gray-300 cursor-not-allowed'
+                                ? 'hover:bg-muted text-muted-foreground'
+                                : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -409,7 +409,7 @@ function UpdateStatusDialog({
                     </DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-muted-foreground">
                         {isFailed
                             ? <>Provide a reason for the failed delivery of <span className="font-semibold">{delivery?.order?.order_number}</span>.</>
                             : <>Confirm status update for <span className="font-semibold">{delivery?.order?.order_number}</span>?</>
@@ -418,16 +418,16 @@ function UpdateStatusDialog({
 
                     {/* GPS location block */}
                     <div className={`rounded-lg border px-3 py-2.5 space-y-2 ${
-                        gpsState === 'ok'        ? 'bg-emerald-50 border-emerald-200' :
-                        gpsState === 'failed'    ? 'bg-amber-50 border-amber-200' :
-                        gpsState === 'capturing' ? 'bg-blue-50 border-blue-200' :
-                                                   'bg-gray-50 border-gray-200'
+                        gpsState === 'ok'        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' :
+                        gpsState === 'failed'    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800' :
+                        gpsState === 'capturing' ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800' :
+                                                   'bg-muted border-border'
                     }`}>
                         <div className={`flex items-center gap-2 text-xs font-medium ${
-                            gpsState === 'ok'        ? 'text-emerald-700' :
-                            gpsState === 'failed'    ? 'text-amber-700' :
+                            gpsState === 'ok'        ? 'text-emerald-700 dark:text-emerald-300' :
+                            gpsState === 'failed'    ? 'text-amber-700 dark:text-amber-300' :
                             gpsState === 'capturing' ? 'text-blue-600' :
-                                                       'text-gray-500'
+                                                       'text-muted-foreground'
                         }`}>
                             <Locate className={`h-3.5 w-3.5 shrink-0 ${gpsState === 'capturing' ? 'animate-pulse' : ''}`} />
                             {gpsState === 'ok'        && 'Location captured — will be shared with this update'}
@@ -438,7 +438,7 @@ function UpdateStatusDialog({
 
                         {/* Reverse-geocoded address */}
                         {gpsState === 'ok' && (
-                            <p className="flex items-start gap-1.5 text-xs text-emerald-700">
+                            <p className="flex items-start gap-1.5 text-xs text-emerald-700 dark:text-emerald-300">
                                 <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                                 <span>
                                     {geocodeAddr
@@ -451,7 +451,7 @@ function UpdateStatusDialog({
 
                         {/* Small map preview */}
                         {gpsState === 'ok' && riderLat !== null && riderLng !== null && (
-                            <div className="rounded-md overflow-hidden border border-emerald-200 mt-1">
+                            <div className="rounded-md overflow-hidden border border-emerald-200 dark:border-emerald-800 mt-1">
                                 <MapContainer
                                     center={[riderLat, riderLng]}
                                     zoom={15}
@@ -488,7 +488,7 @@ function UpdateStatusDialog({
                                     </button>
                                 </div>
                             ) : (
-                                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-gray-200 p-4 text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
+                                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-border p-4 text-sm text-muted-foreground hover:border-blue-400 hover:text-blue-600 transition-colors">
                                     <Camera className="h-6 w-6" />
                                     <span>Tap to take or upload a photo</span>
                                     <input
@@ -535,7 +535,7 @@ function UpdateStatusDialog({
                         <p key={k} className="text-xs text-red-500">{v}</p>
                     ))}
                     {needsTanks && (
-                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-900">
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-sm font-medium text-amber-900 dark:text-amber-300">
                             <input type="checkbox" checked={tanksCollected} onChange={(e) => setTanksCollected(e.target.checked)} className="mt-0.5 h-4 w-4" />
                             ♻ Collected {notAccepted.length ? 'the accepted' : delivery?.order?.empty_tank_summary} empty tank(s)
                         </label>
@@ -697,7 +697,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
             : null;
 
     return (
-        <div className="mt-3 grid gap-3 rounded-lg border bg-gray-50 p-3 text-sm">
+        <div className="mt-3 grid gap-3 rounded-lg border bg-muted p-3 text-sm">
             {/* Customer info + action buttons */}
             {o.customer && (
                 <div>
@@ -764,8 +764,8 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                             onClick={() => toggleAutoShare(!autoShare)}
                             className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors ${
                                 autoShare
-                                    ? 'border-emerald-500 bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
-                                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                                    ? 'border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200'
+                                    : 'border-border bg-card text-muted-foreground hover:bg-muted'
                             }`}
                         >
                             <Radio className="h-3 w-3" />
@@ -783,11 +783,11 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
             {/* Route map */}
             {showMap && (
                 <div>
-                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                    <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Route Map
                         {riderPos && <span className="ml-1 text-emerald-600 normal-case font-normal">• Your location shown</span>}
                     </p>
-                    <div className="rounded-lg overflow-hidden border border-gray-200 h-52">
+                    <div className="rounded-lg overflow-hidden border border-border h-52">
                         <MapContainer
                             center={mapCenter}
                             zoom={13}
@@ -809,7 +809,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                             <ServiceAreaLimit />
                         </MapContainer>
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                         {hasStoreLoc && hasCustomerLoc && '● Store → ● Customer'}
                         {riderPos && ' · ● You'}
                     </p>
@@ -818,12 +818,12 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 
             {/* Items */}
             <div>
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">Items</p>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Items</p>
                 <ul className="space-y-1">
                     {o.items.map((item) => (
                         <li key={item.id} className="flex items-center justify-between">
-                            <span className="text-gray-700">{item.product?.name ?? 'Unknown'} × {item.quantity}</span>
-                            <span className="tabular-nums text-gray-500">
+                            <span className="text-foreground/80">{item.product?.name ?? 'Unknown'} × {item.quantity}</span>
+                            <span className="tabular-nums text-muted-foreground">
                                 ₱{item.subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                             </span>
                         </li>
@@ -831,12 +831,12 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
                 </ul>
                 <div className="mt-2 pt-1.5 border-t space-y-1">
                     {o.shipping_fee !== null && o.shipping_fee > 0 && (
-                        <div className="flex justify-between text-gray-500 text-xs">
+                        <div className="flex justify-between text-muted-foreground text-xs">
                             <span>Delivery fee</span>
                             <span>₱{o.shipping_fee.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                         </div>
                     )}
-                    <div className="flex justify-between font-semibold text-gray-900">
+                    <div className="flex justify-between font-semibold text-foreground">
                         <span>Total</span>
                         <span>₱{o.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                     </div>
@@ -845,7 +845,7 @@ function DeliveryDetailPanel({ delivery }: { delivery: DeliveryRow }) {
 
             {/* Payment info */}
             <div className="flex items-center justify-between">
-                <span className="text-gray-500">
+                <span className="text-muted-foreground">
                     {o.payment_mode === 'cod' ? 'Cash on Delivery'
                         : o.payment_mode === 'consignment' ? 'Consignment (balance paid online later)'
                         : o.payment_mode === 'half' ? (o.payment_status === 'paid' ? 'Half payment (both halves paid)' : 'Half payment (half paid online, rest in cash)')
@@ -911,11 +911,11 @@ function RouteMapView({ route, onUpdateStatus, statusDisabled, onMessage }: {
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                     <strong>{remaining}</strong> stop{remaining === 1 ? '' : 's'} left
                     {route.stops.length > remaining && ` · ${route.stops.length - remaining} done today`}
                 </p>
-                <p className={`text-xs ${gpsError ? 'text-amber-600' : 'text-gray-400'}`}>
+                <p className={`text-xs ${gpsError ? 'text-amber-600' : 'text-muted-foreground'}`}>
                     {gpsError ?? (pos ? 'Sharing your location every minute while this map is open' : 'Getting your location…')}
                 </p>
             </div>
@@ -987,7 +987,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">My Deliveries</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">My Deliveries</h1>
                         <p className="mt-0.5 text-sm text-muted-foreground">View and update your assigned deliveries.</p>
                     </div>
                     <MessageButton portal="rider" params={{}} label="Message store" className="gap-1.5" />
@@ -995,12 +995,12 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                 {/* Flash */}
                 {flash?.success && (
-                    <div className="rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700 border border-emerald-200">
+                    <div className="rounded-md bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         {flash.success}
                     </div>
                 )}
                 {flash?.error && (
-                    <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-200">
+                    <div className="rounded-md bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
                         {flash.error}
                     </div>
                 )}
@@ -1066,10 +1066,10 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 <LoadMeter data={my_load} />
 
                 {/* List / Map toggle (kept in the URL so it survives the proof-upload reload) */}
-                <div className="inline-flex w-fit rounded-lg border bg-white p-1 shadow-sm">
+                <div className="inline-flex w-fit rounded-lg border bg-card p-1 shadow-sm">
                     {(['list', 'map'] as const).map((v) => (
                         <button key={v} type="button" onClick={() => changeView(v)}
-                            className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${view === v ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+                            className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${view === v ? 'bg-blue-600 text-white' : 'text-muted-foreground hover:bg-muted'}`}>
                             {v === 'list' ? <List className="h-4 w-4" /> : <MapIcon className="h-4 w-4" />}
                             {v === 'list' ? 'List View' : 'Map View'}
                         </button>
@@ -1098,14 +1098,14 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                 ) : (
                 <>
                 {/* Tabs */}
-                <div className="border-b border-gray-200">
+                <div className="border-b border-border">
                     <nav className="-mb-px flex gap-6">
                         <button
                             onClick={() => switchTab('active')}
                             className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
                                 !isHistory
                                     ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground/80'
                             }`}
                         >
                             Active
@@ -1115,7 +1115,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                             className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors ${
                                 isHistory
                                     ? 'border-blue-600 text-blue-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    : 'border-transparent text-muted-foreground hover:text-foreground/80'
                             }`}
                         >
                             History
@@ -1128,7 +1128,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                 {deliveries.data.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                             <Truck className="mb-3 h-10 w-10" />
                             <p className="font-medium">
                                 {isHistory ? 'No delivery history yet' : 'No active deliveries'}
@@ -1146,13 +1146,13 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                         {deliveries.data.map((d) => (
                             <Card key={d.id} className="overflow-hidden">
                                 <div
-                                    className={`flex cursor-pointer items-start gap-3 p-4 hover:bg-gray-50/60 ${seenRowClass(seen.get(d.id))}`}
+                                    className={`flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/60 ${seenRowClass(seen.get(d.id))}`}
                                     onClick={() => setExpanded(expanded === d.id ? null : d.id)}
                                 >
                                     {/* Status icon */}
                                     <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                                        d.status === 'delivered' ? 'bg-emerald-100' :
-                                        d.status === 'failed' ? 'bg-red-100' : 'bg-blue-100'
+                                        d.status === 'delivered' ? 'bg-emerald-100 dark:bg-emerald-900/40' :
+                                        d.status === 'failed' ? 'bg-red-100 dark:bg-red-900/40' : 'bg-blue-100 dark:bg-blue-900/40'
                                     }`}>
                                         {d.status === 'delivered' ? (
                                             <CheckCircle className="h-4 w-4 text-emerald-600" />
@@ -1172,11 +1172,11 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                             <SeenPill flags={seen.get(d.id)} />
                                             <StatusBadge status={d.status} />
                                         </div>
-                                        <p className="mt-0.5 font-medium text-gray-900">
+                                        <p className="mt-0.5 font-medium text-foreground">
                                             {d.order?.customer?.name ?? '—'}
                                         </p>
                                         {d.order?.customer && (
-                                            <p className="flex items-center gap-1 text-xs text-gray-400 mt-0.5">
+                                            <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                                 <MapPin className="h-3 w-3" />
                                                 {[
                                                     d.order.customer.address,
@@ -1185,7 +1185,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                 ].filter(Boolean).join(', ') || '—'}
                                             </p>
                                         )}
-                                        <div className="mt-1 flex items-center gap-3 text-xs text-gray-400">
+                                        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
                                             <span>Assigned: {d.assigned_at ?? '—'}</span>
                                             {d.delivered_at && (
                                                 <span className="text-emerald-600">Delivered: {fmtDate(d.delivered_at)}</span>
@@ -1212,13 +1212,13 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                                     {/* Amount + actions */}
                                     <div className="flex shrink-0 flex-col items-end gap-2">
-                                        <span className="font-semibold tabular-nums text-gray-900">
+                                        <span className="font-semibold tabular-nums text-foreground">
                                             ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </span>
 
                                         {/* Refill: empty tanks to collect */}
                                         {d.order && !!d.order.empty_tanks_required && !d.order.empty_tanks_collected && d.status !== 'delivered' && (
-                                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                            <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                                                 ♻ Collect {d.order.empty_tank_summary} empty
                                             </span>
                                         )}
@@ -1226,7 +1226,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                         {/* COD: amount to collect + Payment Collected */}
                                         {d.order && d.order.amount_to_collect > 0 && (
                                             <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-                                                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                                <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                                                     Collect ₱{d.order.amount_to_collect.toLocaleString('en-PH', { minimumFractionDigits: 2 })} cash
                                                     {d.order.payment_mode === 'half' && ' (half already paid online)'}
                                                 </span>
@@ -1244,7 +1244,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                             </div>
                                         )}
                                         {(d.order?.payment_mode === 'cod' || d.order?.payment_mode === 'half') && d.order.payment_status === 'paid' && (
-                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{d.order.payment_mode === 'half' ? 'Paid in full' : 'Cash collected'}</span>
+                                            <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">{d.order.payment_mode === 'half' ? 'Paid in full' : 'Cash collected'}</span>
                                         )}
 
                                         {!isHistory && ['assigned', 'picked_up', 'in_transit'].includes(d.status) && (
@@ -1265,7 +1265,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-40">
-                                                        <p className="px-2 py-1.5 text-xs text-gray-500 font-medium">Move to</p>
+                                                        <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Move to</p>
                                                         <DropdownMenuSeparator />
                                                         {STATUS_NEXT[d.status].map((s) => (
                                                             <DropdownMenuItem
@@ -1275,7 +1275,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                                                 className={s === 'failed' ? 'text-red-600' : ''}
                                                             >
                                                                 {STATUS_LABELS[s]}
-                                                                {s === 'picked_up' && cannotDeliver && <span className="ml-1 text-[10px] text-gray-400">(license needed)</span>}
+                                                                {s === 'picked_up' && cannotDeliver && <span className="ml-1 text-xs text-muted-foreground">(license needed)</span>}
                                                             </DropdownMenuItem>
                                                         ))}
                                                     </DropdownMenuContent>

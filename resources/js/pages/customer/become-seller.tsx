@@ -240,7 +240,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                         <Store className="h-6 w-6 text-blue-600" />
                         {isPending ? 'Application Under Review' : isRejected ? 'Application Rejected' : 'Start Selling'}
                     </h1>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         {isPending
                             ? 'Your seller application has been submitted and is being reviewed by our team.'
                             : isRejected
@@ -251,7 +251,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
 
                 {/* Pending state */}
                 {isPending && (
-                    <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20">
+                    <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
                         <CardContent className="pt-6">
                             <div className="flex items-start gap-4">
                                 <Clock className="h-8 w-8 text-amber-600 shrink-0 mt-0.5" />
@@ -269,7 +269,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
 
                 {/* Rejected state */}
                 {isRejected && (
-                    <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
+                    <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
                         <CardContent className="pt-6">
                             <div className="flex items-start gap-4">
                                 <XCircle className="h-8 w-8 text-red-600 shrink-0 mt-0.5" />
@@ -291,7 +291,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
 
                 {/* Too many rejected applications in 30 days */}
                 {!isPending && limit_message && (
-                    <Card className="border-amber-200 bg-amber-50 dark:bg-amber-900/20">
+                    <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
                         <CardContent className="pt-6 text-sm text-amber-800 dark:text-amber-300">{limit_message}</CardContent>
                     </Card>
                 )}
@@ -323,7 +323,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                 return (
                                     <div key={label} className="flex-1 flex flex-col items-center gap-1">
                                         <div className={`w-full h-1.5 rounded-full transition-colors ${done ? 'bg-blue-600' : active ? 'bg-blue-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                                        <span className={`text-xs font-medium hidden sm:block ${active ? 'text-blue-600' : done ? 'text-blue-400' : 'text-gray-400'}`}>
+                                        <span className={`text-xs font-medium hidden sm:block ${active ? 'text-blue-600' : done ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
                                             {done ? <CheckCircle2 className="h-3.5 w-3.5 inline mr-0.5" /> : null}{label}
                                         </span>
                                     </div>
@@ -381,7 +381,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
                                                 placeholder="09XXXXXXXXX or (046) 483-5678"
                                                 maxLength={20}
                                             />
-                                            <p className="mt-1 text-[11px] text-gray-500">09XXXXXXXXX or landline (046) 483-5678</p>
+                                            <p className="mt-1 text-xs text-muted-foreground">09XXXXXXXXX or landline (046) 483-5678</p>
                                             {(errors.store_phone || step1Errors.store_phone) && <p className="mt-1 text-xs text-red-600">{errors.store_phone || step1Errors.store_phone}</p>}
                                         </div>
                                     </CardContent>
@@ -501,7 +501,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
 
                                 {/* Upload progress */}
                                 {progress && (
-                                    <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+                                    <div className="rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
                                         Uploading… {progress.percentage}%
                                     </div>
                                 )}
@@ -569,7 +569,7 @@ export default function BecomeSellerPage({ application, has_valid_id, verified_i
 
                                 {/* Notice */}
                                 <div className="flex items-start gap-2 rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400">
-                                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-gray-400" />
+                                    <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" />
                                     <span>
                                         Your application will be reviewed by our team. You will remain a customer until approved.
                                         Upon approval, you can access the Seller Dashboard from your account.
@@ -684,20 +684,20 @@ function FileField({
                 className="flex items-center gap-3 rounded-md border border-dashed border-gray-300 px-4 py-3 cursor-pointer hover:border-blue-400 transition-colors dark:border-gray-600 dark:hover:border-blue-500"
                 onClick={() => inputRef.current?.click()}
             >
-                <Upload className="h-5 w-5 text-gray-400 shrink-0" />
+                <Upload className="h-5 w-5 text-muted-foreground shrink-0" />
                 <div className="flex-1 min-w-0">
                     {file ? (
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.name}</p>
                     ) : (
-                        <p className="text-sm text-gray-500">Click to upload</p>
+                        <p className="text-sm text-muted-foreground">Click to upload</p>
                     )}
-                    {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
+                    {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
                 </div>
                 {file && (
                     <button
                         type="button"
                         onClick={e => { e.stopPropagation(); onChange(null); if (inputRef.current) inputRef.current.value = ''; }}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        className="text-muted-foreground hover:text-red-500 transition-colors"
                     >
                         <XCircle className="h-4 w-4" />
                     </button>

@@ -89,7 +89,7 @@ export function NavUser() {
                                     <>
                                         <Badge
                                             variant="secondary"
-                                            className={`ml-1 shrink-0 text-[10px] ${badge.className}`}
+                                            className={`ml-1 shrink-0 text-xs ${badge.className}`}
                                         >
                                             {badge.label}
                                         </Badge>

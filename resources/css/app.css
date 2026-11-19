@@ -139,6 +139,8 @@
 
     body {
         @apply bg-background text-foreground;
+        /* J10: long order numbers / emails / URLs wrap instead of pushing the page wider than the phone */
+        overflow-wrap: break-word;
     }
 }
 
@@ -252,4 +254,63 @@ input::-ms-clear {
     &::-webkit-scrollbar {
         display: none;
     }
+}
+
+/*
+ * J10 — phone card lists: a <table class="rt-cards"> shows each row as a card below 640px (the table stays from sm up).
+ * Every cell gets its column name (data-label, filled from the <th> by resources/js/lib/responsive-tables.ts) on the
+ * left; a cell whose header is empty (the actions column) shows its buttons full-width, wrapping, 40px tall.
+ * Columns hidden on small screens (hidden md:table-cell) are shown in the card — every field stays reachable.
+ */
+@media (max-width: 639.98px) {
+    table.rt-cards { min-width: 0 !important; width: 100%; display: block; }
+    table.rt-cards thead { display: none; }
+    table.rt-cards tbody, table.rt-cards tfoot { display: block; }
+    table.rt-cards tr {
+        display: block;
+        margin: 0.625rem 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) + 2px);
+        background: var(--card);
+    }
+    table.rt-cards tr[data-rt-empty] { border: 0; background: transparent; }
+    table.rt-cards td {
+        display: flex !important;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.3rem 0 !important;
+        border: 0 !important;
+        text-align: right !important;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    table.rt-cards td::before {
+        content: attr(data-label);
+        flex: 0 0 auto;
+        max-width: 45%;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: var(--muted-foreground);
+        padding-top: 0.125rem;
+    }
+    table.rt-cards td[data-label=""]::before,
+    table.rt-cards td:not([data-label])::before { display: none; }
+    table.rt-cards td[colspan] { justify-content: center; text-align: center !important; }
+    /* The actions cell: buttons wrap, full row, big touch targets */
+    table.rt-cards td[data-rt-actions] {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        padding-top: 0.5rem !important;
+        margin-top: 0.25rem;
+        border-top: 1px solid var(--border) !important;
+    }
+    table.rt-cards td[data-rt-actions] > div { flex-wrap: wrap; justify-content: flex-start; width: 100%; }
+    table.rt-cards td[data-rt-actions] button,
+    table.rt-cards td[data-rt-actions] a { min-height: 40px; min-width: 40px; }
+    /* every button in a card is a comfortable touch target (text links stay inline) */
+    table.rt-cards td button { min-height: 40px; min-width: 40px; }
+    table.rt-cards td > div { min-width: 0; }
 }

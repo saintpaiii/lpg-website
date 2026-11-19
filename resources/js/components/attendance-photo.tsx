@@ -11,5 +11,5 @@ export function AttendancePhoto({ url, label }: { url: string | null | undefined
 /** "Recorded by Ana Reyes" under a manual clock-in / clock-out (no photo). */
 export function RecordedBy({ name }: { name: string | null | undefined }) {
     if (!name) return null;
-    return <span className="text-[11px] font-normal text-amber-700 font-sans dark:text-amber-400">Recorded by {name}</span>;
+    return <span className="text-xs font-normal text-amber-700 font-sans dark:text-amber-400">Recorded by {name}</span>;
 }

@@ -53,9 +53,9 @@ const TABS = [
 ] as const;
 
 const PAY_COLORS: Record<string, string> = {
-    paid:    'bg-green-100 text-green-700',
-    unpaid:  'bg-red-100 text-red-700',
-    partial: 'bg-yellow-100 text-yellow-700',
+    paid:    'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+    unpaid:  'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    partial: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
 };
 
 export default function SellerInvoices({ invoices, counts, tab, search, date_from, date_to, tax_notice = false }: Props) {
@@ -130,13 +130,13 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map(({ key, label, count_key }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                             {label}
                             {counts[count_key] > 0 && (
-                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>{counts[count_key]}</span>
+                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>{counts[count_key]}</span>
                             )}
                         </button>
                     ))}
@@ -159,7 +159,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Invoice</th>
@@ -184,7 +184,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                                 ₱{inv.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[inv.payment_status] ?? 'bg-muted text-muted-foreground'}`}>
                                                     {inv.payment_status}
                                                 </span>
                                             </td>
@@ -195,7 +195,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                                 <div className="flex items-center justify-end gap-1">
                                                     <Link href={`/seller/invoices/${inv.id}`}>
                                                         <Button size="sm" variant="outline"
-                                                            className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
+                                                            className="h-7 px-2.5 text-xs text-blue-600 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1">
                                                             <Eye className="h-3 w-3" />
                                                             View
                                                         </Button>
@@ -203,7 +203,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                                     {inv.order_status === 'delivered' && inv.payment_status === 'paid' && (
                                                         <a href={`/invoices/${inv.id}/print`} target="_blank" rel="noopener noreferrer">
                                                             <Button size="sm" variant="ghost"
-                                                                className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600 hover:bg-blue-50" title="Print Receipt">
+                                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40" title="Print Receipt">
                                                                 <Printer className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </a>

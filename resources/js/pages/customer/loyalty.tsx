@@ -95,7 +95,7 @@ export default function MyLoyalty({ records }: { records: LoyaltyRecord[] }) {
                                                     </p>
                                                 </>
                                             ) : (
-                                                <p className="text-sm font-semibold text-amber-700">👑 Highest tier reached!</p>
+                                                <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">👑 Highest tier reached!</p>
                                             )}
                                         </div>
 

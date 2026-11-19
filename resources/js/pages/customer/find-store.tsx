@@ -202,7 +202,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
             <div className="space-y-5">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Find a Store</h1>
-                    <p className="mt-1 text-sm text-gray-500">Tell us what LPG you need and we'll list the stores that can deliver it to you — nearest first.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Tell us what LPG you need and we'll list the stores that can deliver it to you — nearest first.</p>
                 </div>
 
                 {/* What do you need? */}
@@ -226,7 +226,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                                                 value={customKg} onChange={(e) => setCustomKg(e.target.value)}
                                                 placeholder="Type kg, e.g. 15" aria-label="Size in kg"
                                                 className={cn(selectCls, 'pr-9')} />
-                                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">kg</span>
+                                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">kg</span>
                                         </div>
                                     )}
                                 </div>
@@ -313,7 +313,7 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
                         {location && (
                             <p className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
                                 <MapPin className="h-4 w-4 text-red-600" /> Deliver to: <span className="font-medium">{location.label}</span>
-                                {results && results.length > 0 && <span className="text-xs text-gray-500">· drag the "You" pin on the map to adjust</span>}
+                                {results && results.length > 0 && <span className="text-xs text-muted-foreground">· drag the "You" pin on the map to adjust</span>}
                             </p>
                         )}
                         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -359,9 +359,9 @@ export default function FindStore({ sizes, brands, addresses, default_location, 
 
                         {!loading && results && results.length === 0 && (
                             <div className="rounded-xl border border-dashed p-8 text-center">
-                                <StoreIcon className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+                                <StoreIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
                                 <p className="font-medium text-gray-800 dark:text-gray-200">No store can deliver this size to your location right now.</p>
-                                <ul className="mt-2 space-y-0.5 text-sm text-gray-500">
+                                <ul className="mt-2 space-y-0.5 text-sm text-muted-foreground">
                                     <li>Try another brand</li>
                                     <li>Try Any brand</li>
                                     <li>Try a different address</li>
@@ -412,7 +412,7 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                     <div className="flex flex-wrap items-center gap-2">
                         {r.store.logo_url
                             ? <img src={r.store.logo_url} alt="" className="h-7 w-7 rounded-full border object-cover" />
-                            : <StoreIcon className="h-5 w-5 text-gray-400" />}
+                            : <StoreIcon className="h-5 w-5 text-muted-foreground" />}
                         <span className="font-semibold text-gray-900 dark:text-white">{r.store.name}</span>
                         {r.store.featured && <FeaturedBadge />}
                         {r.store.pickup_only && <PickupOnlyBadge short />}
@@ -421,9 +421,9 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                         {r.badges.includes('Cheapest') && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">Cheapest</span>}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                        <span className="flex items-center gap-1"><Navigation className="h-3.5 w-3.5" /> {r.distance_km.toFixed(1)} km away{r.store.approximate_location && <span className="text-gray-400">(approx. location)</span>}</span>
-                        {r.avg_rating !== null && <span className="flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" /> {r.avg_rating.toFixed(1)} ({r.rating_count})</span>}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Navigation className="h-3.5 w-3.5" /> {r.distance_km.toFixed(1)} km away{r.store.approximate_location && <span className="text-muted-foreground">(approx. location)</span>}</span>
+                        {r.avg_rating !== null && <span className="flex items-center gap-0.5"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-600 dark:text-amber-400" /> {r.avg_rating.toFixed(1)} ({r.rating_count})</span>}
                         <span>In stock: {r.stock_left}</span>
                         {r.allows_cod && <span className="flex items-center gap-1 text-green-700 dark:text-green-400"><Banknote className="h-3.5 w-3.5" /> Cash on delivery available</span>}
                     </div>
@@ -434,12 +434,12 @@ function ResultCard({ r, rank, selected, adding, added, cardRef, onSelect, onAdd
                                 {r.product.name}{r.product.brand ? ` · ${r.product.brand}` : ''}
                                 <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">{r.product.size_label}</span>
                             </p>
-                            <p className="text-gray-500 tabular-nums">{peso(r.unit_price)} × {r.quantity}</p>
-                            <p className="text-gray-500 tabular-nums">{r.delivery_fee === null ? 'Pick-up only — no delivery' : `Delivery ${peso(r.delivery_fee)}`}</p>
+                            <p className="text-muted-foreground tabular-nums">{peso(r.unit_price)} × {r.quantity}</p>
+                            <p className="text-muted-foreground tabular-nums">{r.delivery_fee === null ? 'Pick-up only — no delivery' : `Delivery ${peso(r.delivery_fee)}`}</p>
                         </div>
                         <div className="sm:text-right">
                             <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white">Total {peso(r.total)}</p>
-                            <p className="text-[11px] text-gray-500">Estimated total before coupons</p>
+                            <p className="text-xs text-muted-foreground">Estimated total before coupons</p>
                         </div>
                     </div>
 

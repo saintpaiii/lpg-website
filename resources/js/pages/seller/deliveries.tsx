@@ -88,11 +88,11 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    assigned:   'bg-blue-100 text-blue-700',
-    picked_up:  'bg-purple-100 text-purple-700',
-    in_transit: 'bg-orange-100 text-orange-700',
-    delivered:  'bg-green-100 text-green-700',
-    failed:     'bg-red-100 text-red-700',
+    assigned:   'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    picked_up:  'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    in_transit: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    delivered:  'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+    failed:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -121,7 +121,7 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Delivery Updates
             </p>
-            <ol className="relative border-l border-gray-200 pl-4 space-y-4">
+            <ol className="relative border-l border-border pl-4 space-y-4">
                 {proofs.map((p) => (
                     <li key={p.id} className="relative">
                         {/* dot */}
@@ -131,19 +131,19 @@ function ProofTimeline({ proofs }: { proofs: DeliveryProof[] }) {
                         }`} />
                         <div className="grid gap-1.5">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[p.status] ?? 'bg-muted text-muted-foreground'}`}>
                                     {STATUS_LABELS[p.status] ?? p.status}
                                 </span>
                                 <span className="text-xs text-muted-foreground">{p.created_at}</span>
                             </div>
                             {p.location_note && (
-                                <p className="flex items-center gap-1 text-xs text-gray-600">
+                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3 shrink-0 text-muted-foreground" />
                                     {p.location_note}
                                 </p>
                             )}
                             {p.notes && (
-                                <p className="text-xs text-gray-600 italic">"{p.notes}"</p>
+                                <p className="text-xs text-muted-foreground italic">"{p.notes}"</p>
                             )}
                             {p.photo_url && (
                                 <button
@@ -319,13 +319,13 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                 <RiderBoard initial={board} storePin={store_pin} realtime={realtime} />
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map(({ key, label, count }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                             {label}
                             {count > 0 && (
-                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>{count}</span>
+                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>{count}</span>
                             )}
                         </button>
                     ))}
@@ -350,7 +350,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Order</th>
@@ -390,17 +390,17 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[d.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                         {STATUS_LABELS[d.status] ?? d.status}
                                                     </span>
                                                     {d.fail_info && (
                                                         <div className="mt-1 flex flex-col items-center gap-0.5">
                                                             {d.fail_info.short && (
-                                                                <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800" title={d.fail_info.range_label ? `Estimated redelivery: ${d.fail_info.range_label}` : undefined}>
+                                                                <span className="inline-flex rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300" title={d.fail_info.range_label ? `Estimated redelivery: ${d.fail_info.range_label}` : undefined}>
                                                                     {d.fail_info.short}
                                                                 </span>
                                                             )}
-                                                            <span className="text-[11px] text-red-600">{d.fail_info.reason_label}</span>
+                                                            <span className="text-xs text-red-600">{d.fail_info.reason_label}</span>
                                                         </div>
                                                     )}
                                                 </td>
@@ -417,7 +417,7 @@ export default function SellerDeliveries({ deliveries, riders, vehicles, unassig
                                                             onClick={() => setExpanded(expanded === d.id ? null : d.id)}
                                                         >
                                                             {d.proofs.length > 0 && (
-                                                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold">
+                                                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-bold">
                                                                     {d.proofs.length}
                                                                 </span>
                                                             )}

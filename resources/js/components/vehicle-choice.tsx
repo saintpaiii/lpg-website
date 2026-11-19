@@ -23,7 +23,7 @@ export function preferredVehicle(vehicles: PickerVehicle[]): number | null {
 /** "Choose your vehicle for today" — radio cards; vehicles taken by other riders are disabled. */
 export function VehicleChoice({ vehicles, value, onChange }: { vehicles: PickerVehicle[]; value: number | null; onChange: (id: number) => void }) {
     if (vehicles.length === 0 || vehicles.every((v) => v.in_use_by)) {
-        return <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">No free vehicle — ask the store owner.</p>;
+        return <p className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-300">No free vehicle — ask the store owner.</p>;
     }
     return (
         <div className="grid gap-2" role="radiogroup" aria-label="Vehicle">
@@ -35,14 +35,14 @@ export function VehicleChoice({ vehicles, value, onChange }: { vehicles: PickerV
                     <button key={v.id} type="button" role="radio" aria-checked={active} disabled={taken} onClick={() => onChange(v.id)}
                         className={cn('flex items-center gap-3 rounded-lg border-2 px-3 py-2 text-left text-sm transition-colors',
                             active ? 'border-blue-600 bg-blue-50 dark:bg-blue-950/30' : 'border-gray-200 hover:border-gray-300 dark:border-gray-700',
-                            taken && 'cursor-not-allowed opacity-50 hover:border-gray-200')}>
-                        <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-blue-600' : 'text-gray-500')} />
+                            taken && 'cursor-not-allowed opacity-50 hover:border-border')}>
+                        <Icon className={cn('h-5 w-5 shrink-0', active ? 'text-blue-600' : 'text-muted-foreground')} />
                         <span className="flex-1">
                             <span className="font-semibold">{v.label} {v.plate_number}</span>
-                            <span className="block text-xs text-gray-500">{v.max_tanks} tanks · {v.max_kg} kg</span>
+                            <span className="block text-xs text-muted-foreground">{v.max_tanks} tanks · {v.max_kg} kg</span>
                         </span>
-                        {taken ? <span className="text-xs text-gray-500">In use by {v.in_use_by}</span>
-                            : v.assigned_to_me ? <span className="text-xs font-medium text-blue-700">Yours</span> : null}
+                        {taken ? <span className="text-xs text-muted-foreground">In use by {v.in_use_by}</span>
+                            : v.assigned_to_me ? <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Yours</span> : null}
                     </button>
                 );
             })}

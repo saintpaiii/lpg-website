@@ -58,7 +58,7 @@ export function PhotoLightbox({ urls, index, onClose }: { urls: string[]; index:
                         </>
                     )}
                 </div>
-                {many && <p className="text-center text-xs text-gray-500">{i + 1} / {urls.length}</p>}
+                {many && <p className="text-center text-xs text-muted-foreground">{i + 1} / {urls.length}</p>}
             </DialogContent>
         </Dialog>
     );
@@ -149,14 +149,14 @@ export function PhotoPicker({ files, onFiles, existing = [], onRemoveExisting, m
                 ))}
                 {left > 0 && (
                     <button type="button" onClick={() => inputRef.current?.click()} disabled={busy}
-                        className="flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-gray-300 text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-600 disabled:opacity-60 dark:border-gray-600">
+                        className="flex h-16 w-16 flex-col items-center justify-center gap-0.5 rounded-md border border-dashed border-gray-300 text-xs text-muted-foreground hover:border-blue-400 hover:text-blue-600 disabled:opacity-60 dark:border-gray-600">
                         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
                         {busy ? 'Resizing' : 'Add'}
                     </button>
                 )}
             </div>
             <input ref={inputRef} type="file" multiple accept={PHOTO_ACCEPT} className="hidden" onChange={(e) => pick(e.target.files)} />
-            <p className="text-xs text-gray-500">{label} (up to {max}) · JPG, PNG or WEBP</p>
+            <p className="text-xs text-muted-foreground">{label} (up to {max}) · JPG, PNG or WEBP</p>
             {(problem || error) && <p className="text-xs text-red-600">{problem ?? error}</p>}
         </div>
     );
@@ -171,7 +171,7 @@ export function StarInput({ value, onChange }: { value: number; onChange: (v: nu
             {[1, 2, 3, 4, 5].map((s) => (
                 <button key={s} type="button" aria-label={`${s} star${s > 1 ? 's' : ''}`}
                     onClick={() => onChange(s)} onMouseEnter={() => setHovered(s)} onMouseLeave={() => setHovered(0)}
-                    className={`text-2xl leading-none transition-transform hover:scale-110 ${(hovered || value) >= s ? 'text-amber-400' : 'text-gray-300'}`}>
+                    className={`text-2xl leading-none transition-transform hover:scale-110 ${(hovered || value) >= s ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'}`}>
                     ★
                 </button>
             ))}
@@ -248,11 +248,11 @@ export function ReviewEditDialog({ review, productName, onClose }: { review: MyR
                         existing={existing} onRemoveExisting={(p) => setKeep((k) => k.filter((x) => x !== p))}
                         error={photoError(errors, 'photos')}
                     />
-                    <p className="text-xs text-gray-400">You can edit a review for {REVIEW_EDIT_DAYS} days after posting.</p>
+                    <p className="text-xs text-muted-foreground">You can edit a review for {REVIEW_EDIT_DAYS} days after posting.</p>
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-                    <Button onClick={save} disabled={saving || stars < 1} className="bg-amber-500 text-white hover:bg-amber-600">
+                    <Button onClick={save} disabled={saving || stars < 1} className="bg-amber-600 text-white hover:bg-amber-600">
                         {saving ? 'Saving…' : 'Save changes'}
                     </Button>
                 </DialogFooter>
@@ -287,14 +287,14 @@ export function ReviewOwnerActions({ review, onEdit }: { review: Pick<MyReview, 
                 <Tooltip>
                     <TooltipTrigger asChild>
                         {/* span: a disabled button doesn't fire hover */}
-                        <span className="inline-flex cursor-not-allowed items-center gap-1 rounded px-2 py-1 text-xs text-gray-400">
+                        <span className="inline-flex cursor-not-allowed items-center gap-1 rounded px-2 py-1 text-xs text-muted-foreground">
                             <Pencil className="h-3.5 w-3.5" /> Edit
                         </span>
                     </TooltipTrigger>
                     <TooltipContent>Editing closed after {REVIEW_EDIT_DAYS} days</TooltipContent>
                 </Tooltip>
             )}
-            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirm(true)}>
+            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300" onClick={() => setConfirm(true)}>
                 <Trash2 className="h-3.5 w-3.5" /> Delete
             </Button>
             <AlertDialog open={confirm} onOpenChange={(o) => !deleting && setConfirm(o)}>

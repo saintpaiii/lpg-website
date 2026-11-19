@@ -113,14 +113,14 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                     <Button onClick={openNew} className="gap-1.5"><Plus className="h-4 w-4" /> Add New Address</Button>
                 </div>
 
-                {flash?.success && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{flash.success}</div>}
-                {flash?.error && <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{flash.error}</div>}
+                {flash?.success && <div className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">{flash.success}</div>}
+                {flash?.error && <div className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3 text-sm text-red-700 dark:text-red-300">{flash.error}</div>}
 
                 {addresses.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-                            <MapPinned className="h-10 w-10 text-gray-300" />
-                            <p className="text-sm text-gray-500">No saved addresses yet.</p>
+                            <MapPinned className="h-10 w-10 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">No saved addresses yet.</p>
                             <Button variant="outline" onClick={openNew} className="gap-1.5"><Plus className="h-4 w-4" /> Add your first address</Button>
                         </CardContent>
                     </Card>
@@ -135,7 +135,7 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                                         <div className="min-w-0 flex-1">
                                             <p className="flex flex-wrap items-center gap-2 font-semibold">
                                                 {a.label}
-                                                {a.is_default && <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">Default</span>}
+                                                {a.is_default && <span className="rounded bg-blue-100 dark:bg-blue-900/40 px-1.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">Default</span>}
                                             </p>
                                             <p className="text-sm text-gray-600 dark:text-gray-400">{a.full_text}{a.full_text.includes('Cavite') ? '' : ', Cavite'}</p>
                                             {!a.is_default && (
@@ -149,7 +149,7 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                                             <Button size="icon" variant="ghost" aria-label={`Edit ${a.label}`} onClick={() => openEdit(a)}>
                                                 <Pencil className="h-4 w-4" />
                                             </Button>
-                                            <Button size="icon" variant="ghost" aria-label={`Delete ${a.label}`} className="text-red-600 hover:text-red-700" onClick={() => setDeleting(a)}>
+                                            <Button size="icon" variant="ghost" aria-label={`Delete ${a.label}`} className="text-red-600 hover:text-red-700 dark:hover:text-red-300" onClick={() => setDeleting(a)}>
                                                 <Trash2 className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -175,7 +175,7 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                             <div className="flex flex-wrap gap-2">
                                 {labels.map((l) => (
                                     <button key={l} type="button" onClick={() => form.setData('label', l)}
-                                        className={`rounded-full border px-3 py-1 text-sm ${form.data.label === l ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-gray-50'}`}>
+                                        className={`rounded-full border px-3 py-1 text-sm ${form.data.label === l ? 'border-blue-600 bg-blue-600 text-white' : 'hover:bg-muted'}`}>
                                         {l}
                                     </button>
                                 ))}
@@ -200,7 +200,7 @@ export default function CustomerAddresses({ addresses, labels }: Props) {
                             compact
                             autoFill={autoFill}
                         />
-                        {note && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-700">{note}</p>}
+                        {note && <p className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-xs text-amber-700 dark:text-amber-300">{note}</p>}
 
                         <AddressMap
                             latitude={form.data.latitude}

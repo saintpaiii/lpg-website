@@ -70,14 +70,14 @@ export default function Branches({ main, stores, canAdd, blocker, trialDays }: P
                     <CardContent className="p-0">
                         <div className="divide-y">
                             {stores.map((s) => {
-                                const st = STATUS[s.status] ?? { label: s.status, cls: 'bg-gray-100 text-gray-700' };
+                                const st = STATUS[s.status] ?? { label: s.status, cls: 'bg-muted text-foreground/80' };
                                 return (
                                     <div key={s.id} className="flex flex-wrap items-center gap-3 px-4 py-3" data-testid="branch-row">
                                         <div className="min-w-0 flex-1">
                                             <p className="flex flex-wrap items-center gap-2 font-medium">
                                                 <span className="truncate">{s.is_main ? `${s.name}` : s.branch_name}</span>
-                                                {s.is_main && <span className="rounded bg-blue-100 px-1.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Main</span>}
-                                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${st.cls}`}>{st.label}</span>
+                                                {s.is_main && <span className="rounded bg-blue-100 px-1.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Main</span>}
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${st.cls}`}>{st.label}</span>
                                             </p>
                                             <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" /><span className="truncate">{s.address}</span></p>
                                             <p className="mt-0.5 text-xs text-muted-foreground">

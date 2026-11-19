@@ -49,7 +49,7 @@ function Stars({ value, size = 'sm' }: { value: number; size?: 'xs' | 'sm' }) {
     return (
         <span className="flex gap-px">
             {[1, 2, 3, 4, 5].map((i) => (
-                <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-sm'} ${i <= value ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-sm'} ${i <= value ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>★</span>
             ))}
         </span>
     );
@@ -130,7 +130,7 @@ export default function SellerReviews({ reviews, avg, total, breakdown, filters 
                                 return (
                                     <div key={star} className="flex items-center gap-2 text-sm">
                                         <span className="w-4 text-right text-amber-500 font-semibold">{star}</span>
-                                        <span className="text-amber-400 text-xs">★</span>
+                                        <span className="text-amber-600 dark:text-amber-400 text-xs">★</span>
                                         <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                                             <div
                                                 className="h-full bg-amber-400 rounded-full transition-all"
@@ -149,13 +149,13 @@ export default function SellerReviews({ reviews, avg, total, breakdown, filters 
                 <Card>
                     <CardContent className="p-0">
                         {reviews.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <MessageSquare className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No reviews found.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
@@ -182,7 +182,7 @@ export default function SellerReviews({ reviews, avg, total, breakdown, filters 
                                                     {r.review ? (
                                                         <span className="italic">"{r.review}"</span>
                                                     ) : (
-                                                        <span className="text-gray-300 text-xs">—</span>
+                                                        <span className="text-muted-foreground text-xs">—</span>
                                                     )}
                                                     <PhotoThumbs urls={r.photo_urls} className="mt-1.5" />
                                                 </td>
@@ -205,7 +205,7 @@ export default function SellerReviews({ reviews, avg, total, breakdown, filters 
                                             disabled={!link.url}
                                             onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
-                                            className={`min-w-[32px] rounded px-2 py-1 text-xs ${link.active ? 'bg-blue-600 text-white' : link.url ? 'hover:bg-muted' : 'text-gray-300 cursor-not-allowed'}`}
+                                            className={`min-w-[32px] rounded px-2 py-1 text-xs ${link.active ? 'bg-blue-600 text-white' : link.url ? 'hover:bg-muted' : 'text-muted-foreground cursor-not-allowed'}`}
                                         />
                                     ))}
                                 </div>

@@ -28,8 +28,8 @@ export default function SellerWebsiteReports({ reports }: { reports: Paginated<R
                 </div>
                 {reports.data.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed py-12 text-center">
-                        <Bug className="h-8 w-8 text-gray-300" />
-                        <p className="text-sm text-gray-500">No website problems reported.</p>
+                        <Bug className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">No website problems reported.</p>
                         <Button className="gap-1.5" onClick={() => setOpen(true)}><Bug className="h-4 w-4" /> Report a problem</Button>
                     </div>
                 ) : (

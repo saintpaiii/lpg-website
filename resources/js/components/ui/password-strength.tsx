@@ -43,7 +43,7 @@ export function PasswordStrengthIndicator({ password }: Props) {
                 {REQUIREMENTS.map((req) => {
                     const passed = req.test(password);
                     return (
-                        <li key={req.label} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <li key={req.label} className={`flex items-center gap-1.5 text-xs ${passed ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
                             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${passed ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
                             {req.label}
                         </li>

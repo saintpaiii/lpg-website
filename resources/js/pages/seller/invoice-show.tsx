@@ -165,7 +165,7 @@ export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props
                                         </>
                                     ) : (
                                         <>
-                                            <Banknote className="h-3.5 w-3.5 text-gray-500 shrink-0" />
+                                            <Banknote className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                             <span className="text-muted-foreground">Cash on Delivery</span>
                                         </>
                                     )}
@@ -187,7 +187,7 @@ export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props
                                 )}
 
                                 {invoice.paid_via && (
-                                    <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
+                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 rounded px-2 py-1">
                                         Paid via {invoice.paid_via}
                                     </p>
                                 )}
@@ -195,7 +195,7 @@ export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props
                                 {invoice.pay_ref && (
                                     <div className="pt-1 border-t">
                                         <p className="text-xs text-muted-foreground mb-0.5">Transaction Ref</p>
-                                        <p className="font-mono text-xs break-all text-gray-700">{invoice.pay_ref}</p>
+                                        <p className="font-mono text-xs break-all text-foreground/80">{invoice.pay_ref}</p>
                                     </div>
                                 )}
 

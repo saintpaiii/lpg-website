@@ -150,7 +150,7 @@ export default function DocumentReviewViewer({ items, openKey, onOpenKey, reason
                         {!item.url ? (
                             <p className="rounded-md border p-6 text-center text-sm text-muted-foreground">No file.</p>
                         ) : item.is_pdf ? (
-                            <iframe src={item.url} title={item.label} className="h-[55dvh] w-full rounded-md border bg-white" />
+                            <iframe src={item.url} title={item.label} className="h-[55dvh] w-full rounded-md border bg-card" />
                         ) : (
                             <div className="h-[55dvh] overflow-auto rounded-md border bg-gray-50 dark:bg-gray-900">
                                 <img src={item.url} alt={item.label} draggable={false}
@@ -176,7 +176,7 @@ export default function DocumentReviewViewer({ items, openKey, onOpenKey, reason
                         {item.ocr_key && (
                             <div>
                                 <AutoReadLine result={result} reading={ocr.reading === item.ocr_key} enabled={ocr.enabled} onReadAgain={() => ocr.readAgain(item.ocr_key!)} />
-                                <p className="mt-1 text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+                                <p className="mt-1 text-xs italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                             </div>
                         )}
 
@@ -187,7 +187,7 @@ export default function DocumentReviewViewer({ items, openKey, onOpenKey, reason
                                         <Label htmlFor="rv_date">Valid until</Label>
                                         <Input id="rv_date" type="date" max={item.max_date ?? maxDate} value={date}
                                             onChange={(e) => { setDate(e.target.value); setDateSource('typed'); }} />
-                                        <p className={cn('text-xs', dateSource === 'none' && !date ? 'text-amber-700' : 'text-muted-foreground')}>
+                                        <p className={cn('text-xs', dateSource === 'none' && !date ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
                                             {dateSource === 'ocr' ? 'Read automatically — check it against the document.'
                                                 : dateSource === 'saved' ? 'Confirmed earlier — change it if needed.'
                                                 : date ? 'Typed by you.' : "Couldn't read the date — type it from the document."}
@@ -199,7 +199,7 @@ export default function DocumentReviewViewer({ items, openKey, onOpenKey, reason
                                     <Button type="button" onClick={accept} disabled={busy || (item.needs_date && !date)} className="flex-1 gap-1.5 bg-green-600 text-white hover:bg-green-700">
                                         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Accept
                                     </Button>
-                                    <Button type="button" variant="outline" onClick={() => setMode('reject')} disabled={busy} className="flex-1 gap-1.5 border-red-300 text-red-600 hover:bg-red-50">
+                                    <Button type="button" variant="outline" onClick={() => setMode('reject')} disabled={busy} className="flex-1 gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
                                         <XCircle className="h-4 w-4" /> Reject
                                     </Button>
                                 </div>

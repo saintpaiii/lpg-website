@@ -147,11 +147,11 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
                                 className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors ${active
                                     ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-900/20'
                                     : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                                <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${active ? 'text-blue-600' : 'text-muted-foreground'}`} />
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-center gap-2 text-sm font-semibold">
                                         {a.label}
-                                        {a.is_default && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Default</span>}
+                                        {a.is_default && <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Default</span>}
                                     </span>
                                     <span className="block truncate text-xs text-gray-600 dark:text-gray-400">{a.full_text}</span>
                                 </span>
@@ -174,7 +174,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
             {/* New address details */}
             {isNew && (
                 <div className="space-y-2 rounded-lg border bg-gray-50/60 p-3 dark:bg-gray-900/40">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">New delivery address</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">New delivery address</p>
                     <AddressFields
                         address={value.line}
                         city={value.city}
@@ -219,7 +219,7 @@ export default function AddressSearchMap({ savedAddresses, value, onChange, onSa
                             <Button type="button" size="sm" onClick={saveAddress} disabled={saving || !value.line.trim()}>
                                 {saving && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />} Save address
                             </Button>
-                            {!value.line.trim() && <span className="text-xs text-gray-500">Enter the house no. / street first.</span>}
+                            {!value.line.trim() && <span className="text-xs text-muted-foreground">Enter the house no. / street first.</span>}
                         </div>
                     )}
                 </div>

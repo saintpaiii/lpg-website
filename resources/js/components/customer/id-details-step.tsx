@@ -84,7 +84,7 @@ export default function IdDetailsStep({ details, onSaved }: { details: IdDetails
                     <UserRound className="h-4 w-4 text-blue-600" />
                     Your details
                 </CardTitle>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                     We check these against your ID. Your home address also becomes your default delivery address.
                 </p>
             </CardHeader>
@@ -110,7 +110,7 @@ export default function IdDetailsStep({ details, onSaved }: { details: IdDetails
                             {err.last_name && <p className="text-xs text-red-500">{err.last_name}</p>}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="d-suffix" className="text-sm font-medium">Suffix <span className="font-normal text-gray-400">(optional)</span></Label>
+                            <Label htmlFor="d-suffix" className="text-sm font-medium">Suffix <span className="font-normal text-muted-foreground">(optional)</span></Label>
                             <SuffixSelect id="d-suffix" className="h-11" value={form.data.suffix} onChange={(v) => form.setData('suffix', v)} />
                             {err.suffix && <p className="text-xs text-red-500">{err.suffix}</p>}
                         </div>
@@ -141,7 +141,7 @@ export default function IdDetailsStep({ details, onSaved }: { details: IdDetails
 
                     <div className="grid gap-1.5">
                         <Label className="text-sm font-medium">Home pin</Label>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-muted-foreground">
                             Tap <strong>Use my current location</strong>, or search your street, then drag the pin to your house.
                         </p>
                         <AddressSearchBox onSelect={pickSearchResult} />

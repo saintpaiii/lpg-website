@@ -63,20 +63,20 @@ type Props = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-700 border-yellow-200',
-    confirmed:        'bg-blue-100 text-blue-700 border-blue-200',
-    preparing:        'bg-purple-100 text-purple-700 border-purple-200',
-    out_for_delivery: 'bg-orange-100 text-orange-700 border-orange-200',
-    delivered:        'bg-emerald-100 text-emerald-700 border-emerald-200',
-    cancelled:        'bg-gray-100 text-gray-500 border-gray-200',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    delivered:        'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    cancelled:        'bg-muted text-muted-foreground border-border',
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:    'bg-red-100 text-red-700',
-    paid:      'bg-emerald-100 text-emerald-700',
-    to_refund: 'bg-orange-100 text-orange-700',
-    refunded:  'bg-gray-100 text-gray-600',
-    partial: 'bg-amber-100 text-amber-700',
+    unpaid:    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    paid:      'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    to_refund: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    refunded:  'bg-muted text-muted-foreground',
+    partial: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
 };
 
 /** Online order (Full Payment / Consignment) whose PayMongo payment was never completed. */
@@ -232,20 +232,20 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         {orders.total} order{orders.total !== 1 ? 's' : ''} total
                     </p>
                     <div className="flex flex-wrap items-end gap-2">
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs text-gray-500 font-medium">From</label>
+                            <label className="text-xs text-muted-foreground font-medium">From</label>
                             <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                         </div>
                         <div className="flex flex-col gap-1">
-                            <label className="text-xs text-gray-500 font-medium">To</label>
+                            <label className="text-xs text-muted-foreground font-medium">To</label>
                             <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                         </div>
                         <Button size="sm" variant="outline" onClick={applyDates}>Apply</Button>
-                        {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-gray-500" onClick={clearDates}>Clear</Button>}
+                        {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={clearDates}>Clear</Button>}
                         <Link href="/customer/products">
                             <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Browse Products</Button>
                         </Link>
@@ -263,7 +263,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {orders.data.length === 0 ? (
-                            <div className="py-16 text-center text-gray-400">
+                            <div className="py-16 text-center text-muted-foreground">
                                 <Package className="h-10 w-10 mx-auto mb-3 opacity-40" />
                                 <p className="font-medium">No orders yet</p>
                                 <p className="text-sm mt-1">Place your first order to get started.</p>
@@ -273,9 +273,9 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Order #</th>
                                             <th className="px-4 py-3">Store</th>
                                             <th className="px-4 py-3">Date</th>
@@ -298,32 +298,32 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     </Link>
                                                     <SeenPill flags={seen.get(order.id)} className="ml-1.5" />
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-gray-700 font-medium">{order.store_name}</td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(order.created_at)}</td>
+                                                <td className="px-4 py-3 text-xs text-foreground/80 font-medium">{order.store_name}</td>
+                                                <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(order.created_at)}</td>
                                                 <td className="px-4 py-3">
-                                                    <p className="text-xs text-gray-600">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
-                                                    <p className="text-xs text-gray-400 truncate max-w-[160px]">{order.items_summary}</p>
+                                                    <p className="text-xs text-muted-foreground">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
+                                                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">{order.items_summary}</p>
                                                 </td>
                                                 <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">
                                                     ₱{order.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                         {orderStatusLabel(order.status, order.fulfillment)}
                                                     </span>
                                                     {order.status === 'cancelled' && order.cancelled_by && (
-                                                        <p className="text-[10px] text-gray-400 mt-0.5">
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
                                                             by {order.cancelled_by === 'customer' ? 'you' : 'seller'}
                                                         </p>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     {awaitingPayment(order) ? (
-                                                        <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 whitespace-nowrap">
+                                                        <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300 whitespace-nowrap">
                                                             Waiting for payment
                                                         </span>
                                                     ) : (
-                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? 'bg-muted text-muted-foreground'}`}>
                                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                                          order.payment_status === 'refunded'  ? 'Refunded' :
                                                          order.payment_status === 'partial'   ? 'Partial' :
@@ -331,10 +331,10 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                     </span>
                                                     )}
                                                     {order.payment_mode === 'half' && order.payment_status === 'partial' && order.remaining_balance !== null && (
-                                                        <p className="mt-0.5 text-[10px] font-medium text-amber-600">Half paid · ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })} left</p>
+                                                        <p className="mt-0.5 text-xs font-medium text-amber-600">Half paid · ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })} left</p>
                                                     )}
                                                     {order.payment_mode === 'consignment' && order.payment_status === 'partial' && order.remaining_balance !== null && (
-                                                        <p className={`text-[10px] font-medium mt-0.5 ${order.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
+                                                        <p className={`text-xs font-medium mt-0.5 ${order.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
                                                             Balance: ₱{order.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                             {order.balance_due_date && ` · due ${order.balance_due_date}`}
                                                             {order.is_overdue && ' · OVERDUE'}
@@ -351,7 +351,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                         {awaitingPayment(order) && (
                                                             <Button
                                                                 size="sm"
-                                                                className="h-7 px-2.5 text-xs bg-amber-500 hover:bg-amber-600 text-white font-semibold gap-1"
+                                                                className="h-7 px-2.5 text-xs bg-amber-600 hover:bg-amber-600 text-white font-semibold gap-1"
                                                                 onClick={() => payNow(order)}
                                                                 disabled={payingId === order.id}
                                                             >
@@ -381,7 +381,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                             >
-                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50" title="Print Receipt">
+                                                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40" title="Print Receipt">
                                                                     <Printer className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             </a>
@@ -390,7 +390,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                             <Button
                                                                 size="sm"
                                                                 variant="ghost"
-                                                                className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                                className="h-7 px-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-700 dark:hover:text-red-300"
                                                                 onClick={() => openCancel(order)}
                                                             >
                                                                 <XCircle className="h-3.5 w-3.5 mr-1" />
@@ -409,7 +409,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                         {/* Pagination */}
                         {orders.last_page > 1 && (
                             <div className="flex items-center justify-between border-t px-4 py-3">
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted-foreground">
                                     Showing {orders.from}–{orders.to} of {orders.total}
                                 </p>
                                 <div className="flex gap-1">
@@ -421,8 +421,8 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                 link.active
                                                     ? 'bg-blue-600 text-white'
                                                     : link.url
-                                                    ? 'hover:bg-gray-100 text-gray-600'
-                                                    : 'text-gray-300 pointer-events-none'
+                                                    ? 'hover:bg-muted text-muted-foreground'
+                                                    : 'text-muted-foreground pointer-events-none'
                                             }`}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                         />
@@ -444,7 +444,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-1">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                             Cancel order <strong className="font-mono">{cancelOrder?.order_number}</strong>?
                             {cancelOrder?.status === 'confirmed' && ' Stock will be restored to the seller.'}
                         </p>
@@ -457,7 +457,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                             rows={3}
                         />
                         {cancelOrder?.payment_status === 'paid' && (
-                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                                 Your order was paid. A refund will be processed by the seller.
                             </p>
                         )}

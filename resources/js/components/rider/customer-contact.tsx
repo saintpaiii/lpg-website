@@ -61,7 +61,7 @@ function CopyButton({ text, message, label }: { text: string; message: string; l
         <button
             type="button"
             onClick={(e) => { e.stopPropagation(); void copyText(text, message); }}
-            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-[11px] font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
+            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 text-xs font-medium text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300"
             aria-label={label}
             title={label}
         >
@@ -73,7 +73,7 @@ function CopyButton({ text, message, label }: { text: string; message: string; l
 function Row({ icon, children, copy }: { icon: ReactNode; children: ReactNode; copy?: ReactNode }) {
     return (
         <div className="flex items-start gap-2">
-            <span className="mt-0.5 shrink-0 text-gray-400">{icon}</span>
+            <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
             <div className="min-w-0 flex-1 break-words">{children}</div>
             {copy}
         </div>
@@ -118,7 +118,7 @@ export default function CustomerContactCard({ customer, orderNumber, contactVisi
 
     return (
         <div className="rounded-lg border bg-white p-3 text-sm dark:bg-gray-950">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Customer</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</p>
             <p className="text-base font-semibold text-gray-900 dark:text-gray-100">{customer.name}</p>
 
             <div className="mt-2 grid gap-2">
@@ -126,23 +126,23 @@ export default function CustomerContactCard({ customer, orderNumber, contactVisi
                     <>
                         <Row icon={<Phone className="h-4 w-4" />}
                             copy={phone ? <CopyButton text={phone} message="Number copied" label="Copy phone number" /> : undefined}>
-                            {phone ? <span className="font-medium tabular-nums">{phone}</span> : <span className="text-gray-400">No phone on file</span>}
+                            {phone ? <span className="font-medium tabular-nums">{phone}</span> : <span className="text-muted-foreground">No phone on file</span>}
                         </Row>
                         <Row icon={<Mail className="h-4 w-4" />}
                             copy={email ? <CopyButton text={email} message="Email copied" label="Copy email address" /> : undefined}>
-                            {email ? <span className="font-medium">{email}</span> : <span className="text-gray-400">No email on file</span>}
+                            {email ? <span className="font-medium">{email}</span> : <span className="text-muted-foreground">No email on file</span>}
                         </Row>
                     </>
                 )}
                 {contactVisible && (
                     <Row icon={<MapPin className="h-4 w-4" />}
                         copy={address ? <CopyButton text={address} message="Address copied" label="Copy address" /> : undefined}>
-                        {address || <span className="text-gray-400">No address on file</span>}
+                        {address || <span className="text-muted-foreground">No address on file</span>}
                     </Row>
                 )}
                 {customer.delivery_notes && (
                     <div className="flex items-start gap-2 rounded-md bg-gray-50 px-2.5 py-2 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300">
-                        <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <span className="whitespace-pre-line break-words">{customer.delivery_notes}</span>
                     </div>
                 )}
@@ -154,7 +154,7 @@ export default function CustomerContactCard({ customer, orderNumber, contactVisi
                         <a href={`tel:${phone}`} onClick={copyOnComputer} className={`${btn} bg-emerald-600 text-white hover:bg-emerald-700`}>
                             <Phone className="h-4 w-4" /> Call
                         </a>
-                        <a href={smsUrl(phone, orderNumber)} onClick={copyOnComputer} className={`${btn} border border-emerald-600 bg-white text-emerald-700 hover:bg-emerald-50 dark:bg-transparent`}>
+                        <a href={smsUrl(phone, orderNumber)} onClick={copyOnComputer} className={`${btn} border border-emerald-600 bg-white text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:bg-transparent`}>
                             <MessageSquare className="h-4 w-4" /> Text
                         </a>
                     </>
@@ -169,10 +169,10 @@ export default function CustomerContactCard({ customer, orderNumber, contactVisi
             </div>
 
             {contactVisible && (phone || email) && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-gray-500">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {onComputer && phone && <span>Call and Text work on your phone — on a computer they copy the number.</span>}
                     {email && (
-                        <a href={mailtoUrl(email, orderNumber)} className="underline hover:text-gray-700">Use mail app</a>
+                        <a href={mailtoUrl(email, orderNumber)} className="underline hover:text-foreground/80">Use mail app</a>
                     )}
                 </div>
             )}
@@ -187,14 +187,14 @@ export function CompactContact({ phone, email }: { phone: string | null; email: 
         <div className="grid gap-1 text-xs">
             {phone && (
                 <div className="flex items-center gap-1.5">
-                    <Phone className="h-3 w-3 shrink-0 text-gray-400" />
-                    <a href={`tel:${phone}`} className="flex-1 font-medium tabular-nums !text-gray-800">{phone}</a>
+                    <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <a href={`tel:${phone}`} className="flex-1 font-medium tabular-nums !text-foreground">{phone}</a>
                     <CopyButton text={phone} message="Number copied" label="Copy phone number" />
                 </div>
             )}
             {email && (
                 <div className="flex items-center gap-1.5">
-                    <Mail className="h-3 w-3 shrink-0 text-gray-400" />
+                    <Mail className="h-3 w-3 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate" title={email}>{email}</span>
                     <CopyButton text={email} message="Email copied" label="Copy email address" />
                 </div>

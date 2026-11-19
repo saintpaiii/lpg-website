@@ -86,9 +86,9 @@ export function WorkDaysPicker({ value, onChange }: { value: number[]; onChange:
 /** "₱65/h" after a role name, or an orange "No rate" tag — only when the plan has Payroll */
 function RoleRateTag({ rate }: { rate: number | null }) {
     if (rate == null) {
-        return <span className="shrink-0 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate</span>;
+        return <span className="shrink-0 rounded bg-orange-100 px-1.5 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate</span>;
     }
-    return <span className="shrink-0 text-xs font-normal text-gray-500">₱{Number(rate.toFixed(2)).toLocaleString('en-PH')}/h</span>;
+    return <span className="shrink-0 text-xs font-normal text-muted-foreground">₱{Number(rate.toFixed(2)).toLocaleString('en-PH')}/h</span>;
 }
 
 // ── Role picker (Add / Edit staff) ─────────────────────────────────────────────
@@ -148,7 +148,7 @@ function LevelControl({ value, viewOnly, disabled, lockedAbove, onChange }: {
                     onClick={() => onChange(o)}
                     className={`px-2.5 py-1 font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${value === o
                         ? (o === 'full' ? 'bg-blue-600 text-white' : o === 'view' ? 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-100')
-                        : 'bg-white text-gray-500 hover:bg-gray-50 dark:bg-transparent dark:hover:bg-gray-800'}`}>
+                        : 'bg-white text-muted-foreground hover:bg-gray-50 dark:bg-transparent dark:hover:bg-gray-800'}`}>
                     {LEVEL_LABEL[o]}
                 </button>
             ))}
@@ -244,7 +244,7 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                     <DialogTitle className="flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-blue-600" />
                         {isNew ? 'New role' : readOnly ? role!.name : `Edit role: ${role!.name}`}
-                        {role?.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
+                        {role?.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
                     </DialogTitle>
                     <DialogDescription>
                         Choose what people with this role can do in each part of the store portal. Someone with several roles gets the highest level of each.
@@ -276,7 +276,7 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                                     </optgroup>
                                 )}
                             </select>
-                            <p className="text-xs text-gray-500">Fills the access below — then change what you want and give it a name.</p>
+                            <p className="text-xs text-muted-foreground">Fills the access below — then change what you want and give it a name.</p>
                         </div>
                     )}
 
@@ -293,7 +293,7 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                             <Input id="role-rate" type="number" step="0.01" min="1" max="10000" required={!readOnly} disabled={readOnly}
                                 className="sm:max-w-[12rem]" value={data.hourly_rate} placeholder="e.g. 65.00"
                                 onChange={(e) => setData('hourly_rate', e.target.value)} />
-                            <p className="text-xs text-gray-500">Paid for each whole hour worked. Overtime adds the multiplier from Payroll Settings.</p>
+                            <p className="text-xs text-muted-foreground">Paid for each whole hour worked. Overtime adds the multiplier from Payroll Settings.</p>
                             {errors.hourly_rate && <p className="text-xs text-red-500">{errors.hourly_rate}</p>}
                         </div>
                     )}
@@ -303,7 +303,7 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                             onChange={(e) => setData('is_rider', e.target.checked)} />
                         <span>
                             <span className="font-medium">Delivers orders (rider)</span>
-                            <span className="block text-xs text-gray-500">Needs a driver's license and picks a vehicle at clock-in. Uses the rider app.</span>
+                            <span className="block text-xs text-muted-foreground">Needs a driver's license and picks a vehicle at clock-in. Uses the rider app.</span>
                         </span>
                     </label>
 
@@ -317,13 +317,13 @@ export function RoleEditor({ role, modules, canEdit, open, onClose, templates = 
                                             {m.label}
                                             {lock && (
                                                 <button type="button" onClick={() => openUpgrade(lock)}
-                                                    className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-200">
+                                                    className="inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800 hover:bg-amber-200 dark:bg-amber-900/50 dark:text-amber-200">
                                                     <Lock className="h-2.5 w-2.5" /> {FEATURE_INFO[lock]?.plan ?? 'Pro'}
                                                 </button>
                                             )}
                                         </p>
-                                        <p className="text-xs text-gray-500">{m.description}</p>
-                                        {usually[m.key] && <p className="mt-0.5 text-[11px] text-gray-400">Usually: {usually[m.key]}</p>}
+                                        <p className="text-xs text-muted-foreground">{m.description}</p>
+                                        {usually[m.key] && <p className="mt-0.5 text-xs text-muted-foreground">Usually: {usually[m.key]}</p>}
                                     </div>
                                     <LevelControl value={data.modules[m.key] ?? 'off'} viewOnly={m.view_only} disabled={readOnly}
                                         // Locked by plan: keep or lower what the role already had (the server checks the same)
@@ -373,7 +373,7 @@ export function RolesTab({ roles, modules, canEdit, templates = [] }: { roles: S
                 </CardTitle>
                 <Button size="sm" onClick={newRole} className={canEdit ? 'bg-blue-600 text-white hover:bg-blue-700' : ''} variant={canEdit ? 'default' : 'outline'}>
                     {canEdit ? <Plus className="mr-1 h-4 w-4" /> : <Lock className="mr-1 h-3.5 w-3.5" />} New role
-                    {!canEdit && <span className="ml-1.5 rounded bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800">Pro</span>}
+                    {!canEdit && <span className="ml-1.5 rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">Pro</span>}
                 </Button>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -396,18 +396,18 @@ export function RolesTab({ roles, modules, canEdit, templates = [] }: { roles: S
                                     <p className="flex flex-wrap items-center gap-1.5 font-medium">
                                         {r.name}
                                         {showRate && <RoleRateTag rate={r.hourly_rate} />}
-                                        {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
-                                        {r.is_rider && <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700"><Truck className="h-3 w-3" /> Delivers orders</span>}
-                                        <span className="text-xs font-normal text-gray-500">· {r.members} staff</span>
+                                        {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
+                                        {r.is_rider && <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 dark:bg-orange-900/40 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:text-orange-300"><Truck className="h-3 w-3" /> Delivers orders</span>}
+                                        <span className="text-xs font-normal text-muted-foreground">· {r.members} staff</span>
                                     </p>
-                                    <p className="mt-0.5 text-xs text-gray-500">{parts.length ? parts.join(' · ') : 'No modules'}</p>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">{parts.length ? parts.join(' · ') : 'No modules'}</p>
                                 </div>
                                 <div className="flex shrink-0 gap-1">
                                     <Button size="sm" variant="ghost" className="h-8" onClick={() => setEditing(r)}>
                                         {canEdit ? <><Pencil className="mr-1 h-3.5 w-3.5" /> Edit</> : 'View'}
                                     </Button>
                                     {canEdit && !r.is_starter && (
-                                        <Button size="sm" variant="ghost" className="h-8 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                        <Button size="sm" variant="ghost" className="h-8 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600"
                                             onClick={() => setDeleting(r)} title={r.members > 0 ? `Remove it from ${r.members} staff first` : 'Delete role'}>
                                             <Trash2 className="h-3.5 w-3.5" />
                                         </Button>

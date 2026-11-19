@@ -6,7 +6,7 @@ import type { SharedData } from '@/types';
 /** planLimit prop from the Seller Product / Staff / Vehicle controllers */
 export type PlanLimit = { used: number; limit: number | null; plan: string; message: string; can_add: boolean };
 
-export const PAUSED_BADGE = 'rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300';
+export const PAUSED_BADGE = 'rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300';
 
 /** "Published 15 / 15 — Basic plan" — amber when full, with an Upgrade link for the owner. */
 export function PlanLimitBar({ label, planLimit, className }: { label: string; planLimit?: PlanLimit | null; className?: string }) {

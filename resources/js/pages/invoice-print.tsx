@@ -9,7 +9,7 @@ export default function InvoicePrint({ doc }: { doc: InvoiceDoc }) {
             <Head title={`Invoice ${doc.number}`} />
             <style>{`@media print { @page { size: A4 portrait; margin: 14mm; } }`}</style>
 
-            <div className="min-h-screen bg-gray-100 px-4 py-6 print:bg-white print:p-0">
+            <div className="min-h-screen bg-muted px-4 py-6 print:bg-card print:p-0">
                 <div className="mx-auto max-w-3xl">
                     <div className="mb-4 flex flex-wrap justify-end gap-2 print:hidden">
                         <button type="button" onClick={() => window.print()}
@@ -18,7 +18,7 @@ export default function InvoicePrint({ doc }: { doc: InvoiceDoc }) {
                         </button>
                     </div>
                     <InvoiceDocument doc={doc} />
-                    <p className="mt-3 text-center text-xs text-gray-400 print:hidden">
+                    <p className="mt-3 text-center text-xs text-muted-foreground print:hidden">
                         <FileDown className="mr-1 inline h-3.5 w-3.5" />Tip: choose "Save as PDF" in the print dialog, or use Download PDF on the invoice page.
                     </p>
                 </div>

@@ -32,10 +32,10 @@ export type Identity = {
 };
 
 const STATUS: Record<Identity['status'], [string, string]> = {
-    verified:      ['bg-green-100 text-green-800', 'Verified'],
-    pending:       ['bg-blue-100 text-blue-800', 'Waiting for review'],
-    rejected:      ['bg-red-100 text-red-800', 'Rejected'],
-    not_submitted: ['bg-gray-100 text-gray-700', 'Not submitted'],
+    verified:      ['bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300', 'Verified'],
+    pending:       ['bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300', 'Waiting for review'],
+    rejected:      ['bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300', 'Rejected'],
+    not_submitted: ['bg-muted text-foreground/80', 'Not submitted'],
 };
 
 const statusText = (s: string) => ({ approved: 'Approved', rejected: 'Rejected', pending: 'Waiting' } as Record<string, string>)[s] ?? s;
@@ -77,7 +77,7 @@ export default function IdentityDocumentsCard({ userId, identity: id }: { userId
                     <p><span className="text-muted-foreground">Phone:</span> {id.phone || '—'}</p>
                     <p>
                         <span className="text-muted-foreground">Email:</span> {id.email}
-                        {id.email_verified && <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">verified</span>}
+                        {id.email_verified && <span className="ml-2 rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-0.5 text-xs font-semibold text-green-800 dark:text-green-300">verified</span>}
                     </p>
                     <p><span className="text-muted-foreground">Saved delivery addresses:</span> {id.saved_addresses}</p>
                     <p className="sm:col-span-2"><span className="text-muted-foreground">Home address:</span> {id.home_address || '—'}</p>
@@ -122,7 +122,7 @@ export default function IdentityDocumentsCard({ userId, identity: id }: { userId
                                 <li key={h.id} className="py-2">
                                     <span className="font-medium">{h.type}</span>
                                     <span className="text-muted-foreground"> · {h.date} · </span>
-                                    <span className={h.status === 'rejected' ? 'text-red-600' : h.status === 'approved' ? 'text-green-700' : ''}>{statusText(h.status)}</span>
+                                    <span className={h.status === 'rejected' ? 'text-red-600' : h.status === 'approved' ? 'text-green-700 dark:text-green-300' : ''}>{statusText(h.status)}</span>
                                     {h.reviewer && <span className="text-muted-foreground"> · by {h.reviewer}</span>}
                                     {h.reason && <span className="block text-xs text-muted-foreground">Reason: {h.reason}</span>}
                                 </li>

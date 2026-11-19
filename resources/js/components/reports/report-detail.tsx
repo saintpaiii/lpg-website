@@ -29,16 +29,16 @@ export default function ReportDetail({ report, portal, backHref, backLabel, side
             {side}
             {report.order_summary && <OrderSummaryCard summary={report.order_summary} />}
             {(report.store_warnings !== undefined && report.store_warnings !== null) && (
-                <div className={`space-y-1 rounded-xl border p-4 text-sm ${warnings >= 3 ? 'border-red-300 bg-red-50 dark:bg-red-900/20' : ''}`}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Store warnings (90 days)</p>
+                <div className={`space-y-1 rounded-xl border p-4 text-sm ${warnings >= 3 ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : ''}`}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Store warnings (90 days)</p>
                     <p className="text-2xl font-bold">{warnings}</p>
                     {portal === 'admin' && warnings >= 3 && report.admin?.store_id && (
-                        <Link href={`/admin/stores/${report.admin.store_id}`} className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-semibold text-white">
+                        <Link href={`/admin/stores/${report.admin.store_id}`} className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                             <AlertTriangle className="h-3 w-3" /> 3+ warnings in 90 days — consider suspending
                         </Link>
                     )}
                     {report.rider && (
-                        <p className="flex items-center gap-1.5 pt-1 text-xs text-gray-600"><Bike className="h-3.5 w-3.5" /> Rider {report.rider.name}: {report.rider.warnings} warning(s) in 90 days</p>
+                        <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground"><Bike className="h-3.5 w-3.5" /> Rider {report.rider.name}: {report.rider.warnings} warning(s) in 90 days</p>
                     )}
                 </div>
             )}
@@ -47,23 +47,23 @@ export default function ReportDetail({ report, portal, backHref, backLabel, side
 
     return (
         <div className="mx-auto w-full max-w-5xl space-y-4">
-            <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800">
+            <Link href={backHref} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
                 <ArrowLeft className="h-4 w-4" /> {backLabel}
             </Link>
 
             {(report.my_false_reports ?? 0) > 0 && (
-                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                <p className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                     You have {report.my_false_reports} warning{report.my_false_reports === 1 ? '' : 's'} for false reports.
                 </p>
             )}
 
-            <div className={report.is_urgent && open ? 'space-y-4 rounded-xl border-2 border-red-300 p-4' : 'space-y-4 rounded-xl border p-4'}>
+            <div className={report.is_urgent && open ? 'space-y-4 rounded-xl border-2 border-red-200 dark:border-red-800 p-4' : 'space-y-4 rounded-xl border p-4'}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
                         <h1 className="flex items-center gap-2 text-xl font-bold">
-                            {report.is_system && <Globe className="h-5 w-5 text-gray-500" />}{report.category_label}
+                            {report.is_system && <Globe className="h-5 w-5 text-muted-foreground" />}{report.category_label}
                         </h1>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             {report.is_system ? <>Website problem · {report.system_area}</> : <>
                                 {report.store && <>{report.store.name} · </>}
                                 {report.order && (report.order.link
@@ -79,14 +79,14 @@ export default function ReportDetail({ report, portal, backHref, backLabel, side
                 <ReportSteps steps={report.steps} />
 
                 <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                    <div><dt className="inline text-gray-500">Reported by: </dt><dd className="inline">{report.reporter.name} ({SIDE_LABEL[report.reporter.side] ?? report.reporter.side})</dd></div>
-                    <div><dt className="inline text-gray-500">About: </dt><dd className="inline">{report.target.name}</dd></div>
+                    <div><dt className="inline text-muted-foreground">Reported by: </dt><dd className="inline">{report.reporter.name} ({SIDE_LABEL[report.reporter.side] ?? report.reporter.side})</dd></div>
+                    <div><dt className="inline text-muted-foreground">About: </dt><dd className="inline">{report.target.name}</dd></div>
                     {report.admin?.page_url && (
-                        <div className="sm:col-span-2"><dt className="inline text-gray-500">Page: </dt>
+                        <div className="sm:col-span-2"><dt className="inline text-muted-foreground">Page: </dt>
                             <dd className="inline break-all"><a href={report.admin.page_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{report.admin.page_url}</a></dd></div>
                     )}
                     {report.admin?.user_agent && (
-                        <div className="sm:col-span-2"><dt className="inline text-gray-500">Browser: </dt><dd className="inline break-all text-xs">{report.admin.user_agent}</dd></div>
+                        <div className="sm:col-span-2"><dt className="inline text-muted-foreground">Browser: </dt><dd className="inline break-all text-xs">{report.admin.user_agent}</dd></div>
                     )}
                 </dl>
                 {report.escalated && report.escalation_reason && (

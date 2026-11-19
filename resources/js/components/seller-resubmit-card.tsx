@@ -94,7 +94,7 @@ export default function SellerResubmitCard({ sentBack }: { sentBack: SentBack })
                     <Label>New selfie (live camera) <span className="text-red-500">*</span></Label>
                     <CameraCapture value={selfie} onChange={setSelfie} fileName="selfie.jpg" compact
                         hint="Hold the new ID next to your face. Uploading a picture is not allowed." error={errors.selfie || null} />
-                    <p className="text-xs text-gray-500">Your ID photo and selfie are compared by our face-matching provider (Face++) only to confirm it's you.</p>
+                    <p className="text-xs text-muted-foreground">Your ID photo and selfie are compared by our face-matching provider (Face++) only to confirm it's you.</p>
                 </div>
             )}
 

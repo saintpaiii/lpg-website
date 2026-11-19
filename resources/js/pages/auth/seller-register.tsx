@@ -65,7 +65,7 @@ function FileUploadField({
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 {label} <span className="text-red-500">*</span>
             </Label>
-            <p className="text-xs text-gray-500 -mt-1">{hint}</p>
+            <p className="text-xs text-muted-foreground -mt-1">{hint}</p>
 
             {file ? (
                 <div className="flex items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 dark:border-blue-800 dark:bg-blue-950/30">
@@ -74,9 +74,9 @@ function FileUploadField({
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{file.name}</p>
-                        <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                     </div>
-                    <button type="button" onClick={onClear} className="text-gray-400 hover:text-red-500 transition-colors">
+                    <button type="button" onClick={onClear} className="text-muted-foreground hover:text-red-500 transition-colors">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
@@ -86,9 +86,9 @@ function FileUploadField({
                     onClick={() => ref.current?.click()}
                     className="flex flex-col items-center gap-2 rounded-lg border-2 border-dashed border-gray-300 px-6 py-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-colors dark:border-gray-700 dark:hover:border-blue-600"
                 >
-                    <Upload className="h-7 w-7 text-gray-400" />
+                    <Upload className="h-7 w-7 text-muted-foreground" />
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Click to upload</span>
-                    <span className="text-xs text-gray-500">JPG, PNG, WEBP or PDF · max 5 MB</span>
+                    <span className="text-xs text-muted-foreground">JPG, PNG, WEBP or PDF · max 5 MB</span>
                 </button>
             )}
 
@@ -324,7 +324,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                 <div>
                     <Link
                         href="/"
-                        className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-blue-600 transition-colors"
                     >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Home
@@ -366,7 +366,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                 return (
                                     <div key={label} className="flex-1 flex flex-col items-center gap-1">
                                         <div className={`w-full h-1.5 rounded-full transition-colors ${done ? 'bg-blue-600' : active ? 'bg-blue-400' : 'bg-gray-200 dark:bg-gray-700'}`} />
-                                        <span className={`text-xs font-medium ${active ? 'text-blue-600' : done ? 'text-blue-400' : 'text-gray-400'}`}>
+                                        <span className={`text-xs font-medium ${active ? 'text-blue-600' : done ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
                                             Step {s}: {label}
                                         </span>
                                     </div>
@@ -379,7 +379,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                             {/* ── Step 1: Account & Store Info ─────────────── */}
                             {step === 1 && (
                                 <>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 1 of 3 — Account & Store Details</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 1 of 3 — Account & Store Details</p>
 
                                     {/* Owner name: first / middle / last / suffix (the full name is built on the server) */}
                                     <div className="grid gap-5 sm:grid-cols-2">
@@ -393,7 +393,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                         </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="middle_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Middle name <span className="font-normal text-gray-400">(optional)</span>
+                                                Middle name <span className="font-normal text-muted-foreground">(optional)</span>
                                             </Label>
                                             <Input id="middle_name" type="text" autoComplete="additional-name" placeholder="Santos" className="h-11"
                                                 value={fields.middle_name} onChange={(e) => set('middle_name', e.target.value)} />
@@ -411,7 +411,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                         </div>
                                         <div className="grid gap-2">
                                             <Label htmlFor="suffix" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                Suffix <span className="font-normal text-gray-400">(optional)</span>
+                                                Suffix <span className="font-normal text-muted-foreground">(optional)</span>
                                             </Label>
                                             <SuffixSelect value={fields.suffix} onChange={(v) => set('suffix', v)} className="h-11" />
                                             <InputError message={errors.suffix} />
@@ -437,7 +437,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                         {signed_in ? (
                                             <>
                                                 <Input id="sr_email" type="email" readOnly aria-readonly="true" className="h-11 bg-gray-100 dark:bg-gray-800" value={signed_in.email} />
-                                                <p className="text-xs text-gray-500">Your Google account — you sign in with Google. You can set a password later with “Forgot password”.</p>
+                                                <p className="text-xs text-muted-foreground">Your Google account — you sign in with Google. You can set a password later with “Forgot password”.</p>
                                             </>
                                         ) : (
                                             <Input id="sr_email" type="email" required placeholder="you@example.com" className="h-11"
@@ -532,7 +532,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                             {/* ── Step 2: Document Uploads ──────────────────── */}
                             {step === 2 && (
                                 <>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 2 of 3 — Upload Required Documents</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 2 of 3 — Upload Required Documents</p>
 
                                     <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800 dark:bg-amber-950/20 dark:border-amber-800 dark:text-amber-300">
                                         All six documents are required for seller verification. Your application will be reviewed within 1–3 business days.
@@ -597,7 +597,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                             {/* ── Step 3: Terms & Conditions ────────────────── */}
                             {step === 3 && (
                                 <>
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Step 3 of 3 — Review & Agree to Terms</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Step 3 of 3 — Review & Agree to Terms</p>
 
                                     <SellerTermsBox terms={seller_terms} />
 
@@ -646,7 +646,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                         {signed_in ? (
                             <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
                                 Changed your mind?{' '}
-                                <Link href="/choose-account" className="font-medium text-blue-600 hover:text-blue-700">
+                                <Link href="/choose-account" className="font-medium text-blue-600 hover:text-blue-700 dark:hover:text-blue-300">
                                     Use this account to buy LPG instead
                                 </Link>
                             </p>
@@ -655,7 +655,7 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
                                 {step === 1 && <>
                                     <div className="mt-6 flex items-center gap-3">
                                         <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                                        <span className="text-xs text-gray-400 dark:text-gray-500">or</span>
+                                        <span className="text-xs text-muted-foreground">or</span>
                                         <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
                                     </div>
                                     {/* A new Google account comes straight back here (signed in); an existing one just signs in */}
@@ -675,14 +675,14 @@ export default function SellerRegister({ seller_terms, plan_catalog, signed_in =
 
                                 <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
                                     Already have an account?{' '}
-                                    <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
+                                    <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700 dark:hover:text-blue-300">
                                         Sign in
                                     </Link>
                                 </p>
 
                                 <p className="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
                                     Want to order LPG instead?{' '}
-                                    <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
+                                    <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700 dark:hover:text-blue-300">
                                         Create a customer account
                                     </Link>
                                 </p>

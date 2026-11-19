@@ -82,7 +82,7 @@ interface Props {
 
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
     return (
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
                 <p className="text-sm font-medium">{label}</p>
                 <p className="text-xs text-muted-foreground">{hint}</p>
@@ -95,7 +95,7 @@ function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: st
                 onClick={() => onChange(!checked)}
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
             >
-                <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-card shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </button>
         </div>
     );
@@ -327,11 +327,11 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-6">
-                                <div className="h-20 w-20 rounded-xl border-2 border-dashed border-gray-200 overflow-hidden bg-gray-50 flex items-center justify-center shrink-0">
+                                <div className="h-20 w-20 rounded-xl border-2 border-dashed border-border overflow-hidden bg-muted flex items-center justify-center shrink-0">
                                     {previewUrl ? (
                                         <img src={previewUrl} alt="Store logo" className="h-full w-full object-cover" />
                                     ) : (
-                                        <Store className="h-8 w-8 text-gray-300" />
+                                        <Store className="h-8 w-8 text-muted-foreground" />
                                     )}
                                 </div>
                                 <div className="space-y-2">
@@ -351,7 +351,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                             type="button"
                                             variant="ghost"
                                             size="sm"
-                                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                            className="text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                                             onClick={() => {
                                                 setPreviewUrl(null);
                                                 setData('logo', null);
@@ -485,7 +485,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                     </Link>
                                 )}
                                 {!has('loyalty') && (
-                                    <span className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1 py-0.5 text-[10px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                                    <span className="inline-flex items-center gap-0.5 rounded bg-violet-100 px-1 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
                                         <Lock className="h-2.5 w-2.5" /> Pro
                                     </span>
                                 )}
@@ -565,7 +565,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                                         maxLength={20}
                                         aria-describedby="phone-hint"
                                     />
-                                    <p id="phone-hint" className="text-[11px] text-muted-foreground">09XXXXXXXXX or landline (046) 483-5678</p>
+                                    <p id="phone-hint" className="text-xs text-muted-foreground">09XXXXXXXXX or landline (046) 483-5678</p>
                                     {allErrors.phone && <p className="text-xs text-red-500">{allErrors.phone}</p>}
                                 </div>
                                 <div className="grid gap-1.5">
@@ -601,7 +601,7 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
                         </CardHeader>
                         <CardContent className="space-y-4">
                             {/* Map */}
-                            <div className="rounded-lg overflow-hidden border border-gray-200 h-64">
+                            <div className="rounded-lg overflow-hidden border border-border h-64">
                                 <MapContainer
                                     center={pin ? [pin.lat, pin.lng] : [14.4791, 120.8980]}
                                     zoom={pin ? 16 : 12}
@@ -638,13 +638,13 @@ export default function SellerSettings({ store, tax, can_edit_tax, refund_window
 
                             {/* Coordinates display */}
                             {pin ? (
-                                <div className="flex items-center gap-3 text-xs text-gray-500">
+                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                     <span>
                                         Pinned at: <span className="font-mono">{pin.lat.toFixed(6)}, {pin.lng.toFixed(6)}</span>
                                     </span>
                                 </div>
                             ) : (
-                                <p className="text-xs font-medium text-amber-700">Required: click the map to pin your store. Delivery fees and staff clock-in use this spot.</p>
+                                <p className="text-xs font-medium text-amber-700 dark:text-amber-300">Required: click the map to pin your store. Delivery fees and staff clock-in use this spot.</p>
                             )}
 
                             {/* Manual lat/lng inputs */}

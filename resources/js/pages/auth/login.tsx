@@ -164,7 +164,7 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
             {/* ── Right panel — form ── */}
             <div className="flex w-full flex-col bg-gray-50 px-6 py-10 lg:w-[55%] dark:bg-gray-950">
                 <div>
-                    <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors">
+                    <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-blue-600 transition-colors">
                         <ArrowLeft className="h-4 w-4" />
                         Back to Home
                     </Link>
@@ -187,18 +187,18 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                         </div>
 
                         {status && (
-                            <div className="mb-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+                            <div className="mb-6 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 px-4 py-3 text-sm font-medium text-emerald-700 dark:text-emerald-300 ring-1 ring-emerald-200">
                                 {status}
                             </div>
                         )}
 
                         {/* Lockout countdown banner */}
                         {isLocked && (
-                            <div className="mb-6 rounded-xl bg-red-50 ring-1 ring-red-200 overflow-hidden">
+                            <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-950/40 ring-1 ring-red-200 overflow-hidden">
                                 <div className="px-4 py-3">
                                     <div className="flex items-center gap-2 mb-1">
                                         <Lock className="h-4 w-4 text-red-600 shrink-0" />
-                                        <p className="text-sm font-semibold text-red-700">Too many failed attempts</p>
+                                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">Too many failed attempts</p>
                                     </div>
                                     <p className="text-sm text-red-600">
                                         Try again in{' '}
@@ -218,9 +218,9 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
 
                         {/* Remaining attempts warning */}
                         {!isLocked && remainingAttempts !== null && remainingAttempts !== undefined && remainingAttempts <= 2 && (
-                            <div className="mb-5 rounded-xl bg-amber-50 ring-1 ring-amber-200 px-4 py-3 flex items-start gap-2.5">
+                            <div className="mb-5 rounded-xl bg-amber-50 dark:bg-amber-950/40 ring-1 ring-amber-200 px-4 py-3 flex items-start gap-2.5">
                                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                                <p className="text-sm text-amber-700">
+                                <p className="text-sm text-amber-700 dark:text-amber-300">
                                     {remainingAttempts === 0
                                         ? 'Next failed attempt will temporarily lock your account for 3 minutes.'
                                         : `${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining before your account is temporarily locked.`
@@ -230,11 +230,11 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                         )}
 
                         {deactivationInfo && (
-                            <div className="mb-6 rounded-xl bg-red-50 ring-1 ring-red-200 overflow-hidden">
+                            <div className="mb-6 rounded-xl bg-red-50 dark:bg-red-950/40 ring-1 ring-red-200 overflow-hidden">
                                 <div className="flex items-start gap-3 px-4 py-3">
                                     <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
                                     <div className="min-w-0">
-                                        <p className="text-sm font-semibold text-red-700">Account Deactivated</p>
+                                        <p className="text-sm font-semibold text-red-700 dark:text-red-300">Account Deactivated</p>
                                         {deactivationInfo.reason && (
                                             <p className="mt-1 text-sm text-red-600">
                                                 <span className="font-medium">Reason:</span> {deactivationInfo.reason}
@@ -247,7 +247,7 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                                         {contact_email && (
                                             <p className="mt-2 text-xs text-red-500">
                                                 If you believe this is a mistake, please contact us at{' '}
-                                                <a href={`mailto:${contact_email}`} className="font-medium underline hover:text-red-700">{contact_email}</a>
+                                                <a href={`mailto:${contact_email}`} className="font-medium underline hover:text-red-700 dark:hover:text-red-300">{contact_email}</a>
                                             </p>
                                         )}
                                     </div>
@@ -316,7 +316,7 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
 
                         <div className="mt-5 flex items-center gap-3">
                             <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
-                            <span className="text-xs text-gray-400 dark:text-gray-500">or</span>
+                            <span className="text-xs text-muted-foreground">or</span>
                             <div className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
                         </div>
 
@@ -346,10 +346,10 @@ export default function Login({ status, canResetPassword, retryAfter = 0, remain
                             </Link>
                         </p>
 
-                        <p className="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
+                        <p className="mt-8 text-center text-xs text-muted-foreground">
                             LPG Distribution Cavite &bull; Marketplace Platform
                         </p>
-                        <p className="mt-2 text-center text-xs text-gray-400 dark:text-gray-500">
+                        <p className="mt-2 text-center text-xs text-muted-foreground">
                             <a href="/terms" className="hover:underline">Terms</a> &middot; <a href="/privacy" className="hover:underline">Privacy</a>
                         </p>
                     </div>

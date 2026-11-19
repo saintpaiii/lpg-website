@@ -267,7 +267,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                                 onClick={() => goToSlide(i)}
                                                 className={`rounded-full transition-all duration-300 ${
                                                     i === slide
-                                                        ? 'bg-white w-5 h-2'
+                                                        ? 'bg-card w-5 h-2'
                                                         : 'bg-white/50 w-2 h-2 hover:bg-white/80'
                                                 }`}
                                             />
@@ -293,7 +293,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         <form onSubmit={handleSearch} className="max-w-lg mx-auto">
                             <div className="flex rounded-xl overflow-hidden shadow-xl bg-white dark:bg-gray-800">
                                 <div className="relative flex-1">
-                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <input
                                         type="text"
                                         value={search}
@@ -339,7 +339,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         <Filter className="h-4 w-4" />
                         Filters
                         {activeFilters.length > 0 && (
-                            <span className="ml-1 h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-bold flex items-center justify-center">
+                            <span className="ml-1 h-5 w-5 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
                                 {activeFilters.length}
                             </span>
                         )}
@@ -350,7 +350,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         if (filters.brand) q.set('brand', filters.brand);
                         return q.toString() ? `?${q}` : '';
                     })()}>
-                        <Button variant="outline" className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300">
+                        <Button variant="outline" className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40 dark:border-blue-800 dark:text-blue-300">
                             <Navigation className="h-4 w-4" />
                             Find the nearest store
                         </Button>
@@ -363,7 +363,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         <CardContent className="pt-4 pb-4">
                             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 mb-1 block">City</label>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">City</label>
                                     <select
                                         value={filters.city ?? ''}
                                         onChange={e => applyFilters({ city: e.target.value || undefined })}
@@ -374,7 +374,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Brand</label>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Brand</label>
                                     <select
                                         value={filters.brand ?? ''}
                                         onChange={e => applyFilters({ brand: e.target.value || undefined })}
@@ -385,7 +385,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Size / Weight</label>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Size / Weight</label>
                                     <select
                                         value={filters.weight ?? ''}
                                         onChange={e => applyFilters({ weight: e.target.value || undefined })}
@@ -396,7 +396,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 mb-1 block">Price Range (Refill ₱)</label>
+                                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Price Range (Refill ₱)</label>
                                     <div className="flex gap-2">
                                         <input
                                             type="number"
@@ -442,7 +442,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                             <button
                                 key={f.key}
                                 onClick={() => clearFilter(f.key)}
-                                className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 text-xs font-medium hover:bg-blue-100 transition-colors"
+                                className="inline-flex items-center gap-1 rounded-full bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-3 py-1 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
                             >
                                 {f.label}
                                 <X className="h-3 w-3" />
@@ -450,7 +450,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                         ))}
                         <button
                             onClick={() => router.get('/customer/products')}
-                            className="inline-flex items-center gap-1 rounded-full bg-gray-100 text-gray-600 border border-gray-200 px-3 py-1 text-xs font-medium hover:bg-gray-200 transition-colors"
+                            className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground border border-border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors"
                         >
                             Clear all
                         </button>
@@ -460,9 +460,9 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                 {/* Product grid */}
                 {products.data.length === 0 ? (
                     <div className="text-center py-20">
-                        <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-500 font-medium">No products available yet.</p>
-                        <p className="text-sm text-gray-400 mt-1">Check back later or try adjusting your filters.</p>
+                        <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground font-medium">No products available yet.</p>
+                        <p className="text-sm text-muted-foreground mt-1">Check back later or try adjusting your filters.</p>
                         <Button variant="outline" className="mt-4" onClick={() => router.get('/customer/products')}>
                             Clear Filters
                         </Button>
@@ -479,14 +479,14 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     photoCount={p.photo_count} hasVideo={p.has_video} className="h-40">
                                     {p.stock === 0 && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <span className="bg-white text-gray-800 text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
+                                            <span className="bg-card text-foreground text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
                                         </div>
                                     )}
                                 </ProductCardImage>
                                 <CardContent className="p-4 flex flex-col flex-1">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
-                                    <p className="text-xs text-gray-500 mb-2">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} · {p.weight}</>}</p>
-                                    <div className="flex items-center gap-1 text-xs text-gray-400 mb-1.5">
+                                    <p className="text-xs text-muted-foreground mb-2">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} · {p.weight}</>}</p>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
                                         <StoreAvatar name={p.store_name} logoUrl={p.store_logo_url} size={18} />
                                         <button
                                             className="hover:text-blue-600 hover:underline transition-colors text-left"
@@ -509,13 +509,13 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         ) : (
                                             <div className="flex items-end justify-between gap-2 mb-3">
                                                 <div>
-                                                    <p className="text-[10px] text-gray-400">Refill</p>
+                                                    <p className="text-xs text-muted-foreground">Refill</p>
                                                     <p className="font-bold text-blue-600 text-base">
                                                         ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[10px] text-gray-400">New purchase</p>
+                                                    <p className="text-xs text-muted-foreground">New purchase</p>
                                                     <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
                                                         ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>
@@ -525,11 +525,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         {p.pickup_only ? (
                                             <PickupOnlyBadge short className="mb-1" />
                                         ) : p.delivery_from != null ? (
-                                            <p className="text-[10px] text-gray-400 mb-1">Delivery from ₱{p.delivery_from.toLocaleString('en-PH')}</p>
+                                            <p className="text-xs text-muted-foreground mb-1">Delivery from ₱{p.delivery_from.toLocaleString('en-PH')}</p>
                                         ) : null}
                                         <StoreHoursBadge hours={p.hours} className="mb-2 flex" />
                                         {isAdminPreview ? (
-                                            <div className="w-full rounded-lg bg-gray-100 text-gray-400 text-xs font-medium h-9 flex items-center justify-center gap-1.5 border border-dashed border-gray-300">
+                                            <div className="w-full rounded-lg bg-muted text-muted-foreground text-xs font-medium h-9 flex items-center justify-center gap-1.5 border border-dashed border-border">
                                                 <ShoppingCart className="h-3.5 w-3.5" />
                                                 Cart disabled in preview
                                             </div>
@@ -564,7 +564,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                         ? 'bg-blue-600 text-white border-blue-600'
                                         : link.url
                                             ? 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800'
-                                            : 'border-gray-200 text-gray-300 cursor-not-allowed'
+                                            : 'border-border text-muted-foreground cursor-not-allowed'
                                 }`}
                             />
                         ))}
@@ -584,20 +584,20 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                 {cartDialog.product.image_url ? (
                                     <img src={cartDialog.product.image_url} alt={cartDialog.product.name} className="h-16 w-16 rounded-lg object-cover shrink-0" />
                                 ) : (
-                                    <div className="h-16 w-16 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                    <div className="h-16 w-16 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
                                         <ShoppingCart className="h-6 w-6 text-blue-300" />
                                     </div>
                                 )}
                                 <div>
                                     <p className="font-semibold text-sm text-gray-900 dark:text-white">{cartDialog.product.name}</p>
-                                    <p className="text-xs text-gray-500">{cartDialog.product.brand} · {cartDialog.product.weight}</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">{cartDialog.product.store_name}</p>
+                                    <p className="text-xs text-muted-foreground">{cartDialog.product.brand} · {cartDialog.product.weight}</p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{cartDialog.product.store_name}</p>
                                 </div>
                             </div>
 
                             {/* Transaction type — accessories are always a new purchase (J7) */}
                             {cartDialog.product.product_type !== 'accessory' && <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1.5">Transaction Type</p>
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Transaction Type</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map(t => (
                                         <button
@@ -620,11 +620,11 @@ export default function ProductsPage({ products, filters, cities, brands, weight
 
                             {/* Quantity */}
                             <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1.5">Quantity</p>
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Quantity</p>
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={() => setQty(q => Math.max(1, q - 1))}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                         disabled={qty <= 1}
                                     >
                                         −
@@ -632,12 +632,12 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button
                                         onClick={() => setQty(q => Math.min(maxAdd(cartDialog.product!), q + 1))}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                         disabled={qty >= maxAdd(cartDialog.product)}
                                     >
                                         +
                                     </button>
-                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{limitLabel(cartDialog.product) && ` · ${limitLabel(cartDialog.product)}`}</span>
+                                    <span className="text-xs text-muted-foreground">{cartDialog.product.stock} in stock{limitLabel(cartDialog.product) && ` · ${limitLabel(cartDialog.product)}`}</span>
                                 </div>
                                 {(() => {
                                     const p = cartDialog.product!;
@@ -652,7 +652,7 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                             {/* Subtotal */}
                             <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-4 py-3">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Subtotal</span>
+                                    <span className="text-muted-foreground">Subtotal</span>
                                     <span className="font-bold text-gray-900 dark:text-white">
                                         ₱{((txType === 'refill' ? cartDialog.product.refill_price : cartDialog.product.purchase_price) * qty).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                     </span>
@@ -806,13 +806,13 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50 dark:bg-gray-800 shrink-0">
                     <button onClick={() => setMode('list')} className="text-sm text-blue-600 hover:underline">← Back</button>
                     <h3 className="font-semibold text-sm text-gray-800 dark:text-white">{mode === 'create' ? 'New Banner' : 'Edit Banner'}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+                    <button onClick={onClose} className="text-muted-foreground hover:text-muted-foreground"><X className="h-4 w-4" /></button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {/* Image upload */}
                     <div>
-                        <label className="text-xs font-medium text-gray-500 block mb-1">Banner Image</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Banner Image</label>
                         <div
                             className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden cursor-pointer hover:border-blue-400 transition-colors"
                             onClick={() => fileRef.current?.click()}
@@ -820,7 +820,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
                             {preview ? (
                                 <img src={preview} alt="" className="w-full h-32 object-cover" />
                             ) : (
-                                <div className="h-32 flex flex-col items-center justify-center text-gray-400 gap-1">
+                                <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-1">
                                     <ImageIcon className="h-8 w-8" />
                                     <span className="text-xs">Click to upload image</span>
                                 </div>
@@ -831,7 +831,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
 
                     {/* Title */}
                     <div>
-                        <label className="text-xs font-medium text-gray-500 block mb-1">Title</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Title</label>
                         <input type="text" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
                             className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Headline text" />
@@ -839,7 +839,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
 
                     {/* Subtitle */}
                     <div>
-                        <label className="text-xs font-medium text-gray-500 block mb-1">Subtitle</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Subtitle</label>
                         <input type="text" value={form.subtitle} onChange={e => setForm(f => ({ ...f, subtitle: e.target.value }))}
                             className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             placeholder="Supporting text" />
@@ -847,7 +847,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
 
                     {/* Display order */}
                     <div>
-                        <label className="text-xs font-medium text-gray-500 block mb-1">Display Order</label>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1">Display Order</label>
                         <input type="number" min={1} value={form.display_order} onChange={e => setForm(f => ({ ...f, display_order: parseInt(e.target.value) || 1 }))}
                             className="w-full rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
@@ -855,7 +855,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
                     {/* Active */}
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
-                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                            className="h-4 w-4 rounded border-border text-blue-600 focus:ring-blue-500" />
                         <span className="text-sm text-gray-700 dark:text-gray-300">Active (visible to customers)</span>
                     </label>
                 </div>
@@ -893,7 +893,7 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
 
             <div className="flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
                 {sorted.length === 0 && (
-                    <div className="py-12 text-center text-gray-400 text-sm">
+                    <div className="py-12 text-center text-muted-foreground text-sm">
                         No banners yet.
                         <br />
                         <button onClick={openCreate} className="mt-2 text-blue-600 hover:underline text-xs">Add your first banner</button>
@@ -905,35 +905,35 @@ function AdminBannerPanel({ banners, onClose }: { banners: AdminBannerItem[]; on
                         <div className="shrink-0 h-11 w-16 rounded overflow-hidden bg-gray-100 dark:bg-gray-700">
                             {b.image_url
                                 ? <img src={b.image_url} alt="" className="h-full w-full object-cover" />
-                                : <div className="h-full w-full flex items-center justify-center"><ImageIcon className="h-4 w-4 text-gray-300" /></div>
+                                : <div className="h-full w-full flex items-center justify-center"><ImageIcon className="h-4 w-4 text-muted-foreground" /></div>
                             }
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold text-gray-800 dark:text-white truncate">{b.title || '(no title)'}</p>
-                            <p className="text-[10px] text-gray-400 truncate">{b.subtitle || '—'}</p>
-                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${b.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            <p className="text-xs text-muted-foreground truncate">{b.subtitle || '—'}</p>
+                            <span className={`inline-block mt-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${b.is_active ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-muted text-muted-foreground'}`}>
                                 {b.is_active ? 'Active' : 'Inactive'}
                             </span>
                         </div>
 
                         {/* Up / down */}
-                        <div className="flex flex-col items-center gap-0.5 shrink-0 text-gray-400">
+                        <div className="flex flex-col items-center gap-0.5 shrink-0 text-muted-foreground">
                             <button onClick={() => handleReorder(b.id, 'up')} disabled={idx === 0}
-                                className="h-5 w-5 flex items-center justify-center hover:text-gray-700 disabled:opacity-20 text-xs leading-none transition-colors">▲</button>
+                                className="h-5 w-5 flex items-center justify-center hover:text-foreground/80 disabled:opacity-20 text-xs leading-none transition-colors">▲</button>
                             <button onClick={() => handleReorder(b.id, 'down')} disabled={idx === sorted.length - 1}
-                                className="h-5 w-5 flex items-center justify-center hover:text-gray-700 disabled:opacity-20 text-xs leading-none transition-colors">▼</button>
+                                className="h-5 w-5 flex items-center justify-center hover:text-foreground/80 disabled:opacity-20 text-xs leading-none transition-colors">▼</button>
                         </div>
 
                         {/* Action buttons */}
                         <div className="flex items-center gap-1 shrink-0">
                             <button onClick={() => handleToggle(b.id)} title={b.is_active ? 'Deactivate' : 'Activate'}
-                                className="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                className="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                 {b.is_active ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                             </button>
                             <button onClick={() => openEdit(b)}
-                                className="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                className="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 dark:border-gray-600 text-muted-foreground hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                 <Pencil className="h-3.5 w-3.5" />
                             </button>
                             <button onClick={() => handleDelete(b.id)}

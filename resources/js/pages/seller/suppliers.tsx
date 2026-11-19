@@ -101,7 +101,7 @@ export default function SuppliersPage({ suppliers, products, canManage, balances
                                 {/* K6: received value − paid on this supplier's purchase orders */}
                                 <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm" data-testid="supplier-balance">
                                     <Wallet className="h-3.5 w-3.5 text-muted-foreground" /> Balance owed: <strong className="tabular-nums">{peso(balances[s.id]?.owed ?? 0)}</strong>
-                                    {(balances[s.id]?.overdue ?? 0) > 0 && <span className="font-medium text-red-700">({peso(balances[s.id].overdue)} overdue)</span>}
+                                    {(balances[s.id]?.overdue ?? 0) > 0 && <span className="font-medium text-red-700 dark:text-red-300">({peso(balances[s.id].overdue)} overdue)</span>}
                                 </p>
                             </div>
                             {canManage && (
@@ -114,7 +114,7 @@ export default function SuppliersPage({ suppliers, products, canManage, balances
                             )}
                         </CardHeader>
                         <CardContent className="overflow-x-auto p-0">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Product supplied</th><th className="px-4 py-2 text-right">Unit cost</th><th className="px-4 py-2 text-right">Min qty</th><th className="px-4 py-2 text-center">Preferred</th>{canManage && <th />}</tr></thead>
                                 <tbody className="divide-y">
                                     {s.products.map((l) => (
@@ -125,7 +125,7 @@ export default function SuppliersPage({ suppliers, products, canManage, balances
                                             <td className="px-4 py-2 text-center">
                                                 {!canManage ? (l.is_preferred ? <Star className="mx-auto h-4 w-4 fill-amber-400 text-amber-500" aria-label="Preferred supplier" /> : null) : <button type="button" aria-label={l.is_preferred ? 'Preferred supplier' : 'Make preferred'} title={l.is_preferred ? 'Preferred supplier for this product' : 'Make preferred'}
                                                     onClick={() => router.post(`/seller/suppliers/${s.id}/products`, { product_id: l.product_id, unit_cost: l.unit_cost, min_order_qty: l.min_order_qty, is_preferred: !l.is_preferred }, { preserveScroll: true })}>
-                                                    <Star className={`h-4 w-4 ${l.is_preferred ? 'fill-amber-400 text-amber-500' : 'text-gray-300'}`} />
+                                                    <Star className={`h-4 w-4 ${l.is_preferred ? 'fill-amber-400 text-amber-500' : 'text-muted-foreground'}`} />
                                                 </button>}
                                             </td>
                                             {canManage && (

@@ -79,7 +79,7 @@ export function StoreLogoPicker({ file, currentUrl, error, onChange }: { file: F
             <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Store logo (optional)</Label>
             <div className="flex items-center gap-4">
                 <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-gray-50 dark:bg-gray-800">
-                    {shown ? <img src={shown} alt="Store logo preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-6 w-6 text-gray-400" />}
+                    {shown ? <img src={shown} alt="Store logo preview" className="h-full w-full object-cover" /> : <ImagePlus className="h-6 w-6 text-muted-foreground" />}
                 </div>
                 <div className="space-y-1.5">
                     <div className="flex flex-wrap gap-2">
@@ -89,12 +89,12 @@ export function StoreLogoPicker({ file, currentUrl, error, onChange }: { file: F
                         </button>
                         {file && (
                             <button type="button" onClick={() => { onChange(null); if (ref.current) ref.current.value = ''; }}
-                                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-gray-500 hover:text-gray-800">
+                                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:text-foreground">
                                 <X className="h-3.5 w-3.5" /> Remove
                             </button>
                         )}
                     </div>
-                    <p className="text-xs text-gray-500">JPG, PNG or WEBP. A square image looks best. Customers see it next to your store name.</p>
+                    <p className="text-xs text-muted-foreground">JPG, PNG or WEBP. A square image looks best. Customers see it next to your store name.</p>
                 </div>
                 <input ref={ref} type="file" accept={IMAGE_ACCEPT} className="hidden" onChange={async (e) => {
                     const picked = e.target.files?.[0];

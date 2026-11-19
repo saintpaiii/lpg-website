@@ -20,7 +20,7 @@ export function DocumentSuspensionBanner() {
                 <FileWarning className="h-4 w-4 shrink-0" />
                 <span className="flex-1">Your store is hidden from customers because a permit expired. Upload the renewed document.</span>
                 {isOwner && (
-                    <Link href="/seller/documents" className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                    <Link href="/seller/documents" className="rounded-md bg-card px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40">
                         Store Documents
                     </Link>
                 )}
@@ -37,7 +37,7 @@ export function DocumentSuspensionBanner() {
                 {alert.status === 'expired' ? `${alert.label} expired on ${alert.date}.` : `${alert.label} expires on ${alert.date}.`}
             </span>
             {isOwner && (
-                <Link href="/seller/documents" className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50">
+                <Link href="/seller/documents" className="rounded-md bg-card px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40">
                     Store Documents
                 </Link>
             )}

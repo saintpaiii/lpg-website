@@ -66,7 +66,7 @@ export function PlanChangeBox({ change }: { change: PlanChange }) {
                 {change.current.active ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> : <Info className="mt-0.5 h-4 w-4 shrink-0" />}
                 <div className="min-w-0 space-y-1">
                     {change.downgrade && (
-                        <span className="inline-block rounded bg-red-600 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">Downgrade</span>
+                        <span className="inline-block rounded bg-red-600 px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">Downgrade</span>
                     )}
                     {change.current.active ? (
                         <p>

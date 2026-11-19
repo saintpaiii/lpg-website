@@ -3,7 +3,7 @@ export function trustColor(score: number): { bar: string; text: string } {
     if (score < 30) return { bar: 'bg-red-500', text: 'text-red-600' };
     if (score < 50) return { bar: 'bg-orange-500', text: 'text-orange-600' };
     if (score <= 70) return { bar: 'bg-green-500', text: 'text-green-600' };
-    return { bar: 'bg-emerald-500', text: 'text-emerald-700' };
+    return { bar: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300' };
 }
 
 export default function TrustScoreBar({ score, size = 'md' }: { score: number; size?: 'sm' | 'md' }) {

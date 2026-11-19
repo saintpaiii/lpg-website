@@ -81,20 +81,20 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800',
-    confirmed:        'bg-blue-100 text-blue-800',
-    preparing:        'bg-purple-100 text-purple-800',
-    out_for_delivery: 'bg-orange-100 text-orange-800',
-    delivered:        'bg-green-100 text-green-800',
-    cancelled:        'bg-red-100 text-red-800',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300',
+    delivered:        'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+    cancelled:        'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300',
 };
 
 const PAY_COLORS: Record<string, string> = {
-    paid:       'bg-green-100 text-green-700',
-    unpaid:     'bg-red-100 text-red-700',
-    partial:    'bg-yellow-100 text-yellow-700',
-    to_refund:  'bg-orange-100 text-orange-700',
-    refunded:   'bg-gray-100 text-gray-600',
+    paid:       'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+    unpaid:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    partial:    'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+    to_refund:  'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    refunded:   'bg-muted text-muted-foreground',
 };
 
 type ActionDialog =
@@ -227,10 +227,10 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
 
     const ACTIVE_STATUS_COUNTS = [
         // Pending = waiting for this store to confirm → glows while > 0
-        { label: 'Pending',          value: counts.pending,          color: `text-yellow-700 bg-yellow-50 border-yellow-200 ${actionGlow(counts.pending)}` },
-        { label: 'Confirmed',        value: counts.confirmed,        color: 'text-blue-700 bg-blue-50 border-blue-200'       },
-        { label: 'Preparing',        value: counts.preparing,        color: 'text-purple-700 bg-purple-50 border-purple-200' },
-        { label: 'Out for delivery / Ready', value: counts.out_for_delivery, color: 'text-orange-700 bg-orange-50 border-orange-200' },
+        { label: 'Pending',          value: counts.pending,          color: `text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-950/40 border-yellow-200 dark:border-yellow-800 ${actionGlow(counts.pending)}` },
+        { label: 'Confirmed',        value: counts.confirmed,        color: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800'       },
+        { label: 'Preparing',        value: counts.preparing,        color: 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800' },
+        { label: 'Out for delivery / Ready', value: counts.out_for_delivery, color: 'text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-800' },
     ];
 
     return (
@@ -280,7 +280,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map(({ key, label }) => (
                         <button key={key} onClick={() => goTab(key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -338,7 +338,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         {tab === 'active' && (
@@ -346,7 +346,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                                                 <input type="checkbox" aria-label="Select all orders ready for delivery"
                                                     disabled={batchable.length === 0} checked={allSelected}
                                                     onChange={() => setSelected(allSelected ? [] : batchable.map((o) => o.id))}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                                                    className="h-4 w-4 rounded border-border text-blue-600" />
                                             </th>
                                         )}
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Order</th>
@@ -368,7 +368,7 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                                                     {isDispatchable(o) && (o.has_coordinates ? (
                                                         <input type="checkbox" aria-label={`Select ${o.order_number}`}
                                                             checked={selected.includes(o.id)} onChange={() => toggleSelected(o.id)}
-                                                            className="h-4 w-4 rounded border-gray-300 text-blue-600" />
+                                                            className="h-4 w-4 rounded border-border text-blue-600" />
                                                     ) : (
                                                         <span title="Address not mapped — assign this order individually" className="inline-flex text-amber-500">
                                                             <MapPinOff className="h-4 w-4" />
@@ -386,25 +386,25 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                                                 ₱{o.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-foreground/80'}`}>
                                                     {orderStatusLabel(o.status, o.fulfillment)}
                                                 </span>
                                                 {o.redelivery && (
                                                     <p className="mt-0.5">
-                                                        <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800"
+                                                        <span className="inline-flex rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300"
                                                             title={[o.redelivery.reason_label, o.redelivery.range_label && `Estimated: ${o.redelivery.range_label}`].filter(Boolean).join(' · ')}>
                                                             {o.redelivery.short ?? 'Delivery failed'}
                                                         </span>
                                                     </p>
                                                 )}
                                                 {o.status === 'cancelled' && o.cancelled_by && (
-                                                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                    <p className="text-xs text-muted-foreground mt-0.5">
                                                         by {o.cancelled_by === 'customer' ? 'Customer' : 'Seller'}
                                                     </p>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-center hidden md:table-cell">
-                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[o.payment_status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[o.payment_status] ?? 'bg-muted text-foreground/80'}`}>
                                                     {o.payment_status === 'to_refund' ? 'To Refund' :
                                                      o.payment_status === 'refunded'  ? 'Refunded'  :
                                                      o.payment_status === 'partial'   ? 'Partial'   :
@@ -413,14 +413,14 @@ export default function SellerOrders({ orders, counts, tab, filters, riders, dss
                                                      o.payment_status}
                                                 </span>
                                                 {o.payment_mode !== 'full' && (
-                                                    <p className="text-[10px] text-muted-foreground mt-0.5">{o.payment_mode === 'cod' ? 'COD' : o.payment_mode === 'half' ? 'Half payment' : 'Consignment'}</p>
+                                                    <p className="text-xs text-muted-foreground mt-0.5">{o.payment_mode === 'cod' ? 'COD' : o.payment_mode === 'half' ? 'Half payment' : 'Consignment'}</p>
                                                 )}
                                                 {o.payment_mode === 'half' && o.payment_status === 'partial' && o.remaining_balance !== null && (
-                                                    <span className="mt-0.5 block text-[10px] font-medium text-amber-600">Remaining: ₱{o.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
+                                                    <span className="mt-0.5 block text-xs font-medium text-amber-600">Remaining: ₱{o.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                                 )}
                                                 {o.payment_mode === 'consignment' && o.payment_status === 'partial' && o.remaining_balance !== null && (
                                                     <div className="mt-0.5 flex flex-col items-center gap-0.5">
-                                                        <span className={`text-[10px] font-medium ${o.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
+                                                        <span className={`text-xs font-medium ${o.is_overdue ? 'text-red-600' : 'text-amber-600'}`}>
                                                             Balance: ₱{o.remaining_balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                             {o.balance_due_date && ` due ${o.balance_due_date}`}
                                                         </span>
@@ -611,7 +611,7 @@ function OrderActions({
             {/* View — always present */}
             <Link href={`/seller/orders/${order.id}`}>
                 <Button size="sm" variant="outline"
-                    className="h-7 px-2.5 text-xs text-blue-600 border-blue-300 hover:bg-blue-50 gap-1">
+                    className="h-7 px-2.5 text-xs text-blue-600 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 gap-1">
                     <Eye className="h-3 w-3" />
                     View
                 </Button>
@@ -635,7 +635,7 @@ function OrderActions({
                     )}
                     {order.status === 'confirmed' && (
                         <Button size="sm"
-                            className="h-7 px-2.5 text-xs bg-amber-500 hover:bg-amber-600 text-white gap-1"
+                            className="h-7 px-2.5 text-xs bg-amber-600 hover:bg-amber-600 text-white gap-1"
                             onClick={() => onOpen({ type: 'prepare', order })}>
                             <Package className="h-3 w-3" />
                             Prepare
@@ -652,7 +652,7 @@ function OrderActions({
                     {/* Pick-up: Ready for pick-up → Mark picked up (no rider) */}
                     {isPickup && ['confirmed', 'preparing'].includes(order.status) && (
                         <Button size="sm"
-                            className="h-7 px-2.5 text-xs bg-orange-500 hover:bg-orange-600 text-white gap-1"
+                            className="h-7 px-2.5 text-xs bg-orange-600 hover:bg-orange-600 text-white gap-1"
                             onClick={() => onReady(order)}>
                             <Package className="h-3 w-3" />
                             Ready for pick-up
@@ -669,7 +669,7 @@ function OrderActions({
                     {/* Pick-up orders can still be cancelled when ready (no-show) */}
                     {(order.status !== 'out_for_delivery' || isPickup) && (
                         <Button size="sm" variant="outline"
-                            className="h-7 px-2.5 text-xs text-red-600 border-red-300 hover:bg-red-50 gap-1"
+                            className="h-7 px-2.5 text-xs text-red-600 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 gap-1"
                             onClick={() => onOpen({ type: 'cancel', order })}>
                             <XCircle className="h-3 w-3" />
                             Cancel

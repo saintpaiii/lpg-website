@@ -19,7 +19,7 @@ export default function CustomerReports({ reports, tab, falseReports }: Props) {
                     <p className="text-sm text-muted-foreground">Problems you reported. Open one to see replies or add details.</p>
                 </div>
                 {falseReports > 0 && (
-                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                    <p className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                         You have {falseReports} warning{falseReports === 1 ? '' : 's'} for false reports.
                     </p>
                 )}

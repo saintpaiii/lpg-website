@@ -104,7 +104,7 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
 
     if (data?.status === 'delivered') {
         return (
-            <div className="mt-4 flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 p-4 font-semibold text-green-800">
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 font-semibold text-green-800 dark:text-green-300">
                 <CheckCircle2 className="h-5 w-5" /> Order Delivered!
             </div>
         );
@@ -117,11 +117,11 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
             </div>
 
             {!data && !failed && <div className="h-[300px] animate-pulse bg-gray-100 dark:bg-gray-800" />}
-            {failed && !data && <p className="p-4 text-sm text-gray-500">Tracking is unavailable right now.</p>}
+            {failed && !data && <p className="p-4 text-sm text-muted-foreground">Tracking is unavailable right now.</p>}
 
             {data && (
                 points.length === 0 ? (
-                    <div className="flex h-[160px] flex-col items-center justify-center gap-1 text-sm text-gray-500">
+                    <div className="flex h-[160px] flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
                         <MapPinOff className="h-6 w-6" /> Location not available for this address.
                     </div>
                 ) : (
@@ -159,13 +159,13 @@ export default function TrackingCard({ orderId }: { orderId: number }) {
 
             {data && (
                 <div className="grid gap-1 px-4 py-3 text-sm">
-                    <p><span className="text-gray-500">Rider:</span> <strong>{data.rider_name ?? '—'}</strong></p>
-                    <p><span className="text-gray-500">Status:</span> {STATUS_TEXT[data.status]}</p>
-                    <p><span className="text-gray-500">Deliveries before yours:</span> {data.stops_before}</p>
+                    <p><span className="text-muted-foreground">Rider:</span> <strong>{data.rider_name ?? '—'}</strong></p>
+                    <p><span className="text-muted-foreground">Status:</span> {STATUS_TEXT[data.status]}</p>
+                    <p><span className="text-muted-foreground">Deliveries before yours:</span> {data.stops_before}</p>
                     {exact && route && (
-                        <p data-testid="tracking-eta"><span className="text-gray-500">Arriving in about:</span> <strong>{route.eta} min</strong>{route.km !== null && <span className="text-gray-500"> · {route.km.toFixed(1)} km</span>}</p>
+                        <p data-testid="tracking-eta"><span className="text-muted-foreground">Arriving in about:</span> <strong>{route.eta} min</strong>{route.km !== null && <span className="text-muted-foreground"> · {route.km.toFixed(1)} km</span>}</p>
                     )}
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                         {exact
                             ? 'Your order is the rider\'s next stop — live position and route. Updates as the rider moves.'
                             : data.rider_area

@@ -120,14 +120,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 /** Small driver's-license badge for riders in the staff list. */
 function LicenseBadge({ status }: { status: string }) {
     const [cls, text] = ({
-        valid:    ['bg-green-100 text-green-700', 'License OK'],
-        expiring: ['bg-amber-100 text-amber-700', 'License expires soon'],
-        pending:  ['bg-blue-100 text-blue-700', 'License: waiting for admin'],
-        expired:  ['bg-red-100 text-red-700', 'Expired'],
-        rejected: ['bg-red-100 text-red-700', 'License rejected'],
-        missing:  ['bg-red-100 text-red-700', 'License missing'],
-    } as Record<string, [string, string]>)[status] ?? ['bg-gray-100 text-gray-600', status];
-    return <span className={`ml-1.5 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{text}</span>;
+        valid:    ['bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', 'License OK'],
+        expiring: ['bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', 'License expires soon'],
+        pending:  ['bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', 'License: waiting for admin'],
+        expired:  ['bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300', 'Expired'],
+        rejected: ['bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300', 'License rejected'],
+        missing:  ['bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300', 'License missing'],
+    } as Record<string, [string, string]>)[status] ?? ['bg-muted text-muted-foreground', status];
+    return <span className={`ml-1.5 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${cls}`}>{text}</span>;
 }
 
 const SUB_ROLE_LABELS: Record<string, string> = {
@@ -138,10 +138,10 @@ const SUB_ROLE_LABELS: Record<string, string> = {
 };
 
 const SUB_ROLE_STYLES: Record<string, string> = {
-    cashier:   'bg-emerald-100 text-emerald-700',
-    warehouse: 'bg-amber-100 text-amber-700',
-    rider:     'bg-blue-100 text-blue-700',
-    hr:        'bg-purple-100 text-purple-700',
+    cashier:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    warehouse: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    rider:     'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    hr:        'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
 };
 
 // ── Small components ───────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ function fmtTime(t: string): string {
 
 function RoleBadge({ role, names }: { role: string; names?: string[] }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-muted text-muted-foreground'}`}>
             {names?.length ? names.join(', ') : (SUB_ROLE_LABELS[role] ?? role)}
         </span>
     );
@@ -166,12 +166,12 @@ function RoleBadge({ role, names }: { role: string; names?: string[] }) {
 
 function StatusBadge({ active }: { active: boolean }) {
     return active ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Active
         </span>
     ) : (
-        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-gray-400" />
             Inactive
         </span>
@@ -182,7 +182,7 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     if (data.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-gray-500">Showing {data.from}–{data.to} of {data.total}</p>
+            <p className="text-sm text-muted-foreground">Showing {data.from}–{data.to} of {data.total}</p>
             <div className="flex gap-1">
                 {data.links.map((link, i) => (
                     <button
@@ -191,8 +191,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
                         onClick={() => link.url && onVisit(link.url!)}
                         className={`min-w-[32px] rounded px-2 py-1 text-sm ${
                             link.active ? 'bg-blue-600 text-white'
-                            : link.url  ? 'hover:bg-gray-100 text-gray-600'
-                            : 'text-gray-300 cursor-not-allowed'
+                            : link.url  ? 'hover:bg-muted text-muted-foreground'
+                            : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -355,7 +355,7 @@ function StaffFormDialog({
                             {errors.first_name && <p className="text-xs text-red-500">{errors.first_name}</p>}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label>Middle Name <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Label>Middle Name <span className="text-xs text-muted-foreground">(optional)</span></Label>
                             <Input value={data.middle_name} onChange={(e) => setData('middle_name', e.target.value)} placeholder="Santos" />
                             {errors.middle_name && <p className="text-xs text-red-500">{errors.middle_name}</p>}
                         </div>
@@ -368,7 +368,7 @@ function StaffFormDialog({
                             {errors.last_name && <p className="text-xs text-red-500">{errors.last_name}</p>}
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="staff-suffix">Suffix <span className="text-xs text-gray-400">(optional)</span></Label>
+                            <Label htmlFor="staff-suffix">Suffix <span className="text-xs text-muted-foreground">(optional)</span></Label>
                             <SuffixSelect id="staff-suffix" value={data.suffix} onChange={(v) => setData('suffix', v)} />
                             {formErrors.suffix && <p className="text-xs text-red-500">{formErrors.suffix}</p>}
                         </div>
@@ -381,7 +381,7 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>Phone <span className="text-xs text-gray-400">(optional)</span></Label>
+                        <Label>Phone <span className="text-xs text-muted-foreground">(optional)</span></Label>
                         <Input
                             type="tel"
                             value={data.phone}
@@ -393,7 +393,7 @@ function StaffFormDialog({
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label>Roles <span className="text-red-500">*</span> <span className="text-xs font-normal text-gray-400">(one or more)</span></Label>
+                        <Label>Roles <span className="text-red-500">*</span> <span className="text-xs font-normal text-muted-foreground">(one or more)</span></Label>
                         <RolesChecklist roles={roles} value={data.role_ids} onChange={changeRoles} />
                         {rolesNeedingRate.map((r) => (
                             <div key={r.id} className="grid gap-1 rounded-md border border-orange-200 bg-orange-50/60 px-3 py-2 dark:border-orange-900 dark:bg-orange-950/30">
@@ -406,14 +406,14 @@ function StaffFormDialog({
                                         const v = e.target.value;
                                         setData((prev) => ({ ...prev, role_rates: { ...prev.role_rates, [String(r.id)]: v } }));
                                     }} />
-                                <p className="text-xs text-gray-500">Saved to the role — everyone with this role gets it. Change it later in Payroll Settings.</p>
+                                <p className="text-xs text-muted-foreground">Saved to the role — everyone with this role gets it. Change it later in Payroll Settings.</p>
                                 {formErrors[`role_rates.${r.id}`] && <p className="text-xs text-red-500">{formErrors[`role_rates.${r.id}`]}</p>}
                             </div>
                         ))}
                         <button type="button" onClick={createRole}
                             className="inline-flex items-center gap-1 justify-self-start text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
                             {canEditRoles ? <Plus className="h-3.5 w-3.5" /> : <Lock className="h-3 w-3" />} Create a new role
-                            {!canEditRoles && <span className="rounded bg-amber-100 px-1.5 text-[10px] font-semibold text-amber-800">Pro</span>}
+                            {!canEditRoles && <span className="rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300">Pro</span>}
                         </button>
                         {(errors.role_ids || (errors as Record<string, string>)['role_ids.0']) && (
                             <p className="text-xs text-red-500">{errors.role_ids ?? (errors as Record<string, string>)['role_ids.0']}</p>
@@ -448,12 +448,12 @@ function StaffFormDialog({
                     <div className="grid gap-1.5">
                         <Label>Work days</Label>
                         <WorkDaysPicker value={data.work_days} onChange={(d) => setData('work_days', d)} />
-                        <p className="text-xs text-gray-400">Other days show as "Day off" (never absent). Clocking in on a day off is allowed and counted as an extra day.</p>
+                        <p className="text-xs text-muted-foreground">Other days show as "Day off" (never absent). Clocking in on a day off is allowed and counted as an extra day.</p>
                         {errors.work_days && <p className="text-xs text-red-500">{errors.work_days}</p>}
                     </div>
 
                     {!isEdit && (
-                        <div className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                        <div className="rounded-md bg-blue-50 dark:bg-blue-950/40 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
                             A random password is emailed to them. They will be asked to change it on first login.
                         </div>
                     )}
@@ -667,12 +667,12 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                             <Users className="h-6 w-6 text-blue-600" />
                             Staff Management
                         </h1>
-                        <p className="mt-0.5 text-sm text-gray-500">Manage your store's staff accounts and permissions.</p>
-                        <p className="mt-0.5 text-xs text-gray-400">
+                        <p className="mt-0.5 text-sm text-muted-foreground">Manage your store's staff accounts and permissions.</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                             Create roles like “Delivery Boy” or “Counter + Stock” in Manage Roles, then give them to your staff.
                         </p>
                     </div>
@@ -721,7 +721,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                 <Archive className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold text-gray-400">{archivedCount}</div>
+                                <div className="text-2xl font-bold text-muted-foreground">{archivedCount}</div>
                                 <p className="text-xs text-muted-foreground">inactive accounts</p>
                             </CardContent>
                         </Card>
@@ -729,19 +729,19 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 )}
 
                 {/* Tabs */}
-                <div className="border-b border-gray-200">
+                <div className="border-b border-border">
                     <nav className="-mb-px flex gap-6">
                         {['active', 'paused', 'archived', 'roles'].map((t) => (
                             <button key={t} onClick={() => switchTab(t)}
                                 className={`border-b-2 px-1 pb-3 text-sm font-medium transition-colors capitalize flex items-center gap-1.5 ${
-                                    tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground/80'
                                 }`}>
                                 {t === 'paused' ? 'Paused (plan)' : t === 'roles' ? `Roles (${roles.length})` : t}
                                 {t === 'archived' && archivedCount > 0 && (
-                                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600">{archivedCount}</span>
+                                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">{archivedCount}</span>
                                 )}
                                 {t === 'paused' && pausedCount > 0 && (
-                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{pausedCount}</span>
+                                    <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">{pausedCount}</span>
                                 )}
                             </button>
                         ))}
@@ -754,7 +754,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                 {/* Search */}
                 <form onSubmit={applySearch} className="flex gap-2 max-w-sm">
                     <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input className="pl-8" placeholder="Search by name or email…" value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                     <Button type="submit" size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Search</Button>
@@ -769,21 +769,21 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                         <CardTitle className="text-base flex items-center gap-2">
                             <Users className="h-4 w-4 text-blue-600" />
                             {isArchived ? 'Archived Staff' : 'Staff Members'}
-                            <span className="ml-auto text-sm font-normal text-gray-400">{staff.total} record{staff.total !== 1 ? 's' : ''}</span>
+                            <span className="ml-auto text-sm font-normal text-muted-foreground">{staff.total} record{staff.total !== 1 ? 's' : ''}</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {staff.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <Users className="mb-3 h-10 w-10" />
                                 <p className="font-medium">{isArchived ? 'No archived staff' : 'No staff members yet'}</p>
                                 {!isArchived && <p className="mt-1 text-sm">Click "Add Staff" to create the first account.</p>}
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Name</th>
                                             <th className="px-4 py-3">Role</th>
                                             <th className="px-4 py-3">Phone</th>
@@ -792,19 +792,19 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {staff.data.map((s) => (
-                                            <tr key={s.id} className="hover:bg-gray-50/60">
+                                            <tr key={s.id} className="hover:bg-muted/60">
                                                 <td className="px-4 py-3">
                                                     <button onClick={() => router.visit(`/seller/staff/${s.id}`)} className="text-left hover:underline">
-                                                        <p className="font-medium text-gray-900 hover:text-blue-600 transition-colors">{s.name}</p>
-                                                        <p className="text-xs text-gray-400">{s.email}</p>
+                                                        <p className="font-medium text-foreground hover:text-blue-600 transition-colors">{s.name}</p>
+                                                        <p className="text-xs text-muted-foreground">{s.email}</p>
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <RoleBadge role={s.sub_role} names={s.role_names} />
                                                     {s.license_status && <LicenseBadge status={s.license_status} />}
-                                                    <p className="mt-1 text-xs text-gray-400">
+                                                    <p className="mt-1 text-xs text-muted-foreground">
                                                         {fmtWorkDays(s.work_days)}{s.schedule_start && s.schedule_end ? ` · ${fmtTime(s.schedule_start)}–${fmtTime(s.schedule_end)}` : ''}
                                                     </p>
                                                     {showPayRate && s.pay_rate && (s.pay_rate.source === 'none' ? (
@@ -817,38 +817,38 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                                         </Link>
                                                     ))}
                                                 </td>
-                                                <td className="px-4 py-3 text-sm text-gray-500">{s.phone ?? '—'}</td>
+                                                <td className="px-4 py-3 text-sm text-muted-foreground">{s.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">
                                                     {isArchived ? (
-                                                        <span className="text-xs text-gray-400">Archived {s.deleted_at ? fmtDate(s.deleted_at) : ''}</span>
+                                                        <span className="text-xs text-muted-foreground">Archived {s.deleted_at ? fmtDate(s.deleted_at) : ''}</span>
                                                     ) : s.paused_by_plan ? (
                                                         <span className={PAUSED_BADGE}>Paused — over plan limit</span>
                                                     ) : (
                                                         <StatusBadge active={s.is_active} />
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(s.created_at)}</td>
+                                                <td className="px-4 py-3 text-xs text-muted-foreground">{fmtDate(s.created_at)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex items-center justify-end gap-1">
                                                         {isArchived ? (
                                                             <>
                                                                 <Button size="sm" variant="ghost" onClick={() => handleRestore(s)}
-                                                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50" title="Restore">
+                                                                    className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40" title="Restore">
                                                                     <RotateCcw className="h-3.5 w-3.5" />
                                                                 </Button>
                                                                 <Button size="sm" variant="ghost" onClick={() => setForceTarget(s)}
-                                                                    className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 hover:text-red-600" title="Delete permanently">
+                                                                    className="h-7 w-7 p-0 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600" title="Delete permanently">
                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <Button size="sm" variant="ghost" onClick={() => router.visit(`/seller/staff/${s.id}`)}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="View & permissions">
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground" title="View & permissions">
                                                                     <Eye className="h-3.5 w-3.5" />
                                                                 </Button>
                                                                 <Button size="sm" variant="ghost" onClick={() => { setEditTarget(s); setFormOpen(true); }}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Edit">
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground" title="Edit">
                                                                     <Pencil className="h-3.5 w-3.5" />
                                                                 </Button>
                                                                 {(s.paused_by_plan || planLimit?.limit != null) && (
@@ -858,12 +858,12 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                                                                     </Button>
                                                                 )}
                                                                 <Button size="sm" variant="ghost" onClick={() => handleToggle(s)}
-                                                                    className={`h-7 w-7 p-0 ${s.is_active ? 'text-amber-500 hover:bg-amber-50 hover:text-amber-700' : 'text-emerald-500 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                                                                    className={`h-7 w-7 p-0 ${s.is_active ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/40 hover:text-amber-700 dark:hover:text-amber-300' : 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:text-emerald-700 dark:hover:text-emerald-300'}`}
                                                                     title={s.is_active ? 'Deactivate' : 'Activate'}>
                                                                     {s.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                                                                 </Button>
                                                                 <Button size="sm" variant="ghost" onClick={() => setArchiveTarget(s)}
-                                                                    className="h-7 w-7 p-0 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Archive">
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:bg-muted hover:text-muted-foreground" title="Archive">
                                                                     <Archive className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             </>

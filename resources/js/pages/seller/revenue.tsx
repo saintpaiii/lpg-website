@@ -170,7 +170,7 @@ export default function SellerRevenue({ tax, summary, orders, filters }: Props) 
                         ) : (
                             <>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="rt-cards w-full text-sm">
                                         <thead>
                                             <tr className="border-b text-left text-muted-foreground">
                                                 <th className="pb-3 pr-4 font-medium">Order #</th>

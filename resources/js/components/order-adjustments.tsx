@@ -32,7 +32,7 @@ export default function OrderAdjustments({ adjustments, compact = false }: { adj
                     </a>
                     <span className="min-w-0">
                         <span className="font-medium">{a.quantity} × {a.product}</span> — {a.choice_label}{' '}
-                        <span className={a.amount_change >= 0 ? 'text-amber-700' : 'text-green-700'}>({a.amount_change >= 0 ? '+' : '−'}{peso(a.amount_change)})</span>
+                        <span className={a.amount_change >= 0 ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-green-300'}>({a.amount_change >= 0 ? '+' : '−'}{peso(a.amount_change)})</span>
                         <span className="block text-xs text-muted-foreground">
                             {a.reason}{a.note ? ` — ${a.note}` : ''} · {a.stage} · {a.at}{a.by ? ` · ${a.by}` : ''}
                             {a.refund_request_id ? ' · refund requested' : ''}
@@ -42,7 +42,7 @@ export default function OrderAdjustments({ adjustments, compact = false }: { adj
             ))}
         </ul>
     );
-    if (compact) return <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/50 p-2 dark:border-amber-900 dark:bg-amber-950/30"><p className="mb-1 text-xs font-semibold text-amber-800">Adjusted at handover</p>{list}</div>;
+    if (compact) return <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/50 p-2 dark:border-amber-900 dark:bg-amber-950/30"><p className="mb-1 text-xs font-semibold text-amber-800 dark:text-amber-300">Adjusted at handover</p>{list}</div>;
     return (
         <Card>
             <CardHeader className="pb-2">

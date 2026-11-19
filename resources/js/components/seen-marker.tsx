@@ -72,7 +72,7 @@ export function SeenPill({ flags, className }: { flags: SeenFlags; className?: s
     return (
         <span
             className={cn(
-                'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-semibold leading-none',
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 align-middle text-xs font-semibold leading-none',
                 isNew ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
                 className,
             )}

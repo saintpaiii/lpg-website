@@ -92,12 +92,12 @@ function fmt(n: number) {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800',
-    confirmed:        'bg-blue-100 text-blue-800',
-    preparing:        'bg-purple-100 text-purple-800',
-    out_for_delivery: 'bg-orange-100 text-orange-800',
-    delivered:        'bg-green-100 text-green-800',
-    cancelled:        'bg-red-100 text-red-800',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300',
+    delivered:        'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+    cancelled:        'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300',
 };
 
 const PLATFORM_ROLES = ['platform_admin', 'admin', 'manager', 'cashier', 'warehouse', 'rider'];
@@ -106,15 +106,15 @@ function RoleBadge({ user }: { user: UserDetail }) {
     const parts: { label: string; cls: string }[] = [];
 
     if (user.role === 'customer') {
-        parts.push({ label: 'Buyer', cls: 'bg-blue-100 text-blue-700' });
+        parts.push({ label: 'Buyer', cls: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' });
     } else if (user.role === 'seller') {
-        parts.push({ label: 'Seller', cls: 'bg-emerald-100 text-emerald-700' });
+        parts.push({ label: 'Seller', cls: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' });
     } else if (user.role === 'seller_staff') {
-        parts.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
+        parts.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300' });
     } else if (user.role === 'platform_staff') {
-        parts.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 text-violet-700' });
+        parts.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' });
     } else if (PLATFORM_ROLES.includes(user.role)) {
-        parts.push({ label: user.role.replace('_', ' '), cls: 'bg-purple-100 text-purple-700 capitalize' });
+        parts.push({ label: user.role.replace('_', ' '), cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 capitalize' });
     }
 
     return (
@@ -188,11 +188,11 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                 <div className="flex items-center gap-3 flex-wrap">
                                     <h1 className="text-2xl font-bold">{user.name}</h1>
                                     {user.deleted_at ? (
-                                        <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700">Archived</span>
+                                        <span className="rounded-full bg-red-100 dark:bg-red-900/40 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">Archived</span>
                                     ) : user.is_active ? (
-                                        <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">Active</span>
+                                        <span className="rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">Active</span>
                                     ) : (
-                                        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">Inactive</span>
+                                        <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">Inactive</span>
                                     )}
                                 </div>
                                 <RoleBadge user={user} />
@@ -241,7 +241,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className="text-red-600 border-red-200 hover:bg-red-50"
+                                                className="text-red-600 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40"
                                                 onClick={() => setShowArchive(true)}
                                             >
                                                 <UserX className="h-3.5 w-3.5 mr-1" />
@@ -263,7 +263,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                             {ownedStores.map((s) => (
                                 <Link key={s.id} href={`/admin/stores/${s.id}`} className="flex flex-wrap items-center gap-2 px-6 py-2 text-sm hover:bg-muted/30">
                                     <span className="font-medium">{s.name}</span>
-                                    <span className="rounded bg-muted px-1.5 text-[11px]">{s.is_branch ? 'Branch' : 'Main'}</span>
+                                    <span className="rounded bg-muted px-1.5 text-xs">{s.is_branch ? 'Branch' : 'Main'}</span>
                                     <span className="text-xs capitalize text-muted-foreground">{s.status} · {s.plan}</span>
                                 </Link>
                             ))}
@@ -288,10 +288,10 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                        store.status === 'approved' ? 'bg-emerald-100 text-emerald-700'
-                                        : store.status === 'pending'  ? 'bg-yellow-100 text-yellow-700'
-                                        : store.status === 'rejected' ? 'bg-red-100 text-red-700'
-                                        : 'bg-gray-100 text-gray-600'
+                                        store.status === 'approved' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                        : store.status === 'pending'  ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300'
+                                        : store.status === 'rejected' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
+                                        : 'bg-muted text-muted-foreground'
                                     }`}>
                                         {fmtStatus(store.status)}
                                     </span>
@@ -324,7 +324,7 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                 <p className="text-sm text-muted-foreground text-center py-6">No orders yet.</p>
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="rt-cards w-full text-sm">
                                         <thead>
                                             <tr className="border-b text-left text-muted-foreground">
                                                 <th className="pb-2 font-medium">Order</th>
@@ -339,13 +339,13 @@ export default function UserShow({ user, store, orders, legalAcceptances, identi
                                                 <tr className="hover:bg-muted/30">
                                                     <td className="py-2 font-mono text-xs">{o.order_number}</td>
                                                     <td className="py-2">
-                                                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                        <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                             {o.status.replace(/_/g, ' ')}
                                                         </span>
                                                     </td>
                                                     <td className="py-2 text-right font-medium">
                                                         {fmt(o.grand_total)}
-                                                        <HalfPaymentNote order={o} className="block text-[11px] font-normal" />
+                                                        <HalfPaymentNote order={o} className="block text-xs font-normal" />
                                                     </td>
                                                     <td className="py-2 text-muted-foreground">{fmtDate(o.created_at)}</td>
                                                 </tr>

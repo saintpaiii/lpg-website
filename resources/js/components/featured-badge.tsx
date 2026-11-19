@@ -6,7 +6,7 @@ export function FeaturedBadge({ className }: { className?: string }) {
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+                'inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
                 className,
             )}
             title="Featured store"

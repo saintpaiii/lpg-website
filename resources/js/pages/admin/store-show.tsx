@@ -132,13 +132,13 @@ type ActionHistory = {
 };
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-    approve:   { label: 'Approved',     color: 'bg-green-100 text-green-700'   },
-    reject:    { label: 'Rejected',     color: 'bg-red-100 text-red-700'       },
-    suspend:   { label: 'Suspended',    color: 'bg-orange-100 text-orange-700' },
-    unsuspend: { label: 'Reinstated',   color: 'bg-blue-100 text-blue-700'     },
-    archive:   { label: 'Archived',     color: 'bg-gray-100 text-gray-700'     },
-    restore:   { label: 'Restored',     color: 'bg-teal-100 text-teal-700'     },
-    send_back: { label: 'Sent back',    color: 'bg-red-100 text-red-700'       },
+    approve:   { label: 'Approved',     color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'   },
+    reject:    { label: 'Rejected',     color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'       },
+    suspend:   { label: 'Suspended',    color: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300' },
+    unsuspend: { label: 'Reinstated',   color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'     },
+    archive:   { label: 'Archived',     color: 'bg-muted text-foreground/80'     },
+    restore:   { label: 'Restored',     color: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300'     },
+    send_back: { label: 'Sent back',    color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'       },
 };
 
 type StoreStats = {
@@ -183,10 +183,10 @@ type Props = {
 };
 
 const STATUS_BADGE: Record<string, string> = {
-    pending:   'bg-yellow-100 text-yellow-800 border-yellow-200',
-    approved:  'bg-green-100 text-green-800 border-green-200',
-    rejected:  'bg-red-100 text-red-800 border-red-200',
-    suspended: 'bg-orange-100 text-orange-800 border-orange-200',
+    pending:   'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    approved:  'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
+    rejected:  'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
+    suspended: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800',
 };
 
 function fmt(n: number) {
@@ -200,7 +200,7 @@ function DocLink({ url, label }: { url: string | null; label: string }) {
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 dark:hover:text-blue-300 hover:underline"
         >
             <FileText className="h-4 w-4" />
             {label}
@@ -275,7 +275,7 @@ export default function StoreShow({
 
             <div className="p-6 space-y-6 max-w-5xl">
                 {/* Header */}
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
                         <Link href="/admin/stores">
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -287,11 +287,11 @@ export default function StoreShow({
                                 <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={40} />
                                 <h1 className="text-2xl font-bold tracking-tight">{store.store_name}</h1>
                                 {store.branch_of && <Link href={`/admin/stores/${store.branch_of.id}`} className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-of">Branch of {store.branch_of.name}</Link>}
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-muted text-foreground/80'}`}>
                                     {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                 </span>
                                 {store.documents_suspended && (
-                                    <span className="inline-flex items-center rounded-full border border-red-200 bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-800">
+                                    <span className="inline-flex items-center rounded-full border border-red-200 dark:border-red-800 bg-red-100 dark:bg-red-900/40 px-2.5 py-0.5 text-xs font-semibold text-red-800 dark:text-red-300">
                                         Hidden from customers (expired documents)
                                     </span>
                                 )}
@@ -302,14 +302,14 @@ export default function StoreShow({
                                 {store.approved_by_name && ` by ${store.approved_by_name}`}
                             </p>
                             {store.status === 'suspended' && store.suspension_reason && (
-                                <div className="mt-2 rounded-lg bg-orange-50 border border-orange-200 px-3 py-2 text-sm">
-                                    <span className="font-medium text-orange-700">Suspended:</span>{' '}
+                                <div className="mt-2 rounded-lg bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 px-3 py-2 text-sm">
+                                    <span className="font-medium text-orange-700 dark:text-orange-300">Suspended:</span>{' '}
                                     <span className="text-orange-600">{store.suspension_reason}</span>
                                     {store.suspension_notes && (
                                         <span className="text-orange-500 italic"> — "{store.suspension_notes}"</span>
                                     )}
                                     {store.suspended_at && (
-                                        <span className="ml-2 text-xs text-orange-400">{store.suspended_at}</span>
+                                        <span className="ml-2 text-xs text-orange-600 dark:text-orange-400">{store.suspended_at}</span>
                                     )}
                                 </div>
                             )}
@@ -317,10 +317,10 @@ export default function StoreShow({
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         {store.status === 'pending' && (
                             <>
-                                <Button onClick={() => setShowReject(true)} variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                                <Button onClick={() => setShowReject(true)} variant="outline" className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
                                     <XCircle className="h-4 w-4 mr-1.5" /> Reject
                                 </Button>
                                 {review && (
@@ -334,7 +334,7 @@ export default function StoreShow({
                             </>
                         )}
                         {store.status === 'approved' && (
-                            <Button onClick={() => setShowSuspend(true)} variant="outline" className="border-orange-300 text-orange-600 hover:bg-orange-50">
+                            <Button onClick={() => setShowSuspend(true)} variant="outline" className="border-orange-200 dark:border-orange-800 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40">
                                 <PauseCircle className="h-4 w-4 mr-1.5" /> Suspend
                             </Button>
                         )}
@@ -419,7 +419,7 @@ export default function StoreShow({
                                 </div>
                             )}
                             <div className="flex items-center gap-2">
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${store.owner_id_verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${store.owner_id_verified ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300'}`}>
                                     ID {store.owner_id_verified ? 'verified' : 'unverified'}
                                 </span>
                             </div>
@@ -483,7 +483,7 @@ export default function StoreShow({
                                     </div>
                                 )}
                                 {Object.keys(documentOcr).length > 0 && (
-                                    <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+                                    <p className="text-xs italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                                 )}
                             </div>
                             )}
@@ -657,14 +657,14 @@ export default function StoreShow({
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-gray-400" />
+                                <Clock className="h-4 w-4 text-muted-foreground" />
                                 Store Action History
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ol className="relative border-l border-gray-200 pl-5 space-y-4">
+                            <ol className="relative border-l border-border pl-5 space-y-4">
                                 {history.map((item) => {
-                                    const meta = ACTION_LABELS[item.action] ?? { label: item.action, color: 'bg-gray-100 text-gray-700' };
+                                    const meta = ACTION_LABELS[item.action] ?? { label: item.action, color: 'bg-muted text-foreground/80' };
                                     return (
                                         <li key={item.id} className="relative">
                                             <span className="absolute -left-[1.3125rem] flex h-3 w-3 items-center justify-center rounded-full ring-2 ring-white bg-gray-300" />
@@ -675,11 +675,11 @@ export default function StoreShow({
                                                             {meta.label}
                                                         </span>
                                                         {item.reason && (
-                                                            <span className="text-sm text-gray-700">{item.reason}</span>
+                                                            <span className="text-sm text-foreground/80">{item.reason}</span>
                                                         )}
                                                     </div>
                                                     {item.notes && (
-                                                        <p className="mt-0.5 text-xs text-gray-500 italic">"{item.notes}"</p>
+                                                        <p className="mt-0.5 text-xs text-muted-foreground italic">"{item.notes}"</p>
                                                     )}
                                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                                         by {item.performed_by}
@@ -731,7 +731,7 @@ export default function StoreShow({
                                                 <td className="py-2 pr-3 whitespace-nowrap">{d.date}</td>
                                                 <td className="py-2 pr-3 whitespace-nowrap">{d.expires_on ?? '—'}</td>
                                                 <td className="py-2 pr-3">
-                                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${d.status === 'approved' ? 'bg-green-100 text-green-800' : d.status === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800'}`}>
+                                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${d.status === 'approved' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : d.status === 'pending' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300' : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300'}`}>
                                                         {d.status === 'pending' ? 'Waiting for review' : d.status === 'approved' ? 'Approved' : 'Rejected'}
                                                     </span>
                                                     {d.reason && <span className="block text-xs text-red-600">{d.reason}</span>}

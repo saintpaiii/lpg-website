@@ -7,7 +7,7 @@ export default function ReportQuickReplies({ groups, onPick }: { groups: QuickRe
         <div className="space-y-1.5">
             {groups.map((g) => (
                 <div key={g.group} className="min-w-0">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{g.group}</p>
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.group}</p>
                     <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
                         {g.items.map((q, i) => (
                             <button key={i} type="button" onClick={() => onPick(q.text)} title={q.text}

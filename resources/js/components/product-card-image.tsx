@@ -32,12 +32,12 @@ export default function ProductCardImage({ imageUrl, hoverUrl, name, photoCount 
             {(photoCount > 1 || hasVideo) && (
                 <div className="pointer-events-none absolute right-1.5 bottom-1.5 z-10 flex gap-1">
                     {photoCount > 1 && (
-                        <span className="flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[11px] text-white">
+                        <span className="flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-xs text-white">
                             <Images className="h-3 w-3" /> {photoCount}
                         </span>
                     )}
                     {hasVideo && (
-                        <span className="flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[11px] text-white">
+                        <span className="flex items-center gap-1 rounded-full bg-black/55 px-1.5 py-0.5 text-xs text-white">
                             <Play className="h-3 w-3 fill-white" /> Video
                         </span>
                     )}

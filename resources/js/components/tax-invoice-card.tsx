@@ -76,7 +76,7 @@ export function TaxInvoiceCard({ tax, canEdit, storeName }: { tax: TaxSettings; 
 
                     <div className="grid gap-1.5 sm:max-w-xs">
                         <Label htmlFor="tax-tin">
-                            TIN {data.vat_status === 'vat' ? <span className="text-red-500">*</span> : <span className="text-xs font-normal text-gray-400">(optional)</span>}
+                            TIN {data.vat_status === 'vat' ? <span className="text-red-500">*</span> : <span className="text-xs font-normal text-muted-foreground">(optional)</span>}
                         </Label>
                         <Input id="tax-tin" value={data.tin} disabled={readOnly} inputMode="numeric" placeholder="000-000-000-00000"
                             onChange={(e) => setData('tin', e.target.value)} />
@@ -85,14 +85,14 @@ export function TaxInvoiceCard({ tax, canEdit, storeName }: { tax: TaxSettings; 
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label htmlFor="tax-name">Registered business name <span className="text-xs font-normal text-gray-400">(optional)</span></Label>
+                        <Label htmlFor="tax-name">Registered business name <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
                         <Input id="tax-name" value={data.registered_name} disabled={readOnly} placeholder={storeName} maxLength={255}
                             onChange={(e) => setData('registered_name', e.target.value)} />
                         {errors.registered_name && <p className="text-xs text-red-500">{errors.registered_name}</p>}
                     </div>
 
                     <div className="grid gap-1.5">
-                        <Label htmlFor="tax-address">Registered address <span className="text-xs font-normal text-gray-400">(optional)</span></Label>
+                        <Label htmlFor="tax-address">Registered address <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
                         <Input id="tax-address" value={data.registered_address} disabled={readOnly} placeholder={tax.store_address || 'Store address'} maxLength={500}
                             onChange={(e) => setData('registered_address', e.target.value)} />
                         {errors.registered_address && <p className="text-xs text-red-500">{errors.registered_address}</p>}

@@ -36,7 +36,7 @@ const STATUS_LABEL: Record<string, string> = { draft: 'Draft', released: 'Releas
 
 function StatusBadge({ status }: { status: string }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAYROLL_STATUS_STYLE[status] ?? 'bg-gray-100 text-gray-500'}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAYROLL_STATUS_STYLE[status] ?? 'bg-muted text-muted-foreground'}`}>
             {STATUS_LABEL[status] ?? status}
         </span>
     );
@@ -68,20 +68,20 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                 {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                        <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+                        <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
                             <BadgeDollarSign className="h-6 w-6 text-blue-600" />
                             Payroll
                         </h1>
-                        <p className="mt-0.5 text-sm text-gray-500">Hourly pay from attendance — whole hours, per day.</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Hourly pay from attendance — whole hours, per day.</p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <div className="flex items-center gap-1.5 text-sm">
-                            <label className="text-gray-500">From</label>
+                            <label className="text-muted-foreground">From</label>
                             <input type="date" value={period_start} onChange={(e) => handleFilter('period_start', e.target.value)}
                                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:ring-2 focus:ring-ring focus:outline-none" />
                         </div>
                         <div className="flex items-center gap-1.5 text-sm">
-                            <label className="text-gray-500">To</label>
+                            <label className="text-muted-foreground">To</label>
                             <input type="date" value={period_end} onChange={(e) => handleFilter('period_end', e.target.value)}
                                 className="rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:ring-2 focus:ring-ring focus:outline-none" />
                         </div>
@@ -106,7 +106,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                 {is_owner && <PayrollTabs active="payslips" />}
 
                 {can_generate && (
-                    <p className="-mt-2 text-xs text-gray-500">
+                    <p className="-mt-2 text-xs text-muted-foreground">
                         Generate makes or updates <strong>draft</strong> payslips. Drafts use current rates and schedules; released and paid payslips are never changed.
                     </p>
                 )}
@@ -117,7 +117,7 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                         <span>
                             <strong>{roles_without_rate.join(', ')}</strong> {roles_without_rate.length === 1 ? 'has' : 'have'} no hourly rate yet — their staff can't get a payslip.
                         </span>
-                        <Link href="/seller/payroll/settings" className="font-medium underline underline-offset-2 hover:text-amber-700">Set rates →</Link>
+                        <Link href="/seller/payroll/settings" className="font-medium underline underline-offset-2 hover:text-amber-700 dark:hover:text-amber-300">Set rates →</Link>
                     </div>
                 )}
 
@@ -125,14 +125,14 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                 {payrolls.length > 0 && (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         {[
-                            { label: 'Staff Count', value: payrolls.length, cls: 'text-gray-800' },
-                            { label: 'Total Net Pay', value: peso(totalNet), cls: 'text-blue-700' },
+                            { label: 'Staff Count', value: payrolls.length, cls: 'text-foreground' },
+                            { label: 'Total Net Pay', value: peso(totalNet), cls: 'text-blue-700 dark:text-blue-300' },
                             { label: 'Released', value: payrolls.filter((r) => r.status === 'released' || r.status === 'paid').length, cls: 'text-emerald-600' },
-                            { label: 'Paid', value: payrolls.filter((r) => r.status === 'paid').length, cls: 'text-emerald-700' },
+                            { label: 'Paid', value: payrolls.filter((r) => r.status === 'paid').length, cls: 'text-emerald-700 dark:text-emerald-300' },
                         ].map((c) => (
                             <Card key={c.label}>
                                 <CardHeader className="px-4 pt-4 pb-1">
-                                    <CardTitle className="text-xs font-medium tracking-wide text-gray-500 uppercase">{c.label}</CardTitle>
+                                    <CardTitle className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{c.label}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="px-4 pb-4">
                                     <p className={`text-2xl font-bold ${c.cls}`}>{c.value}</p>
@@ -152,16 +152,16 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                     </CardHeader>
                     <CardContent className="p-0">
                         {payrolls.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <ClipboardList className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No payroll records yet</p>
                                 <p className="mt-1 text-sm">Click "Generate" to create payroll for the selected period.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                                             <th className="px-4 py-3">Staff</th>
                                             <th className="px-4 py-3 text-center">Days</th>
                                             <th className="px-4 py-3 text-right">Regular h</th>
@@ -173,18 +173,18 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {payrolls.map((row) => {
                                             const hourly = row.pay_basis === 'hourly';
                                             return (
-                                                <tr key={row.id} className="hover:bg-gray-50/60">
+                                                <tr key={row.id} className="hover:bg-muted/60">
                                                     <td className="px-4 py-3">
-                                                        <Link href={`/seller/payroll/${row.id}`} className="font-medium text-gray-900 hover:text-blue-700 hover:underline">{row.name}</Link>
-                                                        <p className="text-xs text-gray-500">{row.role_names.length ? row.role_names.join(', ') : row.sub_role}</p>
+                                                        <Link href={`/seller/payroll/${row.id}`} className="font-medium text-foreground hover:text-blue-700 dark:hover:text-blue-300 hover:underline">{row.name}</Link>
+                                                        <p className="text-xs text-muted-foreground">{row.role_names.length ? row.role_names.join(', ') : row.sub_role}</p>
                                                     </td>
                                                     <td className="px-4 py-3 text-center text-xs whitespace-nowrap">
-                                                        <span className="text-gray-700">{row.days_present}P</span>
-                                                        {row.days_late > 0 && <span className="text-yellow-600"> · {row.days_late}L</span>}
+                                                        <span className="text-foreground/80">{row.days_present}P</span>
+                                                        {row.days_late > 0 && <span className="text-amber-700 dark:text-amber-300"> · {row.days_late}L</span>}
                                                         {row.days_absent > 0 && <span className="text-red-600"> · {row.days_absent}A</span>}
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-mono">{hourly ? row.regular_hours : '—'}</td>
@@ -193,12 +193,12 @@ export default function PayrollPage({ payrolls, period_start, period_end, is_own
                                                         {hourly ? (
                                                             <>
                                                                 <span className="font-mono">{peso(row.hourly_rate)}</span>
-                                                                <span className="block text-[11px] text-gray-400">{rateSourceLabel(row.rate_source)}</span>
+                                                                <span className="block text-xs text-muted-foreground">{rateSourceLabel(row.rate_source)}</span>
                                                             </>
                                                         ) : '—'}
                                                     </td>
-                                                    {hasDaily && <td className="px-4 py-3 text-right font-mono text-gray-500">{hourly ? '—' : peso(row.daily_rate)}</td>}
-                                                    <td className="px-4 py-3 text-right font-semibold text-blue-700">{peso(row.net_pay)}</td>
+                                                    {hasDaily && <td className="px-4 py-3 text-right font-mono text-muted-foreground">{hourly ? '—' : peso(row.daily_rate)}</td>}
+                                                    <td className="px-4 py-3 text-right font-semibold text-blue-700 dark:text-blue-300">{peso(row.net_pay)}</td>
                                                     <td className="px-4 py-3 text-center"><StatusBadge status={row.status} /></td>
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center justify-end gap-1">

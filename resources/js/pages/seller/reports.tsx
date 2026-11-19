@@ -112,14 +112,14 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                 <Card>
                     <CardContent className="pt-4 pb-4">
                         <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-medium text-gray-500">Date Range:</span>
+                            <span className="text-sm font-medium text-muted-foreground">Date Range:</span>
                             <Input
                                 type="date"
                                 value={from}
                                 onChange={(e) => setFrom(e.target.value)}
                                 className="w-36 h-8 text-sm"
                             />
-                            <span className="text-gray-400 text-sm">to</span>
+                            <span className="text-muted-foreground text-sm">to</span>
                             <Input
                                 type="date"
                                 value={to}
@@ -138,7 +138,7 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                     <button
                                         key={label}
                                         onClick={fn}
-                                        className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+                                        className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground/80 transition-colors"
                                     >
                                         {label}
                                     </button>
@@ -241,31 +241,31 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                     </CardHeader>
                     <CardContent className="p-0">
                         {chart.length === 0 ? (
-                            <p className="px-4 py-8 text-center text-sm text-gray-400">No data for this period.</p>
+                            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No data for this period.</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Date</th>
                                             <th className="px-4 py-3 text-right">Orders</th>
                                             <th className="px-4 py-3 text-right">Revenue</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {chart.map((row) => (
-                                            <tr key={row.date} className="hover:bg-gray-50/60">
-                                                <td className="px-4 py-2.5 text-gray-700">{row.date}</td>
+                                            <tr key={row.date} className="hover:bg-muted/60">
+                                                <td className="px-4 py-2.5 text-foreground/80">{row.date}</td>
                                                 <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
-                                                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 font-medium">{fmt(row.gross)}</td>
+                                                <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-medium">{fmt(row.gross)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                     <tfoot>
-                                        <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                                        <tr className="border-t-2 border-border bg-muted font-semibold">
                                             <td className="px-4 py-2.5">Total</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums">{summary.total_orders}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">{fmt(summary.gross_revenue)}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(summary.gross_revenue)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

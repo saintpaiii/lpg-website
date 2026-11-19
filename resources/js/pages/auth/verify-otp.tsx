@@ -185,7 +185,7 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                             </div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Verify your email</h1>
                             <div className="flex items-center justify-center gap-1.5 mt-2">
-                                <Mail className="h-4 w-4 text-gray-400" />
+                                <Mail className="h-4 w-4 text-muted-foreground" />
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {codeSent
                                         ? <>Code sent to <span className="font-semibold text-gray-700 dark:text-gray-300">{email}</span></>
@@ -277,7 +277,7 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                                     <p className="text-sm text-gray-500 dark:text-gray-400">
                                         Didn't receive it?{' '}
                                         {countdown > 0 ? (
-                                            <span className="text-gray-400 dark:text-gray-500">
+                                            <span className="text-muted-foreground">
                                                 Resend in <span className="font-medium tabular-nums">{countdown}s</span>
                                             </span>
                                         ) : (
@@ -285,7 +285,7 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                                                 type="button"
                                                 onClick={handleSend}
                                                 disabled={resending}
-                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium transition-colors disabled:opacity-50"
+                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:hover:text-blue-300 font-medium transition-colors disabled:opacity-50"
                                             >
                                                 {resending
                                                     ? <><Loader2 className="h-3 w-3 animate-spin" />Sending…</>
@@ -301,7 +301,7 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                                         Code expired. Click Resend to get a new one.
                                     </p>
                                 ) : (
-                                    <p className="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+                                    <p className="mt-4 text-center text-xs text-muted-foreground">
                                         Code expires in{' '}
                                         <span className="font-medium tabular-nums text-gray-500 dark:text-gray-400">
                                             {Math.floor(otpCountdown / 60)}:{String(otpCountdown % 60).padStart(2, '0')}
@@ -312,7 +312,7 @@ export default function VerifyOtp({ email, resend_available, code_expires_in, co
                             </>
                         )}
 
-                        <p className="mt-5 text-center text-xs text-gray-400 dark:text-gray-500">
+                        <p className="mt-5 text-center text-xs text-muted-foreground">
                             Wrong email?{' '}
                             <button
                                 type="button"

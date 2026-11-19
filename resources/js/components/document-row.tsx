@@ -18,7 +18,7 @@ export default function DocumentRow({ label, children, className }: { label: Rea
 /** "View" link for a private document, or "Not uploaded". */
 export function DocumentLink({ url, label = 'View' }: { url: string | null | undefined; label?: string }) {
     return url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 hover:underline">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 dark:hover:text-blue-300 hover:underline">
             {label} <ExternalLink className="h-3 w-3" />
         </a>
     ) : (

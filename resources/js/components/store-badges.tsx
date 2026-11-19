@@ -15,7 +15,7 @@ export type StoreHoursStatus = {
 /** "Pick-up only — delivery not available right now" (J4: no rider / no delivery vehicle) */
 export function PickupOnlyBadge({ className, short = false }: { className?: string; short?: boolean }) {
     return (
-        <span className={cn('inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300', className)}
+        <span className={cn('inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-300', className)}
             title="Pick-up only — delivery not available right now">
             <Store className="h-3 w-3 shrink-0" /> {short ? 'Pick-up only' : 'Pick-up only — delivery not available right now'}
         </span>
@@ -26,7 +26,7 @@ export function PickupOnlyBadge({ className, short = false }: { className?: stri
 export function StoreHoursBadge({ hours, className }: { hours?: StoreHoursStatus | null; className?: string }) {
     if (!hours) return null;
     return (
-        <span className={cn('inline-flex items-center gap-1 text-[11px] font-medium',
+        <span className={cn('inline-flex items-center gap-1 text-xs font-medium',
             hours.open ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400', className)}>
             <Clock className="h-3 w-3 shrink-0" /> {hours.label}
         </span>

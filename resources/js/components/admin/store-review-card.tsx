@@ -124,7 +124,7 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
                     </Button>
                 )}
                 {dec.status !== 'rejected' && (
-                    <Button size="sm" variant="outline" className="h-7 gap-1 border-red-300 text-red-600 hover:bg-red-50" onClick={() => setItemReject({ key: k, reason: '', note: '' })}>
+                    <Button size="sm" variant="outline" className="h-7 gap-1 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => setItemReject({ key: k, reason: '', note: '' })}>
                         <XCircle className="h-3.5 w-3.5" /> Reject
                     </Button>
                 )}
@@ -149,7 +149,7 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
                             <span className="flex min-w-0 flex-1 items-start gap-2 text-sm">
                                 {i.status === 'accepted' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" aria-label="Accepted" />
                                     : i.status === 'rejected' ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-label="Rejected" />
-                                    : <span className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-gray-300" aria-label="Not reviewed" />}
+                                    : <span className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-border" aria-label="Not reviewed" />}
                                 <span className="min-w-0">
                                     <span className="font-medium">{i.label}</span>
                                     <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
@@ -179,7 +179,7 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
                     <li className="px-3 py-2.5 text-sm">
                         <ItemHead dec={decided('duplicates')} label="Duplicate warnings checked (or none)" />
                         <p className="mt-1 text-xs text-muted-foreground">
-                            {duplicateCount > 0 ? <span className="inline-flex items-center gap-1 text-red-700"><AlertTriangle className="h-3 w-3" /> {duplicateCount} possible duplicate{duplicateCount > 1 ? 's' : ''} — see the red box above.</span> : 'No duplicate warnings.'}
+                            {duplicateCount > 0 ? <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-300"><AlertTriangle className="h-3 w-3" /> {duplicateCount} possible duplicate{duplicateCount > 1 ? 's' : ''} — see the red box above.</span> : 'No duplicate warnings.'}
                         </p>
                         {duplicateCount > 0 && itemActions('duplicates')}
                     </li>
@@ -210,7 +210,7 @@ export default function StoreReviewCard({ storeId, storeName, review, ownerFace,
                         <div className="flex flex-wrap items-center justify-end gap-2">
                             {blocker && <span className="mr-auto text-xs text-muted-foreground">{blocker}</span>}
                             <Button variant="outline" disabled={review.rejected.length === 0 || busy !== null} onClick={() => setConfirmSend(true)}
-                                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50">
+                                className="gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
                                 <Send className="h-4 w-4" /> Send back to seller
                             </Button>
                             <Button onClick={approve} disabled={!!blocker || busy !== null} className="gap-1.5 bg-green-600 text-white hover:bg-green-700">
@@ -261,7 +261,7 @@ function ItemHead({ dec, label }: { dec: Decision; label: string }) {
         <span className="flex items-start gap-2">
             {dec.status === 'accepted' ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
                 : dec.status === 'rejected' ? <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                : <span className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-gray-300" />}
+                : <span className="mt-1 h-3 w-3 shrink-0 rounded-full border-2 border-border" />}
             <span className="min-w-0">
                 <span className="font-medium">{label}</span>
                 <span className="mt-0.5 block"><ReviewStatusChip item={dec} /></span>

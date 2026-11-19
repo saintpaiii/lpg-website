@@ -21,7 +21,7 @@ export default function SellerCustomerReportShow({ report, customer, loyalty }: 
 
     const side = customer && (
         <div className="space-y-3 rounded-xl border p-4 text-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Customer</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Customer</p>
             <p className="font-semibold">{customer.name}</p>
             {customer.phone && <a href={`tel:${customer.phone}`} className="flex items-center gap-1.5 text-blue-600"><Phone className="h-4 w-4" /> {customer.phone}</a>}
             {report.order?.link && <Link href={report.order.link} className="block text-blue-600 hover:underline">View order {report.order.order_number}</Link>}
@@ -29,7 +29,7 @@ export default function SellerCustomerReportShow({ report, customer, loyalty }: 
                 <div className="space-y-2 border-t pt-3">
                     <TierBadge tier={loyalty.tier} size="md" />
                     <div>
-                        <p className="mb-1 text-xs text-gray-500">Trust score</p>
+                        <p className="mb-1 text-xs text-muted-foreground">Trust score</p>
                         <TrustScoreBar score={loyalty.trust_score} />
                     </div>
                 </div>

@@ -75,7 +75,7 @@ export default function ChatPage({ portal, conversations, openId, emptyText = EM
             <div className={cn('w-full shrink-0 border-r md:block md:w-80', activeId ? 'hidden' : 'block')}>
                 <ConversationList items={items} activeId={activeId} onSelect={select} emptyText={emptyText} />
                 {conversations.last_page > 1 && (
-                    <p className="border-t px-3 py-2 text-center text-[11px] text-gray-400">Showing your {conversations.data.length} most recent conversations</p>
+                    <p className="border-t px-3 py-2 text-center text-xs text-muted-foreground">Showing your {conversations.data.length} most recent conversations</p>
                 )}
             </div>
 
@@ -92,8 +92,8 @@ export default function ChatPage({ portal, conversations, openId, emptyText = EM
                         composerTools={composerTools}
                     />
                 ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-gray-400">
-                        <MessageSquare className="h-10 w-10 text-gray-300" />
+                    <div className="flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                        <MessageSquare className="h-10 w-10 text-muted-foreground" />
                         Select a conversation
                     </div>
                 )}

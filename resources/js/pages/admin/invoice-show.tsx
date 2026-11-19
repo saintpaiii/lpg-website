@@ -38,7 +38,7 @@ export default function InvoiceShowPage({ invoice, doc }: Props) {
                 {/* Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="ghost" onClick={() => history.back()} className="flex items-center gap-1.5 text-gray-600">
+                        <Button variant="ghost" onClick={() => history.back()} className="flex items-center gap-1.5 text-muted-foreground">
                             <ArrowLeft className="h-4 w-4" /> Back to Invoices
                         </Button>
                         <InvoiceStatusBadge doc={doc} />
@@ -53,7 +53,7 @@ export default function InvoiceShowPage({ invoice, doc }: Props) {
                     </div>
                 </div>
 
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700">
+                <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-300">
                     Read-only (platform monitoring). This invoice is issued by the store.
                     {invoice.deleted_at && ' It is archived.'}
                     {doc.order?.archived && ' Its order is archived.'}
@@ -69,8 +69,8 @@ export default function InvoiceShowPage({ invoice, doc }: Props) {
                             <CardHeader className="pb-2"><CardTitle className="text-base">Customer</CardTitle></CardHeader>
                             <CardContent className="space-y-0.5 text-sm">
                                 <p className="font-semibold">{invoice.customer?.name ?? doc.buyer.name}</p>
-                                {invoice.customer?.phone && <p className="text-gray-500">{invoice.customer.phone}</p>}
-                                {invoice.customer?.email && <p className="text-gray-500">{invoice.customer.email}</p>}
+                                {invoice.customer?.phone && <p className="text-muted-foreground">{invoice.customer.phone}</p>}
+                                {invoice.customer?.email && <p className="text-muted-foreground">{invoice.customer.email}</p>}
                             </CardContent>
                         </Card>
 
@@ -79,9 +79,9 @@ export default function InvoiceShowPage({ invoice, doc }: Props) {
                                 <CardHeader className="pb-2"><CardTitle className="text-base">Order</CardTitle></CardHeader>
                                 <CardContent className="space-y-1 text-sm">
                                     <p className="font-mono font-semibold">{invoice.order.order_number}</p>
-                                    {invoice.order.ordered_at && <p className="text-gray-500">Ordered {invoice.order.ordered_at}</p>}
+                                    {invoice.order.ordered_at && <p className="text-muted-foreground">Ordered {invoice.order.ordered_at}</p>}
                                     {invoice.order.delivered_at && <p className="text-emerald-600">Delivered {invoice.order.delivered_at}</p>}
-                                    {invoice.order.notes && <p className="whitespace-pre-line text-gray-600">{invoice.order.notes}</p>}
+                                    {invoice.order.notes && <p className="whitespace-pre-line text-muted-foreground">{invoice.order.notes}</p>}
                                 </CardContent>
                             </Card>
                         )}

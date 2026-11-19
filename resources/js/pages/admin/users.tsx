@@ -49,15 +49,15 @@ function RoleBadges({ user }: { user: UserRow }) {
     const badges: { label: string; cls: string }[] = [];
 
     if (user.role === 'customer') {
-        badges.push({ label: 'Buyer', cls: 'bg-blue-100 text-blue-700' });
+        badges.push({ label: 'Buyer', cls: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' });
     } else if (user.role === 'seller') {
-        badges.push({ label: 'Seller', cls: 'bg-emerald-100 text-emerald-700' });
+        badges.push({ label: 'Seller', cls: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' });
     } else if (user.role === 'seller_staff') {
-        badges.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 text-teal-700' });
+        badges.push({ label: user.role_names?.length ? `Staff · ${user.role_names.join(', ')}` : user.sub_role ? `Staff · ${user.sub_role}` : 'Seller Staff', cls: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300' });
     } else if (user.role === 'platform_staff') {
-        badges.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 text-violet-700' });
+        badges.push({ label: user.sub_role ? `Platform Staff · ${user.sub_role}` : 'Platform Staff', cls: 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300' });
     } else if (['platform_admin', 'admin', 'manager', 'cashier', 'warehouse', 'rider'].includes(user.role)) {
-        badges.push({ label: user.role.replace('_', ' '), cls: 'bg-purple-100 text-purple-700 capitalize' });
+        badges.push({ label: user.role.replace('_', ' '), cls: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 capitalize' });
     }
 
 
@@ -149,7 +149,7 @@ export default function AdminUsers({ users, filter, search }: Props) {
 
                 {/* Table */}
                 <div className="rounded-lg border bg-card overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead>
                             <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                                 <th className="px-4 py-3 font-medium">User</th>
@@ -190,11 +190,11 @@ export default function AdminUsers({ users, filter, search }: Props) {
                                     </td>
                                     <td className="px-4 py-3">
                                         {u.deleted_at ? (
-                                            <span className="inline-flex rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">Archived</span>
+                                            <span className="inline-flex rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs text-red-700 dark:text-red-300">Archived</span>
                                         ) : u.is_active ? (
-                                            <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">Active</span>
+                                            <span className="inline-flex rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300">Active</span>
                                         ) : (
-                                            <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">Inactive</span>
+                                            <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Inactive</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{fmtDate(u.created_at)}</td>

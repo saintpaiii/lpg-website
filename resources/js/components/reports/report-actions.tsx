@@ -25,7 +25,7 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
         <div className="space-y-4">
             {/* Reporter: a resolution was proposed */}
             {f.can_confirm && (
-                <div className="space-y-3 rounded-lg border border-purple-200 bg-purple-50 p-4 dark:bg-purple-900/20">
+                <div className="space-y-3 rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50 p-4 dark:bg-purple-900/20">
                     <p className="text-sm font-semibold">A solution was proposed. Is your problem solved?</p>
                     {report.resolution && <p className="text-sm">{report.resolution}</p>}
                     {report.resolution_photos.length > 0 && (
@@ -40,7 +40,7 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
                             <CheckCircle2 className="h-4 w-4" /> Yes, it's solved
                         </Button>
                         {f.can_not_solved && (
-                            <Button variant="outline" className="flex-1 gap-1.5 border-orange-300 text-orange-700" onClick={() => setDialog('not_solved')}>
+                            <Button variant="outline" className="flex-1 gap-1.5 border-orange-200 dark:border-orange-800 text-orange-700 dark:text-orange-300" onClick={() => setDialog('not_solved')}>
                                 <XCircle className="h-4 w-4" /> Not solved
                             </Button>
                         )}
@@ -57,7 +57,7 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
             {/* Handler: status steps */}
             {(f.can_start_review || f.can_start_investigating || f.can_propose_resolution) && (
                 <div className="flex flex-wrap gap-2 rounded-lg border bg-gray-50 p-3 dark:bg-gray-900/40">
-                    <span className="w-full text-xs font-semibold uppercase tracking-wide text-gray-500">Update status</span>
+                    <span className="w-full text-xs font-semibold uppercase tracking-wide text-muted-foreground">Update status</span>
                     {f.can_start_review && (
                         <Button size="sm" variant="outline" onClick={() => router.post(`${base}/start-review`, {}, { preserveScroll: true })}>Start review</Button>
                     )}
@@ -81,7 +81,7 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
                     </Button>
                 )}
                 {f.can_remind_store && f.reminded_at && (
-                    <span className="text-xs text-gray-500">Reminded {relativeTime(f.reminded_at) === 'now' ? 'just now' : `${relativeTime(f.reminded_at)} ago`}</span>
+                    <span className="text-xs text-muted-foreground">Reminded {relativeTime(f.reminded_at) === 'now' ? 'just now' : `${relativeTime(f.reminded_at)} ago`}</span>
                 )}
                 {f.can_hand_to_store && (
                     <Button variant="outline" className="gap-1.5" onClick={() => setDialog('hand')}><Store className="h-4 w-4" /> Send to store to fix</Button>
@@ -90,11 +90,11 @@ export default function ReportActions({ report }: { report: ReportDetail; portal
                     <Button className="gap-1.5" onClick={() => setDialog('close')}><CheckCircle2 className="h-4 w-4" /> Close report</Button>
                 )}
                 {f.can_escalate && (
-                    <button type="button" onClick={() => setDialog('escalate')} className="text-sm font-medium text-orange-700 underline">Send to admin</button>
+                    <button type="button" onClick={() => setDialog('escalate')} className="text-sm font-medium text-orange-700 dark:text-orange-300 underline">Send to admin</button>
                 )}
                 {f.can_withdraw && (
                     <button type="button" onClick={() => { if (confirm('Withdraw this report?')) router.post(`${base}/withdraw`, {}, { preserveScroll: true }); }}
-                        className="text-sm text-gray-500 underline">Withdraw report</button>
+                        className="text-sm text-muted-foreground underline">Withdraw report</button>
                 )}
             </div>
 
@@ -147,13 +147,13 @@ function ReplyBox({ base, allowInternal, quickReplies }: { base: string; allowIn
                 <p className="text-xs text-red-600">{errors.body ?? Object.entries(errors).find(([k]) => k.startsWith('images'))?.[1]}</p>
             )}
             <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-1 text-sm text-gray-600">
+                <label className="inline-flex cursor-pointer items-center gap-1 text-sm text-muted-foreground">
                     <ImagePlus className="h-4 w-4" /> Photo
                     <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
                         onChange={(e) => { form.setData('images', [...form.data.images, ...Array.from(e.target.files ?? [])].slice(0, 3)); e.target.value = ''; }} />
                 </label>
                 {allowInternal && (
-                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-gray-600">
+                    <label className="inline-flex cursor-pointer items-center gap-1.5 text-sm text-muted-foreground">
                         <Checkbox checked={form.data.internal} onCheckedChange={(c) => form.setData('internal', c === true)} /> Private note
                     </label>
                 )}
@@ -200,7 +200,7 @@ function ProposeDialog({ open, onClose, url, needsPhoto }: { open: boolean; onCl
                                 </span>
                             ))}
                             {form.data.photos.length < 3 && (
-                                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-dashed px-2 py-1 text-xs text-gray-600">
+                                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-dashed px-2 py-1 text-xs text-muted-foreground">
                                     <ImagePlus className="h-3.5 w-3.5" /> Add photo
                                     <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden"
                                         onChange={(e) => { form.setData('photos', [...form.data.photos, ...Array.from(e.target.files ?? [])].slice(0, 3)); e.target.value = ''; }} />
@@ -252,7 +252,7 @@ function CloseDialog({ open, onClose, report, url }: { open: boolean; onClose: (
                     <div className="grid gap-1.5" role="radiogroup" aria-label="Outcome">
                         {a.close_outcomes.map((o) => (
                             <button key={o.key} type="button" role="radio" aria-checked={form.data.outcome === o.key} onClick={() => form.setData('outcome', o.key)}
-                                className={cn('rounded-md border px-3 py-2 text-left text-sm', form.data.outcome === o.key ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-900/20' : 'hover:bg-gray-50')}>
+                                className={cn('rounded-md border px-3 py-2 text-left text-sm', form.data.outcome === o.key ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-900/20' : 'hover:bg-muted')}>
                                 {o.label}
                             </button>
                         ))}
@@ -273,8 +273,8 @@ function CloseDialog({ open, onClose, report, url }: { open: boolean; onClose: (
                     {errors.reason && <p className="text-xs text-red-600">{errors.reason}</p>}
                     {report.flags.needs_safety_note && (
                         <div className="grid gap-1.5 text-sm">
-                            <span className="flex items-center gap-1 font-medium text-red-700"><ShieldAlert className="h-4 w-4" /> Safety note (required)</span>
-                            <span className="text-xs text-gray-500">The store hasn't sent a fix with photos. What was confirmed about the tank's safety, and with whom?</span>
+                            <span className="flex items-center gap-1 font-medium text-red-700 dark:text-red-300"><ShieldAlert className="h-4 w-4" /> Safety note (required)</span>
+                            <span className="text-xs text-muted-foreground">The store hasn't sent a fix with photos. What was confirmed about the tank's safety, and with whom?</span>
                             <NotePicker context="report_safety_note" required value={form.data.safety_note} onChange={(v) => form.setData('safety_note', v)} rows={3} maxLength={1000} textareaClassName={textareaCls} />
                         </div>
                     )}

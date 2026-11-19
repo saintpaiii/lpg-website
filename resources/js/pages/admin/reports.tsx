@@ -113,7 +113,7 @@ function fmt(n: number) {
     return '₱' + n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function StatCard({ label, value, sub, color = 'text-gray-900' }: { label: string; value: string | number; sub?: string; color?: string }) {
+function StatCard({ label, value, sub, color = 'text-foreground' }: { label: string; value: string | number; sub?: string; color?: string }) {
     return (
         <Card>
             <CardContent className="pt-5 pb-4">
@@ -127,7 +127,7 @@ function StatCard({ label, value, sub, color = 'text-gray-900' }: { label: strin
 
 function EmptyChart({ message }: { message: string }) {
     return (
-        <div className="flex h-48 items-center justify-center text-sm text-gray-400">
+        <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
             <div className="text-center">
                 <BarChart2 className="mx-auto mb-2 h-8 w-8 text-gray-200" />
                 {message}
@@ -194,7 +194,7 @@ function SalesTab({ data }: { data: SalesData }) {
                                             <td className="px-4 py-2.5 font-medium">{row.store_name}</td>
                                             <td className="px-4 py-2.5 text-muted-foreground">{row.city || '—'}</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-700">{fmt(row.gmv)}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-emerald-700 dark:text-emerald-300">{fmt(row.gmv)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -355,10 +355,10 @@ function UsersTab({ data }: { data: UsersData }) {
 
 function StoresTab({ data }: { data: StoresData }) {
     const statusConfig: Record<string, string> = {
-        approved:  'bg-emerald-100 text-emerald-700',
-        pending:   'bg-yellow-100 text-yellow-700',
-        rejected:  'bg-red-100 text-red-700',
-        suspended: 'bg-gray-100 text-gray-600',
+        approved:  'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+        pending:   'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+        rejected:  'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+        suspended: 'bg-muted text-muted-foreground',
     };
 
     return (
@@ -425,7 +425,7 @@ function StoresTab({ data }: { data: StoresData }) {
                                                 {s.city && <p className="text-xs text-muted-foreground">{s.city}</p>}
                                             </td>
                                             <td className="px-4 py-2.5">
-                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig[s.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusConfig[s.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                     {s.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                 </span>
                                             </td>
@@ -548,7 +548,7 @@ function RatingsTab({ data }: { data: RatingsData }) {
                                 </div>
                                 <div className="flex gap-px mt-1">
                                     {[1,2,3,4,5].map((i) => (
-                                        <span key={i} className={`text-sm ${i <= Math.round(data.platform_avg) ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                                        <span key={i} className={`text-sm ${i <= Math.round(data.platform_avg) ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'}`}>★</span>
                                     ))}
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">{total.toLocaleString()} review{total !== 1 ? 's' : ''}</p>
@@ -570,7 +570,7 @@ function RatingsTab({ data }: { data: RatingsData }) {
                             return (
                                 <div key={star} className="flex items-center gap-2 text-sm">
                                     <span className="w-4 text-right text-amber-500 font-semibold">{star}</span>
-                                    <span className="text-amber-400 text-xs">★</span>
+                                    <span className="text-amber-600 dark:text-amber-400 text-xs">★</span>
                                     <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                                         <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
                                     </div>
@@ -638,10 +638,10 @@ function RatingsTab({ data }: { data: RatingsData }) {
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-amber-400 text-sm">★</span>
+                                                    <span className="text-amber-600 dark:text-amber-400 text-sm">★</span>
                                                     <span className="font-semibold tabular-nums">{s.avg_rating.toFixed(2)}</span>
                                                     {s.avg_rating >= 4.5 && (
-                                                        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">Top Rated</span>
+                                                        <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Top Rated</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -724,7 +724,7 @@ export default function ReportsPage({
 
                 {/* Tabs */}
                 <div className="border-b">
-                    <nav className="flex gap-1">
+                    <nav className="flex gap-1 overflow-x-auto scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                         {TABS.map(({ key, label, icon: Icon }) => (
                             <button
                                 key={key}

@@ -52,12 +52,12 @@ const ORDER_STEPS = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800 border-yellow-200',
-    confirmed:        'bg-blue-100 text-blue-800 border-blue-200',
-    preparing:        'bg-purple-100 text-purple-800 border-purple-200',
-    out_for_delivery: 'bg-orange-100 text-orange-800 border-orange-200',
-    delivered:        'bg-green-100 text-green-800 border-green-200',
-    cancelled:        'bg-red-100 text-red-800 border-red-200',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    delivered:        'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
+    cancelled:        'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
 };
 
 function StatusStepper({ status }: { status: string }) {
@@ -87,7 +87,7 @@ function StatusStepper({ status }: { status: string }) {
                                 )}
                             </div>
                             <span className={`mt-1.5 text-xs font-medium text-center max-w-[60px] ${
-                                done || current ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-600'
+                                done || current ? 'text-gray-900 dark:text-white' : 'text-muted-foreground'
                             }`}>
                                 {step.label}
                             </span>
@@ -152,7 +152,7 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                 {/* Quick search */}
                 <form onSubmit={handleSearch} className="flex gap-2">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                             type="text"
                             value={searchQuery}
@@ -240,19 +240,19 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                                             <p className="font-semibold text-sm text-gray-900 dark:text-white leading-tight">
                                                 {p.name}
                                             </p>
-                                            <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-yellow-100 text-yellow-700 text-[10px] font-semibold px-1.5 py-0.5">
+                                            <span className="shrink-0 inline-flex items-center gap-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 text-xs font-semibold px-1.5 py-0.5">
                                                 <Star className="h-2.5 w-2.5 fill-yellow-500 text-yellow-500" />
                                                 Featured
                                             </span>
                                         </div>
-                                        <p className="text-xs text-gray-500 mb-2">{p.brand} · {p.weight}</p>
-                                        <div className="flex items-center gap-1 text-xs text-gray-500 mb-3">
+                                        <p className="text-xs text-muted-foreground mb-2">{p.brand} · {p.weight}</p>
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground mb-3">
                                             <MapPin className="h-3 w-3" />
                                             {p.store_name} · {p.store_city}
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-xs text-gray-400">Refill from</p>
+                                                <p className="text-xs text-muted-foreground">Refill from</p>
                                                 <p className="font-bold text-blue-600">₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
                                             </div>
                                             {p.stock === 0 ? (
@@ -288,14 +288,14 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                                 <span className="font-semibold text-gray-900 dark:text-white">
                                     {activeOrder.order_number}
                                 </span>
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[activeOrder.status] ?? 'bg-gray-100 text-gray-800'}`}>
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[activeOrder.status] ?? 'bg-muted text-foreground'}`}>
                                     {orderStatusLabel(activeOrder.status, activeOrder.fulfillment)}
                                 </span>
-                                <span className="text-sm text-gray-500">
+                                <span className="text-sm text-muted-foreground">
                                     ₱{activeOrder.total_amount.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                 </span>
                                 {activeOrder.rider_name && (
-                                    <span className="text-sm text-gray-500">
+                                    <span className="text-sm text-muted-foreground">
                                         Rider: <span className="font-medium text-gray-700 dark:text-gray-300">{activeOrder.rider_name}</span>
                                     </span>
                                 )}
@@ -306,7 +306,7 @@ export default function Dashboard({ customerName, stats, activeOrder, hasProfile
                 ) : (
                     <Card className="border-dashed">
                         <CardContent className="py-12 text-center">
-                            <ShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                            <ShoppingCart className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
                                 You have no active orders right now.
                             </p>

@@ -19,8 +19,8 @@ export function IdDocumentTile({ url, label, height = 220 }: { url: string | nul
                 <div style={{ height }} className="flex items-center justify-center rounded-lg border bg-muted text-xs text-muted-foreground">Not uploaded</div>
             ) : isFile ? (
                 <div style={{ height }} className="flex flex-col items-center justify-center gap-2 rounded-lg border bg-gray-50 dark:bg-gray-900">
-                    <FileText className="h-8 w-8 text-gray-400" />
-                    <span className="text-xs font-semibold text-gray-500">PDF</span>
+                    <FileText className="h-8 w-8 text-muted-foreground" />
+                    <span className="text-xs font-semibold text-muted-foreground">PDF</span>
                     <a href={url} target="_blank" rel="noopener" className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:underline">
                         Open <ExternalLink className="h-3.5 w-3.5" />
                     </a>
@@ -30,7 +30,7 @@ export function IdDocumentTile({ url, label, height = 220 }: { url: string | nul
                     className="group relative flex w-full items-center justify-center overflow-hidden rounded-lg border bg-gray-100 dark:bg-gray-900"
                     aria-label={`View ${label} full screen`}>
                     <img src={url} alt={label} onError={() => setIsFile(true)} className="max-h-full max-w-full object-contain" />
-                    <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[11px] text-white opacity-80 group-hover:opacity-100">
+                    <span className="absolute right-2 bottom-2 inline-flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white opacity-80 group-hover:opacity-100">
                         <ZoomIn className="h-3 w-3" /> View
                     </span>
                 </button>

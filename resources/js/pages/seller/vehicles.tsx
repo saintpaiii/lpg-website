@@ -103,10 +103,10 @@ type VehicleLimits = Record<string, { label: string; kg: number; tanks: number }
 type StoreSize = { key: string; label: string; full_kg: number };
 
 const STATUS_STYLES: Record<VehicleStatus, string> = {
-    available:   'bg-emerald-100 text-emerald-700',
-    in_use:      'bg-blue-100 text-blue-700',
-    maintenance: 'bg-amber-100 text-amber-700',
-    retired:     'bg-gray-100 text-gray-500',
+    available:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    in_use:      'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    maintenance: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    retired:     'bg-muted text-muted-foreground',
 };
 
 const STATUS_LABELS: Record<VehicleStatus, string> = {
@@ -281,7 +281,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Type</th>
@@ -304,7 +304,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                                 <td className="px-4 py-3 font-mono text-sm font-semibold">{v.plate_number}</td>
                                                 <td className="px-4 py-3 hidden sm:table-cell text-xs text-muted-foreground">
                                                     <span>{v.max_tanks} tanks · {v.max_capacity_kg} kg max</span>
-                                                    {v.tank_limits_label && <span className="block text-[11px]" data-testid="tank-limits-label">{v.tank_limits_label}</span>}
+                                                    {v.tank_limits_label && <span className="block text-xs" data-testid="tank-limits-label">{v.tank_limits_label}</span>}
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell text-sm">
                                                     {v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
@@ -333,7 +333,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
-                                                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                                                             onClick={() => setArchiveTarget(v)}
                                                             disabled={v.status === 'in_use'}
                                                             title={v.status === 'in_use' ? 'Cannot archive while in use' : 'Archive'}
@@ -359,7 +359,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Type</th>
@@ -598,10 +598,10 @@ function TankLimitsSection({ sizes, maxKg, maxTanks, value, errors, onChange }: 
                             <Input id={`tl-${s.key}`} type="number" inputMode="numeric" min={0} max={maxTanks || undefined} step={1}
                                 placeholder={`max ${suggested[s.key] ?? '—'}`} value={v} aria-label={`Max ${s.label} tanks`}
                                 onChange={(e) => onChange({ ...value, [s.key]: e.target.value })} />
-                            <span className={`text-[11px] ${over ? 'text-red-600' : 'text-muted-foreground'}`}>
+                            <span className={`text-xs ${over ? 'text-red-600' : 'text-muted-foreground'}`}>
                                 {kg === null ? `${s.full_kg} kg each` : `= ${kg} kg${over ? ` — over ${maxKg} kg` : ''}`}
                             </span>
-                            {err && <span className="text-[11px] text-red-600">{err}</span>}
+                            {err && <span className="text-xs text-red-600">{err}</span>}
                         </div>
                     );
                 })}

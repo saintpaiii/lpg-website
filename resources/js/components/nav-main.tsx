@@ -49,7 +49,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                     {item.icon && <item.icon className="mr-2 size-4 shrink-0" />}
                                     <span className="flex-1 truncate">{item.title}</span>
                                     <span className={cn(
-                                        'ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold leading-none',
+                                        'ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-xs font-semibold leading-none',
                                         item.lockedPlan === 'Premium'
                                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
                                             : 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
@@ -84,7 +84,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                                 // Dot on the icon, visible when the sidebar is collapsed to icons
                                                 <span className={cn(
                                                     'absolute -right-1 -top-1 hidden h-2 w-2 rounded-full ring-2 ring-sidebar group-data-[collapsible=icon]:block',
-                                                    item.badgeTone === 'alert' ? 'bg-red-600' : item.badgeTone === 'warning' ? 'bg-amber-500' : 'bg-blue-600',
+                                                    item.badgeTone === 'alert' ? 'bg-red-600' : item.badgeTone === 'warning' ? 'bg-amber-600' : 'bg-blue-600',
                                                 )} />
                                             )}
                                         </span>
@@ -93,13 +93,13 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                                     {item.badge && (
                                         <span
                                             className={cn(
-                                                'ml-auto rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none',
+                                                'ml-auto rounded-full px-1.5 py-0.5 text-xs font-semibold leading-none',
                                                 item.badgeTone === 'unread'
-                                                    ? (active ? 'bg-white text-blue-700' : 'bg-blue-600 text-white')
+                                                    ? (active ? 'bg-card text-blue-700 dark:text-blue-300' : 'bg-blue-600 text-white')
                                                     : item.badgeTone === 'alert'
-                                                    ? (active ? 'bg-white text-red-600' : 'bg-red-600 text-white')
+                                                    ? (active ? 'bg-card text-red-600' : 'bg-red-600 text-white')
                                                     : item.badgeTone === 'warning'
-                                                    ? (active ? 'bg-white text-amber-600' : 'bg-amber-500 text-white')
+                                                    ? (active ? 'bg-card text-amber-600' : 'bg-amber-600 text-white')
                                                     : active
                                                         ? 'bg-white/20 text-white'
                                                         : 'bg-muted text-muted-foreground',

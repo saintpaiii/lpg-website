@@ -75,7 +75,7 @@ export default function TankNotAcceptedFields({ items, rows, onChange, currentTo
 
     if (!open) {
         return (
-            <button type="button" className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 hover:underline"
+            <button type="button" className="inline-flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300 hover:underline"
                 onClick={() => { setOpen(true); onChange([newRow(items)]); }}>
                 <AlertTriangle className="h-4 w-4" /> A tank was not accepted
             </button>
@@ -113,7 +113,7 @@ export default function TankNotAcceptedFields({ items, rows, onChange, currentTo
                             <input aria-label="Describe the problem" maxLength={300} placeholder="Describe the problem" className="h-9 w-full rounded-md border bg-background px-2"
                                 value={r.note} onChange={(e) => set(r.key, { note: e.target.value })} />
                         )}
-                        <label className={cn('flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-2 py-2 text-xs', r.photo ? 'border-green-400 text-green-700' : 'text-muted-foreground')}>
+                        <label className={cn('flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-2 py-2 text-xs', r.photo ? 'border-green-400 text-green-700 dark:text-green-300' : 'text-muted-foreground')}>
                             <Camera className="h-4 w-4" /> {r.photo ? `Photo: ${r.photo.name}` : 'Photo of the tank (required) — camera or file'}
                             <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => set(r.key, { photo: e.target.files?.[0] ?? null })} />
                         </label>

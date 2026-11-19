@@ -141,9 +141,9 @@ export default function CartPage({ cart }: Props) {
             <CustomerLayout>
                 <Head title="My Cart — LPG Portal" />
                 <div className="text-center py-24">
-                    <ShoppingCart className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <ShoppingCart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Your cart is empty</h2>
-                    <p className="text-gray-500 mb-6">Browse products and add items to your cart.</p>
+                    <p className="text-muted-foreground mb-6">Browse products and add items to your cart.</p>
                     <Link href="/customer/products">
                         <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6">
                             <ShoppingBag className="h-4 w-4 mr-2" />
@@ -182,7 +182,7 @@ export default function CartPage({ cart }: Props) {
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white">My Cart</h1>
                     <button
                         onClick={() => setClearOpen(true)}
-                        className="text-sm text-red-500 hover:text-red-700 flex items-center gap-1"
+                        className="text-sm text-red-500 hover:text-red-700 dark:hover:text-red-300 flex items-center gap-1"
                     >
                         <Trash2 className="h-3.5 w-3.5" />
                         Clear cart
@@ -253,7 +253,7 @@ export default function CartPage({ cart }: Props) {
                                                 checked={available && allStoreSelected}
                                                 ref={el => { if (el) el.indeterminate = someStoreSelected && !allStoreSelected; }}
                                                 onChange={() => toggleStore(sg)}
-                                                className="h-4 w-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                                                className="h-4 w-4 rounded border-border text-blue-600 cursor-pointer"
                                             />
                                             <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                                                 <StoreAvatar name={sg.store_name} logoUrl={sg.store_logo_url} size={24} />
@@ -262,11 +262,11 @@ export default function CartPage({ cart }: Props) {
                                             {sg.pickup_only ? (
                                                 <PickupOnlyBadge short className="ml-auto" />
                                             ) : sg.delivery_from != null ? (
-                                                <span className="ml-auto text-xs text-gray-500">
-                                                    Delivery from ₱{sg.delivery_from.toLocaleString('en-PH')} <span className="text-gray-400">(final fee at checkout)</span>
+                                                <span className="ml-auto text-xs text-muted-foreground">
+                                                    Delivery from ₱{sg.delivery_from.toLocaleString('en-PH')} <span className="text-muted-foreground">(final fee at checkout)</span>
                                                 </span>
                                             ) : sg.allow_pickup ? (
-                                                <span className="ml-auto text-xs text-gray-500">Pick-up only</span>
+                                                <span className="ml-auto text-xs text-muted-foreground">Pick-up only</span>
                                             ) : null}
                                         </div>
                                         <StoreHoursBadge hours={sg.hours} className="mt-1 pl-7" />
@@ -289,7 +289,7 @@ export default function CartPage({ cart }: Props) {
                                                                 disabled={!available}
                                                                 checked={available && isChecked}
                                                                 onChange={() => available && toggleItem(item.product_id)}
-                                                                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 cursor-pointer shrink-0"
+                                                                className="mt-1 h-4 w-4 rounded border-border text-blue-600 cursor-pointer shrink-0"
                                                             />
                                                             {item.image_url ? (
                                                                 <img src={item.image_url} alt={item.name} className="h-16 w-16 rounded-lg object-cover shrink-0" />
@@ -302,11 +302,11 @@ export default function CartPage({ cart }: Props) {
                                                                 <div className="flex items-start justify-between gap-2">
                                                                     <div>
                                                                         <p className="font-semibold text-sm text-gray-900 dark:text-white">{item.name}</p>
-                                                                        <p className="text-xs text-gray-500">{item.product_type === 'accessory' ? <AccessoryBadge category={item.accessory_category} /> : <>{item.brand} · {item.weight}</>}</p>
+                                                                        <p className="text-xs text-muted-foreground">{item.product_type === 'accessory' ? <AccessoryBadge category={item.accessory_category} /> : <>{item.brand} · {item.weight}</>}</p>
                                                                     </div>
                                                                     <button
                                                                         onClick={() => removeItem(item.product_id)}
-                                                                        className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                                                                        className="text-muted-foreground hover:text-red-500 transition-colors shrink-0"
                                                                     >
                                                                         <Trash2 className="h-4 w-4" />
                                                                     </button>
@@ -315,7 +315,7 @@ export default function CartPage({ cart }: Props) {
                                                                 {/* Transaction type toggle — not for accessories (no tank exchange) */}
                                                                 <div className="flex gap-2 mt-2">
                                                                     {item.product_type === 'accessory' ? (
-                                                                        <span className="text-xs text-gray-500" data-testid="accessory-price">₱{item.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })} each</span>
+                                                                        <span className="text-xs text-muted-foreground" data-testid="accessory-price">₱{item.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })} each</span>
                                                                     ) : (['refill', 'new_purchase'] as const).map(t => (
                                                                         <button
                                                                             key={t}
@@ -339,7 +339,7 @@ export default function CartPage({ cart }: Props) {
                                                                         <button
                                                                             onClick={() => updateItem(item.product_id, item.quantity - 1)}
                                                                             disabled={item.quantity <= 1}
-                                                                            className="h-7 w-7 rounded border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                                                            className="h-7 w-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                                                         >
                                                                             <Minus className="h-3 w-3" />
                                                                         </button>
@@ -347,11 +347,11 @@ export default function CartPage({ cart }: Props) {
                                                                         <button
                                                                             onClick={() => updateItem(item.product_id, item.quantity + 1)}
                                                                             disabled={item.quantity >= maxQty(item)}
-                                                                            className="h-7 w-7 rounded border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                                                            className="h-7 w-7 rounded border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                                                         >
                                                                             <Plus className="h-3 w-3" />
                                                                         </button>
-                                                                        <span className="text-xs text-gray-400 ml-1">{item.stock} avail.{limitLabel(item) && ` · ${limitLabel(item)}`}</span>
+                                                                        <span className="text-xs text-muted-foreground ml-1">{item.stock} avail.{limitLabel(item) && ` · ${limitLabel(item)}`}</span>
                                                                     </div>
                                                                     <span className={`font-bold text-sm ${isChecked ? 'text-gray-900 dark:text-white' : 'text-gray-400 line-through'}`}>
                                                                         ₱{subtotalItem.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -386,7 +386,7 @@ export default function CartPage({ cart }: Props) {
                                     <span>{selectedCount}</span>
                                 </div>
                                 {selectedStores.map(sg => (
-                                    <div key={sg.store_id} className="text-xs text-gray-500 space-y-1 border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
+                                    <div key={sg.store_id} className="text-xs text-muted-foreground space-y-1 border-t border-gray-100 dark:border-gray-800 pt-2 mt-2">
                                         <p className="font-medium text-gray-700 dark:text-gray-300">{sg.store_name}</p>
                                         {sg.delivery_from != null && (
                                             <div className="flex justify-between">
@@ -400,7 +400,7 @@ export default function CartPage({ cart }: Props) {
                                     <span>Subtotal</span>
                                     <span>₱{selectedSubtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <p className="text-xs text-gray-400">Delivery fee is added at checkout (it depends on your address and the vehicle).</p>
+                                <p className="text-xs text-muted-foreground">Delivery fee is added at checkout (it depends on your address and the vehicle).</p>
                                 <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-between font-bold text-gray-900 dark:text-white">
                                     <span>Total (before delivery)</span>
                                     <span>₱{selectedTotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</span>

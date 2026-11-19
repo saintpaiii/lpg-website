@@ -63,10 +63,10 @@ const POSITION_LABELS: Record<string, string> = {
 };
 
 const POSITION_STYLES: Record<string, string> = {
-    manager:       'bg-purple-100 text-purple-700',
-    moderator:     'bg-blue-100 text-blue-700',
-    support_staff: 'bg-teal-100 text-teal-700',
-    accountant:    'bg-amber-100 text-amber-700',
+    manager:       'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    moderator:     'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    support_staff: 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+    accountant:    'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
 };
 
 interface PermDef {
@@ -89,10 +89,10 @@ interface Props {
 }
 
 const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-    deactivate: { label: 'Deactivated',  color: 'bg-red-100 text-red-700'      },
-    activate:   { label: 'Activated',    color: 'bg-green-100 text-green-700'  },
-    archive:    { label: 'Archived',     color: 'bg-gray-100 text-gray-700'    },
-    restore:    { label: 'Restored',     color: 'bg-blue-100 text-blue-700'    },
+    deactivate: { label: 'Deactivated',  color: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'      },
+    activate:   { label: 'Activated',    color: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'  },
+    archive:    { label: 'Archived',     color: 'bg-muted text-foreground/80'    },
+    restore:    { label: 'Restored',     color: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'    },
 };
 
 // ── Change Position ───────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ function PermissionManager({
                         <Shield className="h-4 w-4 text-blue-500" />
                         Permission Manager
                         {grantedCount > 0 && (
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                            <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
                                 {grantedCount} granted
                             </span>
                         )}
@@ -243,7 +243,7 @@ function PermissionManager({
                             variant="outline"
                             onClick={handleClearAll}
                             disabled={clearing || saving || grantedCount === 0}
-                            className="text-gray-600"
+                            className="text-muted-foreground"
                         >
                             <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                             {clearing ? 'Clearing…' : 'Clear All'}
@@ -272,7 +272,7 @@ function PermissionManager({
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {groups.map(([group, perms]) => (
                             <div key={group} className="space-y-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                                     {group}
                                 </h4>
                                 {perms.map((perm) => {
@@ -280,7 +280,7 @@ function PermissionManager({
                                     return (
                                         <label
                                             key={perm.name}
-                                            className="flex cursor-pointer items-start gap-2.5 rounded-md p-2 hover:bg-gray-50 transition-colors"
+                                            className="flex cursor-pointer items-start gap-2.5 rounded-md p-2 hover:bg-muted transition-colors"
                                         >
                                             <input
                                                 type="checkbox"
@@ -288,16 +288,16 @@ function PermissionManager({
                                                 onChange={(e) =>
                                                     setChecked((prev) => ({ ...prev, [perm.name]: e.target.checked }))
                                                 }
-                                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 accent-blue-600"
+                                                className="mt-0.5 h-4 w-4 cursor-pointer rounded border-border accent-blue-600"
                                             />
                                             <div className="min-w-0">
                                                 <p className={`text-xs font-medium leading-tight ${
-                                                    isChecked ? 'text-gray-800' : 'text-gray-400'
+                                                    isChecked ? 'text-foreground' : 'text-muted-foreground'
                                                 }`}>
                                                     {perm.name.split('.').pop()?.replace(/_/g, ' ')}
                                                 </p>
                                                 {perm.description && (
-                                                    <p className="text-xs text-gray-400 leading-tight mt-0.5 truncate">
+                                                    <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate">
                                                         {perm.description}
                                                     </p>
                                                 )}
@@ -365,27 +365,27 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                     <CardContent className="pt-6">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="flex items-center gap-4">
-                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-blue-700 text-2xl font-bold uppercase shrink-0">
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-2xl font-bold uppercase shrink-0">
                                     {staff.name.charAt(0)}
                                 </div>
                                 <div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h1 className="text-xl font-bold">{staff.name}</h1>
                                         <Badge
-                                            className={staff.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-700'}
+                                            className={staff.is_active ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'}
                                         >
                                             {staff.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
-                                        <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-medium text-purple-700">
+                                        <span className="inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/40 px-2.5 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">
                                             <Shield className="mr-1 h-3 w-3" />
                                             Platform Staff
                                         </span>
                                         {staff.sub_role ? (
-                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${POSITION_STYLES[staff.sub_role] ?? 'bg-gray-100 text-gray-600'}`}>
+                                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${POSITION_STYLES[staff.sub_role] ?? 'bg-muted text-muted-foreground'}`}>
                                                 {POSITION_LABELS[staff.sub_role] ?? staff.sub_role}
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                                            <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
                                                 No position set
                                             </span>
                                         )}
@@ -409,8 +409,8 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
 
                                     {/* Deactivation info banner */}
                                     {!staff.is_active && staff.deactivation_reason && (
-                                        <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm">
-                                            <span className="font-medium text-red-700">Deactivated:</span>{' '}
+                                        <div className="mt-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-3 py-2 text-sm">
+                                            <span className="font-medium text-red-700 dark:text-red-300">Deactivated:</span>{' '}
                                             <span className="text-red-600">{staff.deactivation_reason}</span>
                                             {staff.deactivation_notes && (
                                                 <span className="text-red-500 italic"> — "{staff.deactivation_notes}"</span>
@@ -430,7 +430,7 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                                         size="sm"
                                         variant="outline"
                                         onClick={() => setShowDeactivate(true)}
-                                        className="text-amber-600 border-amber-200 hover:bg-amber-50"
+                                        className="text-amber-600 border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                                     >
                                         <UserX className="mr-1 h-3.5 w-3.5" />Deactivate
                                     </Button>
@@ -439,7 +439,7 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                                         size="sm"
                                         variant="outline"
                                         onClick={activate}
-                                        className="text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                        className="text-emerald-600 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                     >
                                         <UserCheck className="mr-1 h-3.5 w-3.5" />Activate
                                     </Button>
@@ -449,7 +449,7 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                                     size="sm"
                                     variant="outline"
                                     onClick={() => setShowArchive(true)}
-                                    className="text-red-600 border-red-200 hover:bg-red-50"
+                                    className="text-red-600 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40"
                                 >
                                     Archive
                                 </Button>
@@ -474,14 +474,14 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-gray-400" />
+                                <Clock className="h-4 w-4 text-muted-foreground" />
                                 Account Action History
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ol className="relative border-l border-gray-200 pl-5 space-y-4">
+                            <ol className="relative border-l border-border pl-5 space-y-4">
                                 {history.map((item) => {
-                                    const meta = ACTION_LABELS[item.action] ?? { label: item.action, color: 'bg-gray-100 text-gray-700' };
+                                    const meta = ACTION_LABELS[item.action] ?? { label: item.action, color: 'bg-muted text-foreground/80' };
                                     return (
                                         <li key={item.id} className="relative">
                                             <span className="absolute -left-[1.3125rem] flex h-3 w-3 items-center justify-center rounded-full ring-2 ring-white bg-gray-300" />
@@ -492,11 +492,11 @@ export default function StaffShow({ staff, allPermissions, roleDefaults, userOve
                                                             {meta.label}
                                                         </span>
                                                         {item.reason && (
-                                                            <span className="text-sm text-gray-700">{item.reason}</span>
+                                                            <span className="text-sm text-foreground/80">{item.reason}</span>
                                                         )}
                                                     </div>
                                                     {item.notes && (
-                                                        <p className="mt-0.5 text-xs text-gray-500 italic">"{item.notes}"</p>
+                                                        <p className="mt-0.5 text-xs text-muted-foreground italic">"{item.notes}"</p>
                                                     )}
                                                     <p className="mt-0.5 text-xs text-muted-foreground">
                                                         by {item.performed_by}

@@ -114,7 +114,7 @@ function StarsDisplay({ value, size = 'sm' }: { value: number; size?: 'xs' | 'sm
     return (
         <span className="flex">
             {[1, 2, 3, 4, 5].map((i) => (
-                <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-base'} ${i <= filled ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-base'} ${i <= filled ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>★</span>
             ))}
         </span>
     );
@@ -189,13 +189,13 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     {store.is_featured && <FeaturedBadge />}
                                     <MessageButton portal="customer" params={{ store_id: store.id }} label="Message store" className="gap-1.5" />
                                     {store.is_top_rated && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
                                             <Award className="h-3 w-3" />
                                             Top Rated
                                         </span>
                                     )}
                                     {store.is_trusted && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                                             <BadgeCheck className="h-3 w-3" />
                                             Trusted Seller
                                         </span>
@@ -206,7 +206,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl">{store.description}</p>
                                 )}
 
-                                <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                     {location && (
                                         <span className="flex items-center gap-1">
                                             <MapPin className="h-3.5 w-3.5" />
@@ -222,7 +222,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                 </div>
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                     {store.pickup_only ? <PickupOnlyBadge /> : store.delivery_from != null && (
-                                        <span className="text-xs text-gray-500">Delivery from ₱{store.delivery_from.toLocaleString('en-PH')}</span>
+                                        <span className="text-xs text-muted-foreground">Delivery from ₱{store.delivery_from.toLocaleString('en-PH')}</span>
                                     )}
                                     <StoreHoursBadge hours={store.hours} className="text-xs" />
                                 </div>
@@ -236,12 +236,12 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                             <StarsDisplay value={store.avg_rating} />
                                             <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{store.avg_rating.toFixed(1)}</span>
                                         </div>
-                                        <p className="text-xs text-gray-400">{store.review_count} review{store.review_count !== 1 ? 's' : ''}</p>
+                                        <p className="text-xs text-muted-foreground">{store.review_count} review{store.review_count !== 1 ? 's' : ''}</p>
                                     </>
                                 ) : (
-                                    <p className="text-xs text-gray-400 italic">No reviews yet</p>
+                                    <p className="text-xs text-muted-foreground italic">No reviews yet</p>
                                 )}
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-muted-foreground">
                                     {store.product_count} product{store.product_count !== 1 ? 's' : ''}
                                     {store.order_count > 0 && ` · ${store.order_count} fulfilled`}
                                     {' · '}Joined {store.joined_at}
@@ -265,7 +265,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                             </li>
                                         ))}
                                     </ul>
-                                    {store.hours?.closed_note && <p className="mt-2 text-xs text-amber-700">{store.hours.closed_note} You can still order.</p>}
+                                    {store.hours?.closed_note && <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">{store.hours.closed_note} You can still order.</p>}
                                 </CardContent>
                             </Card>
                         )}
@@ -284,7 +284,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                 {/* Search */}
                 <form onSubmit={doSearch} className="flex gap-2 max-w-sm">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <input
                             type="text"
                             value={search}
@@ -303,7 +303,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
 
                 {/* Product grid */}
                 {products.data.length === 0 ? (
-                    <div className="text-center py-16 text-gray-400">
+                    <div className="text-center py-16 text-muted-foreground">
                         <ShoppingCart className="h-10 w-10 mx-auto mb-3" />
                         <p className="font-medium">No products found.</p>
                     </div>
@@ -315,13 +315,13 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     photoCount={p.photo_count} hasVideo={p.has_video} className="h-40">
                                     {p.stock === 0 && (
                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                            <span className="bg-white text-gray-800 text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
+                                            <span className="bg-card text-foreground text-xs font-bold px-3 py-1 rounded-full">Out of Stock</span>
                                         </div>
                                     )}
                                 </ProductCardImage>
                                 <CardContent className="p-4 flex flex-col flex-1">
                                     <h3 className="font-semibold text-sm text-gray-900 dark:text-white leading-tight mb-0.5">{p.name}</h3>
-                                    <p className="text-xs text-gray-500 mb-2">{p.brand} · {p.weight}</p>
+                                    <p className="text-xs text-muted-foreground mb-2">{p.brand} · {p.weight}</p>
                                     <div className="mb-3">
                                         <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                                     </div>
@@ -334,13 +334,13 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                         ) : (
                                             <div className="flex items-end justify-between gap-2 mb-3">
                                                 <div>
-                                                    <p className="text-[10px] text-gray-400">Refill</p>
+                                                    <p className="text-xs text-muted-foreground">Refill</p>
                                                     <p className="font-bold text-blue-600 text-base">
                                                         ₱{p.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-[10px] text-gray-400">New purchase</p>
+                                                    <p className="text-xs text-muted-foreground">New purchase</p>
                                                     <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">
                                                         ₱{p.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                     </p>
@@ -375,8 +375,8 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     link.active
                                         ? 'bg-blue-600 text-white border-blue-600'
                                         : link.url
-                                            ? 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                                            : 'border-gray-200 text-gray-300 cursor-not-allowed'
+                                            ? 'border-border text-muted-foreground hover:bg-muted'
+                                            : 'border-border text-muted-foreground cursor-not-allowed'
                                 }`}
                             />
                         ))}
@@ -395,7 +395,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                     <div className="flex items-start justify-between gap-3 flex-wrap">
                                         <div>
                                             <p className="text-sm font-medium text-gray-900 dark:text-white">{r.customer_name}</p>
-                                            <p className="text-xs text-gray-400">{r.product_name} · {r.created_at}{r.edited ? ' (edited)' : ''}</p>
+                                            <p className="text-xs text-muted-foreground">{r.product_name} · {r.created_at}{r.edited ? ' (edited)' : ''}</p>
                                         </div>
                                         <StarsDisplay value={r.rating} size="xs" />
                                     </div>
@@ -422,18 +422,18 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                 {cartDialog.product.image_url ? (
                                     <img src={cartDialog.product.image_url} alt={cartDialog.product.name} className="h-16 w-16 rounded-lg object-cover shrink-0" />
                                 ) : (
-                                    <div className="h-16 w-16 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                                    <div className="h-16 w-16 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center shrink-0">
                                         <ShoppingCart className="h-6 w-6 text-blue-300" />
                                     </div>
                                 )}
                                 <div>
                                     <p className="font-semibold text-sm text-gray-900 dark:text-white">{cartDialog.product.name}</p>
-                                    <p className="text-xs text-gray-500">{cartDialog.product.brand} · {cartDialog.product.weight}</p>
+                                    <p className="text-xs text-muted-foreground">{cartDialog.product.brand} · {cartDialog.product.weight}</p>
                                 </div>
                             </div>
                             {/* Transaction type — accessories are always a new purchase */}
                             {cartDialog.product.product_type !== 'accessory' && <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1.5">Transaction Type</p>
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Transaction Type</p>
                                 <div className="grid grid-cols-2 gap-2">
                                     {(['refill', 'new_purchase'] as const).map((t) => (
                                         <button
@@ -442,7 +442,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                             className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                                                 txType === t
                                                     ? 'bg-blue-600 border-blue-600 text-white'
-                                                    : 'border-gray-200 text-gray-700 hover:border-blue-300'
+                                                    : 'border-border text-foreground/80 hover:border-blue-200 dark:hover:border-blue-800'
                                             }`}
                                         >
                                             <p>{t === 'refill' ? 'Refill' : 'New Purchase'}</p>
@@ -454,14 +454,14 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                                 </div>
                             </div>}
                             <div>
-                                <p className="text-xs font-medium text-gray-500 mb-1.5">Quantity</p>
+                                <p className="text-xs font-medium text-muted-foreground mb-1.5">Quantity</p>
                                 <div className="flex items-center gap-3">
                                     <button onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40">−</button>
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40">−</button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button onClick={() => setQty((q) => Math.min(maxAdd(cartDialog.product!), q + 1))} disabled={qty >= maxAdd(cartDialog.product)}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40">+</button>
-                                    <span className="text-xs text-gray-400">{cartDialog.product.stock} in stock{limitLabel(cartDialog.product) && ` · ${limitLabel(cartDialog.product)}`}</span>
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40">+</button>
+                                    <span className="text-xs text-muted-foreground">{cartDialog.product.stock} in stock{limitLabel(cartDialog.product) && ` · ${limitLabel(cartDialog.product)}`}</span>
                                 </div>
                                 {(() => {
                                     const p = cartDialog.product!;
@@ -474,7 +474,7 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                             </div>
                             <div className="rounded-lg bg-gray-50 dark:bg-gray-800 px-4 py-3">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">Subtotal</span>
+                                    <span className="text-muted-foreground">Subtotal</span>
                                     <span className="font-bold text-gray-900 dark:text-white">
                                         ₱{((txType === 'refill' ? cartDialog.product.refill_price : cartDialog.product.purchase_price) * qty).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                     </span>

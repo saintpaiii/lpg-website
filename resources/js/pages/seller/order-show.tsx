@@ -114,12 +114,12 @@ type Props = {
 const STATUS_STEPS = ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered'];
 
 const STATUS_COLORS: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800 border-yellow-200',
-    confirmed:        'bg-blue-100 text-blue-800 border-blue-200',
-    preparing:        'bg-purple-100 text-purple-800 border-purple-200',
-    out_for_delivery: 'bg-orange-100 text-orange-800 border-orange-200',
-    delivered:        'bg-green-100 text-green-800 border-green-200',
-    cancelled:        'bg-red-100 text-red-800 border-red-200',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    delivered:        'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
+    cancelled:        'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
 };
 
 function fmt(n: number) {
@@ -231,7 +231,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h1 className="text-xl font-bold font-mono">{order.order_number}</h1>
-                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[order.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLORS[order.status] ?? 'bg-muted text-foreground/80'}`}>
                                     {orderStatusLabel(order.status, order.fulfillment)}
                                 </span>
                                 <FulfillmentBadge fulfillment={order.fulfillment} />
@@ -268,7 +268,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                             </Button>
                         )}
                         {isPickup && ['confirmed', 'preparing'].includes(order.status) && (
-                            <Button onClick={() => moveStatus('out_for_delivery')} size="sm" className="bg-orange-500 hover:bg-orange-600 text-white">
+                            <Button onClick={() => moveStatus('out_for_delivery')} size="sm" className="bg-orange-600 hover:bg-orange-600 text-white">
                                 <Package className="h-3.5 w-3.5 mr-1" /> Ready for pick-up
                             </Button>
                         )}
@@ -289,7 +289,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                             </Button>
                         )}
                         {canCancel && (
-                            <Button onClick={() => setShowCancel(true)} size="sm" variant="outline" className="border-red-300 text-red-600 hover:bg-red-50">
+                            <Button onClick={() => setShowCancel(true)} size="sm" variant="outline" className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
                                 <XCircle className="h-3.5 w-3.5 mr-1" /> Cancel
                             </Button>
                         )}
@@ -299,7 +299,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                             </Link>
                         )}
                         {order.customer && canFileReport && (
-                            <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50" onClick={() => setShowReport(true)}>
+                            <Button size="sm" variant="outline" className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => setShowReport(true)}>
                                 <Flag className="h-3.5 w-3.5 mr-1" /> Report customer
                             </Button>
                         )}
@@ -434,7 +434,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                         order.payment_status === 'partial'   ? 'text-amber-600' :
                                         order.payment_status === 'unpaid'    ? 'text-red-600' :
                                         order.payment_status === 'to_refund' ? 'text-orange-600' :
-                                        order.payment_status === 'refunded'  ? 'text-gray-500' : ''
+                                        order.payment_status === 'refunded'  ? 'text-muted-foreground' : ''
                                     }`}>
                                         {order.payment_status === 'paid'      && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
@@ -468,7 +468,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                                 <p className={`pt-0.5 font-medium ${order.is_overdue ? 'text-red-700 dark:text-red-400' : 'text-amber-700 dark:text-amber-400'}`}>
                                                     Balance: {fmt(order.remaining_balance ?? 0)} due {order.balance_due_date}
                                                     {order.is_overdue && (
-                                                        <span className="ml-1.5 rounded bg-red-600 px-1.5 py-px text-[10px] font-bold text-white">OVERDUE</span>
+                                                        <span className="ml-1.5 rounded bg-red-600 px-1.5 py-px text-xs font-bold text-white">OVERDUE</span>
                                                     )}
                                                 </p>
                                             ) : (
@@ -515,7 +515,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                 {order.payment_status === 'to_refund' && (
                                     <button
                                         onClick={() => router.patch(`/seller/orders/${order.id}/refunded`)}
-                                        className="w-full mt-1 text-xs rounded border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 px-2 py-1.5 transition-colors"
+                                        className="w-full mt-1 text-xs rounded border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 hover:bg-orange-100 dark:hover:bg-orange-900/40 px-2 py-1.5 transition-colors"
                                     >
                                         Mark as Refunded
                                     </button>
@@ -529,14 +529,14 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                 )}
 
                                 {order.payment_record?.paid_at && (
-                                    <p className="text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
+                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 rounded px-2 py-1">
                                         Paid via PayMongo on {order.payment_record.paid_at}
                                     </p>
                                 )}
                                 {order.payment_record?.pay_ref && (
                                     <div className="pt-1 border-t">
                                         <p className="text-xs text-muted-foreground mb-0.5">Transaction Ref</p>
-                                        <p className="font-mono text-xs break-all text-gray-700">
+                                        <p className="font-mono text-xs break-all text-foreground/80">
                                             {order.payment_record.pay_ref}
                                         </p>
                                     </div>
@@ -557,7 +557,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                         <div className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
                                             {order.delivery.fail_info.short && <p className="font-semibold">{order.delivery.fail_info.short}</p>}
                                             <p>Reason: {order.delivery.fail_info.reason_label}</p>
-                                            <p className="mt-0.5 text-amber-700">Assign a rider again to retry.</p>
+                                            <p className="mt-0.5 text-amber-700 dark:text-amber-300">Assign a rider again to retry.</p>
                                         </div>
                                     )}
                                     {order.delivery.rider && <p><span className="text-muted-foreground">Rider:</span> {order.delivery.rider.name}</p>}
@@ -580,9 +580,9 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
 
                         {/* Cancellation info */}
                         {order.status === 'cancelled' && (
-                            <Card className="border-red-200 bg-red-50/40 dark:bg-red-900/10">
+                            <Card className="border-red-200 dark:border-red-800 bg-red-50/40 dark:bg-red-900/10">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm text-red-700 flex items-center gap-1.5">
+                                    <CardTitle className="text-sm text-red-700 dark:text-red-300 flex items-center gap-1.5">
                                         <XCircle className="h-3.5 w-3.5" />
                                         Cancellation
                                     </CardTitle>
@@ -610,7 +610,7 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                                         <p className="text-xs text-muted-foreground italic">"{order.cancellation_notes}"</p>
                                     )}
                                     {order.cancelled_by === 'customer' && (
-                                        <p className="text-xs text-amber-700 mt-2 pt-2 border-t border-red-200">
+                                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-2 pt-2 border-t border-red-200 dark:border-red-800">
                                             If payment was received, please process a refund for the customer.
                                         </p>
                                     )}

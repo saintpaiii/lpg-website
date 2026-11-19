@@ -132,8 +132,8 @@ function BannerForm({
                                 </div>
                             ) : (
                                 <>
-                                    <Image className="h-8 w-8 text-gray-400" />
-                                    <p className="text-sm text-gray-500">Click to upload image (JPG/PNG, max 3 MB)</p>
+                                    <Image className="h-8 w-8 text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">Click to upload image (JPG/PNG, max 3 MB)</p>
                                 </>
                             )}
                         </div>
@@ -169,7 +169,7 @@ function BannerForm({
                                     type="checkbox"
                                     checked={data.is_active}
                                     onChange={(e) => setData('is_active', e.target.checked)}
-                                    className="h-4 w-4 rounded border-gray-300"
+                                    className="h-4 w-4 rounded border-border"
                                     disabled={!isEdit && !data.is_active && activeCount >= MAX_ACTIVE}
                                 />
                                 <span className="text-sm font-medium">Active</span>
@@ -238,7 +238,7 @@ export default function BannersPage({ banners, activeCount }: Props) {
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Banners</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             Manage the hero carousel on the customer browse page.
                             <span className={`ml-2 font-medium ${activeCount >= MAX_ACTIVE ? 'text-amber-600' : 'text-emerald-600'}`}>
                                 {activeCount}/{MAX_ACTIVE} active
@@ -264,7 +264,7 @@ export default function BannersPage({ banners, activeCount }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {activeBanners.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                 <Image className="mb-3 h-9 w-9" />
                                 <p className="font-medium">No active banners</p>
                                 <p className="text-sm mt-1">Create a banner and activate it to show on the browse page.</p>
@@ -295,7 +295,7 @@ export default function BannersPage({ banners, activeCount }: Props) {
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <EyeOff className="h-4 w-4 text-gray-400" />
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
                                 Inactive Banners
                             </CardTitle>
                         </CardHeader>
@@ -325,7 +325,7 @@ export default function BannersPage({ banners, activeCount }: Props) {
                 {archivedBanners.length > 0 && (
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="flex items-center gap-2 text-base text-gray-500">
+                            <CardTitle className="flex items-center gap-2 text-base text-muted-foreground">
                                 <Trash2 className="h-4 w-4" />
                                 Archived Banners
                             </CardTitle>
@@ -338,24 +338,24 @@ export default function BannersPage({ banners, activeCount }: Props) {
                                             <img src={b.image_url} alt="" className="h-12 w-20 rounded-lg object-cover shrink-0" />
                                         ) : (
                                             <div className="h-12 w-20 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
-                                                <Image className="h-5 w-5 text-gray-400" />
+                                                <Image className="h-5 w-5 text-muted-foreground" />
                                             </div>
                                         )}
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-sm truncate">{b.title ?? '(no title)'}</p>
-                                            <p className="text-xs text-gray-500 truncate">{b.subtitle ?? ''}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{b.subtitle ?? ''}</p>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <button
                                                 onClick={() => restore(b)}
-                                                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+                                                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                                             >
                                                 <RotateCcw className="h-3.5 w-3.5" />
                                                 Restore
                                             </button>
                                             <button
                                                 onClick={() => forceDelete(b)}
-                                                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                                                className="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                                             >
                                                 <Trash2 className="h-3.5 w-3.5" />
                                                 Delete
@@ -412,21 +412,21 @@ function BannerListRow({
     activeCount?: number;
 }) {
     return (
-        <div className="flex items-center gap-4 px-4 py-3 hover:bg-gray-50/60 dark:hover:bg-gray-800/40 transition-colors">
+        <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/60 dark:hover:bg-gray-800/40 transition-colors">
             {/* Reorder arrows */}
             {canReorder ? (
                 <div className="flex flex-col gap-0.5 shrink-0">
                     <button
                         onClick={onMoveUp}
                         disabled={isFirst}
-                        className="rounded p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                        className="rounded p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     >
                         <ArrowUp className="h-3.5 w-3.5" />
                     </button>
                     <button
                         onClick={onMoveDown}
                         disabled={isLast}
-                        className="rounded p-0.5 text-gray-400 hover:text-gray-600 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                        className="rounded p-0.5 text-muted-foreground hover:text-muted-foreground disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     >
                         <ArrowDown className="h-3.5 w-3.5" />
                     </button>
@@ -437,7 +437,7 @@ function BannerListRow({
 
             {/* Thumbnail */}
             {b.image_url ? (
-                <img src={b.image_url} alt="" className="h-14 w-24 rounded-lg object-cover shrink-0 border border-gray-200" />
+                <img src={b.image_url} alt="" className="h-14 w-24 rounded-lg object-cover shrink-0 border border-border" />
             ) : (
                 <div className="h-14 w-24 rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center shrink-0">
                     <Image className="h-6 w-6 text-white/60" />
@@ -446,8 +446,8 @@ function BannerListRow({
 
             {/* Text */}
             <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{b.title ?? <span className="text-gray-400 italic">No title</span>}</p>
-                {b.subtitle && <p className="text-xs text-gray-500 truncate mt-0.5">{b.subtitle}</p>}
+                <p className="font-semibold text-sm truncate">{b.title ?? <span className="text-muted-foreground italic">No title</span>}</p>
+                {b.subtitle && <p className="text-xs text-muted-foreground truncate mt-0.5">{b.subtitle}</p>}
                 {b.cta_text && (
                     <p className="text-xs text-blue-600 mt-0.5">
                         [{b.cta_text}] → {b.cta_url}
@@ -462,8 +462,8 @@ function BannerListRow({
                     title={b.is_active ? 'Deactivate' : 'Activate'}
                     className={`flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                         b.is_active
-                            ? 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                            : 'text-gray-500 bg-gray-100 hover:bg-gray-200'
+                            ? 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                            : 'text-muted-foreground bg-muted hover:bg-muted'
                     } ${!b.is_active && (activeCount ?? 0) >= MAX_ACTIVE ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
                     {b.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -471,14 +471,14 @@ function BannerListRow({
                 </button>
                 <button
                     onClick={onEdit}
-                    className="rounded-lg p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                    className="rounded-lg p-1.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
                     title="Edit"
                 >
                     <Pencil className="h-4 w-4" />
                 </button>
                 <button
                     onClick={onDelete}
-                    className="rounded-lg p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                    className="rounded-lg p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                     title="Archive"
                 >
                     <Trash2 className="h-4 w-4" />

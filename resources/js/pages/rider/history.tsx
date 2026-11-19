@@ -100,25 +100,25 @@ function ProofTimeline({ proofs }: { proofs: Proof[] }) {
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Delivery Updates
             </p>
-            <ol className="relative border-l border-gray-200 pl-5 space-y-4">
+            <ol className="relative border-l border-border pl-5 space-y-4">
                 {proofs.map((p, i) => (
                     <li key={i} className="relative">
                         <span className={`absolute -left-[1.3125rem] flex h-3.5 w-3.5 items-center justify-center rounded-full ring-2 ring-white ${PROOF_DOT[p.status] ?? 'bg-blue-500'}`} />
                         <div className="grid gap-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-gray-900">
+                                <span className="text-sm font-medium text-foreground">
                                     {PROOF_LABELS[p.status] ?? p.status}
                                 </span>
                                 <span className="text-xs text-muted-foreground">{p.created_at}</span>
                             </div>
                             {p.location_note && (
-                                <p className="flex items-center gap-1 text-xs text-gray-500">
+                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3 shrink-0" />
                                     {p.location_note}
                                 </p>
                             )}
                             {p.notes && (
-                                <p className="text-xs text-gray-500 italic">"{p.notes}"</p>
+                                <p className="text-xs text-muted-foreground italic">"{p.notes}"</p>
                             )}
                             {p.photo_url && (
                                 <button
@@ -160,7 +160,7 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     if (data.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
                 Showing {data.from}–{data.to} of {data.total}
             </p>
             <div className="flex gap-1">
@@ -173,8 +173,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
                             link.active
                                 ? 'bg-blue-600 text-white'
                                 : link.url
-                                ? 'hover:bg-gray-100 text-gray-600'
-                                : 'text-gray-300 cursor-not-allowed'
+                                ? 'hover:bg-muted text-muted-foreground'
+                                : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -196,7 +196,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
             <div className="flex flex-col gap-6 p-6">
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">Delivery History</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Delivery History</h1>
                     <p className="mt-0.5 text-sm text-muted-foreground">All your completed and failed deliveries.</p>
                 </div>
 
@@ -227,7 +227,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                 {/* List */}
                 {deliveries.data.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-gray-400">
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                             <History className="mb-3 h-10 w-10" />
                             <p className="font-medium">No delivery history yet</p>
                             <p className="mt-1 text-sm">Completed and failed deliveries will appear here.</p>
@@ -243,11 +243,11 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                 <Card key={d.id} className="overflow-hidden">
                                     {/* Row */}
                                     <div
-                                        className="flex cursor-pointer items-start gap-3 p-4 hover:bg-gray-50/60"
+                                        className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/60"
                                         onClick={() => setExpanded(isExpanded ? null : d.id)}
                                     >
                                         {/* Status icon */}
-                                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isDelivered ? 'bg-emerald-100' : 'bg-red-100'}`}>
+                                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isDelivered ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-red-100 dark:bg-red-900/40'}`}>
                                             {isDelivered
                                                 ? <CheckCircle className="h-4 w-4 text-emerald-600" />
                                                 : <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -260,7 +260,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                                 <span className="font-mono text-sm font-semibold text-blue-600">
                                                     {d.order?.order_number ?? '—'}
                                                 </span>
-                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${isDelivered ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                                <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${isDelivered ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'}`}>
                                                     {isDelivered ? 'Delivered' : 'Failed'}
                                                 </span>
                                                 {d.proofs.length > 0 && (
@@ -270,7 +270,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="mt-0.5 font-medium text-gray-900">
+                                            <p className="mt-0.5 font-medium text-foreground">
                                                 {d.order?.customer?.name ?? '—'}
                                             </p>
                                             {d.can_report && d.order && (
@@ -279,11 +279,11 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                                                 </div>
                                             )}
                                             {d.order?.customer && (
-                                                <p className="mt-0.5 text-xs text-gray-400">
+                                                <p className="mt-0.5 text-xs text-muted-foreground">
                                                     {[d.order.customer.address, d.order.customer.barangay, d.order.customer.city].filter(Boolean).join(', ') || '—'}
                                                 </p>
                                             )}
-                                            <p className="mt-1 text-xs text-gray-400">
+                                            <p className="mt-1 text-xs text-muted-foreground">
                                                 {isDelivered ? 'Delivered' : 'Failed'}: {d.delivered_at ?? '—'}
                                             </p>
                                             {!isDelivered && d.fail_reason_label && (
@@ -296,7 +296,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
 
                                         {/* Amount + expand toggle */}
                                         <div className="flex shrink-0 flex-col items-end gap-2">
-                                            <span className="font-semibold tabular-nums text-gray-900">
+                                            <span className="font-semibold tabular-nums text-foreground">
                                                 ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </span>
                                             {isExpanded

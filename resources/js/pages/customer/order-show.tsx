@@ -146,20 +146,20 @@ const ORDER_STEPS = [
 ];
 
 const STATUS_STYLES: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800',
-    confirmed:        'bg-blue-100 text-blue-800',
-    preparing:        'bg-purple-100 text-purple-800',
-    out_for_delivery: 'bg-orange-100 text-orange-800',
-    delivered:        'bg-emerald-100 text-emerald-800',
-    cancelled:        'bg-gray-100 text-gray-600',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300',
+    delivered:        'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300',
+    cancelled:        'bg-muted text-muted-foreground',
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:     'bg-red-100 text-red-700',
-    paid:       'bg-emerald-100 text-emerald-700',
-    partial:    'bg-amber-100 text-amber-700',
-    to_refund:  'bg-orange-100 text-orange-700',
-    refunded:   'bg-gray-100 text-gray-600',
+    unpaid:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    paid:       'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    partial:    'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    to_refund:  'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    refunded:   'bg-muted text-muted-foreground',
 };
 
 const PROOF_STATUS_COLORS: Record<string, string> = {
@@ -182,9 +182,9 @@ function DeliveryTimeline({ proofs }: { proofs: NonNullable<Order['delivery']>['
     if (proofs.length === 0) return null;
 
     return (
-        <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Delivery Updates</p>
-            <ol className="relative border-l border-gray-200 pl-5 space-y-4">
+        <div className="mt-4 pt-4 border-t border-border">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Delivery Updates</p>
+            <ol className="relative border-l border-border pl-5 space-y-4">
                 {proofs.map((p, i) => (
                     <li key={i} className="relative">
                         <span className={`absolute -left-[1.3125rem] flex h-3.5 w-3.5 items-center justify-center rounded-full ring-2 ring-white ${PROOF_STATUS_COLORS[p.status] ?? 'bg-blue-500'}`} />
@@ -193,16 +193,16 @@ function DeliveryTimeline({ proofs }: { proofs: NonNullable<Order['delivery']>['
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
                                     {PROOF_STATUS_LABELS[p.status] ?? p.status}
                                 </span>
-                                <span className="text-xs text-gray-400">{p.created_at}</span>
+                                <span className="text-xs text-muted-foreground">{p.created_at}</span>
                             </div>
                             {p.location_note && (
-                                <p className="flex items-center gap-1 text-xs text-gray-500">
+                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3 shrink-0" />
                                     {p.location_note}
                                 </p>
                             )}
                             {p.notes && (
-                                <p className="text-xs text-gray-500 italic">"{p.notes}"</p>
+                                <p className="text-xs text-muted-foreground italic">"{p.notes}"</p>
                             )}
                             {p.photo_url && (
                                 <button
@@ -244,8 +244,8 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
 
     if (isCancelled) {
         return (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 space-y-1">
-                <p className="text-sm text-red-700 font-medium">
+            <div className="rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-4 py-3 space-y-1">
+                <p className="text-sm text-red-700 dark:text-red-300 font-medium">
                     This order was cancelled
                     {order.cancelled_by === 'customer' ? ' by you' : order.cancelled_by === 'seller' ? ' by the seller' : ''}.
                 </p>
@@ -259,7 +259,7 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
                     <p className="text-xs text-red-400">Cancelled at {order.cancelled_at}</p>
                 )}
                 {order.payment_status === 'paid' && (
-                    <p className="text-xs text-amber-700 mt-1 pt-1 border-t border-red-200">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 pt-1 border-t border-red-200 dark:border-red-800">
                         Your payment will be refunded by the seller.
                     </p>
                 )}
@@ -285,17 +285,17 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
                                 ) : current ? (
                                     <Clock className="h-4 w-4 text-white" />
                                 ) : (
-                                    <Circle className="h-4 w-4 text-gray-300" />
+                                    <Circle className="h-4 w-4 text-muted-foreground" />
                                 )}
                             </div>
                             <span className={`mt-1.5 text-xs font-medium text-center whitespace-nowrap ${
-                                done || current ? 'text-gray-900 dark:text-white' : 'text-gray-400'
+                                done || current ? 'text-gray-900 dark:text-white' : 'text-muted-foreground'
                             }`}>
                                 {order.fulfillment === 'pickup' ? (step.key === 'pending' ? 'Placed' : orderStatusLabel(step.key, 'pickup')) : step.label}
                             </span>
                         </div>
                         {idx < ORDER_STEPS.length - 1 && (
-                            <div className={`flex-1 h-0.5 mx-2 mb-5 min-w-[20px] ${done ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                            <div className={`flex-1 h-0.5 mx-2 mb-5 min-w-[20px] ${done ? 'bg-emerald-500' : 'bg-muted'}`} />
                         )}
                     </div>
                 );
@@ -318,7 +318,7 @@ function StarSelector({ value, onChange }: { value: number; onChange: (v: number
                     onMouseEnter={() => setHovered(star)}
                     onMouseLeave={() => setHovered(0)}
                     className={`text-2xl leading-none transition-transform hover:scale-110 ${
-                        (hovered || value) >= star ? 'text-amber-400' : 'text-gray-300'
+                        (hovered || value) >= star ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'
                     }`}
                 >
                     ★
@@ -583,11 +583,11 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             </Button>
                         </Link>
                         <h1 className="text-xl font-bold text-gray-900 dark:text-white font-mono">{order.order_number}</h1>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] ?? 'bg-gray-100'}`}>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] ?? 'bg-muted'}`}>
                             {order.status.replace('_', ' ')}
                         </span>
                         {awaitingPayment && (
-                            <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                            <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                                 Waiting for payment
                             </span>
                         )}
@@ -612,7 +612,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                className="gap-1.5 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                                 onClick={openRateDialog}
                             >
                                 <Star className="h-4 w-4" />
@@ -623,7 +623,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+                                className="gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                 onClick={() => { setCancelReason(''); setCancelNotes(''); setCancelOpen(true); }}
                             >
                                 <XCircle className="h-4 w-4" />
@@ -634,7 +634,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 border-blue-300 text-blue-700 hover:bg-blue-50"
+                                className="gap-1.5 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                                 onClick={() => openRefund(false)}
                             >
                                 <RefreshCcw className="h-4 w-4" />
@@ -645,7 +645,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+                                className="gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                 onClick={() => openRefund(true)}
                             >
                                 <AlertTriangle className="h-4 w-4" />
@@ -667,7 +667,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="gap-1.5 border-red-200 text-red-600 hover:bg-red-50"
+                                className="gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                 onClick={() => setReportOpen(true)}
                             >
                                 <Flag className="h-4 w-4" />
@@ -714,7 +714,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 {' '}within 60 minutes of placing the order, or it will be cancelled automatically.
                             </p>
                         </div>
-                        <Button className="gap-1.5 bg-amber-500 font-semibold text-white hover:bg-amber-600" onClick={payNow} disabled={payingNow}>
+                        <Button className="gap-1.5 bg-amber-600 font-semibold text-white hover:bg-amber-600" onClick={payNow} disabled={payingNow}>
                             {payingNow ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
                             Pay now
                         </Button>
@@ -786,16 +786,16 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         )}
                         {order.delivery && (
                             <>
-                                <div className="mt-4 pt-4 border-t border-gray-100 grid gap-2 sm:grid-cols-2 text-sm">
+                                <div className="mt-4 pt-4 border-t border-border grid gap-2 sm:grid-cols-2 text-sm">
                                     {order.delivery.rider_name && (
                                         <div>
-                                            <span className="text-gray-500">Rider:</span>{' '}
+                                            <span className="text-muted-foreground">Rider:</span>{' '}
                                             <span className="font-medium">{order.delivery.rider_name}</span>
                                         </div>
                                     )}
                                     {order.delivery.assigned_at && (
                                         <div>
-                                            <span className="text-gray-500">Assigned:</span>{' '}
+                                            <span className="text-muted-foreground">Assigned:</span>{' '}
                                             <span className="font-medium">{order.delivery.assigned_at}</span>
                                         </div>
                                     )}
@@ -812,25 +812,25 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-base">Order Items</CardTitle>
-                                {(order.adjustments?.length ?? 0) > 0 && <p className="text-xs text-amber-700">Adjusted at handover — see below.</p>}
+                                {(order.adjustments?.length ?? 0) > 0 && <p className="text-xs text-amber-700 dark:text-amber-300">Adjusted at handover — see below.</p>}
                             </CardHeader>
                             <CardContent className="p-0">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Product</th>
                                             <th className="px-4 py-3 text-center">Qty</th>
                                             <th className="px-4 py-3 text-right">Unit Price</th>
                                             <th className="px-4 py-3 text-right">Subtotal</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {order.items.map((item) => (
                                             <tr key={item.id}>
                                                 <td className="px-4 py-3">
                                                     <p className="font-medium text-gray-900 dark:text-white">{item.product?.name ?? '—'}</p>
                                                     {item.product?.brand && (
-                                                        <p className="text-xs text-gray-400">{item.product.brand}</p>
+                                                        <p className="text-xs text-muted-foreground">{item.product.brand}</p>
                                                     )}
                                                     {(() => {
                                                         const mine = item.product_id ? myReviewByProduct.get(item.product_id) : undefined;
@@ -839,8 +839,8 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                                             <div className="mt-2 space-y-1.5 rounded-md border border-amber-200 bg-amber-50/60 p-2 dark:border-amber-900 dark:bg-amber-950/20">
                                                                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
                                                                     <span className="font-semibold text-gray-700 dark:text-gray-200">Your review</span>
-                                                                    <span className="text-amber-400">{'★'.repeat(mine.rating)}<span className="text-gray-300">{'★'.repeat(5 - mine.rating)}</span></span>
-                                                                    <span className="text-gray-400">{mine.created_at}{mine.edited ? ' (edited)' : ''}</span>
+                                                                    <span className="text-amber-600 dark:text-amber-400">{'★'.repeat(mine.rating)}<span className="text-gray-500">{'★'.repeat(5 - mine.rating)}</span></span>
+                                                                    <span className="text-muted-foreground">{mine.created_at}{mine.edited ? ' (edited)' : ''}</span>
                                                                 </div>
                                                                 {mine.review && <p className="text-xs text-gray-600 dark:text-gray-300">{mine.review}</p>}
                                                                 <PhotoThumbs urls={mine.photo_urls} />
@@ -878,26 +878,26 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             </CardHeader>
                             <CardContent className="space-y-3 text-sm">
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Store</span>
+                                    <span className="text-muted-foreground">Store</span>
                                     <span className="font-medium text-right">{order.store_name}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Type</span>
+                                    <span className="text-muted-foreground">Type</span>
                                     <span className="font-medium">{order.type_label ?? (order.transaction_type === 'refill' ? 'Refill' : 'New Purchase')}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Ordered</span>
+                                    <span className="text-muted-foreground">Ordered</span>
                                     <span className="font-medium">{fmtDate(order.ordered_at ?? order.created_at)}</span>
                                 </div>
                                 {order.delivered_at && (
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Delivered</span>
+                                        <span className="text-muted-foreground">Delivered</span>
                                         <span className="font-medium">{fmtDate(order.delivered_at)}</span>
                                     </div>
                                 )}
                                 {order.notes && (
                                     <div>
-                                        <span className="text-gray-500 block mb-1">Notes</span>
+                                        <span className="text-muted-foreground block mb-1">Notes</span>
                                         <p className="text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded p-2 text-xs">{order.notes}</p>
                                     </div>
                                 )}
@@ -912,7 +912,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             <CardContent className="space-y-3 text-sm">
                                 {/* Payment mode */}
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-500">Mode</span>
+                                    <span className="text-muted-foreground">Mode</span>
                                     <span className="flex items-center gap-1 text-xs font-medium">
                                         {order.payment_mode === 'consignment' ? (
                                             <><Handshake className="h-3.5 w-3.5 text-amber-500" /> Consignment</>
@@ -927,7 +927,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 </div>
 
                                 <div className="flex justify-between items-center">
-                                    <span className="text-gray-500">Status</span>
+                                    <span className="text-muted-foreground">Status</span>
                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_STYLES[order.payment_status] ?? ''}`}>
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                          order.payment_status === 'refunded'  ? 'Refunded' :
@@ -1039,20 +1039,20 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
 
                                 {order.coupon_discount > 0 && (
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Coupon {order.coupon_code}</span>
+                                        <span className="text-muted-foreground">Coupon {order.coupon_code}</span>
                                         <span className="font-medium text-emerald-600">−{peso(order.coupon_discount)}</span>
                                     </div>
                                 )}
                                 {order.discount_amount > 0 && (
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Store discount</span>
+                                        <span className="text-muted-foreground">Store discount</span>
                                         <span className="font-medium text-emerald-600">−{peso(order.discount_amount)}</span>
                                     </div>
                                 )}
 
                                 {order.payment_method && (
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Method</span>
+                                        <span className="text-muted-foreground">Method</span>
                                         <span className="font-medium capitalize">{order.payment_method.replace('_', ' ')}</span>
                                     </div>
                                 )}
@@ -1060,11 +1060,11 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                     <>
                                         {order.payment.status !== 'paid' && (
                                             <div className="flex justify-between items-center">
-                                                <span className="text-gray-500">Payment</span>
+                                                <span className="text-muted-foreground">Payment</span>
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                    order.payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                                    order.payment.status === 'cancelled' ? 'bg-gray-100 text-gray-600' :
-                                                    'bg-red-100 text-red-700'
+                                                    order.payment.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300' :
+                                                    order.payment.status === 'cancelled' ? 'bg-muted text-muted-foreground' :
+                                                    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
                                                 }`}>
                                                     {order.payment.status}
                                                 </span>
@@ -1072,13 +1072,13 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                         )}
                                         {order.payment.paymongo_payment_id && (
                                             <div className="flex justify-between gap-2">
-                                                <span className="text-gray-500 shrink-0">Ref #</span>
+                                                <span className="text-muted-foreground shrink-0">Ref #</span>
                                                 <span className="font-mono text-xs font-medium text-right break-all">{order.payment.paymongo_payment_id}</span>
                                             </div>
                                         )}
                                         {order.payment.paid_at && (
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Paid At</span>
+                                                <span className="text-muted-foreground">Paid At</span>
                                                 <span className="font-medium text-xs">{order.payment.paid_at}</span>
                                             </div>
                                         )}
@@ -1087,7 +1087,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                 {order.invoice && (
                                     <>
                                         <div className="flex justify-between">
-                                            <span className="text-gray-500">Invoice #</span>
+                                            <span className="text-muted-foreground">Invoice #</span>
                                             <Link href={`/customer/invoices/${order.invoice.id}`} className="font-mono text-xs font-medium text-blue-600 hover:underline flex items-center gap-0.5">
                                                 {order.invoice.invoice_number}
                                                 <ExternalLink className="h-3 w-3" />
@@ -1095,7 +1095,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                         </div>
                                         {order.invoice.due_date && (
                                             <div className="flex justify-between">
-                                                <span className="text-gray-500">Due</span>
+                                                <span className="text-muted-foreground">Due</span>
                                                 <span className="font-medium">{order.invoice.due_date}</span>
                                             </div>
                                         )}
@@ -1119,7 +1119,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4 py-1">
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-muted-foreground">
                             Cancel order <strong className="font-mono">{order.order_number}</strong>?
                             {order.status === 'confirmed' && ' Stock will be restored to the seller.'}
                         </p>
@@ -1132,7 +1132,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             rows={3}
                         />
                         {order.payment_status === 'paid' && (
-                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                            <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
                                 Your order was paid. A refund will be processed by the seller.
                             </p>
                         )}
@@ -1157,7 +1157,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                 <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <Star className="h-4 w-4 text-amber-400" />
+                            <Star className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                             Rate Products
                         </DialogTitle>
                     </DialogHeader>
@@ -1166,13 +1166,13 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             const pid = item.product_id!;
                             const state = ratings[pid] ?? { rating: 0, review: '', photos: [] as File[] };
                             return (
-                                <div key={item.id} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                                <div key={item.id} className="rounded-lg border border-border p-4 space-y-3">
                                     <div>
                                         <p className="font-medium text-gray-900 dark:text-white text-sm">
                                             {item.product?.name ?? `Product #${pid}`}
                                         </p>
                                         {item.product?.brand && (
-                                            <p className="text-xs text-gray-500">{item.product.brand}</p>
+                                            <p className="text-xs text-muted-foreground">{item.product.brand}</p>
                                         )}
                                     </div>
                                     <StarSelector
@@ -1199,7 +1199,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setRateOpen(false)}>Cancel</Button>
                         <Button
-                            className="bg-amber-500 hover:bg-amber-600 text-white"
+                            className="bg-amber-600 hover:bg-amber-600 text-white"
                             disabled={ratingSubmitting || Object.values(ratings).every((v) => v.rating === 0)}
                             onClick={submitRatings}
                         >
@@ -1232,7 +1232,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             </div>
                         )}
                         {leakOnly && (
-                            <p className="text-xs text-gray-500">The refund period for this order has ended, but a leaking tank can always be reported.</p>
+                            <p className="text-xs text-muted-foreground">The refund period for this order has ended, but a leaking tank can always be reported.</p>
                         )}
                         <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 px-3 py-2">
                             <p className="text-xs text-blue-700 dark:text-blue-400">

@@ -48,7 +48,7 @@ export default function StorePinPicker({ latitude, longitude, onChange, error, a
                     Use my current location
                 </Button>
             </div>
-            <p className="text-xs text-gray-500">Drag the pin to your store's entrance. Customers' delivery fees and staff clock-in use this spot.</p>
+            <p className="text-xs text-muted-foreground">Drag the pin to your store's entrance. Customers' delivery fees and staff clock-in use this spot.</p>
             <AddressMap
                 latitude={latitude}
                 longitude={longitude}

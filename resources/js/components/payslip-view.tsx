@@ -101,9 +101,9 @@ export function smallPrint(rules: PayslipRules | null) {
 }
 
 export const PAYROLL_STATUS_STYLE: Record<string, string> = {
-    draft:    'bg-gray-100 text-gray-600',
-    released: 'bg-blue-100 text-blue-700',
-    paid:     'bg-emerald-100 text-emerald-700',
+    draft:    'bg-muted text-muted-foreground',
+    released: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    paid:     'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
 };
 
 const STATUS_LABEL: Record<string, string> = { draft: 'Draft', released: 'Released', paid: 'Paid' };
@@ -124,8 +124,8 @@ export function PayslipView({ p }: { p: PayslipData }) {
                     <div className="min-w-0">
                         {p.store_name && <p className="text-xs font-semibold tracking-wide text-blue-500 uppercase">{p.store_name}</p>}
                         <p className="text-base font-bold text-gray-900 dark:text-gray-100">{p.name}</p>
-                        <p className="text-sm text-gray-500">{p.role_names.length ? p.role_names.join(', ') : p.sub_role}</p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
+                        <p className="text-sm text-muted-foreground">{p.role_names.length ? p.role_names.join(', ') : p.sub_role}</p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                             <CalendarDays className="h-3.5 w-3.5" /> {fmtPeriod(p.period_start, p.period_end)}
                         </p>
                     </div>
@@ -135,7 +135,7 @@ export function PayslipView({ p }: { p: PayslipData }) {
                 </div>
                 {hourly && (
                     <p className="mt-2 text-sm font-medium text-gray-800 dark:text-gray-200">
-                        Rate: {peso(rate)}/hour <span className="font-normal text-gray-500">({rateSourceLabel(p.rate_source)})</span>
+                        Rate: {peso(rate)}/hour <span className="font-normal text-muted-foreground">({rateSourceLabel(p.rate_source)})</span>
                     </p>
                 )}
             </div>
@@ -146,7 +146,7 @@ export function PayslipView({ p }: { p: PayslipData }) {
                     <div className="overflow-x-auto rounded-lg border">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-gray-50 text-left text-xs font-semibold tracking-wide text-gray-500 uppercase dark:bg-gray-900">
+                                <tr className="border-b bg-gray-50 text-left text-xs font-semibold tracking-wide text-muted-foreground uppercase dark:bg-gray-900">
                                     <th className="px-3 py-2">Date</th>
                                     <th className="px-3 py-2">Day</th>
                                     <th className="px-3 py-2">In</th>
@@ -161,13 +161,13 @@ export function PayslipView({ p }: { p: PayslipData }) {
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                 {p.lines.length === 0 && (
-                                    <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-400">No days in this period.</td></tr>
+                                    <tr><td colSpan={10} className="px-3 py-6 text-center text-muted-foreground">No days in this period.</td></tr>
                                 )}
                                 {p.lines.map((l) => {
                                     const empty = l.kind === 'day_off' || l.kind === 'absent';
                                     const unpaid = l.kind === 'no_clock_out' || l.kind === 'no_schedule';
                                     return (
-                                        <tr key={l.date} className={l.kind === 'day_off' ? 'text-gray-400' : ''}>
+                                        <tr key={l.date} className={l.kind === 'day_off' ? 'text-muted-foreground' : ''}>
                                             <td className="px-3 py-1.5 whitespace-nowrap">{new Date(l.date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}</td>
                                             <td className="px-3 py-1.5">{l.day}</td>
                                             <td className="px-3 py-1.5 whitespace-nowrap">{l.clock_in ?? '—'}</td>
@@ -190,11 +190,11 @@ export function PayslipView({ p }: { p: PayslipData }) {
                     {/* Totals */}
                     <div className="space-y-1.5 rounded-lg border p-4 text-sm">
                         <div className="flex justify-between gap-3">
-                            <span className="text-gray-600">Regular {p.regular_hours} h × {peso(rate)}</span>
+                            <span className="text-muted-foreground">Regular {p.regular_hours} h × {peso(rate)}</span>
                             <span className="font-mono">{peso(p.basic_pay)}</span>
                         </div>
                         <div className="flex justify-between gap-3">
-                            <span className="text-gray-600">Overtime {p.overtime_hours_paid} h × {peso(rate * mult)} (×{num(mult)})</span>
+                            <span className="text-muted-foreground">Overtime {p.overtime_hours_paid} h × {peso(rate * mult)} (×{num(mult)})</span>
                             <span className="font-mono">{peso(p.overtime_pay)}</span>
                         </div>
                         <div className="flex justify-between gap-3 border-t pt-1.5 font-semibold">
@@ -205,10 +205,10 @@ export function PayslipView({ p }: { p: PayslipData }) {
                             <span className="font-semibold text-emerald-700 dark:text-emerald-300">Net pay</span>
                             <span className="text-xl font-bold text-emerald-800 dark:text-emerald-200">{peso(p.net_pay)}</span>
                         </div>
-                        <p className="pt-1 text-xs text-gray-500">
+                        <p className="pt-1 text-xs text-muted-foreground">
                             {p.days_present} day{p.days_present === 1 ? '' : 's'} worked · {p.days_late} late · {p.days_absent} absent
                         </p>
-                        <p className="text-[11px] text-gray-400">{smallPrint(p.rules)}</p>
+                        <p className="text-xs text-muted-foreground">{smallPrint(p.rules)}</p>
                     </div>
                 </>
             ) : (
@@ -216,21 +216,21 @@ export function PayslipView({ p }: { p: PayslipData }) {
                     <p className="mb-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
                         Older payslip (daily rate) — no day-by-day breakdown.
                     </p>
-                    <div className="flex justify-between"><span className="text-gray-600">Daily rate</span><span className="font-mono">{peso(p.daily_rate)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Days</span><span>{p.days_present} present · {p.days_late} late · {p.days_half_day} half day · {p.days_absent} absent</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Basic pay</span><span className="font-mono">{peso(p.basic_pay)}</span></div>
-                    <div className="flex justify-between"><span className="text-gray-600">Overtime ({p.total_overtime_hours} h)</span><span className="font-mono">{peso(p.overtime_pay)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Daily rate</span><span className="font-mono">{peso(p.daily_rate)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Days</span><span>{p.days_present} present · {p.days_late} late · {p.days_half_day} half day · {p.days_absent} absent</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Basic pay</span><span className="font-mono">{peso(p.basic_pay)}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Overtime ({p.total_overtime_hours} h)</span><span className="font-mono">{peso(p.overtime_pay)}</span></div>
                     <div className="flex justify-between border-t pt-1.5 font-semibold"><span>Gross</span><span className="font-mono">{peso(p.gross_pay)}</span></div>
                     {deductions > 0 && <div className="flex justify-between text-red-600"><span>Deductions</span><span className="font-mono">−{peso(deductions)}</span></div>}
                     <div className="flex items-center justify-between rounded-md bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
-                        <span className="font-semibold text-emerald-700">Net pay</span>
-                        <span className="text-xl font-bold text-emerald-800">{peso(p.net_pay)}</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">Net pay</span>
+                        <span className="text-xl font-bold text-emerald-800 dark:text-emerald-300">{peso(p.net_pay)}</span>
                     </div>
                 </div>
             )}
 
             {(p.released_at || p.paid_at) && (
-                <p className="text-right text-xs text-gray-400">
+                <p className="text-right text-xs text-muted-foreground">
                     {p.status === 'paid' && p.paid_at ? `Paid on ${p.paid_at}` : p.released_at ? `Released on ${p.released_at}` : ''}
                 </p>
             )}

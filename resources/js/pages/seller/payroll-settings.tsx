@@ -153,11 +153,11 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
 
             <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6">
                 <div>
-                    <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
+                    <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
                         <Settings2 className="h-6 w-6 text-blue-600" />
                         Payroll Settings
                     </h1>
-                    <p className="mt-0.5 text-sm text-gray-500">Hourly rate per role, personal rates and the pay rules.</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">Hourly rate per role, personal rates and the pay rules.</p>
                 </div>
 
                 <PayrollTabs active="settings" />
@@ -167,7 +167,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                     <Card>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-base"><ShieldCheck className="h-4 w-4 text-blue-600" /> Hourly rate per role</CardTitle>
-                            <p className="text-xs text-gray-500">Each role has its own pay. Someone with several roles gets the highest rate. A personal rate (below) beats the role rate.</p>
+                            <p className="text-xs text-muted-foreground">Each role has its own pay. Someone with several roles gets the highest rate. A personal rate (below) beats the role rate.</p>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="divide-y">
@@ -180,27 +180,27 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                                         <div className="min-w-0">
                                             <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
                                                 {r.name}
-                                                {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
-                                                {needed && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate yet</span>}
+                                                {r.is_starter && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Starter</span>}
+                                                {needed && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-950 dark:text-orange-300">No rate yet</span>}
                                             </p>
-                                            <p className="text-xs text-gray-500">{r.members} staff</p>
-                                            {empty && !needed && <p className="text-xs text-gray-400">No rate yet — needed before you give it to someone</p>}
+                                            <p className="text-xs text-muted-foreground">{r.members} staff</p>
+                                            {empty && !needed && <p className="text-xs text-muted-foreground">No rate yet — needed before you give it to someone</p>}
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-sm text-gray-500">₱</span>
+                                            <span className="text-sm text-muted-foreground">₱</span>
                                             <Input type="number" step="0.01" min="1" max="10000"
                                                 className={`h-8 w-32 text-right ${needed || err ? 'border-orange-400 focus-visible:ring-orange-300' : ''}`}
                                                 value={d.rates[String(r.id)] ?? ''}
                                                 placeholder="e.g. 65.00"
                                                 onChange={(e) => form.setData('rates', { ...d.rates, [String(r.id)]: e.target.value })} />
-                                            <span className="text-xs text-gray-500">/h</span>
+                                            <span className="text-xs text-muted-foreground">/h</span>
                                         </div>
                                         {err && <p className="w-full text-xs text-red-500">{err}</p>}
                                     </div>
                                     );
                                 })}
                             </div>
-                            <p className="border-t px-4 py-2 text-xs text-gray-400">Check that rates meet the minimum wage for your region (DOLE – NWPC wage orders).</p>
+                            <p className="border-t px-4 py-2 text-xs text-muted-foreground">Check that rates meet the minimum wage for your region (DOLE – NWPC wage orders).</p>
                         </CardContent>
                     </Card>
 
@@ -214,7 +214,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                                 <Label htmlFor="ot-mult">Overtime multiplier</Label>
                                 <Input id="ot-mult" type="number" step="0.01" min="1.25" max="3" value={d.overtime_multiplier}
                                     onChange={(e) => form.setData('overtime_multiplier', e.target.value)} />
-                                <p className="text-xs text-gray-400">1.25 = legal minimum (Labor Code Art. 87). You can pay more, e.g. 1.5.</p>
+                                <p className="text-xs text-muted-foreground">1.25 = legal minimum (Labor Code Art. 87). You can pay more, e.g. 1.5.</p>
                                 {errors.overtime_multiplier && <p className="text-xs text-red-500">{errors.overtime_multiplier}</p>}
                             </div>
 
@@ -222,7 +222,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                             <div className="grid gap-1.5">
                                 <Label>Meal break</Label>
                                 <p className="flex items-start gap-2 rounded-md border bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                                    <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                                     <span>
                                         <strong>Meal break: 60 minutes, unpaid</strong> (Labor Code Art. 85). Subtracted automatically when the person worked
                                         5 hours or more in their shift. Short coffee/rest breaks are paid.
@@ -277,7 +277,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <div>
                             <CardTitle className="flex items-center gap-2 text-base"><UserRound className="h-4 w-4 text-blue-600" /> Personal rates</CardTitle>
-                            <p className="mt-0.5 text-xs text-gray-500">A personal rate wins over the person's roles.</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">A personal rate wins over the person's roles.</p>
                         </div>
                         <Button size="sm" variant="outline" onClick={() => setPersonal('new')} disabled={staff.length === 0}>
                             <Plus className="mr-1 h-4 w-4" /> Set personal rate
@@ -285,17 +285,17 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                     </CardHeader>
                     <CardContent className="p-0">
                         {withPersonal.length === 0 ? (
-                            <p className="px-4 py-4 text-sm text-gray-400">Nobody has a personal rate.</p>
+                            <p className="px-4 py-4 text-sm text-muted-foreground">Nobody has a personal rate.</p>
                         ) : (
                             <div className="divide-y">
                                 {withPersonal.map((s) => (
                                     <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                                         <div className="min-w-0">
                                             <p className="text-sm font-medium">{s.name}</p>
-                                            <p className="text-xs text-gray-500">{s.role_names.join(', ') || '—'}</p>
+                                            <p className="text-xs text-muted-foreground">{s.role_names.join(', ') || '—'}</p>
                                         </div>
                                         <div className="flex items-center gap-1">
-                                            <span className="mr-2 font-semibold text-blue-700">{peso(s.hourly_rate_override)}/h</span>
+                                            <span className="mr-2 font-semibold text-blue-700 dark:text-blue-300">{peso(s.hourly_rate_override)}/h</span>
                                             <Button size="sm" variant="ghost" className="h-8" onClick={() => setPersonal(s)}><Pencil className="h-3.5 w-3.5" /></Button>
                                             <Button size="sm" variant="ghost" className="h-8 text-red-500 hover:text-red-600" title="Remove personal rate"
                                                 onClick={() => router.patch(`/seller/payroll/staff/${s.id}/rate`, { hourly_rate_override: null }, { preserveScroll: true })}>
@@ -307,7 +307,7 @@ export default function PayrollSettingsPage({ settings, roles, needs_rate, staff
                             </div>
                         )}
                         {staff.length > 0 && (
-                            <details className="border-t px-4 py-2 text-xs text-gray-500">
+                            <details className="border-t px-4 py-2 text-xs text-muted-foreground">
                                 <summary className="cursor-pointer select-none">Everyone's current rate</summary>
                                 <ul className="mt-1.5 space-y-0.5">
                                     {staff.map((s) => (

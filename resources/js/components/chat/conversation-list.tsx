@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { relativeTime } from './format';
 import type { ConversationItem } from './types';
 
-const AVATAR_TONES = ['bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-violet-100 text-violet-700', 'bg-rose-100 text-rose-700'];
+const AVATAR_TONES = ['bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300', 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300', 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300', 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300', 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300'];
 
 export function Avatar({ initials, seed, className, src }: { initials: string; seed: number; className?: string; src?: string | null }) {
     if (src) {
@@ -34,19 +34,19 @@ export default function ConversationList({ items, activeId, onSelect, emptyText 
         <div className="flex h-full flex-col">
             <div className="border-b p-3">
                 <div className="relative">
-                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search conversations" className="h-9 pl-8" aria-label="Search conversations" />
                 </div>
             </div>
 
             <div className="flex-1 overflow-y-auto">
                 {items.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-sm text-gray-500">
-                        <MessageSquare className="h-8 w-8 text-gray-300" />
+                    <div className="flex flex-col items-center gap-2 px-6 py-12 text-center text-sm text-muted-foreground">
+                        <MessageSquare className="h-8 w-8 text-muted-foreground" />
                         {emptyText}
                     </div>
                 ) : shown.length === 0 ? (
-                    <p className="px-4 py-6 text-center text-sm text-gray-500">No conversations match “{q}”.</p>
+                    <p className="px-4 py-6 text-center text-sm text-muted-foreground">No conversations match “{q}”.</p>
                 ) : (
                     <ul>
                         {shown.map((c) => {
@@ -61,19 +61,19 @@ export default function ConversationList({ items, activeId, onSelect, emptyText 
                                         <span className="min-w-0 flex-1">
                                             <span className="flex items-baseline gap-2">
                                                 <span className={cn('truncate text-sm', unread ? 'font-bold' : 'font-semibold')}>{c.title}</span>
-                                                <span className="ml-auto shrink-0 text-[11px] text-gray-400">{relativeTime(c.last_message_at)}</span>
+                                                <span className="ml-auto shrink-0 text-xs text-muted-foreground">{relativeTime(c.last_message_at)}</span>
                                             </span>
-                                            <span className={cn('flex items-center gap-1.5 text-[11px]', c.rider_active ? 'font-medium text-amber-700' : 'text-gray-500')}>
+                                            <span className={cn('flex items-center gap-1.5 text-xs', c.rider_active ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
                                                 {c.rider_active && <Bike className="h-3 w-3 shrink-0" />}
                                                 <span className="truncate">{c.subtitle}</span>
-                                                {c.is_closed && <span className="shrink-0 rounded bg-gray-100 px-1.5 py-px text-[10px] font-medium text-gray-500 dark:bg-gray-800">Closed</span>}
+                                                {c.is_closed && <span className="shrink-0 rounded bg-gray-100 px-1.5 py-px text-xs font-medium text-muted-foreground dark:bg-gray-800">Closed</span>}
                                             </span>
                                             <span className="mt-0.5 flex items-center gap-2">
-                                                <span className={cn('truncate text-xs', unread ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-gray-500')}>
+                                                <span className={cn('truncate text-xs', unread ? 'font-medium text-gray-900 dark:text-gray-100' : 'text-muted-foreground')}>
                                                     {c.last_message_preview ?? 'No messages yet'}
                                                 </span>
                                                 {unread && (
-                                                    <span className="ml-auto shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                                                    <span className="ml-auto shrink-0 rounded-full bg-blue-600 px-1.5 py-0.5 text-xs font-semibold leading-none text-white">
                                                         {c.unread_count > 99 ? '99+' : c.unread_count}
                                                     </span>
                                                 )}

@@ -118,7 +118,7 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                                                 {r.order_number ?? '—'}
                                             </Link>
                                             <SeenPill flags={seen.get(r.id)} />
-                                            <span className="text-sm font-bold text-blue-700">{peso(r.amount)}</span>
+                                            <span className="text-sm font-bold text-blue-700 dark:text-blue-300">{peso(r.amount)}</span>
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-0.5">
                                             {r.store_name && <span>{r.store_name} · </span>}
@@ -133,7 +133,7 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                                             );
                                         })()}
                                     </div>
-                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${REFUND_STATUS_STYLES[r.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold shrink-0 ${REFUND_STATUS_STYLES[r.status] ?? 'bg-muted text-muted-foreground'}`}>
                                         {REFUND_STATUS_LABELS[r.status] ?? r.status}
                                     </span>
                                 </div>
@@ -157,7 +157,7 @@ export default function CustomerRefunds({ refunds, coupons }: Props) {
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50"
+                                            className="gap-1.5 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40"
                                             onClick={() => { setEscalating(r); setReason(''); }}
                                         >
                                             <ShieldAlert className="h-4 w-4" />

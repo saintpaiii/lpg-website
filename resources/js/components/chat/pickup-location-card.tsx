@@ -21,7 +21,7 @@ export default function PickupLocationCard({ card, orderId, portal }: { card: Pi
 
     return (
         <div className="mt-2 w-full rounded-xl border border-gray-200 bg-white p-3 text-left text-gray-900 shadow-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
+            <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
                 <MapPin className="h-3.5 w-3.5" /> Pick-up location
             </p>
             <p className="mt-1 text-sm font-semibold text-gray-900 dark:text-gray-100">{card.store_name}</p>

@@ -43,7 +43,7 @@ export default function ChooseAccount({ name, email }: { name: string; email: st
                     <button type="button" className={`${card} border-gray-200 dark:border-gray-700`} disabled={busy !== null} onClick={() => choose('seller')}>
                         <span className="flex flex-wrap items-center gap-2 font-semibold text-gray-900 dark:text-white">
                             {busy === 'seller' ? <Spinner /> : <Store className="h-5 w-5 text-emerald-600" />} I only want to sell LPG
-                            <span className="text-xs font-normal text-gray-500">(store owner)</span>
+                            <span className="text-xs font-normal text-muted-foreground">(store owner)</span>
                         </span>
                         <span className="mt-1 block text-xs text-gray-600 dark:text-gray-400">
                             Seller-only accounts can't place orders. If you also want to buy, register as a customer and use Start Selling later.

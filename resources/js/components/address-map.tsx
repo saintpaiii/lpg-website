@@ -124,7 +124,7 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
                 )}
             </div>
             {hasPin && !disabled && (
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                     {clickMoves ? 'Drag the pin or tap the map to set your exact delivery location.' : 'Drag the pin to adjust your exact delivery location.'}
                 </p>
             )}

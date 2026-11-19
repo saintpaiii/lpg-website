@@ -71,10 +71,10 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                 <div className="flex flex-wrap gap-1 border-b">
                     {TABS.map((t) => (
                         <button key={t.key} type="button" onClick={() => setTab(t.key)}
-                            className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium', tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800')}>
+                            className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium', tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground')}>
                             {t.label}
                             {counts[t.key] > 0 && (
-                                <span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold', t.key === 'pending' || t.key === 'expired' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600')}>
+                                <span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold', t.key === 'pending' || t.key === 'expired' ? 'bg-red-600 text-white' : 'bg-muted text-muted-foreground')}>
                                     {counts[t.key]}
                                 </span>
                             )}
@@ -84,10 +84,10 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
 
                 {tab === 'pending' ? (
                     pending.length === 0 ? (
-                        <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">Nothing is waiting for review.</p>
+                        <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nothing is waiting for review.</p>
                     ) : (
                         <ul className="space-y-2">
-                            <p className="text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+                            <p className="text-xs italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
                             <SeenNote counts={seen.counts} onClear={seen.clear} />
                             {pending.map((p) => (
                                 <li key={p.id} className={`flex flex-col gap-3 rounded-lg border bg-white px-4 py-3 sm:flex-row sm:items-center dark:bg-gray-950 ${seenRowClass(seen.get(p.id))}`}>
@@ -117,10 +117,10 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                         </ul>
                     )
                 ) : rows.length === 0 ? (
-                    <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">No stores here.</p>
+                    <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">No stores here.</p>
                 ) : (
                     <div className="overflow-x-auto rounded-xl border">
-                        <table className="w-full text-sm">
+                        <table className="rt-cards w-full text-sm">
                             <thead className="border-b bg-muted/30 text-left text-muted-foreground">
                                 <tr>
                                     <th className="px-4 py-2.5 font-medium">Store</th>
@@ -134,14 +134,14 @@ export default function AdminStoreDocuments({ tab: initialTab, pending, expiring
                                         <td className="px-4 py-2.5">
                                             {canStores ? <Link href={`/admin/stores/${r.store_id}`} className="font-medium text-blue-600 hover:underline">{r.store_name}</Link> : <span className="font-medium">{r.store_name}</span>}
                                             {tab === 'expired' && r.documents_suspended && (
-                                                <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-800">Hidden from customers</span>
+                                                <span className="ml-2 rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-semibold text-red-800 dark:text-red-300">Hidden from customers</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-2.5">{r.label}</td>
                                         <td className="px-4 py-2.5">
                                             {tab === 'missing' ? 'No expiry date on file'
                                                 : tab === 'expired' ? <span className="text-red-600">{r.expires_on} ({Math.abs(r.days_left ?? 0)} {Math.abs(r.days_left ?? 0) === 1 ? 'day' : 'days'} expired)</span>
-                                                : <span className="text-amber-700">{r.expires_on} ({r.days_left} {r.days_left === 1 ? 'day' : 'days'} left)</span>}
+                                                : <span className="text-amber-700 dark:text-amber-300">{r.expires_on} ({r.days_left} {r.days_left === 1 ? 'day' : 'days'} left)</span>}
                                         </td>
                                     </tr>
                                 ))}

@@ -203,9 +203,9 @@ export default function AdminSettings({ settings }: Props) {
                             </div>
 
                             {/* Info box */}
-                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm text-blue-800 space-y-1">
+                            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 p-4 text-sm text-blue-800 dark:text-blue-300 space-y-1">
                                 <p className="font-medium">How these are used:</p>
-                                <ul className="list-disc list-inside space-y-0.5 text-blue-700">
+                                <ul className="list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300">
                                     <li><strong>Reorder level</strong> — triggers low-stock alerts in the DSS Reorder Alerts tab</li>
                                     <li><strong>Lead time</strong> — adjusts the "days until stockout" buffer so you order early enough</li>
                                     <li>Both values can be overridden per-product from the Inventory page</li>

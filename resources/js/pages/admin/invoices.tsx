@@ -77,11 +77,11 @@ type Props = {
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Invoices', href: '/admin/invoices' }];
 
 const STATUS_STYLES: Record<PaymentStatus, string> = {
-    unpaid:    'bg-red-100 text-red-700',
-    partial:   'bg-amber-100 text-amber-700',
-    paid:      'bg-emerald-100 text-emerald-700',
-    to_refund: 'bg-orange-100 text-orange-700',
-    refunded:  'bg-gray-100 text-gray-600',
+    unpaid:    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    partial:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    paid:      'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    to_refund: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    refunded:  'bg-muted text-muted-foreground',
 };
 
 const STATUS_LABELS: Record<PaymentStatus, string> = {
@@ -112,7 +112,7 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
     if (data.last_page <= 1) return null;
     return (
         <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
                 Showing {data.from}–{data.to} of {data.total}
             </p>
             <div className="flex gap-1">
@@ -125,8 +125,8 @@ function Pagination({ data, onVisit }: { data: Paginated<any>; onVisit: (url: st
                             link.active
                                 ? 'bg-blue-600 text-white'
                                 : link.url
-                                ? 'hover:bg-gray-100 text-gray-600'
-                                : 'text-gray-300 cursor-not-allowed'
+                                ? 'hover:bg-muted text-muted-foreground'
+                                : 'text-muted-foreground cursor-not-allowed'
                         }`}
                         dangerouslySetInnerHTML={{ __html: link.label }}
                     />
@@ -173,8 +173,8 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">Platform-wide invoice monitoring. Payment recording is handled by each seller.</p>
+                        <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Platform-wide invoice monitoring. Payment recording is handled by each seller.</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <a href={`/admin/invoices/export?format=csv&payment_status=${encodeURIComponent(payStatus)}&search=${encodeURIComponent(search)}&date_from=${dateFrom}&date_to=${dateTo}`}
@@ -239,7 +239,7 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                     <CardContent className="pt-5">
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     className="pl-8"
                                     placeholder="Invoice#, Order#, Customer…"
@@ -265,7 +265,7 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                 <Filter className="mr-1.5 h-3.5 w-3.5" /> Apply
                             </Button>
                             {hasFilters && (
-                                <Button size="sm" variant="ghost" onClick={clearFilters} className="text-gray-500">
+                                <Button size="sm" variant="ghost" onClick={clearFilters} className="text-muted-foreground">
                                     Clear
                                 </Button>
                             )}
@@ -279,23 +279,23 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                         <CardTitle className="flex items-center gap-2 text-base">
                             <FileText className="h-4 w-4 text-blue-600" />
                             Invoices
-                            <span className="ml-auto text-sm font-normal text-gray-400">
+                            <span className="ml-auto text-sm font-normal text-muted-foreground">
                                 {invoices.total} record{invoices.total !== 1 ? 's' : ''}
                             </span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {invoices.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <FileText className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No invoices found</p>
                                 <p className="mt-1 text-sm">Invoices are created automatically when orders are confirmed.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Invoice #</th>
                                             <th className="px-4 py-3">Order #</th>
                                             <th className="px-4 py-3">Customer</th>
@@ -306,11 +306,11 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                             <th className="px-4 py-3">Date</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {invoices.data.map((inv) => (
                                             <tr
                                                 key={inv.id}
-                                                className="cursor-pointer hover:bg-gray-50/60"
+                                                className="cursor-pointer hover:bg-muted/60"
                                                 onClick={() => router.visit(`/admin/invoices/${inv.id}`)}
                                             >
                                                 <td className="px-4 py-3">
@@ -319,14 +319,14 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <span className="font-mono text-xs text-gray-500">
+                                                    <span className="font-mono text-xs text-muted-foreground">
                                                         {inv.order?.order_number ?? '—'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3">
-                                                    <p className="font-medium text-gray-900">{inv.customer?.name ?? '—'}</p>
+                                                    <p className="font-medium text-foreground">{inv.customer?.name ?? '—'}</p>
                                                     {inv.customer?.phone && (
-                                                        <p className="text-xs text-gray-400">{inv.customer.phone}</p>
+                                                        <p className="text-xs text-muted-foreground">{inv.customer.phone}</p>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-right tabular-nums font-semibold">
@@ -335,16 +335,16 @@ export default function InvoicesPage({ invoices, summary, filters }: Props) {
                                                 <td className="px-4 py-3 text-right tabular-nums text-emerald-600">
                                                     {peso(inv.paid_amount)}
                                                 </td>
-                                                <td className={`px-4 py-3 text-right tabular-nums font-medium ${inv.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                                <td className={`px-4 py-3 text-right tabular-nums font-medium ${inv.balance > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>
                                                     {peso(inv.balance)}
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge status={inv.payment_status} />
                                                 </td>
-                                                <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500">
+                                                <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                                                     {fmtDate(inv.created_at)}
                                                     {inv.due_date && (
-                                                        <p className="text-gray-400">Due: {fmtDate(inv.due_date)}</p>
+                                                        <p className="text-muted-foreground">Due: {fmtDate(inv.due_date)}</p>
                                                     )}
                                                 </td>
                                             </tr>

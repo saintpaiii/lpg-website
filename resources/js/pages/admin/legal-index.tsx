@@ -36,7 +36,7 @@ export default function LegalIndex({ documents }: { documents: Doc[] }) {
                                 <CardTitle className="flex items-start justify-between gap-2 text-base">
                                     <span className="flex items-center gap-2"><ScrollText className="h-4 w-4 text-blue-600" /> {d.label}</span>
                                     {d.has_draft && (
-                                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
+                                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-300">
                                             Draft in progress
                                         </span>
                                     )}

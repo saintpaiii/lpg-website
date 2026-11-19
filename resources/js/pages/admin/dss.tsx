@@ -127,7 +127,8 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Decision Support System', href: '/admin/dss' }];
 
-const STORE_COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#64748b'];
+// J10: dark enough for white numbers (≥ 3 : 1)
+const STORE_COLORS = ['#2563eb', '#047857', '#b45309', '#dc2626', '#7c3aed', '#0e7490', '#be185d', '#4d7c0f', '#c2410c', '#475569'];
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -159,10 +160,10 @@ function SectionHeader({
     badgeColor?: 'red' | 'amber' | 'blue' | 'emerald';
 }) {
     const badgeStyles = {
-        red:     'bg-red-100 text-red-700',
-        amber:   'bg-amber-100 text-amber-700',
-        blue:    'bg-blue-100 text-blue-700',
-        emerald: 'bg-emerald-100 text-emerald-700',
+        red:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+        amber:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+        blue:    'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+        emerald: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
     };
 
     return (
@@ -172,8 +173,8 @@ function SectionHeader({
                     <Icon className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                    <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-                    <p className="text-sm text-gray-500">{subtitle}</p>
+                    <h2 className="text-lg font-bold text-foreground">{title}</h2>
+                    <p className="text-sm text-muted-foreground">{subtitle}</p>
                 </div>
             </div>
             {badge !== undefined && (
@@ -187,9 +188,9 @@ function SectionHeader({
 
 function EmptyChart({ message }: { message: string }) {
     return (
-        <div className="flex h-56 flex-col items-center justify-center gap-2 text-gray-300">
+        <div className="flex h-56 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Brain className="h-10 w-10" />
-            <p className="text-sm text-gray-400">{message}</p>
+            <p className="text-sm text-muted-foreground">{message}</p>
         </div>
     );
 }
@@ -198,28 +199,28 @@ function EmptyChart({ message }: { message: string }) {
 
 function TrendBadge({ direction, percent }: { direction: string; percent: number }) {
     if (direction === 'increasing') return (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
             <TrendingUp className="h-6 w-6 text-emerald-600 shrink-0" />
             <div>
-                <p className="font-bold text-emerald-700 text-lg">+{percent}%</p>
+                <p className="font-bold text-emerald-700 dark:text-emerald-300 text-lg">+{percent}%</p>
                 <p className="text-xs text-emerald-600">vs last week — Increasing</p>
             </div>
         </div>
     );
     if (direction === 'decreasing') return (
-        <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+        <div className="flex items-center gap-2 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 px-4 py-3">
             <TrendingDown className="h-6 w-6 text-red-600 shrink-0" />
             <div>
-                <p className="font-bold text-red-700 text-lg">{percent}%</p>
+                <p className="font-bold text-red-700 dark:text-red-300 text-lg">{percent}%</p>
                 <p className="text-xs text-red-600">vs last week — Decreasing</p>
             </div>
         </div>
     );
     return (
-        <div className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+        <div className="flex items-center gap-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 px-4 py-3">
             <ArrowRight className="h-6 w-6 text-blue-600 shrink-0" />
             <div>
-                <p className="font-bold text-blue-700 text-lg">{percent > 0 ? '+' : ''}{percent}%</p>
+                <p className="font-bold text-blue-700 dark:text-blue-300 text-lg">{percent > 0 ? '+' : ''}{percent}%</p>
                 <p className="text-xs text-blue-600">vs last week — Stable</p>
             </div>
         </div>
@@ -242,39 +243,39 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                     <Card>
                         <CardContent className="pt-4 space-y-3">
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">This Week</p>
-                                <p className="text-xl font-bold text-gray-900 tabular-nums">{pesoFull(data.this_week)}</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">This Week</p>
+                                <p className="text-xl font-bold text-foreground tabular-nums">{pesoFull(data.this_week)}</p>
                             </div>
                             <Separator />
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Last Week</p>
-                                <p className="text-xl font-bold text-gray-500 tabular-nums">{pesoFull(data.last_week)}</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Last Week</p>
+                                <p className="text-xl font-bold text-muted-foreground tabular-nums">{pesoFull(data.last_week)}</p>
                             </div>
                             {data.peak_day && (
                                 <>
                                     <Separator />
                                     <div>
-                                        <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Peak Day (30d)</p>
-                                        <p className="font-bold text-gray-800">{data.peak_day.label}</p>
+                                        <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Peak Day (30d)</p>
+                                        <p className="font-bold text-foreground">{data.peak_day.label}</p>
                                         <p className="text-sm text-emerald-600 font-semibold">{pesoFull(data.peak_day.revenue)}</p>
-                                        <p className="text-xs text-gray-400">{data.peak_day.orders_count} orders</p>
+                                        <p className="text-xs text-muted-foreground">{data.peak_day.orders_count} orders</p>
                                     </div>
                                 </>
                             )}
                             <Separator />
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Trend Slope</p>
-                                <p className="font-mono text-sm text-gray-700">
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Trend Slope</p>
+                                <p className="font-mono text-sm text-foreground/80">
                                     {data.slope > 0 ? '+' : ''}{data.slope.toFixed(4)} ₱/day
                                 </p>
-                                <p className="text-xs text-gray-400 mt-0.5">OLS regression coefficient</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">OLS regression coefficient</p>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Daily Platform Revenue + Trend Line (Last 30 Days)
                         </CardTitle>
                     </CardHeader>
@@ -292,14 +293,14 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                                             if (!active || !payload?.length) return null;
                                             const entry = data.chart.find((d) => d.label === label);
                                             return (
-                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
-                                                    <p className="font-bold text-gray-800 mb-1">{label}</p>
+                                                <div className="rounded-lg border bg-card p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-foreground mb-1">{label}</p>
                                                     {payload.map((p: any) => (
                                                         <p key={p.dataKey} style={{ color: p.stroke }}>
                                                             {p.name}: {pesoFull(p.value)}
                                                         </p>
                                                     ))}
-                                                    <p className="text-gray-500 mt-1 text-xs">Orders: {entry?.orders_count ?? 0}</p>
+                                                    <p className="text-muted-foreground mt-1 text-xs">Orders: {entry?.orders_count ?? 0}</p>
                                                 </div>
                                             );
                                         }}
@@ -333,7 +334,7 @@ function TopStoresSection({ stores }: { stores: TopStore[] }) {
             <div className="grid gap-4 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Orders This Month — Top Stores
                         </CardTitle>
                     </CardHeader>
@@ -355,9 +356,9 @@ function TopStoresSection({ stores }: { stores: TopStore[] }) {
                                             if (!active || !payload?.length) return null;
                                             const s = payload[0].payload as TopStore;
                                             return (
-                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
-                                                    <p className="font-bold text-gray-800">{s.store_name}</p>
-                                                    {s.city && <p className="text-xs text-gray-500">{s.city}</p>}
+                                                <div className="rounded-lg border bg-card p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-foreground">{s.store_name}</p>
+                                                    {s.city && <p className="text-xs text-muted-foreground">{s.city}</p>}
                                                     <p className="text-blue-600 font-semibold mt-1">{s.orders_count} orders</p>
                                                     <p className="text-emerald-600">{pesoFull(s.revenue)} revenue</p>
                                                 </div>
@@ -373,41 +374,41 @@ function TopStoresSection({ stores }: { stores: TopStore[] }) {
 
                 <Card className="lg:col-span-2">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Leaderboard
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {stores.length === 0 ? (
-                            <p className="px-4 py-8 text-center text-sm text-gray-400">No approved stores.</p>
+                            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No approved stores.</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-400">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase text-muted-foreground">
                                             <th className="px-3 py-2">#</th>
                                             <th className="px-3 py-2">Store</th>
                                             <th className="px-2 py-2 text-center">Orders</th>
                                             <th className="px-3 py-2 text-right">Revenue</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {stores.map((s, i) => (
-                                            <tr key={s.id} className="hover:bg-gray-50/60">
+                                            <tr key={s.id} className="hover:bg-muted/60">
                                                 <td className="px-3 py-2.5">
                                                     <span
-                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                                                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white"
                                                         style={{ background: STORE_COLORS[i % STORE_COLORS.length] }}
                                                     >
                                                         {s.rank}
                                                     </span>
                                                 </td>
                                                 <td className="px-3 py-2.5">
-                                                    <p className="font-medium text-gray-800 truncate max-w-[110px]">{s.store_name}</p>
-                                                    {s.city && <p className="text-gray-400">{s.city}</p>}
+                                                    <p className="font-medium text-foreground truncate max-w-[110px]">{s.store_name}</p>
+                                                    {s.city && <p className="text-muted-foreground">{s.city}</p>}
                                                 </td>
-                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-blue-700">{s.orders_count}</td>
-                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 font-semibold">{peso(s.revenue)}</td>
+                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-blue-700 dark:text-blue-300">{s.orders_count}</td>
+                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-semibold">{peso(s.revenue)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -443,33 +444,33 @@ function CustomerGrowthSection({ data }: { data: CustomerGrowthPoint[] }) {
                     <Card>
                         <CardContent className="pt-4 space-y-3">
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">This Week</p>
-                                <p className="text-3xl font-black text-gray-900 tabular-nums">{thisWeek}</p>
-                                <p className="text-sm text-gray-400">new customers</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">This Week</p>
+                                <p className="text-3xl font-black text-foreground tabular-nums">{thisWeek}</p>
+                                <p className="text-sm text-muted-foreground">new customers</p>
                             </div>
                             <Separator />
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Last Week</p>
-                                <p className="text-xl font-bold text-gray-500 tabular-nums">{lastWeekVal}</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Last Week</p>
+                                <p className="text-xl font-bold text-muted-foreground tabular-nums">{lastWeekVal}</p>
                             </div>
                             <Separator />
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Week-over-Week</p>
-                                <p className={`font-bold text-lg ${growthPct > 0 ? 'text-emerald-600' : growthPct < 0 ? 'text-red-500' : 'text-gray-500'}`}>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">Week-over-Week</p>
+                                <p className={`font-bold text-lg ${growthPct > 0 ? 'text-emerald-600' : growthPct < 0 ? 'text-red-500' : 'text-muted-foreground'}`}>
                                     {growthPct > 0 ? '+' : ''}{growthPct}%
                                 </p>
                             </div>
                             <Separator />
                             <div>
-                                <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">12-Week Total</p>
-                                <p className="text-xl font-bold text-gray-900 tabular-nums">{totalNew}</p>
+                                <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">12-Week Total</p>
+                                <p className="text-xl font-bold text-foreground tabular-nums">{totalNew}</p>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Weekly New Registrations (Last 12 Weeks)
                         </CardTitle>
                     </CardHeader>
@@ -486,8 +487,8 @@ function CustomerGrowthSection({ data }: { data: CustomerGrowthPoint[] }) {
                                         content={({ active, payload, label }) => {
                                             if (!active || !payload?.length) return null;
                                             return (
-                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
-                                                    <p className="font-bold text-gray-800 mb-1">Week of {label}</p>
+                                                <div className="rounded-lg border bg-card p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-foreground mb-1">Week of {label}</p>
                                                     <p className="text-emerald-600 font-semibold">{payload[0].value} new customers</p>
                                                 </div>
                                             );
@@ -528,7 +529,7 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
             <div className="grid gap-4 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Units Sold — Top 8 Products
                         </CardTitle>
                     </CardHeader>
@@ -550,9 +551,9 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
                                             if (!active || !payload?.length) return null;
                                             const p = payload[0].payload as TopProduct;
                                             return (
-                                                <div className="rounded-lg border bg-white p-3 shadow-xl text-sm">
-                                                    <p className="font-bold text-gray-800">{p.name}</p>
-                                                    {p.brand && <p className="text-xs text-gray-500">{p.brand}</p>}
+                                                <div className="rounded-lg border bg-card p-3 shadow-xl text-sm">
+                                                    <p className="font-bold text-foreground">{p.name}</p>
+                                                    {p.brand && <p className="text-xs text-muted-foreground">{p.brand}</p>}
                                                     <p className="text-blue-600 font-semibold mt-1">{p.units_sold} units sold</p>
                                                     <p className="text-emerald-600">{pesoFull(p.revenue)} revenue</p>
                                                 </div>
@@ -568,34 +569,34 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
 
                 <Card className="lg:col-span-2">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                        <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                             Rankings
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {products.length === 0 ? (
-                            <p className="px-4 py-8 text-center text-sm text-gray-400">No sales data.</p>
+                            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No sales data.</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase text-gray-400">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase text-muted-foreground">
                                             <th className="px-3 py-2">#</th>
                                             <th className="px-3 py-2">Product</th>
                                             <th className="px-2 py-2 text-center">Units</th>
                                             <th className="px-3 py-2 text-right">Revenue</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {products.map((p, i) => (
-                                            <tr key={p.product_id} className="hover:bg-gray-50/60">
-                                                <td className="px-3 py-2.5 text-gray-400 font-bold">{i + 1}</td>
+                                            <tr key={p.product_id} className="hover:bg-muted/60">
+                                                <td className="px-3 py-2.5 text-muted-foreground font-bold">{i + 1}</td>
                                                 <td className="px-3 py-2.5">
-                                                    <p className="font-medium text-gray-800 truncate max-w-[100px]">{p.name}</p>
-                                                    {p.brand && <p className="text-gray-400">{p.brand}</p>}
+                                                    <p className="font-medium text-foreground truncate max-w-[100px]">{p.name}</p>
+                                                    {p.brand && <p className="text-muted-foreground">{p.brand}</p>}
                                                 </td>
-                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-purple-700">{p.units_sold}</td>
-                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 font-semibold">{peso(p.revenue)}</td>
+                                                <td className="px-2 py-2.5 text-center tabular-nums font-bold text-purple-700 dark:text-purple-300">{p.units_sold}</td>
+                                                <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-semibold">{peso(p.revenue)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -625,11 +626,11 @@ function InsightCard({
                         <Icon className={`h-6 w-6 ${iconColor}`} />
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{label}</p>
-                        <p className="mt-1 font-bold text-gray-900 leading-tight text-base truncate">{value}</p>
-                        {sub && <p className="mt-0.5 text-sm text-gray-500">{sub}</p>}
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+                        <p className="mt-1 font-bold text-foreground leading-tight text-base truncate">{value}</p>
+                        {sub && <p className="mt-0.5 text-sm text-muted-foreground">{sub}</p>}
                         {accent && (
-                            <p className="mt-1 text-xs font-semibold text-emerald-600 bg-emerald-50 rounded px-2 py-0.5 inline-block">
+                            <p className="mt-1 text-xs font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 rounded px-2 py-0.5 inline-block">
                                 {accent}
                             </p>
                         )}
@@ -666,7 +667,7 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                     </Card>
                 ) : (
                     <Card className="border-dashed">
-                        <CardContent className="flex h-full items-center justify-center py-8 text-center text-sm text-gray-400">
+                        <CardContent className="flex h-full items-center justify-center py-8 text-center text-sm text-muted-foreground">
                             <div>
                                 <p className="font-medium">Projection unavailable</p>
                                 <p className="text-xs mt-1">Needs 2+ months of data</p>
@@ -676,9 +677,9 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                 )}
                 <Card className="border-dashed">
                     <CardContent className="pt-5">
-                        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Active Stores</p>
-                        <p className="mt-1 text-3xl font-black tabular-nums text-gray-900">{data.total_approved_stores}</p>
-                        <p className="mt-1 text-sm text-gray-400">Approved & operating</p>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Active Stores</p>
+                        <p className="mt-1 text-3xl font-black tabular-nums text-foreground">{data.total_approved_stores}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Approved & operating</p>
                     </CardContent>
                 </Card>
             </div>
@@ -686,7 +687,7 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <InsightCard
                     icon={Calendar}
-                    iconBg="bg-purple-100"
+                    iconBg="bg-purple-100 dark:bg-purple-900/40"
                     iconColor="text-purple-600"
                     label="Peak Day"
                     value={data.peak_day ?? 'Insufficient data'}
@@ -695,7 +696,7 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                 />
                 <InsightCard
                     icon={Store}
-                    iconBg="bg-blue-100"
+                    iconBg="bg-blue-100 dark:bg-blue-900/40"
                     iconColor="text-blue-600"
                     label="Top Store This Month"
                     value={data.top_store?.name ?? 'No orders yet'}
@@ -704,7 +705,7 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                 />
                 <InsightCard
                     icon={Crown}
-                    iconBg="bg-amber-100"
+                    iconBg="bg-amber-100 dark:bg-amber-900/40"
                     iconColor="text-amber-600"
                     label="Best Seller This Month"
                     value={data.best_seller?.name ?? 'No sales yet'}
@@ -713,7 +714,7 @@ function BusinessInsightsSection({ data }: { data: BusinessInsights }) {
                 />
                 <InsightCard
                     icon={ShoppingCart}
-                    iconBg="bg-emerald-100"
+                    iconBg="bg-emerald-100 dark:bg-emerald-900/40"
                     iconColor="text-emerald-600"
                     label="Revenue Projection"
                     value={data.revenue_projection !== null ? peso(data.revenue_projection) : 'Calculating...'}
@@ -791,18 +792,18 @@ function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
     })();
 
     const LEVEL_STYLE = {
-        critical: { card: 'border-red-200 bg-red-50',         icon: 'bg-red-500',      text: 'text-red-800' },
-        warning:  { card: 'border-amber-200 bg-amber-50',     icon: 'bg-amber-500',    text: 'text-amber-800' },
-        success:  { card: 'border-emerald-200 bg-emerald-50', icon: 'bg-emerald-500',  text: 'text-emerald-800' },
-        info:     { card: 'border-blue-200 bg-blue-50',       icon: 'bg-blue-500',     text: 'text-blue-800' },
+        critical: { card: 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40',         icon: 'bg-red-500',      text: 'text-red-800 dark:text-red-300' },
+        warning:  { card: 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40',     icon: 'bg-amber-500',    text: 'text-amber-800 dark:text-amber-300' },
+        success:  { card: 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40', icon: 'bg-emerald-500',  text: 'text-emerald-800 dark:text-emerald-300' },
+        info:     { card: 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40',       icon: 'bg-blue-500',     text: 'text-blue-800 dark:text-blue-300' },
     } as const;
     type Level = keyof typeof LEVEL_STYLE;
 
     const REC_STYLE = {
-        critical: { dot: 'bg-red-500',     text: 'text-red-700',     bg: 'bg-red-50 border-red-200'         },
-        warning:  { dot: 'bg-amber-500',   text: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200'     },
-        success:  { dot: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200' },
-        info:     { dot: 'bg-blue-500',    text: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200'       },
+        critical: { dot: 'bg-red-500',     text: 'text-red-700 dark:text-red-300',     bg: 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800'         },
+        warning:  { dot: 'bg-amber-500',   text: 'text-amber-700 dark:text-amber-300',   bg: 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800'     },
+        success:  { dot: 'bg-emerald-500', text: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800' },
+        info:     { dot: 'bg-blue-500',    text: 'text-blue-700 dark:text-blue-300',    bg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800'       },
     } as const;
 
     function InsightCard({ title, text, level, icon }: { title: string; text: string; level: Level; icon: React.ReactNode }) {
@@ -830,35 +831,35 @@ function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
 
                 {/* Summary stats row */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                    <div className="rounded-xl border bg-white p-4 space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Platform Sales (This Month)</p>
-                        <p className="text-2xl font-black text-emerald-700 tabular-nums">{pesoFull(data.sales_this_month)}</p>
-                        <p className="text-xs text-gray-400">GMV of delivered orders</p>
+                    <div className="rounded-xl border bg-card p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Platform Sales (This Month)</p>
+                        <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300 tabular-nums">{pesoFull(data.sales_this_month)}</p>
+                        <p className="text-xs text-muted-foreground">GMV of delivered orders</p>
                     </div>
-                    <div className="rounded-xl border bg-white p-4 space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subscription Income (This Month)</p>
-                        <p className="text-2xl font-black text-violet-700 tabular-nums">{pesoFull(data.subscription_income_this_month)}</p>
-                        <p className="text-xs text-gray-400">Store plans paid (PayMongo + cash)</p>
+                    <div className="rounded-xl border bg-card p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Subscription Income (This Month)</p>
+                        <p className="text-2xl font-black text-violet-700 dark:text-violet-300 tabular-nums">{pesoFull(data.subscription_income_this_month)}</p>
+                        <p className="text-xs text-muted-foreground">Store plans paid (PayMongo + cash)</p>
                     </div>
-                    <div className="rounded-xl border bg-white p-4 space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Revenue vs Last Month</p>
-                        <p className={`text-2xl font-black tabular-nums flex items-center gap-1 ${revenueUp ? 'text-emerald-600' : revenueDown ? 'text-red-500' : 'text-gray-600'}`}>
+                    <div className="rounded-xl border bg-card p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revenue vs Last Month</p>
+                        <p className={`text-2xl font-black tabular-nums flex items-center gap-1 ${revenueUp ? 'text-emerald-600' : revenueDown ? 'text-red-500' : 'text-muted-foreground'}`}>
                             {revenueUp ? <ArrowUpRight className="h-5 w-5" /> : revenueDown ? <ArrowDownRight className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
                             {data.revenue_change_pct !== null ? `${data.revenue_change_pct > 0 ? '+' : ''}${data.revenue_change_pct}%` : '—'}
                         </p>
-                        <p className="text-xs text-gray-400">vs {pesoFull(data.last_month_revenue)} last month</p>
+                        <p className="text-xs text-muted-foreground">vs {pesoFull(data.last_month_revenue)} last month</p>
                     </div>
-                    <div className="rounded-xl border bg-white p-4 space-y-1">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">New Customers</p>
-                        <p className="text-2xl font-black text-gray-900 tabular-nums">{data.new_customers_this_month}</p>
-                        <p className="text-xs text-gray-400">{data.this_week_customers} this week</p>
+                    <div className="rounded-xl border bg-card p-4 space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">New Customers</p>
+                        <p className="text-2xl font-black text-foreground tabular-nums">{data.new_customers_this_month}</p>
+                        <p className="text-xs text-muted-foreground">{data.this_week_customers} this week</p>
                     </div>
-                    <div className={`rounded-xl border p-4 space-y-1 ${data.pending_verifications > 0 ? 'border-amber-300 bg-amber-50' : 'bg-white'}`}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Pending Verifications</p>
+                    <div className={`rounded-xl border p-4 space-y-1 ${data.pending_verifications > 0 ? 'border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40' : 'bg-card'}`}>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pending Verifications</p>
                         <p className={`text-2xl font-black tabular-nums ${data.pending_verifications > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
                             {data.pending_verifications}
                         </p>
-                        <p className="text-xs text-gray-400">{data.active_stores_this_month}/{data.total_approved_stores} stores active</p>
+                        <p className="text-xs text-muted-foreground">{data.active_stores_this_month}/{data.total_approved_stores} stores active</p>
                     </div>
                 </div>
 
@@ -883,7 +884,7 @@ function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
                     title="Platform Recommendations"
                     subtitle="Actionable steps based on current marketplace data"
                 />
-                <div className="rounded-xl border bg-white p-4 space-y-3">
+                <div className="rounded-xl border bg-card p-4 space-y-3">
                     {data.recommendations.map((rec, i) => {
                         const s = REC_STYLE[rec.type];
                         return (
@@ -1005,11 +1006,11 @@ export default function DssPage({
 
                 <PlatformInsightsSection data={platformInsights} salesTrend={salesTrend} customerGrowth={customerGrowth} />
 
-                <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400">
-                    <Brain className="mx-auto mb-1.5 h-5 w-5 text-gray-300" />
+                <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+                    <Brain className="mx-auto mb-1.5 h-5 w-5 text-muted-foreground" />
                     Admin DSS shows marketplace-wide metrics across all approved stores. Revenue trend uses Ordinary Least Squares linear regression.
                     Insights and recommendations are generated using rule-based IF/ELSE logic — not AI. All computations exclude soft-deleted and cancelled records.
-                    Results are logged to the <code className="font-mono bg-gray-100 px-1 rounded">dss_logs</code> table for academic review.
+                    Results are logged to the <code className="font-mono bg-muted px-1 rounded">dss_logs</code> table for academic review.
                 </div>
             </div>
         </AppLayout>

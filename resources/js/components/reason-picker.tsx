@@ -107,8 +107,8 @@ function ReasonFields({ textareaRef, ...p }: FieldsProps) {
                         className={p.textareaClassName ?? reasonTextareaClass}
                     />
                     <div className="flex items-start justify-between gap-2">
-                        {p.notesError ? <p className="text-xs text-red-500">{p.notesError}</p> : <span className="text-[11px] text-muted-foreground">Required</span>}
-                        {p.maxLength && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{p.typed.length}/{p.maxLength}</span>}
+                        {p.notesError ? <p className="text-xs text-red-500">{p.notesError}</p> : <span className="text-xs text-muted-foreground">Required</span>}
+                        {p.maxLength && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{p.typed.length}/{p.maxLength}</span>}
                     </div>
                 </div>
             )}
@@ -278,7 +278,7 @@ export function NotePicker({ context, value, onChange, label, required = false, 
             {(error || (showText && maxLength)) && (
                 <div className="flex items-start justify-between gap-2">
                     {error ? <p className="text-xs text-red-500">{error}</p> : <span />}
-                    {showText && maxLength && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{value.length}/{maxLength}</span>}
+                    {showText && maxLength && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{value.length}/{maxLength}</span>}
                 </div>
             )}
         </div>

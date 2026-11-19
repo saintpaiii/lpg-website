@@ -39,7 +39,7 @@ export function RefundWindowCard({ days }: { days: number }) {
                             className="h-9 w-24"
                             aria-label="Refund window in days"
                         />
-                        <span className="text-sm text-gray-500">days after delivery</span>
+                        <span className="text-sm text-muted-foreground">days after delivery</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                         {CHIPS.map((n) => (

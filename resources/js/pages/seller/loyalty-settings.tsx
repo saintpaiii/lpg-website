@@ -97,14 +97,14 @@ export default function LoyaltySettings({ settings, consignment_on, allow_consig
                                     : 'Enable the loyalty program to reward repeat customers with better consignment terms. Customers earn tiers based on completed orders and get lower down payment rates.'}
                             </p>
                             {is_enabled && !consignment_on && (
-                                <p className="mt-2 flex items-center gap-1.5 text-sm text-amber-700">
+                                <p className="mt-2 flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
                                     <Info className="h-4 w-4" /> Consignment is turned off — switch it on in the card above.
                                 </p>
                             )}
                         </div>
                         <button type="button" role="switch" aria-checked={is_enabled} aria-label="Enable loyalty program" onClick={toggle}
                             className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors ${is_enabled ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                            <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${is_enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                            <span className={`inline-block h-6 w-6 transform rounded-full bg-card shadow transition-transform ${is_enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
                         </button>
                     </CardContent>
                 </Card>
@@ -126,7 +126,7 @@ export default function LoyaltySettings({ settings, consignment_on, allow_consig
                                     aria-label="Offer consignment to loyal customers"
                                     onClick={() => consignment.setData('allow_consignment', !consignment.data.allow_consignment)}
                                     className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${consignment.data.allow_consignment ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${consignment.data.allow_consignment ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                    <span className={`inline-block h-5 w-5 transform rounded-full bg-card shadow transition-transform ${consignment.data.allow_consignment ? 'translate-x-5' : 'translate-x-0.5'}`} />
                                 </button>
                             </label>
                             <div className="grid gap-1.5 sm:max-w-xs">

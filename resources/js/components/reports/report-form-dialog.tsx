@@ -92,14 +92,14 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
 
     const sentTo = chosen && (
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-gray-500">This report will be sent to:</span>
+            <span className="text-muted-foreground">This report will be sent to:</span>
             {chosen.route !== 'admin' && (
-                <span className="rounded-full bg-blue-100 px-2 py-0.5 font-medium text-blue-800">
+                <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 font-medium text-blue-800 dark:text-blue-300">
                     {order.store_name}{chosen.route === 'store' && reporterSide === 'customer' ? ' (the platform admin can also see it)' : ''}
                 </span>
             )}
             {chosen.route !== 'store' && <span className="rounded-full bg-gray-800 px-2 py-0.5 font-medium text-white">Platform admin</span>}
-            {reporterSide === 'customer' && chosen.route === 'admin' && <span className="w-full text-gray-500">The store will not see this report.</span>}
+            {reporterSide === 'customer' && chosen.route === 'admin' && <span className="w-full text-muted-foreground">The store will not see this report.</span>}
         </div>
     );
 
@@ -120,7 +120,7 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
                             if (!items.length) return null;
                             return (
                                 <div key={g.route} className="space-y-1.5">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{g.title}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{g.title}</p>
                                     {items.map(([key, c]) => {
                                         const active = form.data.category === key;
                                         return (
@@ -128,11 +128,11 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
                                                 onClick={() => form.setData('category', key)}
                                                 className={cn('w-full rounded-lg border px-3 py-2 text-left transition-colors',
                                                     active ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800',
-                                                    c.urgent && 'border-red-300')}>
+                                                    c.urgent && 'border-red-200 dark:border-red-800')}>
                                                 <span className="flex items-center gap-1.5 text-sm font-medium">
                                                     {c.urgent && <AlertTriangle className="h-3.5 w-3.5 text-red-600" />}{c.label}
                                                 </span>
-                                                <span className="block text-xs text-gray-500">{c.hint}</span>
+                                                <span className="block text-xs text-muted-foreground">{c.hint}</span>
                                             </button>
                                         );
                                     })}
@@ -152,7 +152,7 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
                     {chosen && (
                         <>
                             {form.data.category === 'gas_leak' && (
-                                <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
+                                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 p-3 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-200">
                                     <p className="mb-1 flex items-center gap-1.5 font-bold"><AlertTriangle className="h-4 w-4" /> Safety first</p>
                                     If gas is leaking now: close the tank valve, open doors and windows, do not turn on lights or use your phone near the tank,
                                     move everyone outside, and call 911 or the fire department (BFP).
@@ -185,7 +185,7 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
                                     onChange={(e) => form.setData('description', e.target.value)}
                                     className="rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                     placeholder="Tell us what happened, when, and what you'd like done." />
-                                <p className={cn('text-right text-[11px]', form.data.description.trim().length < 10 ? 'text-gray-400' : 'text-gray-500')}>
+                                <p className={cn('text-right text-xs', form.data.description.trim().length < 10 ? 'text-muted-foreground' : 'text-muted-foreground')}>
                                     {form.data.description.length}/5000{form.data.description.trim().length < 10 && ' · at least 10 characters'}
                                 </p>
                                 {errors.description && <p className="text-xs text-red-600">{errors.description}</p>}
@@ -198,14 +198,14 @@ export default function ReportFormDialog({ open, onOpenChange, reporterSide, ord
                                         <div key={i} className="relative">
                                             {previews[i]
                                                 ? <img src={previews[i]} alt={f.name} className="h-16 w-16 rounded-md border object-cover" />
-                                                : <span className="flex h-16 w-16 flex-col items-center justify-center rounded-md border text-[10px] text-gray-500"><FileText className="h-5 w-5" />{f.name.split('.').pop()?.toUpperCase()}</span>}
+                                                : <span className="flex h-16 w-16 flex-col items-center justify-center rounded-md border text-xs text-muted-foreground"><FileText className="h-5 w-5" />{f.name.split('.').pop()?.toUpperCase()}</span>}
                                             <button type="button" onClick={() => removeFile(i)} aria-label={`Remove ${f.name}`}
                                                 className="absolute -right-1.5 -top-1.5 rounded-full bg-gray-800 p-0.5 text-white"><X className="h-3 w-3" /></button>
                                         </div>
                                     ))}
                                     {form.data.evidence.length < MAX_FILES && (
                                         <button type="button" onClick={() => fileRef.current?.click()}
-                                            className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-dashed text-[10px] text-gray-500 hover:bg-gray-50">
+                                            className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted">
                                             <Paperclip className="h-4 w-4" /> Add
                                         </button>
                                     )}

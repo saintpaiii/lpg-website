@@ -144,7 +144,7 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                     <CardHeader className="pb-2"><CardTitle className="text-base">Branch comparison</CardTitle></CardHeader>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[860px] text-sm" data-testid="comparison">
+                            <table className="rt-cards w-full min-w-[860px] text-sm" data-testid="comparison">
                                 <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
                                     <tr>
                                         {th('name', 'Store', false)}{th('sales', 'Sales')}{th('orders', 'Orders')}{th('aov', 'Avg order')}{th('cancel_rate', 'Cancel %')}
@@ -154,8 +154,8 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                                 <tbody>
                                     {rows.map((r) => (
                                         <tr key={r.id} className="cursor-pointer border-b last:border-0 hover:bg-muted/30" onClick={() => switchTo(r.id)} title={`Open ${r.name}`}>
-                                            <td className="px-3 py-2 font-medium">{r.is_main ? <>{r.name} <span className="text-[11px] text-blue-600">(main)</span></> : r.short}</td>
-                                            <td className="px-3 py-2 text-right tabular-nums">{peso(r.sales)}{r.growth !== null && <span className={`block text-[11px] ${r.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.growth >= 0 ? '+' : ''}{r.growth}%</span>}</td>
+                                            <td className="px-3 py-2 font-medium">{r.is_main ? <>{r.name} <span className="text-xs text-blue-600">(main)</span></> : r.short}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{peso(r.sales)}{r.growth !== null && <span className={`block text-xs ${r.growth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{r.growth >= 0 ? '+' : ''}{r.growth}%</span>}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{r.orders}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{peso(r.aov)}</td>
                                             <td className={`px-3 py-2 text-right tabular-nums ${r.cancel_rate >= rules.cancel_rate ? 'font-semibold text-red-600' : ''}`}>{r.cancel_rate}%</td>
@@ -169,7 +169,7 @@ export default function MainDashboard({ period, dashboard, transfers, rules }: P
                                 </tbody>
                             </table>
                         </div>
-                        <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">
+                        <p className="border-t px-3 py-2 text-xs text-muted-foreground">
                             Sales = what customers paid (items + delivery fee) for delivered and paid orders — the same as Revenue and the receipts.
                             {' '}*Stock value = usable stock × cost price (else the last purchase order cost, else the selling price).
                         </p>
@@ -224,7 +224,7 @@ function Stat({ icon: Icon, label, value, sub }: { icon: typeof Wallet; label: s
             <CardContent className="space-y-0.5 p-4">
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</p>
                 <p className="text-xl font-bold tabular-nums">{value}</p>
-                {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+                {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
             </CardContent>
         </Card>
     );

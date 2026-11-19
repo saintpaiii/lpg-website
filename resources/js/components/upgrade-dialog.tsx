@@ -54,7 +54,7 @@ export function UpgradeDialog() {
                                     <p className="flex items-center gap-1 font-semibold">
                                         {p.key === 'premium' && <Crown className="h-3.5 w-3.5 text-amber-500" />}
                                         {p.name}
-                                        {current && <span className="ml-auto rounded bg-blue-100 px-1 text-[10px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Current</span>}
+                                        {current && <span className="ml-auto rounded bg-blue-100 px-1 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">Current</span>}
                                     </p>
                                     <p className="text-xs text-muted-foreground">{peso(p.price)} / {planCatalog.days} days</p>
                                     <p className={cn('mt-2 flex items-center gap-1 text-xs font-medium', included ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>

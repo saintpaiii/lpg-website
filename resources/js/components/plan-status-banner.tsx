@@ -29,10 +29,10 @@ export function PlanStatusBanner() {
 
     if (state === 'expired') {
         return (
-            <div className="flex flex-wrap items-center gap-3 border-b border-red-300 bg-red-600 px-4 py-2.5 text-sm text-white">
+            <div className="flex flex-wrap items-center gap-3 border-b border-red-200 dark:border-red-800 bg-red-600 px-4 py-2.5 text-sm text-white">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
                 <p className="flex-1 font-medium">Your plan has ended — your products are hidden from customers.</p>
-                <Link href="/seller/plan" className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">Choose a plan</Link>
+                <Link href="/seller/plan" className="rounded-md bg-card px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40">Choose a plan</Link>
             </div>
         );
     }

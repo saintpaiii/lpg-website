@@ -112,7 +112,7 @@ export default function CameraCapture({
 
     return (
         <div className="space-y-2">
-            {hint && <p className="text-xs text-gray-500">{hint}</p>}
+            {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
 
             {/* Taken photo */}
             {preview && mode !== 'active' && (
@@ -130,7 +130,7 @@ export default function CameraCapture({
                             </button>
                         </div>
                     )}
-                    <p className="mt-1 text-xs text-gray-500">Photo taken with your camera just now.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Photo taken with your camera just now.</p>
                 </div>
             )}
 

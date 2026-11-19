@@ -13,8 +13,8 @@ function Bar({ used, max, label }: { used: number; max: number; label: string })
     const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
     return (
         <div className="min-w-0 flex-1">
-            <div className="mb-0.5 flex justify-between text-[11px] text-gray-500"><span>{label}</span><span className="tabular-nums">{used} / {max}</span></div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+            <div className="mb-0.5 flex justify-between text-xs text-muted-foreground"><span>{label}</span><span className="tabular-nums">{used} / {max}</span></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-blue-600')} style={{ width: `${pct}%` }} />
             </div>
         </div>
@@ -26,7 +26,7 @@ export function LoadMeter({ data }: { data: RiderLoad | null | undefined }) {
     if (!data) return null;
     if (!data.vehicle) {
         return (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-300">
                 {data.clocked_in ? 'Choose your vehicle for today to receive deliveries.' : 'Clock in and choose your vehicle to receive deliveries.'}{' '}
                 <Link href="/rider/my-attendance" className="font-medium underline">My Attendance</Link>
             </div>
@@ -35,10 +35,10 @@ export function LoadMeter({ data }: { data: RiderLoad | null | undefined }) {
     const l = data.load;
     const kg = (n: number) => String(Math.round(n * 100) / 100);
     return (
-        <div className="space-y-2 rounded-lg border bg-white px-4 py-3 shadow-sm">
-            <p className="text-sm font-medium text-gray-900">
+        <div className="space-y-2 rounded-lg border bg-card px-4 py-3 shadow-sm">
+            <p className="text-sm font-medium text-foreground">
                 {icon(data.vehicle.type)} {data.vehicle.label} {data.vehicle.plate}
-                <span className="text-gray-500"> · Load {kg(l.kg)} / {kg(l.max_kg)} kg · {l.tanks} / {l.max_tanks} tanks</span>
+                <span className="text-muted-foreground"> · Load {kg(l.kg)} / {kg(l.max_kg)} kg · {l.tanks} / {l.max_tanks} tanks</span>
             </p>
             <div className="flex gap-4">
                 <Bar used={Number(kg(l.kg))} max={l.max_kg} label="Weight (kg)" />

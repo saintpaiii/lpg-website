@@ -14,31 +14,31 @@ export function StarRating({ value, count, size = 'sm' }: StarRatingProps) {
             <div className="flex items-center gap-1">
                 <span className="flex leading-none">
                     {[1, 2, 3, 4, 5].map((i) => (
-                        <span key={i} className={`${size === 'xs' ? 'text-[11px]' : 'text-sm'} text-gray-300`}>★</span>
+                        <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-sm'} text-gray-500`}>★</span>
                     ))}
                 </span>
-                <span className={`${size === 'xs' ? 'text-[10px]' : 'text-xs'} text-gray-400 italic`}>No reviews yet</span>
+                <span className={`${size === 'xs' ? 'text-xs' : 'text-xs'} text-muted-foreground italic`}>No reviews yet</span>
             </div>
         );
     }
 
     const filled   = Math.round(value); // round to nearest integer for star fill
-    const textCls  = size === 'xs' ? 'text-[10px]' : 'text-xs';
+    const textCls  = size === 'xs' ? 'text-xs' : 'text-xs';
 
     return (
         <div className="flex items-center gap-1">
             <span className="flex leading-none">
                 {[1, 2, 3, 4, 5].map((i) => (
-                    <span key={i} className={`${size === 'xs' ? 'text-[11px]' : 'text-sm'} ${i <= filled ? 'text-amber-400' : 'text-gray-300'}`}>
+                    <span key={i} className={`${size === 'xs' ? 'text-xs' : 'text-sm'} ${i <= filled ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'}`}>
                         ★
                     </span>
                 ))}
             </span>
             {value > 0 && (
-                <span className={`${textCls} text-gray-600 tabular-nums`}>{value.toFixed(1)}</span>
+                <span className={`${textCls} text-muted-foreground tabular-nums`}>{value.toFixed(1)}</span>
             )}
             {typeof count !== 'undefined' && (
-                <span className={`${textCls} text-gray-400`}>
+                <span className={`${textCls} text-muted-foreground`}>
                     ({count})
                 </span>
             )}

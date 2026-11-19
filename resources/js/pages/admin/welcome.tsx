@@ -16,7 +16,7 @@ export default function PlatformStaffWelcome() {
 
             <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh] px-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-800 mb-6">
-                    <ShieldOff className="h-8 w-8 text-gray-400" />
+                    <ShieldOff className="h-8 w-8 text-muted-foreground" />
                 </div>
 
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">

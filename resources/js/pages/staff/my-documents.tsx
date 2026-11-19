@@ -35,18 +35,18 @@ type Props = {
 };
 
 const LICENSE_BADGE: Record<LicenseStatus, [string, string]> = {
-    valid:    ['bg-green-100 text-green-800', 'Valid'],
-    expiring: ['bg-amber-100 text-amber-800', 'Expiring soon'],
-    pending:  ['bg-blue-100 text-blue-800', 'Waiting for admin review'],
-    rejected: ['bg-red-100 text-red-800', 'Rejected'],
-    expired:  ['bg-red-100 text-red-800', 'Expired'],
-    missing:  ['bg-gray-100 text-gray-700', 'Not uploaded'],
+    valid:    ['bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300', 'Valid'],
+    expiring: ['bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300', 'Expiring soon'],
+    pending:  ['bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300', 'Waiting for admin review'],
+    rejected: ['bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300', 'Rejected'],
+    expired:  ['bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300', 'Expired'],
+    missing:  ['bg-muted text-foreground/80', 'Not uploaded'],
 };
 
 const STATUS_BADGE: Record<Doc['status'], [string, string]> = {
-    pending:  ['bg-blue-100 text-blue-800', 'Waiting for approval'],
-    approved: ['bg-green-100 text-green-800', 'Approved'],
-    rejected: ['bg-red-100 text-red-800', 'Rejected'],
+    pending:  ['bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300', 'Waiting for approval'],
+    approved: ['bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300', 'Approved'],
+    rejected: ['bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300', 'Rejected'],
 };
 
 const tomorrow = () => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); };
@@ -101,13 +101,13 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                 </div>
 
                 {!has_store && (
-                    <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    <p className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
                         Your account is not linked to a store. Ask your store owner.
                     </p>
                 )}
 
                 {is_rider && license && (
-                    <Card className={cn('border-2', ['valid', 'expiring'].includes(license.status) ? 'border-green-300' : 'border-red-300')}>
+                    <Card className={cn('border-2', ['valid', 'expiring'].includes(license.status) ? 'border-green-200 dark:border-green-800' : 'border-red-200 dark:border-red-800')}>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                                 <IdCard className="h-5 w-5 text-blue-600" /> Driver's License (required)
@@ -123,7 +123,7 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                                 </p>
                             )}
                             {license.current?.auto_approved && license.current.status === 'approved' && (
-                                <p className="text-xs font-medium text-green-700">Approved automatically — your selfie matched your license.</p>
+                                <p className="text-xs font-medium text-green-700 dark:text-green-300">Approved automatically — your selfie matched your license.</p>
                             )}
                             {license.current && (
                                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
@@ -144,7 +144,7 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                                         <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
                                             <span>Uploaded {d.date}{d.expires_on ? ` · valid until ${d.expires_on}` : ''}{d.reason && !d.replaced ? ` · rejected: ${d.reason}` : ''}</span>
                                             {d.replaced
-                                                ? <span className="rounded-full bg-gray-100 px-2 py-0.5 font-semibold text-gray-700">Replaced by a newer upload</span>
+                                                ? <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground/80">Replaced by a newer upload</span>
                                                 : <span className={cn('rounded-full px-2 py-0.5 font-semibold', STATUS_BADGE[d.status][0])}>{d.status === 'approved' && d.auto_approved ? 'Approved automatically' : d.status === 'pending' ? 'Waiting for admin review' : STATUS_BADGE[d.status][1]}</span>}
                                         </li>
                                     ))}
@@ -247,7 +247,7 @@ export default function MyDocuments({ is_rider, has_store, post_url, license, do
                                         else if (form.data.file === licenseShot) form.setData('file', null);
                                     }}
                                 />
-                                {licenseShot && <p className="text-xs text-green-700">Using the camera photo as the license file.</p>}
+                                {licenseShot && <p className="text-xs text-green-700 dark:text-green-300">Using the camera photo as the license file.</p>}
                             </div>
                         )}
                         <div className="grid gap-1.5">

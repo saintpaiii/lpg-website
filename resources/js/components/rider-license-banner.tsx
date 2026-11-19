@@ -13,7 +13,7 @@ export function RiderLicenseBanner() {
             <IdCard className="h-4 w-4 shrink-0" />
             <span className="flex-1">{rider_license.message}</span>
             {!onDocuments && (
-                <Link href="/rider/documents" className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50">
+                <Link href="/rider/documents" className="rounded-md bg-card px-3 py-1 text-xs font-semibold text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40">
                     My Documents
                 </Link>
             )}

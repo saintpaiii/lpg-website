@@ -66,24 +66,24 @@ type Props = {
 const fmt = (n: number) => fmtMoney(n);
 
 const STATUS_COLORS: Record<string, string> = {
-    pending: 'bg-amber-100 text-amber-700',
-    confirmed: 'bg-blue-100 text-blue-700',
-    preparing: 'bg-purple-100 text-purple-700',
-    out_for_delivery: 'bg-orange-100 text-orange-700',
-    delivered: 'bg-green-100 text-green-700',
-    cancelled: 'bg-red-100 text-red-700',
+    pending: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    confirmed: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    preparing: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    delivered: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+    cancelled: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
 };
 
 const PAYMENT_COLORS: Record<string, string> = {
-    unpaid:    'bg-red-100 text-red-700',
-    paid:      'bg-green-100 text-green-700',
-    partial:   'bg-amber-100 text-amber-700',
-    to_refund: 'bg-orange-100 text-orange-700',
-    refunded:  'bg-gray-100 text-gray-600',
+    unpaid:    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    paid:      'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
+    partial:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    to_refund: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    refunded:  'bg-muted text-muted-foreground',
 };
 
 function StatusBadge({ value, colors }: { value: string; colors: Record<string, string> }) {
-    const cls = colors[value] ?? 'bg-gray-100 text-gray-600';
+    const cls = colors[value] ?? 'bg-muted text-muted-foreground';
     return (
         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
             {value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -111,14 +111,14 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                         variant="ghost"
                         size="sm"
                         onClick={() => router.visit('/admin/customers')}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-muted-foreground hover:text-foreground/80"
                     >
                         <ArrowLeft className="mr-1 h-4 w-4" />
                         Back
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <h1 className="text-2xl font-bold text-foreground">{customer.name}</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             {formatAddress(null, customer.barangay ?? null, customer.city ?? null)} ·{' '}
                             {customer.phone ?? 'No phone'} ·{' '}
                             <span className="capitalize">{customer.customer_type}</span>
@@ -132,22 +132,22 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                         <CardTitle className="flex items-center gap-2 text-base">
                             <ShoppingCart className="h-4 w-4 text-blue-600" />
                             Order History
-                            <span className="ml-auto text-sm font-normal text-gray-500">
+                            <span className="ml-auto text-sm font-normal text-muted-foreground">
                                 {orders.total} order{orders.total !== 1 ? 's' : ''}
                             </span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {orders.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <ShoppingCart className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No orders yet</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Order #</th>
                                             <th className="px-4 py-3">Items</th>
                                             <th className="px-4 py-3">Total</th>
@@ -156,13 +156,13 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                             <th className="px-4 py-3">Date</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {orders.data.map((o) => (
-                                            <tr key={o.id} className="hover:bg-gray-50/60">
+                                            <tr key={o.id} className="hover:bg-muted/60">
                                                 <td className="px-4 py-3 font-mono font-medium text-blue-600">
                                                     {o.order_number}
                                                 </td>
-                                                <td className="px-4 py-3 text-gray-600">
+                                                <td className="px-4 py-3 text-muted-foreground">
                                                     {o.items.map((item) => (
                                                         <div key={item.id} className="text-xs">
                                                             {item.product?.name ?? '—'} × {item.quantity}
@@ -176,9 +176,9 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <StatusBadge value={o.payment_status} colors={PAYMENT_COLORS} />
-                                                    <HalfPaymentNote order={o} className="mt-1 block text-[11px]" />
+                                                    <HalfPaymentNote order={o} className="mt-1 block text-xs" />
                                                 </td>
-                                                <td className="px-4 py-3 text-gray-500">{fmtDate(o.created_at)}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{fmtDate(o.created_at)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -189,7 +189,7 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                         {/* Pagination */}
                         {orders.last_page > 1 && (
                             <div className="flex items-center justify-between border-t px-4 py-3">
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted-foreground">
                                     Showing {orders.from}–{orders.to} of {orders.total}
                                 </p>
                                 <div className="flex gap-1">
@@ -202,8 +202,8 @@ export default function CustomerOrdersPage({ customer, orders }: Props) {
                                                 link.active
                                                     ? 'bg-blue-600 text-white'
                                                     : link.url
-                                                    ? 'hover:bg-gray-100 text-gray-600'
-                                                    : 'text-gray-300 cursor-not-allowed'
+                                                    ? 'hover:bg-muted text-muted-foreground'
+                                                    : 'text-muted-foreground cursor-not-allowed'
                                             }`}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                         />

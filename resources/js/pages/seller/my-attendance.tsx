@@ -95,13 +95,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-    present:     'bg-emerald-100 text-emerald-700',
-    late:        'bg-yellow-100 text-yellow-700',
-    absent:      'bg-red-100 text-red-700',
-    half_day:    'bg-orange-100 text-orange-700',
-    day_off:     'bg-gray-100 text-gray-500',
-    undertime:   'bg-rose-100 text-rose-700',
-    no_schedule: 'bg-gray-100 text-gray-400',
+    present:     'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    late:        'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+    absent:      'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    half_day:    'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    day_off:     'bg-muted text-muted-foreground',
+    undertime:   'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+    no_schedule: 'bg-muted text-muted-foreground',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -185,7 +185,7 @@ function MapFitter({ positions }: { positions: [number, number][] }) {
 
 function StatusBadge({ status }: { status: string }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${STATUS_STYLE[status] ?? 'bg-gray-100 text-gray-500'}`}>
+        <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${STATUS_STYLE[status] ?? 'bg-muted text-muted-foreground'}`}>
             {STATUS_LABEL[status] ?? status}
         </span>
     );
@@ -328,16 +328,16 @@ export default function MyAttendancePage({
 
                 {/* Header */}
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                         <CalendarDays className="h-6 w-6 text-blue-600" />
                         My Attendance
                     </h1>
-                    <p className="mt-0.5 text-sm text-gray-500">{today}</p>
+                    <p className="mt-0.5 text-sm text-muted-foreground">{today}</p>
                 </div>
 
                 {/* Clock-in reminder banner */}
                 {!attendance?.clock_in && (
-                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
                         <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                         <span>You haven't clocked in yet today! Please clock in below to record your attendance.</span>
                     </div>
@@ -345,7 +345,7 @@ export default function MyAttendancePage({
 
                 {/* The store has no pin yet — clock-in/out is not possible */}
                 {noStorePin && !isDone && (
-                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
                         <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                         <span>Clock-in is not available yet because the store's location is not pinned. Ask the store owner to pin it in Settings.</span>
                     </div>
@@ -363,7 +363,7 @@ export default function MyAttendancePage({
                         <CardContent className="space-y-3">
                             {/* Map (only when we have at least one pin to show) */}
                             {(store_location || myCoords) && (
-                                <div className="rounded-lg overflow-hidden border border-gray-200 h-48">
+                                <div className="rounded-lg overflow-hidden border border-border h-48">
                                     <MapContainer
                                         center={store_location
                                             ? [store_location.latitude, store_location.longitude]
@@ -400,7 +400,7 @@ export default function MyAttendancePage({
 
                             {/* Legend */}
                             {(store_location || myCoords) && (
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
                                     {store_location && (
                                         <span className="flex items-center gap-1">
                                             <span className="inline-block w-3 h-3 rounded-full bg-red-500 border border-white shadow-sm" /> Store
@@ -413,7 +413,7 @@ export default function MyAttendancePage({
                                     )}
                                     {store_location && (
                                         <span className="flex items-center gap-1">
-                                            <span className="inline-block w-3 h-3 rounded-full border border-blue-400 bg-blue-100" /> {store_location.radius}m radius
+                                            <span className="inline-block w-3 h-3 rounded-full border border-blue-400 bg-blue-100 dark:bg-blue-900/40" /> {store_location.radius}m radius
                                         </span>
                                     )}
                                 </div>
@@ -421,31 +421,31 @@ export default function MyAttendancePage({
 
                             {/* Status messages */}
                             {locStatus === 'loading' && (
-                                <div className="flex items-center gap-2 text-sm text-gray-500">
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     Getting your location…
                                 </div>
                             )}
                             {locStatus === 'unavailable' && (
-                                <div className="flex items-start gap-2 text-sm text-red-700">
+                                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
                                     <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     Geolocation is not supported by your browser.
                                 </div>
                             )}
                             {locStatus === 'denied' && (
-                                <div className="flex items-start gap-2 text-sm text-red-700">
+                                <div className="flex items-start gap-2 text-sm text-red-700 dark:text-red-300">
                                     <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                     Location access denied. Please enable location in your browser settings and reload the page.
                                 </div>
                             )}
                             {locStatus === 'granted' && !store_location && (
-                                <div className="flex items-start gap-2 text-sm text-blue-700">
+                                <div className="flex items-start gap-2 text-sm text-blue-700 dark:text-blue-300">
                                     <MapPin className="h-4 w-4 mt-0.5 shrink-0" />
                                     Location captured. No store pin configured — ask your owner to set it in Settings. Clock in is allowed.
                                 </div>
                             )}
                             {locStatus === 'granted' && store_location && distance !== null && (
-                                <div className={`flex items-center gap-2 text-sm font-medium ${withinRadius ? 'text-emerald-700' : 'text-red-700'}`}>
+                                <div className={`flex items-center gap-2 text-sm font-medium ${withinRadius ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-700 dark:text-red-300'}`}>
                                     {withinRadius
                                         ? <CheckCircle2 className="h-4 w-4 shrink-0" />
                                         : <XCircle className="h-4 w-4 shrink-0" />
@@ -471,38 +471,38 @@ export default function MyAttendancePage({
                     <CardContent className="grid gap-5">
                         {/* Schedule */}
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-500">Scheduled Hours</span>
-                            <span className="font-medium text-gray-800">{fmtSchedule(schedule_start, schedule_end)}</span>
+                            <span className="text-muted-foreground">Scheduled Hours</span>
+                            <span className="font-medium text-foreground">{fmtSchedule(schedule_start, schedule_end)}</span>
                         </div>
 
                         {/* Status */}
                         <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-500">Status</span>
+                            <span className="text-sm text-muted-foreground">Status</span>
                             <div className="flex flex-col items-end gap-0.5">
                                 <StatusBadge status={attendance?.status ?? (day_off_today ? 'day_off' : 'absent')} />
                                 {attendance?.is_extra_day && (
                                     <span className="text-xs font-medium text-indigo-600">Extra day — paid like any worked day</span>
                                 )}
                                 {day_off_today && !attendance?.clock_in && (
-                                    <span className="text-xs text-gray-500">Today is your day off. You can still clock in (Extra day).</span>
+                                    <span className="text-xs text-muted-foreground">Today is your day off. You can still clock in (Extra day).</span>
                                 )}
                                 {attendance?.is_late && attendance?.status !== 'late' && (
-                                    <span className="text-xs text-yellow-600 font-medium">Late arrival</span>
+                                    <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Late arrival</span>
                                 )}
                             </div>
                         </div>
 
                         {/* Clock times */}
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="rounded-lg border bg-gray-50 p-4 text-center">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Clock In</p>
-                                <p className={`text-xl font-bold ${hasClockIn ? 'text-emerald-700' : 'text-gray-300'}`}>
+                            <div className="rounded-lg border bg-muted p-4 text-center">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Clock In</p>
+                                <p className={`text-xl font-bold ${hasClockIn ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
                                     {attendance?.clock_in ?? '—'}
                                 </p>
                             </div>
-                            <div className="rounded-lg border bg-gray-50 p-4 text-center">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Clock Out</p>
-                                <p className={`text-xl font-bold ${hasClockOut ? 'text-blue-700' : 'text-gray-300'}`}>
+                            <div className="rounded-lg border bg-muted p-4 text-center">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Clock Out</p>
+                                <p className={`text-xl font-bold ${hasClockOut ? 'text-blue-700 dark:text-blue-300' : 'text-muted-foreground'}`}>
                                     {attendance?.clock_out ?? '—'}
                                 </p>
                             </div>
@@ -510,14 +510,14 @@ export default function MyAttendancePage({
 
                         {/* Hours summary */}
                         {hasClockIn && (
-                            <div className="flex items-center justify-between rounded-lg bg-blue-50 px-4 py-3 text-sm">
-                                <span className="text-blue-700 font-medium">
+                            <div className="flex items-center justify-between rounded-lg bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm">
+                                <span className="text-blue-700 dark:text-blue-300 font-medium">
                                     {hasClockOut ? 'Total Hours Worked' : 'Hours Worked (so far)'}
                                 </span>
-                                <span className="text-blue-900 font-bold">
+                                <span className="text-blue-900 dark:text-blue-300 font-bold">
                                     {hasClockOut
                                         ? fmtHours(attendance?.hours_worked ?? 0, true)
-                                        : <span className="text-amber-700">{fmtHours(liveHoursWorked(attendance!.clock_in!))}~</span>
+                                        : <span className="text-amber-700 dark:text-amber-300">{fmtHours(liveHoursWorked(attendance!.clock_in!))}~</span>
                                     }
                                 </span>
                                 {hasClockOut && (attendance?.overtime_hours ?? 0) > 0 && (
@@ -534,8 +534,8 @@ export default function MyAttendancePage({
                                 <span>
                                     {rider.current.vehicle
                                         ? <>Today's vehicle: <strong>{rider.current.vehicle.label} {rider.current.vehicle.plate}</strong>
-                                            <span className="text-gray-500"> · {rider.current.load.max_tanks} tanks · {rider.current.load.max_kg} kg</span></>
-                                        : <span className="font-medium text-amber-700">No vehicle yet — choose one to receive deliveries.</span>}
+                                            <span className="text-muted-foreground"> · {rider.current.load.max_tanks} tanks · {rider.current.load.max_kg} kg</span></>
+                                        : <span className="font-medium text-amber-700 dark:text-amber-300">No vehicle yet — choose one to receive deliveries.</span>}
                                 </span>
                                 {(!rider.current.vehicle || rider.active_deliveries === 0) ? (
                                     <button type="button" className="text-sm font-medium text-blue-600 hover:underline"
@@ -543,7 +543,7 @@ export default function MyAttendancePage({
                                         {rider.current.vehicle ? 'Change vehicle' : 'Choose vehicle'}
                                     </button>
                                 ) : (
-                                    <span className="text-xs text-gray-500">Finish your active deliveries to change vehicles.</span>
+                                    <span className="text-xs text-muted-foreground">Finish your active deliveries to change vehicles.</span>
                                 )}
                             </div>
                         )}
@@ -551,11 +551,11 @@ export default function MyAttendancePage({
                         {/* Action button */}
                         <div className="flex justify-center pt-1">
                             {!schedule_start || !schedule_end ? (
-                                <div className="text-center text-sm text-gray-500 italic px-4">
+                                <div className="text-center text-sm text-muted-foreground italic px-4">
                                     Cannot clock in — no schedule assigned. Contact your manager.
                                 </div>
                             ) : isDone ? (
-                                <div className="text-center text-sm text-gray-500 italic">
+                                <div className="text-center text-sm text-muted-foreground italic">
                                     Shift complete. See you tomorrow!
                                 </div>
                             ) : !hasClockIn ? (
@@ -572,7 +572,7 @@ export default function MyAttendancePage({
                                         Clock In
                                     </Button>
                                     {beforeWindow && clock_in_window && (
-                                        <p className="text-xs text-amber-700 text-center">Clock-in opens at {clock_in_window.opens_label}</p>
+                                        <p className="text-xs text-amber-700 dark:text-amber-300 text-center">Clock-in opens at {clock_in_window.opens_label}</p>
                                     )}
                                     {shiftEnded && (
                                         <p className="text-xs text-red-600 text-center">Your shift for today has ended</p>
@@ -613,30 +613,30 @@ export default function MyAttendancePage({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-2">Date</th>
                                         <th className="px-4 py-2 text-center">Clock In</th>
                                         <th className="px-4 py-2 text-center">Clock Out</th>
                                         <th className="px-4 py-2 text-center">Status</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-border">
                                     {history.map((h, i) => (
-                                        <tr key={i} className="hover:bg-gray-50/60">
-                                            <td className="px-4 py-2 text-gray-700">{h.date}</td>
-                                            <td className="px-4 py-2 text-center font-mono text-xs text-emerald-700">
+                                        <tr key={i} className="hover:bg-muted/60">
+                                            <td className="px-4 py-2 text-foreground/80">{h.date}</td>
+                                            <td className="px-4 py-2 text-center font-mono text-xs text-emerald-700 dark:text-emerald-300">
                                                 {h.clock_in ?? '—'}
                                             </td>
-                                            <td className="px-4 py-2 text-center font-mono text-xs text-blue-700">
+                                            <td className="px-4 py-2 text-center font-mono text-xs text-blue-700 dark:text-blue-300">
                                                 {h.clock_out ?? '—'}
                                             </td>
                                             <td className="px-4 py-2 text-center">
-                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[h.status] ?? 'bg-gray-100 text-gray-500'}`}>
+                                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[h.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                     {STATUS_LABEL[h.status] ?? h.status}
                                                 </span>
-                                                {h.is_extra_day && <span className="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">Extra day</span>}
+                                                {h.is_extra_day && <span className="ml-1 inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">Extra day</span>}
                                             </td>
                                         </tr>
                                     ))}

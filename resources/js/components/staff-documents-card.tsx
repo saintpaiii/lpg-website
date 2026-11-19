@@ -34,16 +34,16 @@ const OWNER_LICENSE_TEXT: Record<string, string> = {
 
 /** Short status for a license row, e.g. "Approved automatically" / "Waiting for admin". */
 function licenseRowStatus(d: StaffDocumentRow): [string, string] {
-    if (d.replaced) return ['bg-gray-100 text-gray-700', 'Replaced by a newer upload'];
-    if (d.status === 'approved') return ['bg-green-100 text-green-800', d.auto_approved ? 'Approved automatically' : 'Approved'];
-    if (d.status === 'pending') return ['bg-blue-100 text-blue-800', 'Waiting for admin'];
+    if (d.replaced) return ['bg-muted text-foreground/80', 'Replaced by a newer upload'];
+    if (d.status === 'approved') return ['bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300', d.auto_approved ? 'Approved automatically' : 'Approved'];
+    if (d.status === 'pending') return ['bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300', 'Waiting for admin'];
     return STATUS[d.status];
 }
 
 const STATUS: Record<StaffDocumentRow['status'], [string, string]> = {
-    pending:  ['bg-blue-100 text-blue-800', 'Waiting for approval'],
-    approved: ['bg-green-100 text-green-800', 'Approved'],
-    rejected: ['bg-red-100 text-red-800', 'Rejected'],
+    pending:  ['bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300', 'Waiting for approval'],
+    approved: ['bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300', 'Approved'],
+    rejected: ['bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300', 'Rejected'],
 };
 
 /**
@@ -74,7 +74,7 @@ export default function StaffDocumentsCard({ documents, license }: {
                 <CardTitle className="flex items-center gap-2 text-base"><FileText className="h-4 w-4 text-blue-600" /> Documents</CardTitle>
                 {license && (
                     <div className="space-y-0.5 text-sm">
-                        <p className={cn(['valid', 'expiring'].includes(license.status) ? 'text-green-700' : license.status === 'pending' ? 'text-blue-700' : 'text-red-600')}>
+                        <p className={cn(['valid', 'expiring'].includes(license.status) ? 'text-green-700 dark:text-green-300' : license.status === 'pending' ? 'text-blue-700 dark:text-blue-300' : 'text-red-600')}>
                             Driver's license: {license.status === 'rejected' && license.reason
                                 ? `rejected — ${license.reason} The rider needs to upload it again.`
                                 : (OWNER_LICENSE_TEXT[license.status] ?? license.status)}
@@ -85,7 +85,7 @@ export default function StaffDocumentsCard({ documents, license }: {
                                 {license.number ? `No. ${license.number}` : ''}{license.number && license.expires_on ? ' · ' : ''}
                                 {license.expires_on ? `valid until ${license.expires_on}` : ''}
                                 {license.days_left != null && license.days_left >= 0 && license.days_left <= 30 && (
-                                    <span className="ml-1 font-semibold text-amber-700">— expires in {license.days_left} day{license.days_left === 1 ? '' : 's'}</span>
+                                    <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">— expires in {license.days_left} day{license.days_left === 1 ? '' : 's'}</span>
                                 )}
                             </p>
                         )}

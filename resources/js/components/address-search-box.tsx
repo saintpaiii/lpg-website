@@ -99,7 +99,7 @@ export default function AddressSearchBox({ onSelect, placeholder = 'Search a str
 
     return (
         <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
                 value={query}
                 onChange={(e) => handleChange(e.target.value)}
@@ -115,10 +115,10 @@ export default function AddressSearchBox({ onSelect, placeholder = 'Search a str
                 autoComplete="off"
             />
             {searching ? (
-                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-gray-400" />
+                <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
             ) : query && (
                 <button type="button" aria-label="Clear search" onClick={() => { setQuery(''); setResults([]); setSearched(false); }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600">
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-muted-foreground">
                     <X className="h-4 w-4" />
                 </button>
             )}
@@ -126,7 +126,7 @@ export default function AddressSearchBox({ onSelect, placeholder = 'Search a str
             {open && (results.length > 0 || searched) && (
                 <ul className="absolute z-[1000] mt-1 max-h-64 w-full overflow-auto rounded-md border bg-white py-1 text-sm shadow-lg dark:bg-gray-900">
                     {results.length === 0 ? (
-                        <li className="px-3 py-2 text-xs text-gray-500">No places found in Cavite. Try a street or barangay name, or tap the map.</li>
+                        <li className="px-3 py-2 text-xs text-muted-foreground">No places found in Cavite. Try a street or barangay name, or tap the map.</li>
                     ) : results.map((r, i) => (
                         <li key={i}>
                             <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => choose(r)}
@@ -136,7 +136,7 @@ export default function AddressSearchBox({ onSelect, placeholder = 'Search a str
                             </button>
                         </li>
                     ))}
-                    <li className="border-t px-3 pt-1 text-[10px] text-gray-400">Search by OpenStreetMap</li>
+                    <li className="border-t px-3 pt-1 text-xs text-muted-foreground">Search by OpenStreetMap</li>
                 </ul>
             )}
         </div>

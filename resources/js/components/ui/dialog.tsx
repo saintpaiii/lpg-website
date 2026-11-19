@@ -71,7 +71,7 @@ function DialogContent({
         className={cn(
           // Never taller than the screen: the content scrolls inside (max-h-[90dvh] overflow-y-auto) — and never
           // wider than the box (overflow-x-hidden): wide tables scroll in their own container.
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex max-h-[90dvh] w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-y-auto overflow-x-hidden rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 flex max-h-[90dvh] w-full max-w-[calc(100%-1rem)] translate-x-[-50%] translate-y-[-50%] flex-col gap-4 overflow-y-auto overflow-x-hidden rounded-lg border p-4 shadow-lg duration-200 sm:max-w-lg sm:p-6",
           className
         )}
         {...props}
@@ -115,7 +115,8 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        // J10: on phones the buttons stay visible at the bottom of a long dialog (sticky), full width
+        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end max-sm:sticky max-sm:-bottom-4 max-sm:z-10 max-sm:-mx-4 max-sm:-mb-4 max-sm:border-t max-sm:bg-background max-sm:px-4 max-sm:py-3 max-sm:[&>button]:min-h-10",
         className
       )}
       {...props}

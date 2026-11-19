@@ -11,7 +11,7 @@ function typeIcon(type: string) {
         case 'order_update':    return <Package className="h-4 w-4 text-blue-500" />;
         case 'delivery_update': return <Truck className="h-4 w-4 text-orange-500" />;
         case 'payment':         return <span className="h-4 w-4 text-green-500 text-xs font-bold flex items-center justify-center">₱</span>;
-        default:                return <Settings className="h-4 w-4 text-gray-400" />;
+        default:                return <Settings className="h-4 w-4 text-muted-foreground" />;
     }
 }
 
@@ -103,7 +103,7 @@ export function NotificationBell() {
             >
                 <Bell className="h-4 w-4" />
                 {unread > 0 && (
-                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white leading-none">
                         {unread > 9 ? '9+' : unread}
                     </span>
                 )}
@@ -144,7 +144,7 @@ export function NotificationBell() {
                                     <div className="min-w-0 flex-1">
                                         <p className="text-xs font-semibold text-foreground leading-snug">{n.title}</p>
                                         <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.message}</p>
-                                        <p className="mt-1 text-[10px] text-muted-foreground/60">{n.created_at}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground/60">{n.created_at}</p>
                                     </div>
                                     <button
                                         onClick={e => { e.stopPropagation(); markRead(n.id); }}

@@ -137,7 +137,7 @@ export default function SellerDocuments({ permits, others, documents_suspended, 
                                         </span>
                                         <span className="flex items-center justify-end gap-3 whitespace-nowrap">
                                             <span className={cn('rounded-full px-2 py-0.5 text-xs font-semibold',
-                                                o.status === 'approved' ? 'bg-green-100 text-green-800' : o.status === 'pending' ? 'bg-blue-100 text-blue-800' : 'bg-red-100 text-red-800')}>
+                                                o.status === 'approved' ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300' : o.status === 'pending' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300' : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300')}>
                                                 {o.status === 'pending' ? 'Waiting for review' : o.status === 'approved' ? 'Approved' : 'Rejected'}
                                             </span>
                                             <a href={o.url} target="_blank" rel="noopener" className="text-blue-600 hover:underline">View</a>

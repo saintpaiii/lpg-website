@@ -129,7 +129,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
                     onClick={() => onChange(i)}
                     className="text-2xl leading-none transition-colors focus:outline-none"
                 >
-                    <span className={(hover || value) >= i ? 'text-amber-400' : 'text-gray-300'}>★</span>
+                    <span className={(hover || value) >= i ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>★</span>
                 </button>
             ))}
         </div>
@@ -148,14 +148,14 @@ function RelatedCard({ p }: { p: RelatedProduct }) {
                 <ProductCardImage imageUrl={p.image_url} hoverUrl={p.hover_url} name={p.name}
                     photoCount={p.photo_count} hasVideo={p.has_video} className="h-28" />
                 <CardContent className="p-3">
-                    <p className="font-semibold text-xs text-gray-900 truncate">{p.name}</p>
-                    <p className="text-[10px] text-gray-500 mb-1">{p.brand} · {p.weight}</p>
+                    <p className="font-semibold text-xs text-foreground truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground mb-1">{p.brand} · {p.weight}</p>
                     <StarRating value={p.avg_rating} count={p.review_count} size="xs" />
                     <p className="mt-1.5 font-bold text-blue-600 text-sm">
                         ₱{(p.product_type === 'accessory' ? p.purchase_price : p.refill_price).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                     </p>
                     {p.stock === 0 && (
-                        <span className="text-[10px] text-red-500 font-medium">Out of stock</span>
+                        <span className="text-xs text-red-500 font-medium">Out of stock</span>
                     )}
                 </CardContent>
             </Card>
@@ -239,7 +239,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                 {/* Back */}
                 <button
                     onClick={() => router.visit('/customer/products')}
-                    className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-blue-600 transition-colors"
                 >
                     <ArrowLeft className="h-4 w-4" />
                     Back to Products
@@ -254,7 +254,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                     <div className="flex flex-col gap-4">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{product.name}</h1>
-                            <p className="text-gray-500 mt-0.5">{product.brand} · {product.weight}</p>
+                            <p className="text-muted-foreground mt-0.5">{product.brand} · {product.weight}</p>
                         </div>
 
                         {/* Rating */}
@@ -269,13 +269,13 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                         ) : (
                             <div className="flex gap-6">
                                 <div>
-                                    <p className="text-xs text-gray-400 mb-0.5">Refill</p>
+                                    <p className="text-xs text-muted-foreground mb-0.5">Refill</p>
                                     <p className="text-2xl font-bold text-blue-600">
                                         ₱{product.refill_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-xs text-gray-400 mb-0.5">New Purchase</p>
+                                    <p className="text-xs text-muted-foreground mb-0.5">New Purchase</p>
                                     <p className="text-2xl font-semibold text-gray-700 dark:text-gray-300">
                                         ₱{product.purchase_price.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                     </p>
@@ -284,13 +284,13 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                         )}
 
                         {/* Stock */}
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                             {product.stock > 0
                                 ? <span className="text-green-600 font-medium">{product.stock} available</span>
                                 : <span className="text-red-500 font-medium">Out of stock</span>
                             }
                             {product.max_per_order != null && product.stock > 0 && (
-                                <span className="text-gray-500"> · {limitLabel(product)}</span>
+                                <span className="text-muted-foreground"> · {limitLabel(product)}</span>
                             )}
                         </p>
                         {limitInfo ? (
@@ -312,13 +312,13 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 {product.store_featured && <FeaturedBadge />}
                                 <MessageButton portal="customer" params={{ store_id: product.store_id }} label="Message store" className="ml-auto h-7 gap-1 px-2 text-xs" />
                             </div>
-                            <p className="text-gray-500 pl-6">
+                            <p className="text-muted-foreground pl-6">
                                 {[product.store_barangay, product.store_city].filter(Boolean).join(', ')}
                             </p>
                             {product.pickup_only ? (
                                 <p className="pl-6"><PickupOnlyBadge /></p>
                             ) : (product.delivery_from != null || product.allow_pickup) && (
-                                <p className="text-gray-500 pl-6">
+                                <p className="text-muted-foreground pl-6">
                                     {product.delivery_from != null
                                         ? `Delivery from ₱${product.delivery_from.toLocaleString('en-PH')} (final fee at checkout)`
                                         : 'Pick-up only'}
@@ -326,11 +326,11 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                             )}
                             {product.hours && <p className="pl-6"><StoreHoursBadge hours={product.hours} className="text-xs" /></p>}
                             {product.exchange_policy && !isAccessory && (
-                                <p className="text-gray-500 pl-6">
+                                <p className="text-muted-foreground pl-6">
                                     Refill: bring an empty tank that meets the store's exchange policy · <ExchangePolicyLink policy={product.exchange_policy} storeName={product.store_name} />
                                 </p>
                             )}
-                            <p className="text-gray-500 pl-6">
+                            <p className="text-muted-foreground pl-6">
                                 Refunds: within {product.refund_window_days ?? 7} day{(product.refund_window_days ?? 7) === 1 ? '' : 's'} after delivery.
                             </p>
                         </div>
@@ -367,15 +367,15 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                     <button
                                         onClick={() => setQty(q => Math.max(1, q - 1))}
                                         disabled={qty <= 1}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                     >−</button>
                                     <span className="w-10 text-center font-semibold text-gray-900 dark:text-white">{qty}</span>
                                     <button
                                         onClick={() => setQty(q => Math.min(maxAdd, q + 1))}
                                         disabled={qty >= maxAdd}
-                                        className="h-9 w-9 rounded-lg border border-gray-300 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+                                        className="h-9 w-9 rounded-lg border border-border flex items-center justify-center text-muted-foreground hover:bg-muted disabled:opacity-40"
                                     >+</button>
-                                    <span className="text-sm text-gray-500">
+                                    <span className="text-sm text-muted-foreground">
                                         Subtotal: <strong>₱{(unitPrice * qty).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</strong>
                                     </span>
                                 </div>
@@ -390,7 +390,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                     Add to Cart
                                 </Button>
                                 {maxAdd === 0 && (
-                                    <p className={`text-center text-sm ${limitReached ? 'font-medium text-red-600' : 'text-gray-500'}`}>
+                                    <p className={`text-center text-sm ${limitReached ? 'font-medium text-red-600' : 'text-muted-foreground'}`}>
                                         {limitReached ?? 'All available stock is already in your cart'}
                                     </p>
                                 )}
@@ -404,7 +404,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                     <CardHeader className="pb-3">
                         <div className="flex items-center justify-between flex-wrap gap-2">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <Star className="h-4 w-4 text-amber-400" />
+                                <Star className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                                 Reviews ({withPhotos ? product.review_count : reviews.total})
                             </CardTitle>
                             {(reviewsWithPhotos > 0 || withPhotos) && (
@@ -415,7 +415,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                                         withPhotos
                                             ? 'border-blue-600 bg-blue-600 text-white'
-                                            : 'border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300'
+                                            : 'border-gray-300 text-gray-600 hover:bg-muted dark:border-gray-700 dark:text-gray-300'
                                     }`}
                                 >
                                     With photos ({reviewsWithPhotos})
@@ -423,7 +423,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                             )}
                             {product.review_count > 0 && (
                                 <div className="flex items-center gap-1.5">
-                                    <span className="text-sm text-gray-500">Average:</span>
+                                    <span className="text-sm text-muted-foreground">Average:</span>
                                     <StarRating value={product.avg_rating} count={product.review_count} />
                                 </div>
                             )}
@@ -431,7 +431,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                     </CardHeader>
                     <CardContent>
                         {reviews.data.length === 0 ? (
-                            <p className="text-sm text-gray-400 italic py-4 text-center">
+                            <p className="text-sm text-muted-foreground italic py-4 text-center">
                                 {withPhotos ? 'No reviews with photos yet.' : 'No reviews yet. Be the first to review this product!'}
                             </p>
                         ) : (
@@ -441,12 +441,12 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1">
                                             <span className="flex">
                                                 {[1,2,3,4,5].map(i => (
-                                                    <span key={i} className={`text-sm ${i <= r.rating ? 'text-amber-400' : 'text-gray-300'}`}>★</span>
+                                                    <span key={i} className={`text-sm ${i <= r.rating ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>★</span>
                                                 ))}
                                             </span>
                                             <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.user_name}</span>
-                                            {r.is_mine && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Your review</span>}
-                                            <span className="text-xs text-gray-400">— {fmtDate(r.created_at)}{r.edited ? ' (edited)' : ''}</span>
+                                            {r.is_mine && <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">Your review</span>}
+                                            <span className="text-xs text-muted-foreground">— {fmtDate(r.created_at)}{r.edited ? ' (edited)' : ''}</span>
                                         </div>
                                         {r.review && (
                                             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed ml-0.5">"{r.review}"</p>
@@ -475,8 +475,8 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                             link.active
                                                 ? 'bg-blue-600 text-white border-blue-600'
                                                 : link.url
-                                                    ? 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                                                    : 'border-gray-200 text-gray-300 cursor-not-allowed'
+                                                    ? 'border-border text-muted-foreground hover:bg-muted'
+                                                    : 'border-border text-muted-foreground cursor-not-allowed'
                                         }`}
                                     />
                                 ))}
@@ -493,12 +493,12 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 <Star className="h-4 w-4 text-amber-500" />
                                 Rate this product
                             </CardTitle>
-                            <p className="text-xs text-gray-500">You've purchased this product. Share your experience!</p>
+                            <p className="text-xs text-muted-foreground">You've purchased this product. Share your experience!</p>
                         </CardHeader>
                         <CardContent>
                             <form onSubmit={submitRating} className="space-y-3">
                                 <div>
-                                    <p className="text-xs font-medium text-gray-500 mb-1.5">Your rating</p>
+                                    <p className="text-xs font-medium text-muted-foreground mb-1.5">Your rating</p>
                                     <StarPicker value={ratingForm.data.rating} onChange={v => ratingForm.setData('rating', v)} />
                                     {ratingErr['ratings.0.rating'] && <p className="text-xs text-red-500 mt-1">{ratingErr['ratings.0.rating']}</p>}
                                 </div>
@@ -516,7 +516,7 @@ export default function ProductShowPage({ product, reviews, withPhotos = false, 
                                 <Button
                                     type="submit"
                                     disabled={ratingForm.data.rating === 0 || ratingBusy}
-                                    className="bg-amber-500 hover:bg-amber-600 text-white"
+                                    className="bg-amber-600 hover:bg-amber-600 text-white"
                                 >
                                     Submit Review
                                 </Button>

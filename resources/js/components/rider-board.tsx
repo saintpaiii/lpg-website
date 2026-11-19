@@ -125,12 +125,12 @@ export default function RiderBoard({ initial, storePin, realtime }: { initial: B
                                         <p className="truncate font-semibold">{r.full_name}</p>
                                         <p className="truncate text-xs text-muted-foreground">{r.vehicle ? `${r.vehicle.label} · ${r.vehicle.plate}` : 'No vehicle'}</p>
                                     </div>
-                                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${CHIP[r.status]}`}>{r.status_label}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${CHIP[r.status]}`}>{r.status_label}</span>
                                 </div>
                                 {r.status !== 'off_shift' && r.load && (
                                     <div className="mt-2">
                                         <div className="h-1.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-800"><div className="h-full bg-blue-500" style={{ width: `${kgPct}%` }} /></div>
-                                        <p className="mt-1 text-[11px] text-muted-foreground tabular-nums">{r.load.kg} / {r.load.max_kg} kg · {r.load.tanks} / {r.load.max_tanks} tanks</p>
+                                        <p className="mt-1 text-xs text-muted-foreground tabular-nums">{r.load.kg} / {r.load.max_kg} kg · {r.load.tanks} / {r.load.max_tanks} tanks</p>
                                     </div>
                                 )}
                                 <p className="mt-1.5 text-xs text-muted-foreground">

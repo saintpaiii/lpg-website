@@ -306,11 +306,11 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
     };
 
     if (loading) {
-        return <div className="flex h-full items-center justify-center text-sm text-gray-500"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading messages…</div>;
+        return <div className="flex h-full items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading messages…</div>;
     }
     if (loadError || !header) {
         return (
-            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-gray-500">
+            <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
                 {loadError ?? 'Conversation not found.'}
                 {onBack && <Button variant="outline" size="sm" onClick={onBack}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button>}
             </div>
@@ -332,11 +332,11 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                 <Avatar initials={header.initials} seed={header.id} src={header.avatar_url} className="h-9 w-9" />
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{header.title}</p>
-                    <p className="flex items-center gap-1.5 truncate text-xs text-gray-500">
+                    <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                         <span className="truncate">{header.my_delivery ? `Order ${header.my_delivery.order_number} · ${header.my_delivery.status_label}` : header.riders.length ? (portal === 'customer' ? 'Store' : 'Customer') : header.subtitle}</span>
                         <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', live === 'connected' ? 'bg-emerald-500' : 'bg-gray-300')}
                             title={live === 'connected' ? 'Live' : 'Updating every few seconds'} />
-                        <span className="hidden shrink-0 text-[10px] sm:inline">{live === 'connected' ? 'Live' : 'Updating every few seconds'}</span>
+                        <span className="hidden shrink-0 text-xs sm:inline">{live === 'connected' ? 'Live' : 'Updating every few seconds'}</span>
                     </p>
                 </div>
                 {header.my_delivery?.navigate_url && (
@@ -346,7 +346,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                     </a>
                 )}
                 {header.phone && (
-                    <a href={`tel:${header.phone}`} className="rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800" aria-label={`Call ${header.title}`}>
+                    <a href={`tel:${header.phone}`} className="rounded-md p-2 text-muted-foreground hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-800" aria-label={`Call ${header.title}`}>
                         <Phone className="h-4 w-4" />
                     </a>
                 )}
@@ -359,8 +359,8 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                     <Bike className="h-4 w-4 shrink-0" />
                     <span className="min-w-0 flex-1 truncate"><strong>{r.name}</strong> · Rider · {r.status_label}</span>
                     {r.order_number && (r.order_id && orderUrl
-                        ? <Link href={orderUrl(r.order_id)} className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-amber-800 hover:underline dark:bg-gray-900">{r.order_number}</Link>
-                        : <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-[10px] dark:bg-gray-900">{r.order_number}</span>)}
+                        ? <Link href={orderUrl(r.order_id)} className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-xs text-amber-800 dark:text-amber-300 hover:underline dark:bg-gray-900">{r.order_number}</Link>
+                        : <span className="shrink-0 rounded bg-white px-1.5 py-0.5 font-mono text-xs dark:bg-gray-900">{r.order_number}</span>)}
                     {r.phone && (
                         <a href={`tel:${r.phone}`} className="shrink-0 rounded-md p-1 hover:bg-amber-100 dark:hover:bg-amber-900/40" aria-label={`Call rider ${r.name}`}>
                             <Phone className="h-3.5 w-3.5" />
@@ -381,7 +381,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                         </div>
                     )}
                     {messages.length === 0 && (
-                        <p className="py-10 text-center text-sm text-gray-500">No messages yet. Say hello!</p>
+                        <p className="py-10 text-center text-sm text-muted-foreground">No messages yet. Say hello!</p>
                     )}
 
                     {messages.map((m) => {
@@ -391,35 +391,35 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                         const mine = isMine(m);
                         const orderChip = m.order && (
                             orderUrl
-                                ? <Link href={orderUrl(m.order.id)} className={cn('mt-1 inline-block rounded px-1.5 py-0.5 font-mono text-[10px] hover:underline', mine ? 'bg-white/20' : 'bg-white dark:bg-gray-900')}>{m.order.order_number}</Link>
-                                : <span className={cn('mt-1 inline-block rounded px-1.5 py-0.5 font-mono text-[10px]', mine ? 'bg-white/20' : 'bg-white dark:bg-gray-900')}>{m.order.order_number}</span>
+                                ? <Link href={orderUrl(m.order.id)} className={cn('mt-1 inline-block rounded px-1.5 py-0.5 font-mono text-xs hover:underline', mine ? 'bg-white/20' : 'bg-white dark:bg-gray-900')}>{m.order.order_number}</Link>
+                                : <span className={cn('mt-1 inline-block rounded px-1.5 py-0.5 font-mono text-xs', mine ? 'bg-white/20' : 'bg-white dark:bg-gray-900')}>{m.order.order_number}</span>
                         );
 
                         return (
                             <Fragment key={m.id}>
                                 {separator && (
-                                    <div className="my-3 flex items-center gap-3 text-[11px] text-gray-400">
+                                    <div className="my-3 flex items-center gap-3 text-xs text-muted-foreground">
                                         <span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />{separator}<span className="h-px flex-1 bg-gray-200 dark:bg-gray-700" />
                                     </div>
                                 )}
 
                                 {m.side === 'system' ? (
                                     <div className="my-2 flex justify-center">
-                                        <p className="flex max-w-[85%] items-start gap-1.5 text-center text-[11px] text-gray-500">
-                                            <Info className="mt-px h-3.5 w-3.5 shrink-0 text-gray-400" />
-                                            <span>{m.body} <span className="text-[10px] text-gray-400">{timeOf(m.created_at)}</span></span>
+                                        <p className="flex max-w-[85%] items-start gap-1.5 text-center text-xs text-muted-foreground">
+                                            <Info className="mt-px h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                            <span>{m.body} <span className="text-xs text-muted-foreground">{timeOf(m.created_at)}</span></span>
                                         </p>
                                     </div>
                                 ) : (
                                     <div className={cn('my-1.5 flex', mine ? 'justify-end' : 'justify-start')}>
                                         <div className={cn('flex max-w-[80%] flex-col', mine ? 'items-end' : 'items-start')}>
                                             {m.sender_name && (!mine || m.side === 'store') && (
-                                                <span className={cn('mb-0.5 flex items-center gap-1 px-1 text-[11px]', m.side === 'rider' ? 'font-medium text-amber-700' : 'text-gray-500')}>
+                                                <span className={cn('mb-0.5 flex items-center gap-1 px-1 text-xs', m.side === 'rider' ? 'font-medium text-amber-700 dark:text-amber-300' : 'text-muted-foreground')}>
                                                     {m.side === 'rider' && <Bike className="h-3 w-3" />}{m.sender_name}
                                                 </span>
                                             )}
                                             {m.is_automatic && (
-                                                <span className="mb-0.5 flex items-center gap-1 px-1 text-[10px] text-gray-400">
+                                                <span className="mb-0.5 flex items-center gap-1 px-1 text-xs text-muted-foreground">
                                                     <Sparkles className="h-3 w-3" /> Automatic update
                                                 </span>
                                             )}
@@ -442,11 +442,11 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                                                 {m.pickup_card && m.order && <PickupLocationCard card={m.pickup_card} orderId={m.order.id} portal={portal} />}
                                                 {orderChip}
                                             </div>
-                                            <span className="mt-0.5 px-1 text-[10px] text-gray-400">
+                                            <span className="mt-0.5 px-1 text-xs text-muted-foreground">
                                                 {m.status === 'sending' ? 'Sending…' : m.status === 'failed' ? null : timeOf(m.created_at)}
                                             </span>
                                             {m.status === 'failed' && (
-                                                <button type="button" onClick={() => retry(m)} className="flex items-center gap-1 px-1 text-[11px] font-medium text-red-600">
+                                                <button type="button" onClick={() => retry(m)} className="flex items-center gap-1 px-1 text-xs font-medium text-red-600">
                                                     <RotateCcw className="h-3 w-3" /> Not sent — tap to retry
                                                 </button>
                                             )}
@@ -510,7 +510,7 @@ export default function MessageThread({ portal, conversationId, onBack, onLoaded
                     </div>
                 </div>
             ) : (
-                <div className="border-t bg-gray-50 px-4 py-3 text-center text-sm text-gray-500 dark:bg-gray-900/40">
+                <div className="border-t bg-gray-50 px-4 py-3 text-center text-sm text-muted-foreground dark:bg-gray-900/40">
                     {CANNOT_SEND[header.cannot_send_reason ?? 'no_access'] ?? "You can't send messages here."}
                 </div>
             )}

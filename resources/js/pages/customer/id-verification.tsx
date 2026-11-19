@@ -204,7 +204,7 @@ export default function IdVerification({ details, details_complete, status, reje
                         <div className="mt-6 grid gap-4 sm:grid-cols-2">
                             {valid_id_url && (
                                 <div>
-                                    <p className="mb-1.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Submitted ID</p>
+                                    <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Submitted ID</p>
                                     <a href={valid_id_url} target="_blank" rel="noopener noreferrer">
                                         <img src={valid_id_url} alt="Valid ID" className="w-full rounded-lg border object-cover aspect-video hover:opacity-90 transition" />
                                     </a>
@@ -212,7 +212,7 @@ export default function IdVerification({ details, details_complete, status, reje
                             )}
                             {selfie_url && (
                                 <div>
-                                    <p className="mb-1.5 text-xs font-medium text-gray-500 uppercase tracking-wide">Submitted Selfie</p>
+                                    <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Submitted Selfie</p>
                                     <img src={selfie_url} alt="Selfie" className="w-full rounded-lg border object-cover aspect-video" />
                                 </div>
                             )}
@@ -234,7 +234,7 @@ export default function IdVerification({ details, details_complete, status, reje
                         <ShieldCheck className="h-6 w-6 text-blue-600" />
                         Identity Verification
                     </h1>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <p className="mt-1 text-sm text-muted-foreground">
                         Verify your identity to place orders. You can still browse products while your verification is being reviewed.
                     </p>
                 </div>
@@ -271,16 +271,16 @@ export default function IdVerification({ details, details_complete, status, reje
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                                 Accepted: {ACCEPTED_IDS.join(' · ')}
                             </p>
-                            <p className="text-xs text-gray-400">File types: JPG, PNG, PDF · Max 5 MB</p>
+                            <p className="text-xs text-muted-foreground">File types: JPG, PNG, PDF · Max 5 MB</p>
 
                             {!idPreview ? (
                                 <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50 p-8 text-center transition hover:border-blue-400 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-900">
-                                    <Upload className="mb-2 h-8 w-8 text-gray-400" />
+                                    <Upload className="mb-2 h-8 w-8 text-muted-foreground" />
                                     <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Click to upload ID</span>
-                                    <span className="mt-1 text-xs text-gray-400">JPG, PNG or PDF</span>
+                                    <span className="mt-1 text-xs text-muted-foreground">JPG, PNG or PDF</span>
                                     <input
                                         type="file"
                                         accept={DOCUMENT_ACCEPT}
@@ -295,7 +295,7 @@ export default function IdVerification({ details, details_complete, status, reje
                                             <FileText className="h-8 w-8 text-red-500" />
                                             <div>
                                                 <p className="text-sm font-medium">{idFile?.name}</p>
-                                                <p className="text-xs text-gray-400">PDF document</p>
+                                                <p className="text-xs text-muted-foreground">PDF document</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -328,7 +328,7 @@ export default function IdVerification({ details, details_complete, status, reje
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                                 Hold your valid ID next to your face. The selfie must be taken now with your camera — uploading a picture is not allowed.
                             </p>
                             <CameraCapture
@@ -338,7 +338,7 @@ export default function IdVerification({ details, details_complete, status, reje
                                 startLabel="Open camera"
                                 error={errors.selfie || null}
                             />
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-muted-foreground">
                                 Your ID photo and selfie are compared by our face-matching provider (Face++) only to confirm it's you.
                                 See our <a href="/privacy" target="_blank" rel="noopener" className="underline">Privacy Policy</a>.
                             </p>
@@ -346,8 +346,8 @@ export default function IdVerification({ details, details_complete, status, reje
                     </Card>
 
                     {/* Submit */}
-                    <div className="flex items-center justify-between gap-4">
-                        <p className="text-sm text-gray-500" aria-live="polite">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <p className="text-sm text-muted-foreground" aria-live="polite">
                             {processing
                                 ? 'Checking your photo… this can take up to 15 seconds.'
                                 : 'When your selfie matches your ID you are verified right away; otherwise an admin reviews it — usually within 24 hours.'}

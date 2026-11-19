@@ -83,7 +83,7 @@ export function CompletePickupDialog({ order, onClose, refillItems = [] }: { ord
                         </label>
                     )}
                     {paidEnough && rowsAmountChange(rows, refillItems) > 0 && (
-                        <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900">Collect {peso(rowsAmountChange(rows, refillItems))} more in cash — a receipt is issued for it.</p>
+                        <p className="rounded-md bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-amber-900 dark:text-amber-300">Collect {peso(rowsAmountChange(rows, refillItems))} more in cash — a receipt is issued for it.</p>
                     )}
                     {blocked && (
                         <p className="rounded-md bg-red-50 px-3 py-2 text-red-700 dark:bg-red-950/30 dark:text-red-300">
@@ -105,11 +105,11 @@ export function CompletePickupDialog({ order, onClose, refillItems = [] }: { ord
 /** Small "Pick-up" / "Delivery" badge for order lists and headers. */
 export function FulfillmentBadge({ fulfillment }: { fulfillment?: string | null }) {
     return fulfillment === 'pickup' ? (
-        <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-300">
+        <span className="inline-flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800 dark:border-teal-800 dark:bg-teal-950/30 dark:text-teal-300">
             <Store className="h-3 w-3" /> Pick-up
         </span>
     ) : (
-        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+        <span className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
             <Truck className="h-3 w-3" /> Delivery
         </span>
     );

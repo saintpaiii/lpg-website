@@ -127,7 +127,7 @@ export default function LegalSectionEditor({ value, onChange }: { value: EditorD
                                 <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => move(i, 1)} disabled={i === sections.length - 1} aria-label="Move down" title="Move down">
                                     <ChevronDown className="h-4 w-4" />
                                 </Button>
-                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700" onClick={() => remove(i)} aria-label="Delete section" title="Delete section">
+                                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-red-600 hover:text-red-700 dark:hover:text-red-300" onClick={() => remove(i)} aria-label="Delete section" title="Delete section">
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>

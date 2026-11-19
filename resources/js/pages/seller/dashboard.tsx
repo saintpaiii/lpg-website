@@ -60,12 +60,12 @@ type Props = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-    pending:          'bg-yellow-100 text-yellow-800',
-    confirmed:        'bg-blue-100 text-blue-800',
-    preparing:        'bg-purple-100 text-purple-800',
-    out_for_delivery: 'bg-orange-100 text-orange-800',
-    delivered:        'bg-green-100 text-green-800',
-    cancelled:        'bg-red-100 text-red-800',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300',
+    delivered:        'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+    cancelled:        'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300',
 };
 
 function fmt(n: number) {
@@ -131,7 +131,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         {/* J4: opening status + "Closed today" (needs Settings access) */}
                         {hours_status && (
                             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-                                <span className={hours_status.open ? 'font-medium text-green-700' : 'font-medium text-red-600'} data-testid="dashboard-hours">{hours_status.label}</span>
+                                <span className={hours_status.open ? 'font-medium text-green-700 dark:text-green-300' : 'font-medium text-red-600'} data-testid="dashboard-hours">{hours_status.label}</span>
                                 {canOpen('/seller/settings') && (
                                     <label className="flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-1 text-xs font-medium">
                                         <input type="checkbox" aria-label="Closed today" checked={closed_today}
@@ -165,7 +165,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                             <p className="text-sm text-muted-foreground">Revenue (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(stats.revenueThisMonth)}</p>
                             <p className="text-xs text-muted-foreground mt-1">{fmt(stats.revenueAllTime)} all time{stats.deliveryFeesThisMonth ? ` · of which delivery fees ${fmt(stats.deliveryFeesThisMonth)}` : ''}</p>
-                            <p className="text-[11px] text-muted-foreground">Delivered and paid orders, items + delivery fee</p>
+                            <p className="text-xs text-muted-foreground">Delivered and paid orders, items + delivery fee</p>
                         </CardContent>
                     </Card>
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-blue-500">
@@ -270,7 +270,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left px-4 py-2 font-medium text-muted-foreground">Order</th>
@@ -299,7 +299,7 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                                                 <td className="px-4 py-2.5 text-sm hidden sm:table-cell">{o.customer}</td>
                                                 <td className="px-4 py-2.5 text-right font-medium text-sm">{fmt(o.grand_total)}</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLORS[o.status] ?? 'bg-muted text-foreground/80'}`}>
                                                         {o.status.replace('_', ' ')}
                                                     </span>
                                                 </td>

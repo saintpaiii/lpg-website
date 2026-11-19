@@ -111,7 +111,7 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                     <div className="min-w-0">
                         <h1 className="flex flex-wrap items-center gap-2 text-2xl font-bold">
                             {po.po_number}
-                            {po.source === 'auto' && <span className="inline-flex items-center gap-1 rounded bg-violet-100 px-1.5 py-0.5 text-xs font-semibold text-violet-700"><Sparkles className="h-3 w-3" /> Auto-reorder draft</span>}
+                            {po.source === 'auto' && <span className="inline-flex items-center gap-1 rounded bg-violet-100 dark:bg-violet-900/40 px-1.5 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300"><Sparkles className="h-3 w-3" /> Auto-reorder draft</span>}
                         </h1>
                         <p className="text-sm break-words text-muted-foreground">{po.supplier.name}{po.supplier.email ? ` · ${po.supplier.email}` : ' · no email'} · lead time {po.supplier.lead_time_days} day(s)</p>
                     </div>
@@ -134,13 +134,13 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                 </div>
 
                 {isDraft && !can.send && (
-                    <p className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="po-awaiting-approval">
+                    <p className="flex items-center gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-300" data-testid="po-awaiting-approval">
                         <Clock className="h-4 w-4 shrink-0" /> Waiting for owner/manager approval — someone who can send purchase orders will review and send it.
                     </p>
                 )}
                 {/* K6: the supplier's minimum order — a draft may be below it, but it can't be sent */}
                 {isDraft && po.below_minimum.length > 0 && (
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="po-below-minimum">
+                    <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-300" data-testid="po-below-minimum">
                         <p className="flex items-center gap-2 font-medium"><AlertTriangle className="h-4 w-4 shrink-0" /> Below the supplier's minimum order — raise the quantity before sending:</p>
                         <ul className="mt-1 list-disc pl-9">{po.below_minimum.map((m) => <li key={m}>{m}</li>)}</ul>
                     </div>
@@ -151,7 +151,7 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                     {po.status === 'cancelled'
                         ? <li className="flex items-center gap-1.5 text-red-600"><Ban className="h-4 w-4" /> Cancelled</li>
                         : timeline.map((t) => (
-                            <li key={t.label} className={`flex items-center gap-1.5 ${t.done ? 'text-emerald-700' : 'text-muted-foreground'}`}>
+                            <li key={t.label} className={`flex items-center gap-1.5 ${t.done ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>
                                 {t.done ? <CheckCircle2 className="h-4 w-4" /> : <Clock className="h-4 w-4" />} {t.label}{t.at && <span className="text-xs text-muted-foreground">· {t.at}</span>}
                             </li>
                         ))}
@@ -170,8 +170,8 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                                     return (
                                         <tr key={pid}>
                                             <td className="px-4 py-2">
-                                                {name}<span className="block text-[11px] text-muted-foreground">{po.items.find((i) => i.product_id === pid)?.reorder}</span>
-                                                {q > 0 && q < min && <span className="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800" data-testid="line-min-warning">Minimum order from this supplier is {min}</span>}
+                                                {name}<span className="block text-xs text-muted-foreground">{po.items.find((i) => i.product_id === pid)?.reorder}</span>
+                                                {q > 0 && q < min && <span className="mt-1 inline-block rounded bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-300" data-testid="line-min-warning">Minimum order from this supplier is {min}</span>}
                                             </td>
                                             <td className="px-4 py-2"><Input aria-label={`Quantity of ${name}`} type="number" min="0" className="ml-auto h-8 w-20 text-right" value={qty[pid] ?? ''} onChange={(e) => setQty((m) => ({ ...m, [pid]: e.target.value }))} /></td>
                                             <td className="px-4 py-2 text-right">—</td>
@@ -182,8 +182,8 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                                 }) : po.items.map((i) => (
                                     <tr key={i.id}>
                                         <td className="px-4 py-2">
-                                            {i.name}{i.empties_sent > 0 && <span className="block text-[11px] text-muted-foreground">{i.empties_sent} empties handed over</span>}
-                                            {isDraft && i.quantity_ordered < i.min_order_qty && <span className="mt-1 inline-block rounded bg-amber-50 px-1.5 py-0.5 text-[11px] text-amber-800">Minimum order from this supplier is {i.min_order_qty}</span>}
+                                            {i.name}{i.empties_sent > 0 && <span className="block text-xs text-muted-foreground">{i.empties_sent} empties handed over</span>}
+                                            {isDraft && i.quantity_ordered < i.min_order_qty && <span className="mt-1 inline-block rounded bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-300">Minimum order from this supplier is {i.min_order_qty}</span>}
                                         </td>
                                         <td className="px-4 py-2 text-right tabular-nums">{i.quantity_ordered}</td>
                                         <td className="px-4 py-2 text-right tabular-nums">{i.quantity_received}</td>
@@ -219,12 +219,12 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                                 <span className="text-muted-foreground">Payment terms: {po.payment_terms || '—'}</span>
                                 {can.pay ? (
                                     <label className="flex items-center gap-2">
-                                        <span className={po.overdue ? 'font-medium text-red-700' : 'text-muted-foreground'}>Due</span>
+                                        <span className={po.overdue ? 'font-medium text-red-700 dark:text-red-300' : 'text-muted-foreground'}>Due</span>
                                         <Input type="date" aria-label="Payment due date" className="h-8 w-40" value={due} onChange={(e) => setDue(e.target.value)} />
                                         {due !== (po.payment_due_on ?? '') && <Button size="sm" variant="outline" onClick={saveDue}>Save</Button>}
                                     </label>
                                 ) : (
-                                    <span className={po.overdue ? 'font-medium text-red-700' : 'text-muted-foreground'}>Due: {po.payment_due_label ?? '—'}</span>
+                                    <span className={po.overdue ? 'font-medium text-red-700 dark:text-red-300' : 'text-muted-foreground'}>Due: {po.payment_due_label ?? '—'}</span>
                                 )}
                                 {can.pay && po.balance > 0 && (
                                     <Button size="sm" className="ml-auto gap-1 bg-blue-600 text-white hover:bg-blue-700" onClick={openPay}><Wallet className="h-4 w-4" /> Record payment</Button>
@@ -240,11 +240,11 @@ export default function PurchaseOrderShow({ po, catalog, can, methods }: { po: P
                                                 <tr key={p.id}>
                                                     <td className="py-1.5 pr-3 whitespace-nowrap">{p.paid_on}</td>
                                                     <td className="py-1.5 pr-3">{p.is_credit ? 'Return credit' : p.method_label}</td>
-                                                    <td className="py-1.5 pr-3 text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' · ') || '—'}{p.recorded_by && <span className="block text-[11px]">by {p.recorded_by}</span>}</td>
+                                                    <td className="py-1.5 pr-3 text-muted-foreground">{[p.reference, p.note].filter(Boolean).join(' · ') || '—'}{p.recorded_by && <span className="block text-xs">by {p.recorded_by}</span>}</td>
                                                     <td className="py-1.5 pr-3 text-right tabular-nums">{peso(p.amount)}</td>
                                                     <td className="py-1.5 text-right">
                                                         {can.owner && (
-                                                            <button type="button" aria-label={`Delete payment of ${peso(p.amount)}`} onClick={() => setDeleteTarget(p)} className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600">
+                                                            <button type="button" aria-label={`Delete payment of ${peso(p.amount)}`} onClick={() => setDeleteTarget(p)} className="rounded p-1 text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600">
                                                                 <Trash2 className="h-4 w-4" />
                                                             </button>
                                                         )}

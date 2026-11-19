@@ -77,10 +77,10 @@ type Props = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS_BADGE: Record<string, string> = {
-    pending:   'bg-yellow-100 text-yellow-800 border-yellow-200',
-    approved:  'bg-green-100 text-green-800 border-green-200',
-    rejected:  'bg-red-100 text-red-800 border-red-200',
-    suspended: 'bg-orange-100 text-orange-800 border-orange-200',
+    pending:   'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    approved:  'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800',
+    rejected:  'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800',
+    suspended: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-800',
 };
 
 const TABS = [
@@ -163,7 +163,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
 
             <div className="p-6 space-y-5">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Store className="h-6 w-6 text-blue-600" />
@@ -195,7 +195,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map(({ key, label, count_key }) => (
                         <button
                             key={key}
@@ -209,7 +209,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                             {label}
                             {counts[count_key] > 0 && (
                                 <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                                    tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
+                                    tab === key ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-muted text-muted-foreground'
                                 } ${key === 'pending' ? actionGlow(counts[count_key]) : ''}`}>
                                     {counts[count_key]}
                                 </span>
@@ -224,7 +224,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Store</th>
@@ -256,7 +256,7 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                                                         </Link>
                                                         <SeenPill flags={seen.get(store.id)} className="ml-1.5" />
                                                         {store.branch_of && (
-                                                            <Link href={`/admin/stores/${store.branch_of.id}`} className="mt-0.5 block w-fit rounded bg-indigo-100 px-1.5 text-[11px] font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-tag">
+                                                            <Link href={`/admin/stores/${store.branch_of.id}`} className="mt-0.5 block w-fit rounded bg-indigo-100 px-1.5 text-xs font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-tag">
                                                                 Branch of {store.branch_of.name}
                                                             </Link>
                                                         )}
@@ -273,19 +273,19 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                                             <td className="px-4 py-3 hidden md:table-cell">
                                                 <p className="text-sm">{store.plan ?? '—'}</p>
                                                 {store.plan_status && (
-                                                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ADMIN_PLAN_STATUS[store.plan_status]?.cls}`}>
+                                                    <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${ADMIN_PLAN_STATUS[store.plan_status]?.cls}`}>
                                                         {ADMIN_PLAN_STATUS[store.plan_status]?.label}
                                                     </span>
                                                 )}
                                                 {store.possible_duplicate && (
-                                                    <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Possible duplicate</span>
+                                                    <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Possible duplicate</span>
                                                 )}
                                                 {store.status === 'approved' && store.has_eligible_rider === false && (
-                                                    <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Hidden: no eligible rider</span>
+                                                    <span className="ml-1 rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-900/40 dark:text-red-300">Hidden: no eligible rider</span>
                                                 )}
                                             </td>
                                             <td className="px-4 py-3 text-center">
-                                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-gray-100 text-gray-700'}`}>
+                                                <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-muted text-foreground/80'}`}>
                                                     {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                 </span>
                                             </td>

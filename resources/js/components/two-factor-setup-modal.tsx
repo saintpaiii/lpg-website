@@ -71,7 +71,7 @@ function TwoFactorSetupStep({
                             <div className="z-10 flex h-full w-full items-center justify-center p-5">
                                 {qrCodeSvg ? (
                                     <div
-                                        className="aspect-square w-full rounded-lg bg-white p-2 [&_svg]:size-full"
+                                        className="aspect-square w-full rounded-lg bg-card p-2 [&_svg]:size-full"
                                         dangerouslySetInnerHTML={{ __html: qrCodeSvg }}
                                         style={{
                                             filter: resolvedAppearance === 'dark' ? 'invert(1) brightness(1.5)' : undefined,

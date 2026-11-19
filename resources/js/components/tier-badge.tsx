@@ -13,10 +13,10 @@ export const TIER_DOTS: Record<Tier, string> = {
 };
 
 const STYLES: Record<Tier, string> = {
-    new:     'bg-gray-100 text-gray-600 border-gray-200',
-    regular: 'bg-blue-100 text-blue-700 border-blue-200',
-    loyal:   'bg-purple-100 text-purple-700 border-purple-200',
-    vip:     'bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 text-amber-700 border-amber-300 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]',
+    new:     'bg-muted text-muted-foreground border-border',
+    regular: 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    loyal:   'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    vip:     'bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-100 dark:from-amber-900/50 dark:via-yellow-900/40 dark:to-amber-900/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]',
 };
 
 const SIZES = {

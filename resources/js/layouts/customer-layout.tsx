@@ -1,5 +1,6 @@
 import WebsiteProblemSidebar from '@/components/reports/website-problem-sidebar';
 import { Link, router, usePage } from '@inertiajs/react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import {
     Bell,
     ChevronRight,
@@ -295,6 +296,9 @@ export default function CustomerLayout({ children, title }: Props) {
                             </Button>
                         )}
 
+                        {/* J10: Light / Dark / System */}
+                        <ThemeToggle compact />
+
                         <Separator orientation="vertical" className="mx-1 h-4" />
 
                         {/* Logout */}
@@ -423,7 +427,7 @@ export default function CustomerLayout({ children, title }: Props) {
                                             <Icon className="h-5 w-5" />
                                             <Lock className="absolute -bottom-0.5 -right-1.5 h-3 w-3" />
                                         </div>
-                                        <span className="text-[10px] font-medium">{label}</span>
+                                        <span className="text-xs font-medium">{label}</span>
                                     </span>
                                 );
                             }
@@ -453,7 +457,7 @@ export default function CustomerLayout({ children, title }: Props) {
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-[10px] font-medium">{label}</span>
+                                    <span className="text-xs font-medium">{label}</span>
                                 </Link>
                             );
                         })}

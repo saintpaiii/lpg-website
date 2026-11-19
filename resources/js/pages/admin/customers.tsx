@@ -84,9 +84,9 @@ const TYPE_LABELS: Record<CustomerType, string> = {
 };
 
 const TYPE_COLORS: Record<CustomerType, string> = {
-    household:  'bg-blue-100 text-blue-700',
-    commercial: 'bg-purple-100 text-purple-700',
-    industrial: 'bg-amber-100 text-amber-700',
+    household:  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    commercial: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    industrial: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
 };
 
 function TypeBadge({ type }: { type: CustomerType }) {
@@ -198,21 +198,21 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-                        <p className="mt-0.5 text-sm text-gray-500">
+                        <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
                             {customers.total} customer{customers.total !== 1 ? 's' : ''}{isArchived ? ' archived' : ' total'}
                         </p>
                     </div>
                 </div>
 
                 {/* ── Tabs ────────────────────────────────────────────────── */}
-                <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
+                <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
                     <button
                         onClick={() => switchTab('active')}
                         className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
                             !isArchived
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-card text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground/80'
                         }`}
                     >
                         Active
@@ -221,13 +221,13 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                         onClick={() => switchTab('archived')}
                         className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
                             isArchived
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-card text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground/80'
                         }`}
                     >
                         Archived
                         {archivedCount > 0 && (
-                            <span className="ml-1.5 rounded-full bg-red-100 px-1.5 py-0.5 text-xs text-red-600">
+                            <span className="ml-1.5 rounded-full bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-xs text-red-600">
                                 {archivedCount}
                             </span>
                         )}
@@ -238,7 +238,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                 <Card>
                     <CardContent className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center">
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 className="pl-9"
                                 placeholder="Search by name, phone, or barangay…"
@@ -276,7 +276,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                     </CardHeader>
                     <CardContent className="p-0">
                         {customers.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <Users className="mb-3 h-10 w-10" />
                                 <p className="font-medium">
                                     {isArchived ? 'No archived customers' : 'No customers found'}
@@ -290,9 +290,9 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Name</th>
                                             <th className="px-4 py-3">Address</th>
                                             <th className="px-4 py-3">Barangay</th>
@@ -302,12 +302,12 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {customers.data.map((c) => (
-                                            <tr key={c.id} className={`hover:bg-gray-50/60 ${isArchived ? 'opacity-75' : ''}`}>
+                                            <tr key={c.id} className={`hover:bg-muted/60 ${isArchived ? 'opacity-75' : ''}`}>
                                                 <td className="px-4 py-3 font-medium">
                                                     {isArchived ? (
-                                                        <span className="text-gray-500">{c.name}</span>
+                                                        <span className="text-muted-foreground">{c.name}</span>
                                                     ) : (
                                                         <button
                                                             className="text-blue-600 hover:underline text-left"
@@ -317,15 +317,15 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                         </button>
                                                     )}
                                                 </td>
-                                                <td className="max-w-[180px] truncate px-4 py-3 text-gray-600">
+                                                <td className="max-w-[180px] truncate px-4 py-3 text-muted-foreground">
                                                     {c.address ?? '—'}
                                                 </td>
-                                                <td className="px-4 py-3 text-gray-600">{c.barangay ?? '—'}</td>
-                                                <td className="px-4 py-3 text-gray-600">{c.phone ?? '—'}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{c.barangay ?? '—'}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{c.phone ?? '—'}</td>
                                                 <td className="px-4 py-3">
                                                     <TypeBadge type={c.customer_type} />
                                                 </td>
-                                                <td className="px-4 py-3 text-right text-gray-600">
+                                                <td className="px-4 py-3 text-right text-muted-foreground">
                                                     {c.orders_count}
                                                 </td>
                                                 <td className="px-4 py-3">
@@ -337,7 +337,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                                     variant="ghost"
                                                                     onClick={() => handleRestore(c)}
                                                                     title="Restore customer"
-                                                                    className="h-8 w-8 p-0 text-gray-500 hover:text-emerald-600"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-emerald-600"
                                                                 >
                                                                     <ArchiveRestore className="h-3.5 w-3.5" />
                                                                 </Button>
@@ -346,7 +346,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                                     variant="ghost"
                                                                     onClick={() => setForceTarget(c)}
                                                                     title="Permanently delete"
-                                                                    className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                 </Button>
@@ -358,7 +358,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                                     variant="ghost"
                                                                     onClick={() => openEdit(c)}
                                                                     title="Edit"
-                                                                    className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-blue-600"
                                                                 >
                                                                     <Edit2 className="h-3.5 w-3.5" />
                                                                 </Button>
@@ -367,7 +367,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                                     variant="ghost"
                                                                     onClick={() => setArchiveTarget(c)}
                                                                     title="Archive customer"
-                                                                    className="h-8 w-8 p-0 text-gray-500 hover:text-amber-600"
+                                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-amber-600"
                                                                 >
                                                                     <Trash2 className="h-3.5 w-3.5" />
                                                                 </Button>
@@ -385,7 +385,7 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                         {/* Pagination */}
                         {customers.last_page > 1 && (
                             <div className="flex items-center justify-between border-t px-4 py-3">
-                                <p className="text-sm text-gray-500">
+                                <p className="text-sm text-muted-foreground">
                                     Showing {customers.from}–{customers.to} of {customers.total}
                                 </p>
                                 <div className="flex gap-1">
@@ -398,8 +398,8 @@ export default function CustomersPage({ customers, filters, archivedCount }: Pro
                                                 link.active
                                                     ? 'bg-blue-600 text-white'
                                                     : link.url
-                                                    ? 'hover:bg-gray-100 text-gray-600'
-                                                    : 'text-gray-300 cursor-not-allowed'
+                                                    ? 'hover:bg-muted text-muted-foreground'
+                                                    : 'text-muted-foreground cursor-not-allowed'
                                             }`}
                                             dangerouslySetInnerHTML={{ __html: link.label }}
                                         />

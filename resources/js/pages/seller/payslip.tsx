@@ -33,7 +33,7 @@ export default function PayslipPage({ payslip, mode, is_rider, pdf_url, back_url
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4 p-4 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
-                        <Link href={back_url} className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Back">
+                        <Link href={back_url} className="rounded-md p-1.5 text-muted-foreground hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Back">
                             <ArrowLeft className="h-4 w-4" />
                         </Link>
                         <h1 className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">

@@ -15,7 +15,7 @@ export function StoreLocationBanner() {
             <MapPin className="h-4 w-4 shrink-0" />
             <span className="flex-1">Pin your store's location so delivery fees are exact and your staff can clock in.</span>
             {isOwner && (
-                <Link href="/seller/settings" className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50">
+                <Link href="/seller/settings" className="rounded-md bg-card px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40">
                     Pin now
                 </Link>
             )}

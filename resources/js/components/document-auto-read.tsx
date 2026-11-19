@@ -114,9 +114,9 @@ export function AutoReadLine({ result, reading, enabled, onReadAgain, canRead = 
     }
 
     return (
-        <div className="mt-1 rounded-md bg-gray-50 px-2 py-1.5 text-[11px] leading-snug dark:bg-gray-800/50">
+        <div className="mt-1 rounded-md bg-gray-50 px-2 py-1.5 text-xs leading-snug dark:bg-gray-800/50">
             <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-                <span className="inline-flex shrink-0 items-center gap-1 font-medium text-gray-500"><ScanText className="h-3 w-3" /> Auto-read:</span>
+                <span className="inline-flex shrink-0 items-center gap-1 font-medium text-muted-foreground"><ScanText className="h-3 w-3" /> Auto-read:</span>
                 <div className="min-w-0 flex-1">{body}</div>
                 <span className="flex shrink-0 items-center gap-2">
                     {result && result.text && (
@@ -130,14 +130,14 @@ export function AutoReadLine({ result, reading, enabled, onReadAgain, canRead = 
                 </span>
             </div>
             {result && !result.unavailable && (result.likely_expiry || result.found_tin) && (
-                <p className="mt-0.5 text-gray-500">
+                <p className="mt-0.5 text-muted-foreground">
                     {result.likely_expiry && <>Date on document: {result.likely_expiry}</>}
                     {result.likely_expiry && result.found_tin && ' · '}
                     {result.found_tin && <>TIN: {result.found_tin}</>}
                 </p>
             )}
             {open && result?.text && (
-                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-white p-2 font-mono text-[10px] text-gray-700 dark:bg-gray-900 dark:text-gray-300">{result.text}</pre>
+                <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-white p-2 font-mono text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">{result.text}</pre>
             )}
         </div>
     );

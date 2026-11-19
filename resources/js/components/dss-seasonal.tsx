@@ -61,11 +61,11 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                     {products.length > 0 && <optgroup label="Products">{products.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</optgroup>}
                 </select>
                 {data.has_demo && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800" data-testid="demo-badge">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300" data-testid="demo-badge">
                         <Sparkles className="h-3 w-3" /> Includes demo history (generated)
                     </span>
                 )}
-                <span className="text-xs text-gray-500">Method: {s.method_label}</span>
+                <span className="text-xs text-muted-foreground">Method: {s.method_label}</span>
                 <div className="ml-auto flex flex-wrap gap-2">
                     {can.import && <Button size="sm" variant="outline" className="gap-1" onClick={() => setImportOpen(true)}><FileUp className="h-4 w-4" /> Import past sales</Button>}
                     {can.owner && data.has_demo && <Button size="sm" variant="outline" className="gap-1 text-red-600" onClick={() => setRemoveDemo(true)}><Trash2 className="h-4 w-4" /> Remove demo history</Button>}
@@ -73,7 +73,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
             </div>
 
             {s.message && (
-                <p className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900" data-testid="seasonal-not-enough">
+                <p className="flex items-center gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-sm text-amber-900 dark:text-amber-300" data-testid="seasonal-not-enough">
                     <Info className="h-4 w-4 shrink-0" /> {s.message}{s.basis === 'recent' ? '' : ' The forecast below uses the plain trend.'}
                 </p>
             )}
@@ -91,7 +91,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                                 </li>
                             ))}
                         </ul>
-                        <p className="mt-2 text-[11px] text-gray-500">Advice only — auto-reorder keeps using its own formula.</p>
+                        <p className="mt-2 text-xs text-muted-foreground">Advice only — auto-reorder keeps using its own formula.</p>
                     </CardContent>
                 </Card>
             )}
@@ -101,7 +101,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                 <CardHeader className="pb-1"><CardTitle className="text-sm">{s.label} — last 24 months and the next 3</CardTitle></CardHeader>
                 <CardContent className="px-2 pb-4 sm:px-4">
                     {s.chart.length === 0 ? (
-                        <p className="py-10 text-center text-sm text-gray-400">No sales yet for this selection.</p>
+                        <p className="py-10 text-center text-sm text-muted-foreground">No sales yet for this selection.</p>
                     ) : (
                         <div className="overflow-x-auto" data-testid="seasonal-chart">
                             <div className="min-w-[640px]">
@@ -117,9 +117,9 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                                                 <div className="rounded-lg border bg-white p-2.5 text-xs shadow-xl dark:bg-gray-900">
                                                     <p className="mb-1 font-bold">{label}</p>
                                                     {p.actual !== null && <p>Actual: {p.actual} {unit}</p>}
-                                                    {p.fitted !== null && <p className="text-slate-500">Fitted: {Math.round(p.fitted)}</p>}
+                                                    {p.fitted !== null && <p className="text-muted-foreground">Fitted: {Math.round(p.fitted)}</p>}
                                                     {p.forecast !== null && <p className="text-indigo-600">Forecast: {p.forecast} {unit}</p>}
-                                                    <p className="text-gray-500">Seasonal index: {p.index.toFixed(2)} ({pct(p.index)})</p>
+                                                    <p className="text-muted-foreground">Seasonal index: {p.index.toFixed(2)} ({pct(p.index)})</p>
                                                 </div>
                                             );
                                         }} />
@@ -142,7 +142,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Seasonal pattern — {s.label}</CardTitle></CardHeader>
                     <CardContent className="overflow-x-auto p-0">
                         <table className="w-full text-sm" data-testid="seasonal-pattern">
-                            <thead><tr className="border-y text-left text-xs text-gray-500"><th className="px-4 py-2">Month</th><th className="px-4 py-2 text-right">Index</th><th className="px-4 py-2 text-right">vs average</th><th className="px-4 py-2" /></tr></thead>
+                            <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Month</th><th className="px-4 py-2 text-right">Index</th><th className="px-4 py-2 text-right">vs average</th><th className="px-4 py-2" /></tr></thead>
                             <tbody className="divide-y">
                                 {MONTHS.map((m, i) => {
                                     const idx = s.indices[String(i + 1)] ?? 1;
@@ -152,17 +152,17 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                                         <tr key={m}>
                                             <td className="px-4 py-1.5">{m}</td>
                                             <td className="px-4 py-1.5 text-right tabular-nums">{idx.toFixed(2)}</td>
-                                            <td className={`px-4 py-1.5 text-right tabular-nums ${idx > 1.005 ? 'text-emerald-700' : idx < 0.995 ? 'text-red-600' : 'text-gray-500'}`}>{s.enough ? pct(idx) : '—'}</td>
+                                            <td className={`px-4 py-1.5 text-right tabular-nums ${idx > 1.005 ? 'text-emerald-700 dark:text-emerald-300' : idx < 0.995 ? 'text-red-600' : 'text-muted-foreground'}`}>{s.enough ? pct(idx) : '—'}</td>
                                             <td className="px-4 py-1.5">
-                                                {peak && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">peak</span>}
-                                                {low && <span className="rounded bg-red-100 px-1.5 py-0.5 text-[11px] font-semibold text-red-700">low</span>}
+                                                {peak && <span className="rounded bg-emerald-100 dark:bg-emerald-900/40 px-1.5 py-0.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300">peak</span>}
+                                                {low && <span className="rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-0.5 text-xs font-semibold text-red-700 dark:text-red-300">low</span>}
                                             </td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
-                        <p className="border-t px-4 py-2 text-[11px] text-gray-500">Method: {s.method_label}.</p>
+                        <p className="border-t px-4 py-2 text-xs text-muted-foreground">Method: {s.method_label}.</p>
                     </CardContent>
                 </Card>
 
@@ -175,26 +175,26 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                                 const ch = s.last_year.known ? vsLastYear(now, then) : null;
                                 return (
                                     <div key={label} className="rounded-lg border p-3">
-                                        <p className="text-xs text-gray-500">{label}</p>
-                                        <p className="text-xl font-bold tabular-nums">{now} <span className="text-xs font-normal text-gray-500">{unit}</span></p>
-                                        {ch !== null && <p className={`text-xs ${ch >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{ch >= 0 ? '+' : '−'}{Math.abs(ch)}% vs same period last year ({then})</p>}
+                                        <p className="text-xs text-muted-foreground">{label}</p>
+                                        <p className="text-xl font-bold tabular-nums">{now} <span className="text-xs font-normal text-muted-foreground">{unit}</span></p>
+                                        {ch !== null && <p className={`text-xs ${ch >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600'}`}>{ch >= 0 ? '+' : '−'}{Math.abs(ch)}% vs same period last year ({then})</p>}
                                     </div>
                                 );
                             })}
                         </div>
                         <ul className="divide-y rounded-lg border">
-                            <li className="flex justify-between px-3 py-1.5"><span>{s.current.label} <span className="text-xs text-gray-500">(rest of the month, {s.current.remaining_days} days)</span></span><span className="tabular-nums">{s.current.remaining_qty}</span></li>
+                            <li className="flex justify-between px-3 py-1.5"><span>{s.current.label} <span className="text-xs text-muted-foreground">(rest of the month, {s.current.remaining_days} days)</span></span><span className="tabular-nums">{s.current.remaining_qty}</span></li>
                             {s.forecast.map((f) => (
-                                <li key={f.ym} className="flex justify-between px-3 py-1.5"><span>{f.label} <span className="text-xs text-gray-500">{s.enough ? pct(f.index) : ''}</span></span><span className="font-medium tabular-nums">{f.qty}</span></li>
+                                <li key={f.ym} className="flex justify-between px-3 py-1.5"><span>{f.label} <span className="text-xs text-muted-foreground">{s.enough ? pct(f.index) : ''}</span></span><span className="font-medium tabular-nums">{f.qty}</span></li>
                             ))}
                         </ul>
                         {s.backtest && s.backtest.mape !== null ? (
-                            <p className="text-xs text-gray-600" data-testid="seasonal-accuracy">
+                            <p className="text-xs text-muted-foreground" data-testid="seasonal-accuracy">
                                 Accuracy (last 3 months held out): MAPE <strong>{s.backtest.mape}%</strong> · MAE {s.backtest.mae} {unit} ·{' '}
-                                <span className={`font-semibold ${s.backtest.grade === 'Good' ? 'text-emerald-700' : s.backtest.grade === 'Fair' ? 'text-amber-700' : 'text-red-600'}`}>{s.backtest.grade}</span>
+                                <span className={`font-semibold ${s.backtest.grade === 'Good' ? 'text-emerald-700 dark:text-emerald-300' : s.backtest.grade === 'Fair' ? 'text-amber-700 dark:text-amber-300' : 'text-red-600'}`}>{s.backtest.grade}</span>
                             </p>
                         ) : (
-                            <p className="text-xs text-gray-400">Accuracy is shown once there are 15 months of history.</p>
+                            <p className="text-xs text-muted-foreground">Accuracy is shown once there are 15 months of history.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -206,25 +206,25 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Next 30 / 90 days per product</CardTitle></CardHeader>
                     <CardContent className="overflow-x-auto p-0">
                         <table className="w-full text-sm" data-testid="seasonal-products">
-                            <thead><tr className="border-y text-left text-xs text-gray-500"><th className="px-4 py-2">Product</th><th className="px-4 py-2 text-right">Next 30 days</th><th className="px-4 py-2 text-right">Next 90 days</th><th className="px-4 py-2">Peak / low</th><th className="px-4 py-2">History</th></tr></thead>
+                            <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Product</th><th className="px-4 py-2 text-right">Next 30 days</th><th className="px-4 py-2 text-right">Next 90 days</th><th className="px-4 py-2">Peak / low</th><th className="px-4 py-2">History</th></tr></thead>
                             <tbody className="divide-y">
                                 {products.map((p) => {
                                     const c30 = p.last_year.known ? vsLastYear(p.next_30, p.last_year.d30) : null;
                                     const c90 = p.last_year.known ? vsLastYear(p.next_90, p.last_year.d90) : null;
-                                    const tag = (c: number | null) => c === null ? null : <span className={`ml-1 text-[11px] ${c >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>{c >= 0 ? '+' : '−'}{Math.abs(c)}%</span>;
+                                    const tag = (c: number | null) => c === null ? null : <span className={`ml-1 text-xs ${c >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600'}`}>{c >= 0 ? '+' : '−'}{Math.abs(c)}%</span>;
                                     return (
                                         <tr key={p.key} className="cursor-pointer hover:bg-muted/30" onClick={() => setKey(p.key)}>
                                             <td className="px-4 py-2 font-medium">{p.label}</td>
                                             <td className="px-4 py-2 text-right tabular-nums">{p.next_30} {p.unit}{tag(c30)}</td>
                                             <td className="px-4 py-2 text-right tabular-nums">{p.next_90} {p.unit}{tag(c90)}</td>
                                             <td className="px-4 py-2 text-xs">{p.enough ? [...p.peaks.map((m) => `${MONTHS[m - 1]} ${pct(p.indices[String(m)])}`), ...p.lows.map((m) => `${MONTHS[m - 1]} ${pct(p.indices[String(m)])}`)].join(' · ') || '—' : '—'}</td>
-                                            <td className="px-4 py-2 text-xs text-gray-500">{p.months} mo</td>
+                                            <td className="px-4 py-2 text-xs text-muted-foreground">{p.months} mo</td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
-                        <p className="border-t px-4 py-2 text-[11px] text-gray-500">% = change vs the same period last year (when the store has sales that old). Click a row to see its chart.</p>
+                        <p className="border-t px-4 py-2 text-xs text-muted-foreground">% = change vs the same period last year (when the store has sales that old). Click a row to see its chart.</p>
                     </CardContent>
                 </Card>
             )}
@@ -235,15 +235,15 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Imported past sales</CardTitle></CardHeader>
                     <CardContent className="overflow-x-auto p-0">
                         {imports.length === 0 ? (
-                            <p className="px-4 py-4 text-sm text-gray-500">No imports yet. Moving from a notebook or Excel? Import your past sales to see seasonal patterns sooner.</p>
+                            <p className="px-4 py-4 text-sm text-muted-foreground">No imports yet. Moving from a notebook or Excel? Import your past sales to see seasonal patterns sooner.</p>
                         ) : (
                             <table className="w-full text-sm" data-testid="sales-imports">
-                                <thead><tr className="border-y text-left text-xs text-gray-500"><th className="px-4 py-2">Imported</th><th className="px-4 py-2 text-right">Rows</th><th className="px-4 py-2">Period</th><th className="px-4 py-2">By</th><th /></tr></thead>
+                                <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Imported</th><th className="px-4 py-2 text-right">Rows</th><th className="px-4 py-2">Period</th><th className="px-4 py-2">By</th><th /></tr></thead>
                                 <tbody className="divide-y">
                                     {imports.map((im) => (
                                         <tr key={im.batch}>
                                             <td className="px-4 py-2 whitespace-nowrap">{im.imported_at}</td>
-                                            <td className="px-4 py-2 text-right tabular-nums">{im.rows} <span className="text-xs text-gray-500">({im.units} units)</span></td>
+                                            <td className="px-4 py-2 text-right tabular-nums">{im.rows} <span className="text-xs text-muted-foreground">({im.units} units)</span></td>
                                             <td className="px-4 py-2 whitespace-nowrap">{im.from} – {im.to}</td>
                                             <td className="px-4 py-2">{im.by ?? '—'}</td>
                                             <td className="px-4 py-2 text-right">{can.import && <button type="button" className="text-xs text-red-600 underline" onClick={() => setDeleteBatch(im)}>Delete this import</button>}</td>
@@ -269,7 +269,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                         <p><strong>Forecast</strong> = (level + change × month number) × the month's index, never below 0. The next 30 / 90 days add up the daily rate (month forecast ÷ days in the month) over the exact days.</p>
                         <p><strong>Accuracy (MAPE)</strong> — the last 3 complete months are hidden, the model is fitted on the rest and forecasts them; MAPE is the average % error (months with 0 sales are skipped), MAE the average error in units. Good &lt; 15%, Fair 15–30%, Weak &gt; 30%. Shown from 15 months of history.</p>
                         <p><strong>Peak / low</strong> — the 2 highest indices at least 1.10 are peak months; the lowest index at most 0.90 is the low month. Advice appears when one starts within 45 days, using your usable stock, open purchase orders and the supplier's lead time. It does not change auto-reorder.</p>
-                        {data.has_demo && <p className="rounded bg-amber-50 px-2 py-1 text-amber-900">Demo history is generated with assumed month factors (e.g. December +30%) — demo assumptions, not real sales.</p>}
+                        {data.has_demo && <p className="rounded bg-amber-50 dark:bg-amber-950/40 px-2 py-1 text-amber-900 dark:text-amber-300">Demo history is generated with assumed month factors (e.g. December +30%) — demo assumptions, not real sales.</p>}
                     </CardContent>
                 )}
             </Card>
@@ -345,42 +345,42 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
                             <p>A <strong>.csv</strong> file (max 2 MB, 20,000 rows) with the columns <code>date</code> (YYYY-MM-DD or MM/DD/YYYY), <code>product</code> (the product name as in your store, or its id) and <code>quantity</code> (whole number above 0). One row per day and product (or per sale).</p>
                             <a href="/seller/dss/sales-history/template" className="inline-flex items-center gap-1 text-blue-600 underline"><Download className="h-4 w-4" /> Download the template (with your product names)</a>
                             <input ref={fileRef} type="file" accept=".csv,text/csv" aria-label="CSV file" className="block w-full text-sm" />
-                            <p className="text-xs text-gray-500">Only sales that are NOT already orders on the platform — both are added up. Dates in the future or more than 5 years back are refused.</p>
+                            <p className="text-xs text-muted-foreground">Only sales that are NOT already orders on the platform — both are added up. Dates in the future or more than 5 years back are refused.</p>
                         </>
                     ) : (
                         <>
                             <div className="flex flex-wrap gap-2" data-testid="import-counts">
-                                <span className="rounded bg-emerald-100 px-2 py-1 font-semibold text-emerald-800">{preview.counts.valid} valid</span>
+                                <span className="rounded bg-emerald-100 dark:bg-emerald-900/40 px-2 py-1 font-semibold text-emerald-800 dark:text-emerald-300">{preview.counts.valid} valid</span>
                                 {Object.entries(PROBLEM_LABELS).filter(([k]) => (preview.counts[k] ?? 0) > 0).map(([k, l]) => (
-                                    <span key={k} className="rounded bg-red-100 px-2 py-1 text-red-800">{preview.counts[k]} {l.toLowerCase()}</span>
+                                    <span key={k} className="rounded bg-red-100 dark:bg-red-900/40 px-2 py-1 text-red-800 dark:text-red-300">{preview.counts[k]} {l.toLowerCase()}</span>
                                 ))}
-                                <span className="text-xs text-gray-500 self-center">of {preview.rows} row(s){preview.period && ` · ${preview.period.from} to ${preview.period.to}`}</span>
+                                <span className="text-xs text-muted-foreground self-center">of {preview.rows} row(s){preview.period && ` · ${preview.period.from} to ${preview.period.to}`}</span>
                             </div>
                             {problems.length > 0 && (
-                                <ul className="space-y-1 text-xs text-red-700">
+                                <ul className="space-y-1 text-xs text-red-700 dark:text-red-300">
                                     {problems.map(([k, rows]) => <li key={k}>{PROBLEM_LABELS[k]}: row {rows.join(', ')}{(preview.counts[k] ?? 0) > rows.length ? '…' : ''}</li>)}
                                 </ul>
                             )}
                             {preview.order_months.length > 0 && (
-                                <p className="flex gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                                <p className="flex gap-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-300">
                                     <AlertTriangle className="h-4 w-4 shrink-0" /> These months already have platform orders: {preview.order_months.join(', ')}. Both are added up — import only sales that were NOT made on the platform.
                                 </p>
                             )}
                             <div className="overflow-x-auto rounded border">
                                 <table className="w-full text-xs">
-                                    <thead><tr className="border-b text-left text-gray-500"><th className="px-2 py-1">Row</th><th className="px-2 py-1">Date</th><th className="px-2 py-1">Product</th><th className="px-2 py-1 text-right">Qty</th><th className="px-2 py-1">Status</th></tr></thead>
+                                    <thead><tr className="border-b text-left text-muted-foreground"><th className="px-2 py-1">Row</th><th className="px-2 py-1">Date</th><th className="px-2 py-1">Product</th><th className="px-2 py-1 text-right">Qty</th><th className="px-2 py-1">Status</th></tr></thead>
                                     <tbody className="divide-y">
                                         {preview.preview.map((r) => (
                                             <tr key={r.row} className={r.problem ? 'bg-red-50 dark:bg-red-950/30' : ''}>
                                                 <td className="px-2 py-1 tabular-nums">{r.row}</td><td className="px-2 py-1 whitespace-nowrap">{r.date}</td>
-                                                <td className="px-2 py-1">{r.product}{r.matched && r.matched !== r.product && <span className="text-gray-500"> → {r.matched}</span>}</td>
+                                                <td className="px-2 py-1">{r.product}{r.matched && r.matched !== r.product && <span className="text-muted-foreground"> → {r.matched}</span>}</td>
                                                 <td className="px-2 py-1 text-right tabular-nums">{r.quantity}</td><td className="px-2 py-1">{r.problem ?? 'OK'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="text-xs text-gray-500">Only the {preview.counts.valid} valid row(s) are imported.</p>
+                            <p className="text-xs text-muted-foreground">Only the {preview.counts.valid} valid row(s) are imported.</p>
                         </>
                     )}
                     {error && <p className="text-sm text-red-600">{error}</p>}

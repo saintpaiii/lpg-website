@@ -41,11 +41,11 @@ type Props = {
 };
 
 const PAY_STYLES: Record<string, string> = {
-    unpaid:    'bg-red-100 text-red-700 border-red-200',
-    paid:      'bg-emerald-100 text-emerald-700 border-emerald-200',
-    partial:   'bg-amber-100 text-amber-700 border-amber-200',
-    to_refund: 'bg-orange-100 text-orange-700 border-orange-200',
-    refunded:  'bg-gray-100 text-gray-600 border-gray-200',
+    unpaid:    'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800',
+    paid:      'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    partial:   'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    to_refund: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    refunded:  'bg-muted text-muted-foreground border-border',
 };
 
 export default function Invoices({ invoices, date_from, date_to }: Props) {
@@ -71,15 +71,15 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
             <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-2">
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-500 font-medium">From</label>
+                    <label className="text-xs text-muted-foreground font-medium">From</label>
                     <Input type="date" className="h-8 text-sm w-36" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-1">
-                    <label className="text-xs text-gray-500 font-medium">To</label>
+                    <label className="text-xs text-muted-foreground font-medium">To</label>
                     <Input type="date" className="h-8 text-sm w-36" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                 </div>
                 <Button size="sm" variant="outline" onClick={applyDates}>Apply</Button>
-                {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-gray-500" onClick={clearDates}>Clear</Button>}
+                {(dateFrom || dateTo) && <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={clearDates}>Clear</Button>}
             </div>
 
             <Card>
@@ -87,7 +87,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                     <CardTitle className="flex items-center gap-2 text-base">
                         <Receipt className="h-4 w-4 text-blue-600" />
                         Invoice History
-                        <span className="ml-auto text-sm font-normal text-gray-400">
+                        <span className="ml-auto text-sm font-normal text-muted-foreground">
                             {invoices.total} invoice{invoices.total !== 1 ? 's' : ''}
                         </span>
                     </CardTitle>
@@ -97,7 +97,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                 </CardHeader>
                 <CardContent className="p-0">
                     {invoices.data.length === 0 ? (
-                        <div className="py-16 text-center text-gray-400">
+                        <div className="py-16 text-center text-muted-foreground">
                             <Receipt className="h-10 w-10 mx-auto mb-3 opacity-40" />
                             <p className="font-medium">No invoices yet</p>
                             <p className="text-sm mt-1">Invoices are generated when an order is confirmed.</p>
@@ -106,9 +106,9 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                         <div className="overflow-x-auto">
                             <SeenNote counts={seen.counts} onClear={seen.clear} />
 
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
-                                    <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                    <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-3">Invoice #</th>
                                         <th className="px-4 py-3">Order #</th>
                                         <th className="px-4 py-3">Date</th>
@@ -118,9 +118,9 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                         <th className="px-4 py-3 text-right">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-border">
                                     {invoices.data.map((inv) => (
-                                        <tr key={inv.id} className={`hover:bg-gray-50/60 ${seenRowClass(seen.get(inv.id))}`}>
+                                        <tr key={inv.id} className={`hover:bg-muted/60 ${seenRowClass(seen.get(inv.id))}`}>
                                             <td className="px-4 py-3">
                                                 <Link
                                                     href={`/customer/invoices/${inv.id}`}
@@ -130,19 +130,19 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                                 </Link>
                                                 <SeenPill flags={seen.get(inv.id)} className="ml-1.5" />
                                             </td>
-                                            <td className="px-4 py-3 text-xs font-mono text-gray-500">
+                                            <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
                                                 {inv.order_number ?? '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(inv.created_at)}</td>
+                                            <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(inv.created_at)}</td>
                                             <td className="px-4 py-3 text-right font-semibold tabular-nums">
                                                 ₱{inv.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[inv.payment_status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${PAY_STYLES[inv.payment_status] ?? 'bg-muted text-muted-foreground'}`}>
                                                     {inv.payment_status === 'to_refund' ? 'To Refund' : inv.payment_status === 'refunded' ? 'Refunded' : inv.payment_status.charAt(0).toUpperCase() + inv.payment_status.slice(1)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                            <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                                                 {inv.due_date ?? '—'}
                                             </td>
                                             <td className="px-4 py-3">
@@ -156,7 +156,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                         >
-                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50" title="Print Receipt">
+                                                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40" title="Print Receipt">
                                                                 <Printer className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </a>
@@ -172,7 +172,7 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
 
                     {invoices.last_page > 1 && (
                         <div className="flex items-center justify-between border-t px-4 py-3">
-                            <p className="text-sm text-gray-500">
+                            <p className="text-sm text-muted-foreground">
                                 Showing {invoices.from}–{invoices.to} of {invoices.total}
                             </p>
                             <div className="flex gap-1">
@@ -184,8 +184,8 @@ export default function Invoices({ invoices, date_from, date_to }: Props) {
                                             link.active
                                                 ? 'bg-blue-600 text-white'
                                                 : link.url
-                                                ? 'hover:bg-gray-100 text-gray-600'
-                                                : 'text-gray-300 pointer-events-none'
+                                                ? 'hover:bg-muted text-muted-foreground'
+                                                : 'text-muted-foreground pointer-events-none'
                                         }`}
                                         dangerouslySetInnerHTML={{ __html: link.label }}
                                     />

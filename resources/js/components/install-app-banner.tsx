@@ -61,7 +61,7 @@ export function InstallAppBanner() {
                             <button
                                 onClick={handleInstall}
                                 disabled={installing}
-                                className="rounded-lg bg-white text-blue-700 font-semibold text-xs px-4 py-1.5 hover:bg-blue-50 transition-colors disabled:opacity-70"
+                                className="rounded-lg bg-card text-blue-700 dark:text-blue-300 font-semibold text-xs px-4 py-1.5 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors disabled:opacity-70"
                             >
                                 {installing ? 'Installing…' : 'Install'}
                             </button>

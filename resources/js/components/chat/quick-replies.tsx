@@ -30,11 +30,11 @@ export default function QuickReplies({ replies, onChange, onInsert, canManage }:
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" className="w-72">
                     <DropdownMenuLabel>Quick replies</DropdownMenuLabel>
-                    {replies.length === 0 && <p className="px-2 py-1.5 text-xs text-gray-500">No saved replies yet.</p>}
+                    {replies.length === 0 && <p className="px-2 py-1.5 text-xs text-muted-foreground">No saved replies yet.</p>}
                     {replies.map((r) => (
                         <DropdownMenuItem key={r.id} onSelect={() => onInsert(r.body)} className="flex-col items-start gap-0">
                             <span className="text-sm font-medium">{r.title}</span>
-                            <span className="line-clamp-2 text-xs text-gray-500">{r.body}</span>
+                            <span className="line-clamp-2 text-xs text-muted-foreground">{r.body}</span>
                         </DropdownMenuItem>
                     ))}
                     {canManage && (
@@ -98,12 +98,12 @@ function ManageDialog({ open, onOpenChange, replies, onChange }: {
                 </DialogHeader>
 
                 <ul className="divide-y rounded-md border">
-                    {replies.length === 0 && <li className="px-3 py-3 text-sm text-gray-500">No saved replies yet.</li>}
+                    {replies.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">No saved replies yet.</li>}
                     {replies.map((r) => (
                         <li key={r.id} className="flex items-start gap-2 px-3 py-2">
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium">{r.title}</p>
-                                <p className="text-xs text-gray-500">{r.body}</p>
+                                <p className="text-xs text-muted-foreground">{r.body}</p>
                             </div>
                             <Button size="icon" variant="ghost" aria-label={`Edit ${r.title}`} onClick={() => { setEditing(r); setTitle(r.title); setBody(r.body); }}><Pencil className="h-4 w-4" /></Button>
                             <Button size="icon" variant="ghost" aria-label={`Delete ${r.title}`} className="text-red-600" onClick={() => remove(r)}><Trash2 className="h-4 w-4" /></Button>

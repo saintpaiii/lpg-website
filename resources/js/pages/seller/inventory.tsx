@@ -80,13 +80,13 @@ const TX_COLORS: Record<string, string> = {
     out:        'text-red-600',
     order:      'text-orange-600',
     cancelled:  'text-blue-600',
-    adjustment: 'text-gray-600',
+    adjustment: 'text-muted-foreground',
     empty_in:   'text-sky-600',
-    empty_out:  'text-sky-700',
-    damaged:    'text-red-700',
-    expired:    'text-red-700',
+    empty_out:  'text-sky-700 dark:text-sky-300',
+    damaged:    'text-red-700 dark:text-red-300',
+    expired:    'text-red-700 dark:text-red-300',
     returned_to_supplier: 'text-purple-600',
-    transfer_out: 'text-violet-700',
+    transfer_out: 'text-violet-700 dark:text-violet-300',
     transfer_in:  'text-violet-600',
 };
 
@@ -159,7 +159,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {['overview', 'transactions', 'transfers'].map((t) => (
                         <button key={t} onClick={() => goTab(t)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors capitalize ${tab === t ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
@@ -172,7 +172,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                     <Card>
                         <CardContent className="p-0">
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
@@ -192,10 +192,10 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     <p className="font-medium">{inv.product?.name ?? '—'}</p>
                                                     <p className="text-xs text-muted-foreground">{inv.product?.product_type === 'accessory' ? 'Accessory' : inv.product?.brand ?? ''}</p>
                                                     <div className="mt-1 flex flex-wrap gap-1">
-                                                        {inv.expiring && <span className="rounded bg-amber-100 px-1.5 py-px text-[10px] font-semibold text-amber-800" data-testid="expiring-badge">Expiring soon: {inv.expiring.qty} (in {inv.expiring.days} days)</span>}
-                                                        {!!inv.expired && <span className="rounded bg-red-100 px-1.5 py-px text-[10px] font-semibold text-red-700" data-testid="expired-badge">Expired: {inv.expired}</span>}
+                                                        {inv.expiring && <span className="rounded bg-amber-100 dark:bg-amber-900/40 px-1.5 py-px text-xs font-semibold text-amber-800 dark:text-amber-300" data-testid="expiring-badge">Expiring soon: {inv.expiring.qty} (in {inv.expiring.days} days)</span>}
+                                                        {!!inv.expired && <span className="rounded bg-red-100 dark:bg-red-900/40 px-1.5 py-px text-xs font-semibold text-red-700 dark:text-red-300" data-testid="expired-badge">Expired: {inv.expired}</span>}
                                                     </div>
-                                                    {inv.reorder && <p className={`mt-1 text-[11px] ${inv.reorder.due ? 'text-violet-700' : 'text-muted-foreground'}`} title="How auto-reorder decides">{inv.reorder.text}</p>}
+                                                    {inv.reorder && <p className={`mt-1 text-xs ${inv.reorder.due ? 'text-violet-700 dark:text-violet-300' : 'text-muted-foreground'}`} title="How auto-reorder decides">{inv.reorder.text}</p>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`font-bold text-lg ${inv.quantity === 0 ? 'text-red-600' : inv.quantity <= inv.reorder_level ? 'text-amber-600' : 'text-foreground'}`}>
@@ -204,7 +204,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     {inv.quantity <= inv.reorder_level && (
                                                         <p className="text-xs text-amber-600">Low stock</p>
                                                     )}
-                                                    {inv.usable !== undefined && inv.usable !== inv.quantity && <p className="text-[11px] text-red-600">{inv.usable} usable</p>}
+                                                    {inv.usable !== undefined && inv.usable !== inv.quantity && <p className="text-xs text-red-600">{inv.usable} usable</p>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center tabular-nums">{isLpg(inv) ? inv.empty_quantity ?? 0 : '—'}</td>
                                                 <td className={`px-4 py-3 text-center tabular-nums ${inv.damaged_quantity ? 'font-semibold text-red-600' : ''}`}>{isLpg(inv) ? inv.damaged_quantity ?? 0 : '—'}</td>
@@ -312,7 +312,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                 </Select>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted/30">
                                             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Product</th>
@@ -332,7 +332,7 @@ export default function SellerInventory({ tab, inventories, transactions, produc
                                                     <p className="text-xs text-muted-foreground">{tx.product?.brand ?? ''}</p>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
-                                                    <span className={`text-xs font-medium capitalize ${TX_COLORS[tx.type] ?? 'text-gray-600'}`}>{tx.type.replace(/_/g, ' ')}</span>
+                                                    <span className={`text-xs font-medium capitalize ${TX_COLORS[tx.type] ?? 'text-muted-foreground'}`}>{tx.type.replace(/_/g, ' ')}</span>
                                                 </td>
                                                 <td className={`px-4 py-3 text-center font-bold ${TX_COLORS[tx.type] ?? ''}`}>
                                                     {['out', 'order', 'empty_out', 'damaged', 'expired', 'returned_to_supplier', 'transfer_out'].includes(tx.type) ? `−${tx.quantity}` : `+${tx.quantity}`}

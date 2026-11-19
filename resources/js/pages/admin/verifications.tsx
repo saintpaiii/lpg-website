@@ -133,9 +133,9 @@ const TYPE_CHIPS = [
 ] as const;
 
 const LICENSE_STATUS: Record<string, [string, string]> = {
-    pending:  ['bg-yellow-100 text-yellow-700', 'Waiting for review'],
-    approved: ['bg-green-100 text-green-700', 'Approved'],
-    rejected: ['bg-red-100 text-red-700', 'Rejected'],
+    pending:  ['bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300', 'Waiting for review'],
+    approved: ['bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300', 'Approved'],
+    rejected: ['bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300', 'Rejected'],
 };
 
 const TABS = [
@@ -151,8 +151,8 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_TONE: Record<string, string> = {
-    seller_application: 'bg-purple-100 text-purple-700',
-    rider_license:      'bg-teal-100 text-teal-700',
+    seller_application: 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
+    rider_license:      'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
 };
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ function VerificationAutoRead({ v, enabled, cached, onResult }: {
     return (
         <div className="mt-2">
             <AutoReadLine result={results[key] ?? null} reading={reading === key} enabled={enabled} onReadAgain={() => readAgain(key)} />
-            <p className="mt-1 text-[11px] italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
+            <p className="mt-1 text-xs italic text-muted-foreground">{AUTO_READ_DISCLAIMER}</p>
         </div>
     );
 }
@@ -273,7 +273,7 @@ export default function Verifications({ verifications, counts, tab, search, type
 
             <div className="p-6 space-y-5">
                 {/* Header */}
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <BadgeCheck className="h-6 w-6 text-blue-600" />
@@ -298,7 +298,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map(({ key, label, count_key }) => (
                         <button
                             key={key}
@@ -312,7 +312,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                             {label}
                             {counts[count_key] > 0 && (
                                 <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${
-                                    tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'
+                                    tab === key ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-muted text-muted-foreground'
                                 } ${key === 'pending' ? actionGlow(counts.pending) : ''}`}>
                                     {counts[count_key]}
                                 </span>
@@ -331,7 +331,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                     ))}
                     {tab === 'approved' && (
                         <button type="button" onClick={() => go({ auto: !auto, page: undefined })} aria-pressed={auto}
-                            className={`ml-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${auto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}>
+                            className={`ml-2 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${auto ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'}`}>
                             Auto-approved{counts.auto ? ` (${counts.auto})` : ''}
                         </button>
                     )}
@@ -343,7 +343,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">User</th>
@@ -371,13 +371,13 @@ export default function Verifications({ verifications, counts, tab, search, type
                                             <td className="px-4 py-3 hidden sm:table-cell">
                                                 <div className="flex flex-col gap-1 items-start">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                                                        TYPE_TONE[row.type] ?? 'bg-blue-100 text-blue-700'
+                                                        TYPE_TONE[row.type] ?? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
                                                     }`}>
                                                         {TYPE_LABELS[row.type] ?? row.type}
                                                     </span>
                                                     {row.type === 'rider_license' && row.store_name && <span className="text-xs text-muted-foreground">{row.store_name}</span>}
                                                     {row.is_resubmission && row.status === 'pending' && (
-                                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+                                                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300">
                                                             Resubmitted
                                                         </span>
                                                     )}
@@ -391,8 +391,8 @@ export default function Verifications({ verifications, counts, tab, search, type
                                                 ) : (
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                                                     row.user_id_verified
-                                                        ? 'bg-green-100 text-green-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
+                                                        ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300'
+                                                        : 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300'
                                                 }`}>
                                                     {row.user_id_verified ? 'Verified' : 'Unverified'}
                                                 </span>
@@ -450,7 +450,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                             <BadgeCheck className="h-5 w-5 text-blue-600" />
                             {v?.type === 'seller_application' ? 'Seller Application' : v?.type === 'rider_license' ? "Rider's driver's license" : 'ID Verification'}
                             {v?.is_resubmission && v?.status === 'pending' && (
-                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-700">
+                                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300">
                                     Resubmitted
                                 </span>
                             )}
@@ -499,7 +499,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                                     </InfoLine>
                                     <InfoLine label="Email">
                                         {v.user_email}
-                                        {v.email_verified && <span className="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">verified</span>}
+                                        {v.email_verified && <span className="ml-2 rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-0.5 text-xs font-semibold text-green-800 dark:text-green-300">verified</span>}
                                     </InfoLine>
                                     <InfoLine label="Phone">{v.user_phone || '—'}</InfoLine>
                                     {v.type === 'rider_license' ? <>
@@ -518,7 +518,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                                             <ul className="space-y-0.5">
                                                 {v.past_attempts!.map((a, i) => (
                                                     <li key={i} className="text-xs">
-                                                        {a.date} · <span className={a.status === 'rejected' ? 'text-red-600' : a.status === 'approved' ? 'text-green-700' : ''}>{a.status}</span>
+                                                        {a.date} · <span className={a.status === 'rejected' ? 'text-red-600' : a.status === 'approved' ? 'text-green-700 dark:text-green-300' : ''}>{a.status}</span>
                                                         {a.reason ? ` · ${a.reason}` : ''}
                                                     </li>
                                                 ))}
@@ -673,7 +673,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                             {canRevoke(v) && (
                                 <div className="flex items-center justify-between gap-2 pt-2 border-t">
                                     <p className="text-xs text-muted-foreground">Something wrong? Revoking makes them {v.type === 'rider_license' ? 'unable to deliver' : 'unverified'} until a new upload is approved.</p>
-                                    <Button variant="outline" className="border-red-300 text-red-600 hover:bg-red-50" onClick={() => setRejectMode(true)}>
+                                    <Button variant="outline" className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => setRejectMode(true)}>
                                         <XCircle className="h-4 w-4 mr-1.5" /> Revoke
                                     </Button>
                                 </div>
@@ -684,7 +684,7 @@ export default function Verifications({ verifications, counts, tab, search, type
                                 <div className="flex justify-end gap-2 pt-2 border-t">
                                     <Button
                                         variant="outline"
-                                        className="border-red-300 text-red-600 hover:bg-red-50"
+                                        className="border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                         onClick={() => setRejectMode(true)}
                                     >
                                         <XCircle className="h-4 w-4 mr-1.5" /> Reject

@@ -52,7 +52,7 @@ export default function BatchAssignBar({ count, riders, onAssign, onCancel, proc
                         <X className="h-4 w-4" /> Cancel
                     </Button>
                 </div>
-                <p className="w-full text-xs text-gray-500">
+                <p className="w-full text-xs text-muted-foreground">
                     Stops are ordered automatically by distance from your store (nearest first).
                     {need && need.tanks > 0 && ` Load: ${need.kg} kg / ${need.tanks} tank(s) — it must fit the rider's vehicle with what they already carry.`}
                 </p>

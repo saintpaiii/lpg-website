@@ -26,8 +26,8 @@ export default function ReportList({ reports, empty, showReporter = false, showS
 }) {
     if (reports.data.length === 0) {
         return (
-            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-12 text-center text-sm text-gray-500">
-                <Flag className="h-8 w-8 text-gray-300" /> {empty}
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">
+                <Flag className="h-8 w-8 text-muted-foreground" /> {empty}
             </div>
         );
     }
@@ -41,14 +41,14 @@ export default function ReportList({ reports, empty, showReporter = false, showS
                     return (
                         <li key={r.id}>
                             <Link href={r.link} className={cn('flex items-center gap-3 rounded-lg border bg-white px-4 py-3 transition-colors hover:bg-gray-50 dark:bg-gray-950 dark:hover:bg-gray-900',
-                                r.is_urgent && open && 'border-red-300 ring-1 ring-red-200')}>
+                                r.is_urgent && open && 'border-red-200 dark:border-red-800 ring-1 ring-red-200')}>
                                 <div className="min-w-0 flex-1 space-y-1">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-semibold">{r.category_label}</span>
                                         <ReportStatusBadges status={r.status} label={r.status_label} verdict={r.verdict_label} urgent={r.is_urgent} escalated={r.escalated} route={r.route} showRoute={showRoute} />
                                     </div>
                                     <p className="truncate text-sm text-gray-600 dark:text-gray-400">{r.subject}</p>
-                                    <p className="flex flex-wrap gap-x-3 text-xs text-gray-500">
+                                    <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                                         {r.order_number && <span className="font-mono">{r.order_number}</span>}
                                         {showStore && r.store && <span>{r.store.name}</span>}
                                         {showReporter && <span>By {r.reporter.name} ({r.is_system ? (ROLE[r.reporter.role ?? ''] ?? SIDE[r.reporter.side]) : (SIDE[r.reporter.side] ?? r.reporter.side)})</span>}
@@ -59,7 +59,7 @@ export default function ReportList({ reports, empty, showReporter = false, showS
                                         <span className={cn(stale && 'font-semibold text-red-600')}>{activityLabel(r.last_activity_at)}</span>
                                     </p>
                                 </div>
-                                <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                             </Link>
                         </li>
                     );
@@ -70,7 +70,7 @@ export default function ReportList({ reports, empty, showReporter = false, showS
                 <nav className="flex flex-wrap justify-center gap-1 pt-2" aria-label="Pages">
                     {reports.links.map((l, i) => l.url ? (
                         <Link key={i} href={l.url} preserveScroll
-                            className={cn('rounded-md border px-3 py-1 text-sm', l.active ? 'bg-blue-600 text-white' : 'hover:bg-gray-50')}>
+                            className={cn('rounded-md border px-3 py-1 text-sm', l.active ? 'bg-blue-600 text-white' : 'hover:bg-muted')}>
                             {l.label.replace('&laquo;', '«').replace('&raquo;', '»')}
                         </Link>
                     ) : null)}

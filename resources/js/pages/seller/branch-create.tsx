@@ -195,7 +195,7 @@ function DocUpload({ label, hint, file, error, onChange }: { label: string; hint
                 <div className="flex items-center gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 dark:border-blue-800 dark:bg-blue-950/30">
                     <FileText className="h-4 w-4 shrink-0 text-blue-600" />
                     <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                    <button type="button" onClick={() => onChange(null)} aria-label="Remove" className="text-gray-400 hover:text-red-500"><X className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => onChange(null)} aria-label="Remove" className="text-muted-foreground hover:text-red-500"><X className="h-4 w-4" /></button>
                 </div>
             ) : (
                 <button type="button" onClick={() => ref.current?.click()}

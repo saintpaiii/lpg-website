@@ -194,7 +194,7 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                     <div>
                                         <div className="flex items-center gap-2 flex-wrap">
                                             {r.urgent && (
-                                                <span className="inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+                                                <span className="inline-flex items-center rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
                                                     URGENT · Leaking tank
                                                 </span>
                                             )}
@@ -219,7 +219,7 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {r.escalated_to_admin && !r.admin_decision && (
-                                            <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">Escalated</span>
+                                            <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">Escalated</span>
                                         )}
                                         <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${REFUND_STATUS_STYLES[r.status]}`}>
                                             {REFUND_STATUS_LABELS[r.status]}
@@ -244,7 +244,7 @@ export default function SellerRefunds({ items, counts, tab, search, riders }: Pr
                                 {r.status === 'pending' && (
                                     <div className="flex justify-end gap-2">
                                         {r.admin_decision !== 'favor_customer' && (
-                                            <Button size="sm" variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50"
+                                            <Button size="sm" variant="outline" className="gap-1.5 border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                                                 onClick={() => { setRejecting(r); setRejectReason(''); }}>
                                                 <X className="h-4 w-4" /> Reject
                                             </Button>

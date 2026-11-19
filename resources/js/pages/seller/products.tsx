@@ -292,7 +292,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
                             {label}
                             {counts[count_key] > 0 && (
-                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
+                                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold ${tab === key ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-muted text-muted-foreground'}`}>
                                     {counts[count_key]}
                                 </span>
                             )}
@@ -304,7 +304,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-16">Image</th>
@@ -347,11 +347,11 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                                 <p className="text-xs text-muted-foreground">{p.product_type === 'accessory' ? <AccessoryBadge category={p.accessory_category} /> : <>{p.brand} {p.weight && `· ${p.weight}`}</>}</p>
                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                     {p.max_per_order != null && (
-                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Max {p.max_per_order} / {p.limit_period ?? 'order'}</span>
+                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Max {p.max_per_order} / {p.limit_period ?? 'order'}</span>
                                                     )}
                                                     {p.refill_price > p.purchase_price && (
                                                         <span title="Refill price is higher than the new tank price — edit to fix."
-                                                            className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+                                                            className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
                                                             Check prices
                                                         </span>
                                                     )}
@@ -373,7 +373,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                             <td className="px-4 py-3 hidden lg:table-cell">
                                                 {p.review_count > 0 ? (
                                                     <div className="flex items-center gap-1">
-                                                        <span className="text-amber-400 text-xs">★</span>
+                                                        <span className="text-amber-600 dark:text-amber-400 text-xs">★</span>
                                                         <span className="text-sm font-medium">{p.avg_rating.toFixed(1)}</span>
                                                         <span className="text-xs text-muted-foreground">({p.review_count})</span>
                                                     </div>
@@ -385,7 +385,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                                 {tab === 'archived' ? (
                                                     <div className="flex items-center justify-end gap-2">
                                                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => restore(p)}>Restore</Button>
-                                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => setForceDeleteTarget(p)}>
+                                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => setForceDeleteTarget(p)}>
                                                             <Trash2 className="h-3 w-3" />
                                                         </Button>
                                                     </div>
@@ -397,7 +397,7 @@ export default function SellerProducts({ products, counts, tab, search, max_uplo
                                                         <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => openEdit(p)}>
                                                             <Pencil className="h-3 w-3 mr-1" /> Edit
                                                         </Button>
-                                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-300 text-red-600 hover:bg-red-50" onClick={() => setArchiveTarget(p)}>
+                                                        <Button size="sm" variant="outline" className="h-7 text-xs border-red-200 dark:border-red-800 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40" onClick={() => setArchiveTarget(p)}>
                                                             <Trash2 className="h-3 w-3" />
                                                         </Button>
                                                     </div>

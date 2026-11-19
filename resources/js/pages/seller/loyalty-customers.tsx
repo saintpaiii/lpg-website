@@ -61,7 +61,7 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                 <div className="p-6">
                     <Card className="max-w-xl">
                         <CardContent className="space-y-3 py-10 text-center">
-                            <Award className="mx-auto h-10 w-10 text-amber-400" />
+                            <Award className="mx-auto h-10 w-10 text-amber-600 dark:text-amber-400" />
                             <p className="font-medium">Enable the Loyalty Program in settings to see customer data</p>
                             {/* Loyalty settings are owner-only */}
                             {isOwner
@@ -127,7 +127,7 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                             </p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead className="border-b bg-muted/30 text-muted-foreground">
                                         <tr>
                                             <SortHead col="customer_name" label="Customer" />
@@ -156,8 +156,8 @@ export default function LoyaltyCustomers({ enabled, settings, stats, customers, 
                                                 <td className="px-4 py-3 text-muted-foreground">{timeAgo(c.last_order_at)}</td>
                                                 <td className="px-4 py-3">
                                                     {c.consignment_eligible
-                                                        ? <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Eligible</span>
-                                                        : <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Not Eligible</span>}
+                                                        ? <span className="rounded-full bg-green-100 dark:bg-green-900/40 px-2 py-0.5 text-xs font-medium text-green-800 dark:text-green-300">Eligible</span>
+                                                        : <span className="rounded-full bg-red-100 dark:bg-red-900/40 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-300">Not Eligible</span>}
                                                 </td>
                                                 {canMessage && (
                                                     <td className="px-2 py-3">

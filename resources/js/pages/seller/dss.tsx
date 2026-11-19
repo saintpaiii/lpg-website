@@ -192,9 +192,9 @@ function pTick(v: number) {
 
 function EmptyChart({ message }: { message: string }) {
     return (
-        <div className="flex h-40 flex-col items-center justify-center gap-2 text-gray-300">
+        <div className="flex h-40 flex-col items-center justify-center gap-2 text-muted-foreground">
             <Brain className="h-8 w-8" />
-            <p className="text-sm text-gray-400">{message}</p>
+            <p className="text-sm text-muted-foreground">{message}</p>
         </div>
     );
 }
@@ -203,8 +203,8 @@ function EmptyChart({ message }: { message: string }) {
 
 const SEVERITY_CONFIG = {
     critical: { border: 'border-red-400',    bg: 'bg-red-50 dark:bg-red-950/30',    badge: 'bg-red-600 text-white',            label: 'CRITICAL',  stockBar: 'bg-red-500',    glow: 'shadow-red-100'    },
-    warning:  { border: 'border-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/30', badge: 'bg-amber-500 text-white',          label: 'WARNING',   stockBar: 'bg-amber-500',  glow: 'shadow-amber-100'  },
-    notice:   { border: 'border-yellow-300', bg: 'bg-yellow-50 dark:bg-yellow-950/20', badge: 'bg-yellow-400 text-yellow-900', label: 'LOW STOCK', stockBar: 'bg-yellow-400', glow: 'shadow-yellow-100' },
+    warning:  { border: 'border-amber-400',  bg: 'bg-amber-50 dark:bg-amber-950/30', badge: 'bg-amber-600 text-white',          label: 'WARNING',   stockBar: 'bg-amber-500',  glow: 'shadow-amber-100'  },
+    notice:   { border: 'border-yellow-200 dark:border-yellow-800', bg: 'bg-yellow-50 dark:bg-yellow-950/20', badge: 'bg-yellow-400 text-yellow-950', label: 'LOW STOCK', stockBar: 'bg-yellow-400', glow: 'shadow-yellow-100' },
 };
 
 function AlertCard({ alert }: { alert: ReorderAlert }) {
@@ -217,12 +217,12 @@ function AlertCard({ alert }: { alert: ReorderAlert }) {
             <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-gray-900 dark:text-white text-sm">{alert.name}</p>
-                    {alert.brand && <p className="text-xs text-gray-500">{alert.brand}</p>}
+                    {alert.brand && <p className="text-xs text-muted-foreground">{alert.brand}</p>}
                 </div>
                 <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-black tracking-wide ${cfg.badge}`}>{cfg.label}</span>
             </div>
             <div className="mb-2">
-                <div className="mb-1 flex justify-between text-xs text-gray-500">
+                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                     <span>Stock: <span className="font-bold text-gray-800 dark:text-gray-200">{alert.current_stock}</span></span>
                     <span>Reorder: {alert.reorder_level}</span>
                 </div>
@@ -232,12 +232,12 @@ function AlertCard({ alert }: { alert: ReorderAlert }) {
             </div>
             <div className="mb-2 grid grid-cols-2 gap-1.5 text-xs">
                 <div className="rounded-lg bg-white/80 dark:bg-gray-800/50 p-1.5 text-center">
-                    <p className="text-gray-500">Daily Avg</p>
+                    <p className="text-muted-foreground">Daily Avg</p>
                     <p className="font-bold text-gray-900 dark:text-gray-100">{alert.avg_daily_sales !== null ? `${alert.avg_daily_sales}u` : '—'}</p>
                 </div>
                 <div className="rounded-lg bg-white/80 dark:bg-gray-800/50 p-1.5 text-center">
-                    <p className="text-gray-500">Stockout</p>
-                    <p className={`font-bold ${alert.days_until_stockout !== null ? (alert.severity === 'critical' ? 'text-red-700' : alert.severity === 'warning' ? 'text-amber-700' : 'text-yellow-700') : 'text-gray-400'}`}>
+                    <p className="text-muted-foreground">Stockout</p>
+                    <p className={`font-bold ${alert.days_until_stockout !== null ? (alert.severity === 'critical' ? 'text-red-700 dark:text-red-300' : alert.severity === 'warning' ? 'text-amber-700 dark:text-amber-300' : 'text-yellow-700 dark:text-yellow-300') : 'text-muted-foreground'}`}>
                         {alert.days_until_stockout !== null ? `${alert.days_until_stockout}d` : 'N/A'}
                     </p>
                 </div>
@@ -246,9 +246,9 @@ function AlertCard({ alert }: { alert: ReorderAlert }) {
                 {alert.recommended_order !== null ? (
                     <p className="text-gray-600 dark:text-gray-300">Order <span className="font-bold text-gray-900 dark:text-white">{alert.recommended_order} units</span> <span className="font-semibold">{alert.days_to_order}</span>.</p>
                 ) : (
-                    <p className="text-gray-500">Insufficient data — monitor and reorder soon.</p>
+                    <p className="text-muted-foreground">Insufficient data — monitor and reorder soon.</p>
                 )}
-                {alert.reorder && <p className="mt-1 text-[11px] text-gray-500" title="How it decides">{alert.reorder.text}</p>}
+                {alert.reorder && <p className="mt-1 text-xs text-muted-foreground" title="How it decides">{alert.reorder.text}</p>}
             </div>
             {/* J7: Create PO / Open draft */}
             <div className="mt-2">
@@ -258,7 +258,7 @@ function AlertCard({ alert }: { alert: ReorderAlert }) {
                     <button type="button" className="text-xs font-semibold text-blue-600 hover:underline" data-testid="create-po"
                         onClick={() => router.post(`/seller/purchase-orders/from-alert/${alert.product_id}`)}>Create PO</button>
                 ) : (
-                    <a href="/seller/suppliers" className="text-xs text-amber-700 hover:underline">No supplier set — add one to enable auto-reorder</a>
+                    <a href="/seller/suppliers" className="text-xs text-amber-700 dark:text-amber-300 hover:underline">No supplier set — add one to enable auto-reorder</a>
                 )}
             </div>
         </div>
@@ -304,16 +304,16 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                     <Card>
                         <CardContent className="py-3 px-4 space-y-2 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500 text-xs font-semibold uppercase tracking-wide">This Week</span>
+                                <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">This Week</span>
                                 <span className="font-bold tabular-nums text-sm">{peso(data.this_week)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500 text-xs font-semibold uppercase tracking-wide">Last Week</span>
-                                <span className="font-bold text-gray-400 tabular-nums text-sm">{peso(data.last_week)}</span>
+                                <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wide">Last Week</span>
+                                <span className="font-bold text-muted-foreground tabular-nums text-sm">{peso(data.last_week)}</span>
                             </div>
                             {data.peak_day && (
                                 <div className="border-t pt-2">
-                                    <p className="text-xs text-gray-500 uppercase font-semibold tracking-wide">Peak Day (30d)</p>
+                                    <p className="text-xs text-muted-foreground uppercase font-semibold tracking-wide">Peak Day (30d)</p>
                                     <p className="font-bold text-gray-800 dark:text-gray-200 text-sm">{data.peak_day.label}</p>
                                     <p className="text-sm text-emerald-600 font-semibold">{peso(data.peak_day.revenue)}</p>
                                 </div>
@@ -324,7 +324,7 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
 
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-1 pt-3 px-4">
-                        <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Daily Revenue + Trend Line (Last 30 Days)</CardTitle>
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Daily Revenue + Trend Line (Last 30 Days)</CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-4">
                         {data.chart.length === 0 ? (
@@ -347,7 +347,7 @@ function SalesTrendSection({ data }: { data: SalesTrend }) {
                                                         </p>
                                                     ))}
                                                     {payload[0] && (
-                                                        <p className="text-gray-500 mt-1 text-xs">
+                                                        <p className="text-muted-foreground mt-1 text-xs">
                                                             Orders: {data.chart.find((d) => d.label === label)?.orders_count ?? 0}
                                                         </p>
                                                     )}
@@ -375,9 +375,9 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
         return (
             <Card>
                 <CardContent className="flex flex-col items-center justify-center py-10">
-                    <ShoppingCart className="h-8 w-8 text-gray-300 mb-2" />
-                    <p className="font-medium text-gray-500 text-sm">No sales data yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Process some orders to see your top-selling products.</p>
+                    <ShoppingCart className="h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="font-medium text-muted-foreground text-sm">No sales data yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Process some orders to see your top-selling products.</p>
                 </CardContent>
             </Card>
         );
@@ -388,7 +388,7 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 <th className="px-4 py-2.5">#</th>
                                 <th className="px-4 py-2.5">Product</th>
                                 <th className="px-4 py-2.5 text-center">Units Sold</th>
@@ -397,18 +397,18 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                             {products.map((p, idx) => (
-                                <tr key={p.product_id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30">
-                                    <td className="px-4 py-2.5 text-gray-400 font-bold">{idx + 1}</td>
+                                <tr key={p.product_id} className="hover:bg-muted/60 dark:hover:bg-gray-800/30">
+                                    <td className="px-4 py-2.5 text-muted-foreground font-bold">{idx + 1}</td>
                                     <td className="px-4 py-2.5">
                                         <p className="font-medium">{p.name}</p>
-                                        <p className="text-xs text-gray-400">{p.brand}</p>
+                                        <p className="text-xs text-muted-foreground">{p.brand}</p>
                                     </td>
                                     <td className="px-4 py-2.5 text-center">
                                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/40 px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-300">
                                             {p.units_sold} units
                                         </span>
                                     </td>
-                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700">{peso(p.revenue)}</td>
+                                    <td className="px-4 py-2.5 text-right font-bold text-emerald-700 dark:text-emerald-300">{peso(p.revenue)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -429,7 +429,7 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
             <div className="grid gap-4 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                     <CardHeader className="pb-1 pt-3 px-4">
-                        <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Predicted Daily Units — Top Products (SMA)</CardTitle>
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Predicted Daily Units — Top Products (SMA)</CardTitle>
                     </CardHeader>
                     <CardContent className="px-4 pb-4">
                         {!hasData ? (
@@ -469,16 +469,16 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
 
                 <Card className="lg:col-span-2">
                     <CardHeader className="pb-1 pt-3 px-4">
-                        <CardTitle className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Weekly Totals</CardTitle>
+                        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Weekly Totals</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {!hasData ? (
-                            <p className="px-4 py-8 text-center text-sm text-gray-400">No data</p>
+                            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No data</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase text-gray-400">
+                                        <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase text-muted-foreground">
                                             <th className="px-3 py-2">Product</th>
                                             {data.day_columns.map((c) => (
                                                 <th key={c.key} className="px-2 py-2 text-center">{c.key}</th>
@@ -488,7 +488,7 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                         {data.products.slice(0, 8).map((p, i) => (
-                                            <tr key={p.product_id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30">
+                                            <tr key={p.product_id} className="hover:bg-muted/60 dark:hover:bg-gray-800/30">
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ background: FORECAST_COLORS[i % FORECAST_COLORS.length] }} />
@@ -523,40 +523,40 @@ function MonthlySummaryCards({ data }: { data: Insights }) {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Card className="hover:shadow-md transition-shadow duration-150">
                 <CardContent className="pt-4 pb-3 px-4 space-y-0.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">This Month Revenue</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">This Month Revenue</p>
                     <p className="text-xl font-black text-gray-900 dark:text-white tabular-nums">{peso(data.this_month_revenue)}</p>
                     {pct !== null ? (
-                        <p className={`text-xs font-semibold flex items-center gap-0.5 ${up ? 'text-emerald-600' : down ? 'text-red-500' : 'text-gray-400'}`}>
+                        <p className={`text-xs font-semibold flex items-center gap-0.5 ${up ? 'text-emerald-600' : down ? 'text-red-500' : 'text-muted-foreground'}`}>
                             {up ? <ArrowUpRight className="h-3 w-3" /> : down ? <ArrowDownRight className="h-3 w-3" /> : <ArrowRight className="h-3 w-3" />}
                             {pct > 0 ? '+' : ''}{pct}% vs last month
                         </p>
                     ) : (
-                        <p className="text-xs text-gray-400">No prior month data</p>
+                        <p className="text-xs text-muted-foreground">No prior month data</p>
                     )}
                 </CardContent>
             </Card>
 
-            <Card className="border-blue-200 bg-blue-50/40 dark:bg-blue-950/20 hover:shadow-md transition-shadow duration-150">
+            <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/40 dark:bg-blue-950/20 hover:shadow-md transition-shadow duration-150">
                 <CardContent className="pt-4 pb-3 px-4 space-y-0.5">
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">Projected (Month End)</p>
                     <p className="text-xl font-black text-blue-700 dark:text-blue-400 tabular-nums">{peso(data.projected_revenue)}</p>
-                    <p className="text-xs text-blue-400">Day {data.days_elapsed}/{data.days_in_month} average</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400">Day {data.days_elapsed}/{data.days_in_month} average</p>
                 </CardContent>
             </Card>
 
             <Card className="hover:shadow-md transition-shadow duration-150">
                 <CardContent className="pt-4 pb-3 px-4 space-y-0.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Orders This Month</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Orders This Month</p>
                     <p className="text-xl font-black text-gray-900 dark:text-white tabular-nums">{data.this_month_orders}</p>
-                    <p className="text-xs text-gray-400">Last month: {data.last_month_orders}</p>
+                    <p className="text-xs text-muted-foreground">Last month: {data.last_month_orders}</p>
                 </CardContent>
             </Card>
 
             <Card className="hover:shadow-md transition-shadow duration-150">
                 <CardContent className="pt-4 pb-3 px-4 space-y-0.5">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Unique Customers</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unique Customers</p>
                     <p className="text-xl font-black text-gray-900 dark:text-white tabular-nums">{data.this_month_customers}</p>
-                    <p className="text-xs text-gray-400">{data.repeat_rate}% repeat ({data.repeat_customers} reorders)</p>
+                    <p className="text-xs text-muted-foreground">{data.repeat_rate}% repeat ({data.repeat_customers} reorders)</p>
                 </CardContent>
             </Card>
         </div>
@@ -764,14 +764,14 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                                 tab === key
                                     ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-border dark:text-gray-400 dark:hover:text-gray-200'
                             }`}
                         >
                             <Icon className="h-3.5 w-3.5" />
                             {label}
                             {key === 'forecast' && reorderAlerts.length > 0 && (
-                                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none ${
-                                    criticalCount > 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                                <span className={`ml-1 rounded-full px-1.5 py-0.5 text-xs font-bold leading-none ${
+                                    criticalCount > 0 ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
                                 }`}>
                                     {reorderAlerts.length}
                                 </span>
@@ -794,7 +794,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div>
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">Monthly Summary</h2>
-                                <p className="text-xs text-gray-500">Day {insights.days_elapsed} of {insights.days_in_month}</p>
+                                <p className="text-xs text-muted-foreground">Day {insights.days_elapsed} of {insights.days_in_month}</p>
                             </div>
                         </div>
                         <MonthlySummaryCards data={insights} />
@@ -805,7 +805,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div>
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">Automated Insights</h2>
-                                <p className="text-xs text-gray-500">Plain-language analysis of your store performance</p>
+                                <p className="text-xs text-muted-foreground">Plain-language analysis of your store performance</p>
                             </div>
                         </div>
                         <InsightsSection data={insights} reorderAlerts={reorderAlerts} />
@@ -816,7 +816,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div>
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">Actionable Recommendations</h2>
-                                <p className="text-xs text-gray-500">Steps you can take right now based on your data</p>
+                                <p className="text-xs text-muted-foreground">Steps you can take right now based on your data</p>
                             </div>
                         </div>
                         <RecommendationsCard recs={insights.recommendations} />
@@ -834,13 +834,13 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                                 </div>
                                 <div>
                                     <h2 className="text-sm font-bold text-gray-900 dark:text-white">Reorder Alerts</h2>
-                                    <p className="text-xs text-gray-500">Stockout prediction — products needing attention</p>
+                                    <p className="text-xs text-muted-foreground">Stockout prediction — products needing attention</p>
                                 </div>
                             </div>
                             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                criticalCount > 0 ? 'bg-red-100 text-red-700' :
-                                warningCount > 0  ? 'bg-amber-100 text-amber-700' :
-                                'bg-emerald-100 text-emerald-700'
+                                criticalCount > 0 ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' :
+                                warningCount > 0  ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
                             }`}>
                                 {reorderAlerts.length > 0 ? `${reorderAlerts.length} alert${reorderAlerts.length !== 1 ? 's' : ''}` : 'All clear'}
                             </span>
@@ -849,28 +849,28 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                         {reorderAlerts.length === 0 ? (
                             <Card>
                                 <CardContent className="flex flex-col items-center justify-center py-10">
-                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 mb-2">
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40 mb-2">
                                         <Warehouse className="h-6 w-6 text-emerald-600" />
                                     </div>
                                     <p className="font-semibold text-gray-700 dark:text-gray-300 text-sm">All stock levels are healthy</p>
-                                    <p className="text-xs text-gray-400 mt-1">No products are below reorder level.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">No products are below reorder level.</p>
                                 </CardContent>
                             </Card>
                         ) : (
                             <>
                                 <div className="flex flex-wrap gap-2">
                                     {criticalCount > 0 && (
-                                        <span className="flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+                                        <span className="flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 px-2.5 py-1 text-xs font-semibold text-red-700 dark:text-red-300">
                                             <Zap className="h-3 w-3" /> {criticalCount} Critical
                                         </span>
                                     )}
                                     {warningCount > 0 && (
-                                        <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                                        <span className="flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
                                             <AlertTriangle className="h-3 w-3" /> {warningCount} Warning
                                         </span>
                                     )}
                                     {reorderAlerts.filter((a) => a.severity === 'notice').length > 0 && (
-                                        <span className="flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-1 text-xs font-semibold text-yellow-700">
+                                        <span className="flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 px-2.5 py-1 text-xs font-semibold text-yellow-700 dark:text-yellow-300">
                                             <Package className="h-3 w-3" /> {reorderAlerts.filter((a) => a.severity === 'notice').length} Low Stock
                                         </span>
                                     )}
@@ -888,7 +888,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">7-Day Demand Forecast (SMA)</h2>
-                                <p className="text-xs text-gray-500">Simple Moving Average — predicted units per product</p>
+                                <p className="text-xs text-muted-foreground">Simple Moving Average — predicted units per product</p>
                             </div>
                             {demandForecast.products.length > 0 && (
                                 <span className="rounded-full bg-blue-100 dark:bg-blue-900/40 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
@@ -909,7 +909,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div>
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">Sales Trend</h2>
-                                <p className="text-xs text-gray-500">30-day revenue with linear regression trend line</p>
+                                <p className="text-xs text-muted-foreground">30-day revenue with linear regression trend line</p>
                             </div>
                         </div>
                         <SalesTrendSection data={salesTrend} />
@@ -920,7 +920,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                             </div>
                             <div>
                                 <h2 className="text-sm font-bold text-gray-900 dark:text-white">Top Products</h2>
-                                <p className="text-xs text-gray-500">Best-selling products in the last 30 days</p>
+                                <p className="text-xs text-muted-foreground">Best-selling products in the last 30 days</p>
                             </div>
                         </div>
                         <TopProductsSection products={topProducts} />
@@ -934,7 +934,7 @@ export default function SellerDss({ reorderAlerts, salesTrend, topProducts, dema
                 {tab === 'seasonal' && seasonal && <SeasonalSection data={seasonal} imports={salesImports} can={seasonalCan} />}
 
                 {/* Footer note */}
-                <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-3 text-center text-xs text-gray-400 mt-2">
+                <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-3 text-center text-xs text-muted-foreground mt-2">
                     DSS uses Simple Moving Average (demand forecast) and OLS linear regression (trend). Insights use rule-based logic — not AI. Scoped to your store, excludes cancelled orders.
                 </div>
             </div>
@@ -947,9 +947,9 @@ function FleetSection({ fleet }: { fleet: Fleet }) {
     const waitDays = new Set(fleet.waits.map((w) => w.date)).size;
     const stat = (label: string, value: string | number, hint: string) => (
         <div className="rounded-lg border bg-white p-3 dark:bg-gray-900">
-            <p className="text-xs text-gray-500">{label}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
             <p className="text-xl font-bold tabular-nums">{value}</p>
-            <p className="text-[11px] text-gray-400">{hint}</p>
+            <p className="text-xs text-muted-foreground">{hint}</p>
         </div>
     );
     return (
@@ -974,9 +974,9 @@ function FleetSection({ fleet }: { fleet: Fleet }) {
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Per vehicle</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto p-0">
                     <table className="w-full text-sm">
-                        <thead><tr className="border-b text-left text-xs text-gray-500"><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2 text-right">Trips</th><th className="px-4 py-2 text-right">kg carried</th><th className="px-4 py-2 text-right">Capacity used</th></tr></thead>
+                        <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2 text-right">Trips</th><th className="px-4 py-2 text-right">kg carried</th><th className="px-4 py-2 text-right">Capacity used</th></tr></thead>
                         <tbody className="divide-y">
-                            {fleet.per_vehicle.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-400">No vehicles yet.</td></tr>}
+                            {fleet.per_vehicle.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-muted-foreground">No vehicles yet.</td></tr>}
                             {fleet.per_vehicle.map((v) => (
                                 <tr key={v.id}>
                                     <td className="px-4 py-2">{v.label}</td>
@@ -984,7 +984,7 @@ function FleetSection({ fleet }: { fleet: Fleet }) {
                                     <td className="px-4 py-2 text-right tabular-nums">{v.kg}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">
                                         {v.pct_used === null ? '—' : `${v.pct_used}%`}
-                                        {v.underused && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">underused</span>}
+                                        {v.underused && <span className="ml-1.5 rounded bg-gray-100 px-1.5 py-px text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">underused</span>}
                                     </td>
                                 </tr>
                             ))}
@@ -1016,29 +1016,29 @@ function SupplierSection({ data }: { data: SupplierDss }) {
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Suppliers — last {data.days} days</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto p-0">
                     <table className="w-full text-sm">
-                        <thead><tr className="border-b text-left text-xs text-gray-500">
+                        <thead><tr className="border-b text-left text-xs text-muted-foreground">
                             <th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Received</th><th className="px-4 py-2 text-right">Damaged / expired</th>
                             <th className="px-4 py-2 text-right">Damage rate</th><th className="px-4 py-2 text-right">Avg delay</th><th className="px-4 py-2 text-right">On time</th>
                             <th className="px-4 py-2 text-right">Owed</th><th className="px-4 py-2 text-right">Overdue</th><th className="px-4 py-2">Advice</th>
                         </tr></thead>
                         <tbody className="divide-y">
-                            {data.suppliers.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-gray-400">No suppliers yet.</td></tr>}
+                            {data.suppliers.length === 0 && <tr><td colSpan={9} className="px-4 py-6 text-center text-muted-foreground">No suppliers yet.</td></tr>}
                             {data.suppliers.map((s) => (
                                 <tr key={s.id} data-testid={`dss-supplier-${s.id}`}>
-                                    <td className="px-4 py-2 font-medium">{s.name}<span className="block text-[11px] text-gray-400">lead time {s.lead_days} d</span></td>
+                                    <td className="px-4 py-2 font-medium">{s.name}<span className="block text-xs text-muted-foreground">lead time {s.lead_days} d</span></td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.received}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.damaged}</td>
-                                    <td className="px-4 py-2 text-right tabular-nums">{s.damage_rate === null ? <span className="text-gray-400" title={`Needs ${t.min_received}+ cylinders received`}>—</span> : `${s.damage_rate}%`}</td>
+                                    <td className="px-4 py-2 text-right tabular-nums">{s.damage_rate === null ? <span className="text-muted-foreground" title={`Needs ${t.min_received}+ cylinders received`}>—</span> : `${s.damage_rate}%`}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.avg_delay === null ? '—' : `${s.avg_delay} d`}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.on_time_pct === null ? '—' : `${s.on_time_pct}%`}</td>
                                     <td className="px-4 py-2 text-right tabular-nums">{s.owed ? '₱' + s.owed.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</td>
                                     <td className={`px-4 py-2 text-right tabular-nums ${s.overdue ? 'font-semibold text-red-600' : ''}`}>{s.overdue ? '₱' + s.overdue.toLocaleString('en-PH', { minimumFractionDigits: 2 }) : '—'}</td>
-                                    <td className={`px-4 py-2 text-xs ${s.ok ? 'text-emerald-700' : 'text-amber-800'}`}>{s.advice.join(' ')}</td>
+                                    <td className={`px-4 py-2 text-xs ${s.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-800 dark:text-amber-300'}`}>{s.advice.join(' ')}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <p className="border-t px-4 py-2 text-[11px] text-gray-500">
+                    <p className="border-t px-4 py-2 text-xs text-muted-foreground">
                         Damage rate = damaged/expired cylinders traced to the supplier ÷ cylinders received from them (customer tanks refused at handover are not counted).
                         Advice: ≥ {t.inspect_rate}% inspect deliveries · ≥ {t.switch_rate}% consider another supplier · late on ≥ {t.late_pct}% of orders → order earlier.
                         Delay = received date − (sent date + lead time). Owed = received value − payments (and return credits) on their purchase orders.

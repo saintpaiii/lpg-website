@@ -225,7 +225,7 @@ export default function Landing({ products, stats, plans }: Props) {
                 }
             `}</style>
 
-            <div className="min-h-screen bg-white text-slate-900 antialiased">
+            <div className="min-h-screen bg-card text-foreground antialiased">
 
                 {/* ══════════════ NAVBAR ══════════════ */}
                 <nav className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
@@ -241,7 +241,7 @@ export default function Landing({ products, stats, plans }: Props) {
                             </div>
                             <div className="leading-tight text-left">
                                 <p className="text-sm font-bold text-white">LPG Distribution</p>
-                                <p className="text-[10px] text-blue-300">Cavite</p>
+                                <p className="text-xs text-blue-300">Cavite</p>
                             </div>
                         </button>
 
@@ -365,7 +365,7 @@ export default function Landing({ products, stats, plans }: Props) {
                 </section>
 
                 {/* ══════════════ STATS BAR ══════════════ */}
-                <section className="bg-white py-16">
+                <section className="bg-card py-16">
                     <div ref={statsRef} className="mx-auto max-w-5xl px-6">
                         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
                             {[
@@ -378,7 +378,7 @@ export default function Landing({ products, stats, plans }: Props) {
                                     <p className="text-4xl font-extrabold text-blue-600 tabular-nums">
                                         {value}{suffix}
                                     </p>
-                                    <p className="mt-1.5 text-sm font-medium text-slate-500">{label}</p>
+                                    <p className="mt-1.5 text-sm font-medium text-muted-foreground">{label}</p>
                                 </div>
                             ))}
                         </div>
@@ -386,12 +386,12 @@ export default function Landing({ products, stats, plans }: Props) {
                 </section>
 
                 {/* ══════════════ HOW IT WORKS ══════════════ */}
-                <section id="how-it-works" className="bg-slate-50 py-24">
+                <section id="how-it-works" className="bg-muted py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
                             <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Simple Process</span>
-                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-slate-900">How It Works</h2>
-                            <p className="mt-3 text-slate-500 max-w-lg mx-auto">
+                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">How It Works</h2>
+                            <p className="mt-3 text-muted-foreground max-w-lg mx-auto">
                                 Get your LPG order in three simple steps
                             </p>
                         </Reveal>
@@ -403,36 +403,36 @@ export default function Landing({ products, stats, plans }: Props) {
                                     step: '01',
                                     title: 'Create Your Account',
                                     desc: 'Register and verify your email to get started. Takes less than a minute.',
-                                    color: 'bg-blue-50 text-blue-600',
-                                    border: 'border-blue-100',
+                                    color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-600',
+                                    border: 'border-blue-200 dark:border-blue-800',
                                 },
                                 {
                                     icon: Search,
                                     step: '02',
                                     title: 'Browse & Compare',
                                     desc: 'Find LPG products from multiple stores across Cavite. Compare prices and brands.',
-                                    color: 'bg-indigo-50 text-indigo-600',
-                                    border: 'border-indigo-100',
+                                    color: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600',
+                                    border: 'border-indigo-200 dark:border-indigo-800',
                                 },
                                 {
                                     icon: Truck,
                                     step: '03',
                                     title: 'Order & Track',
                                     desc: 'Place your order, pay securely, and track your delivery with real-time status updates.',
-                                    color: 'bg-cyan-50 text-cyan-600',
-                                    border: 'border-cyan-100',
+                                    color: 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600',
+                                    border: 'border-cyan-200 dark:border-cyan-800',
                                 },
                             ].map(({ icon: Icon, step, title, desc, color, border }, i) => (
                                 <Reveal key={step} delay={i * 120}>
-                                    <div className={`relative rounded-2xl border ${border} bg-white p-8 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group`}>
+                                    <div className={`relative rounded-2xl border ${border} bg-card p-8 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group`}>
                                         <div className="mb-5 flex items-center justify-between">
                                             <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${color} transition-transform duration-300 group-hover:scale-110`}>
                                                 <Icon className="h-6 w-6" />
                                             </div>
-                                            <span className="text-5xl font-extrabold text-slate-100 select-none">{step}</span>
+                                            <span className="text-5xl font-extrabold text-blue-600 dark:text-blue-400 select-none">{step}</span>
                                         </div>
-                                        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-                                        <p className="mt-2 text-sm text-slate-500 leading-relaxed">{desc}</p>
+                                        <h3 className="text-lg font-bold text-foreground">{title}</h3>
+                                        <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{desc}</p>
                                     </div>
                                 </Reveal>
                             ))}
@@ -441,32 +441,32 @@ export default function Landing({ products, stats, plans }: Props) {
                 </section>
 
                 {/* ══════════════ FOR BUYERS ══════════════ */}
-                <section id="for-buyers" className="bg-white py-24">
+                <section id="for-buyers" className="bg-card py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
                             <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Buyers</span>
-                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-slate-900">Everything You Need as a Buyer</h2>
-                            <p className="mt-3 text-slate-500 max-w-xl mx-auto">
+                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">Everything You Need as a Buyer</h2>
+                            <p className="mt-3 text-muted-foreground max-w-xl mx-auto">
                                 Order LPG with confidence from trusted distributors in Cavite
                             </p>
                         </Reveal>
 
                         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                             {[
-                                { icon: Store,   title: 'Multiple Distributors',   desc: 'Browse from verified LPG distributors across Cavite in one place.',                       color: 'text-blue-600 bg-blue-50' },
-                                { icon: Search,  title: 'Compare Prices',           desc: 'Compare refill and new purchase prices side by side before you order.',                    color: 'text-indigo-600 bg-indigo-50' },
-                                { icon: CreditCard, title: 'Secure Payments',       desc: 'Pay via GCash, Maya, Card, or Cash on Delivery — whichever works for you.',               color: 'text-emerald-600 bg-emerald-50' },
-                                { icon: Truck,   title: 'Delivery Tracking',        desc: 'Track your order every step of the way with live status updates.',                         color: 'text-orange-600 bg-orange-50' },
-                                { icon: Shield,  title: 'Photo Proof Delivery',     desc: 'Riders submit photo proof at each step so you always know your order is safe.',            color: 'text-purple-600 bg-purple-50' },
-                                { icon: Package, title: 'Order History',            desc: 'View all past orders, invoices, and payment records from your personal dashboard.',        color: 'text-cyan-600 bg-cyan-50' },
+                                { icon: Store,   title: 'Multiple Distributors',   desc: 'Browse from verified LPG distributors across Cavite in one place.',                       color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/40' },
+                                { icon: Search,  title: 'Compare Prices',           desc: 'Compare refill and new purchase prices side by side before you order.',                    color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40' },
+                                { icon: CreditCard, title: 'Secure Payments',       desc: 'Pay via GCash, Maya, Card, or Cash on Delivery — whichever works for you.',               color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40' },
+                                { icon: Truck,   title: 'Delivery Tracking',        desc: 'Track your order every step of the way with live status updates.',                         color: 'text-orange-600 bg-orange-50 dark:bg-orange-950/40' },
+                                { icon: Shield,  title: 'Photo Proof Delivery',     desc: 'Riders submit photo proof at each step so you always know your order is safe.',            color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40' },
+                                { icon: Package, title: 'Order History',            desc: 'View all past orders, invoices, and payment records from your personal dashboard.',        color: 'text-cyan-600 bg-cyan-50 dark:bg-cyan-950/40' },
                             ].map(({ icon: Icon, title, desc, color }, i) => (
                                 <Reveal key={title} delay={i * 80}>
                                     <div className="glass-card-light group rounded-2xl p-6 transition-all duration-300 hover:shadow-md hover:-translate-y-1">
                                         <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl ${color} transition-transform duration-300 group-hover:scale-110`}>
                                             <Icon className="h-5 w-5" />
                                         </div>
-                                        <h3 className="font-semibold text-slate-900">{title}</h3>
-                                        <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">{desc}</p>
+                                        <h3 className="font-semibold text-foreground">{title}</h3>
+                                        <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{desc}</p>
                                     </div>
                                 </Reveal>
                             ))}
@@ -502,7 +502,7 @@ export default function Landing({ products, stats, plans }: Props) {
                                         'Add and manage your own staff with custom permissions',
                                     ].map((item) => (
                                         <li key={item} className="flex items-start gap-3">
-                                            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-400" />
+                                            <CheckCircle className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
                                             <span className="text-sm text-blue-100">{item}</span>
                                         </li>
                                     ))}
@@ -511,7 +511,7 @@ export default function Landing({ products, stats, plans }: Props) {
                                 <div className="mt-10 flex flex-col sm:flex-row gap-4">
                                     <Link
                                         href="/register"
-                                        className="inline-flex items-center justify-center rounded-xl bg-white px-7 py-3 text-sm font-semibold text-blue-700 shadow-lg hover:bg-blue-50 transition-all hover:scale-[1.02]"
+                                        className="inline-flex items-center justify-center rounded-xl bg-card px-7 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300 shadow-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all hover:scale-[1.02]"
                                     >
                                         Start Selling
                                     </Link>
@@ -544,16 +544,16 @@ export default function Landing({ products, stats, plans }: Props) {
 
                 {/* ══════════════ PRICING ══════════════ */}
                 {plans && plans.plans.length > 0 && (
-                    <section id="pricing" className="bg-white py-24">
+                    <section id="pricing" className="bg-card py-24">
                         <div className="mx-auto max-w-6xl px-6">
                             <Reveal className="mb-12 text-center">
                                 <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Pricing for sellers</p>
-                                <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Start with a free {plans.trial_days}-day Premium trial</h2>
-                                <p className="mt-3 text-slate-600">No commission — sellers keep 100% of their sales. Pick a monthly plan when the trial ends.</p>
+                                <h2 className="mt-2 text-3xl font-bold text-foreground sm:text-4xl">Start with a free {plans.trial_days}-day Premium trial</h2>
+                                <p className="mt-3 text-muted-foreground">No commission — sellers keep 100% of their sales. Pick a monthly plan when the trial ends.</p>
                             </Reveal>
                             <PlanCards
                                 catalog={plans}
-                                className="text-left text-slate-900"
+                                className="text-left text-foreground"
                                 renderAction={(p) => (
                                     <PlanCardButton href="/seller/register" variant={p.key === 'pro' ? 'default' : 'outline'}>Start free trial</PlanCardButton>
                                 )}
@@ -563,12 +563,12 @@ export default function Landing({ products, stats, plans }: Props) {
                 )}
 
                 {/* ══════════════ PLATFORM FEATURES ══════════════ */}
-                <section className="bg-slate-50 py-24">
+                <section className="bg-muted py-24">
                     <div className="mx-auto max-w-6xl px-6">
                         <Reveal className="text-center mb-16">
                             <span className="text-sm font-semibold uppercase tracking-widest text-blue-600">Platform</span>
-                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-slate-900">Built for the Whole Marketplace</h2>
-                            <p className="mt-3 text-slate-500 max-w-lg mx-auto">
+                            <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-foreground">Built for the Whole Marketplace</h2>
+                            <p className="mt-3 text-muted-foreground max-w-lg mx-auto">
                                 A complete platform for buyers, sellers, and platform administrators
                             </p>
                         </Reveal>
@@ -583,12 +583,12 @@ export default function Landing({ products, stats, plans }: Props) {
                                 { icon: BarChart3, title: 'Transparent Fees',     desc: `Simple monthly plans with a free ${plans?.trial_days ?? 14}-day trial. Sellers keep 100% of their sales.`, color: 'bg-cyan-600'   },
                             ].map(({ icon: Icon, title, desc, color }, i) => (
                                 <Reveal key={title} delay={i * 70}>
-                                    <div className="group rounded-2xl border border-slate-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                                    <div className="group rounded-2xl border border-border bg-card p-6 shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
                                         <div className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-xl ${color} shadow-sm transition-transform duration-300 group-hover:scale-110`}>
                                             <Icon className="h-5 w-5 text-white" />
                                         </div>
-                                        <h3 className="font-semibold text-slate-900">{title}</h3>
-                                        <p className="mt-1.5 text-sm text-slate-500 leading-relaxed">{desc}</p>
+                                        <h3 className="font-semibold text-foreground">{title}</h3>
+                                        <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{desc}</p>
                                     </div>
                                 </Reveal>
                             ))}
@@ -607,7 +607,7 @@ export default function Landing({ products, stats, plans }: Props) {
                             <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
                                 <Link
                                     href="/register"
-                                    className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-blue-700 shadow-lg hover:bg-blue-50 transition-all hover:scale-[1.02]"
+                                    className="rounded-xl bg-card px-8 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300 shadow-lg hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-all hover:scale-[1.02]"
                                 >
                                     Create Account
                                 </Link>
@@ -634,16 +634,16 @@ export default function Landing({ products, stats, plans }: Props) {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-white">LPG Distribution</p>
-                                        <p className="text-[10px] text-blue-400">Cavite</p>
+                                        <p className="text-xs text-blue-600 dark:text-blue-400">Cavite</p>
                                     </div>
                                 </div>
-                                <p className="text-sm text-slate-400 leading-relaxed max-w-xs">
+                                <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
                                     A multi-vendor marketplace platform connecting LPG distributors and customers
                                     across Cavite with reliable delivery and secure payments.
                                 </p>
                                 <div className="mt-5 flex gap-3">
                                     {[Facebook, Twitter, Instagram].map((Icon, i) => (
-                                        <div key={i} className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-slate-400 hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+                                        <div key={i} className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800 text-muted-foreground hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
                                             <Icon className="h-4 w-4" />
                                         </div>
                                     ))}
@@ -661,13 +661,13 @@ export default function Landing({ products, stats, plans }: Props) {
                                         { label: 'For Sellers',      onClick: () => scrollTo('for-sellers') },
                                     ].map(({ label, onClick }) => (
                                         <li key={label}>
-                                            <button onClick={onClick} className="text-sm text-slate-400 hover:text-white transition-colors">
+                                            <button onClick={onClick} className="text-sm text-muted-foreground hover:text-white transition-colors">
                                                 {label}
                                             </button>
                                         </li>
                                     ))}
-                                    <li><Link href="/login"    className="text-sm text-slate-400 hover:text-white transition-colors">Login</Link></li>
-                                    <li><Link href="/register" className="text-sm text-slate-400 hover:text-white transition-colors">Register</Link></li>
+                                    <li><Link href="/login"    className="text-sm text-muted-foreground hover:text-white transition-colors">Login</Link></li>
+                                    <li><Link href="/register" className="text-sm text-muted-foreground hover:text-white transition-colors">Register</Link></li>
                                 </ul>
                             </div>
 
@@ -675,26 +675,26 @@ export default function Landing({ products, stats, plans }: Props) {
                             <div>
                                 <h4 className="text-sm font-semibold text-white mb-4">Contact</h4>
                                 <ul className="space-y-3">
-                                    <li className="flex items-start gap-2.5 text-sm text-slate-400">
-                                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+                                    <li className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                                        <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                                         Cavite, Philippines
                                     </li>
                                     {/* Admin → Settings → company email (hidden when not set) */}
                                     {contact_email && (
-                                        <li className="flex items-center gap-2.5 text-sm text-slate-400">
-                                            <Mail className="h-4 w-4 shrink-0 text-blue-400" />
+                                        <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                                            <Mail className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                                             <a href={`mailto:${contact_email}`} className="hover:text-white">{contact_email}</a>
                                         </li>
                                     )}
-                                    <li className="flex items-center gap-2.5 text-sm text-slate-400">
-                                        <Phone className="h-4 w-4 shrink-0 text-blue-400" />
+                                    <li className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                                        <Phone className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                                         +63 (046) 000-0000
                                     </li>
                                 </ul>
                             </div>
                         </div>
 
-                        <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+                        <div className="border-t border-slate-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
                             <p>© 2026 LPG Distribution Cavite. All rights reserved.</p>
                             <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                                 <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>

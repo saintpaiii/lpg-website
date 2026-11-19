@@ -102,7 +102,7 @@ export default function AdminRefundDisputes({ items, counts, tab, search }: Prop
                     )}
                 </form>
 
-                <div className="flex gap-1 border-b">
+                <div className="flex gap-1 overflow-x-auto border-b scrollbar-none [&>button]:shrink-0 [&>button]:whitespace-nowrap">
                     {TABS.map((t) => (
                         <button key={t.key} onClick={() => goTab(t.key)}
                             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === t.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}

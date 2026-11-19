@@ -63,14 +63,14 @@ export default function AdminUserReports({ items, tab, search, counts, storeResp
                 <div className="flex flex-wrap gap-1 border-b">
                     {TABS.map((t) => (
                         <button key={t.key} type="button" onClick={() => go({ tab: t.key, page: '1' })}
-                            className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium', tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800')}>
+                            className={cn('-mb-px border-b-2 px-3 py-2 text-sm font-medium', tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-muted-foreground hover:text-foreground')}>
                             {t.label}
                             {t.key === 'monitoring' && monitoringIdle > 0 && (
                                 <span className="ml-1 inline-block h-2 w-2 rounded-full bg-red-600 align-middle" title="A store hasn't responded for 24+ hours" />
                             )}
                             {(counts[t.key] ?? 0) > 0 && (
-                                <span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
-                                    t.key === 'needs_admin' || t.key === 'urgent' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-600')}>{counts[t.key]}</span>
+                                <span className={cn('ml-1.5 rounded-full px-1.5 py-0.5 text-xs font-semibold',
+                                    t.key === 'needs_admin' || t.key === 'urgent' ? 'bg-red-600 text-white' : 'bg-muted text-muted-foreground')}>{counts[t.key]}</span>
                             )}
                         </button>
                     ))}
@@ -81,7 +81,7 @@ export default function AdminUserReports({ items, tab, search, counts, storeResp
                 ) : (
                     <>
                         <form onSubmit={(e: FormEvent) => { e.preventDefault(); go({ page: '1' }); }} className="relative max-w-sm">
-                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Subject, reporter, store or order" className="pl-8" aria-label="Search reports" />
                         </form>
                         {items && tab === 'monitoring' && <MonitoringList rows={items as Paginated<MonitoringRow>} />}
@@ -102,10 +102,10 @@ function StoreResponse({ rows }: { rows: StoreRow[] }) {
                 and false reports it filed). Stores are never suspended automatically. Slowest stores first.
             </p>
             {rows.length === 0 ? (
-                <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">No store-handled customer reports in the last 90 days.</p>
+                <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">No store-handled customer reports in the last 90 days.</p>
             ) : (
                 <div className="overflow-x-auto rounded-xl border">
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead className="border-b bg-muted/30 text-left text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2.5 font-medium">Store</th>
@@ -131,7 +131,7 @@ function StoreResponse({ rows }: { rows: StoreRow[] }) {
                                     <td className="px-4 py-2.5 text-right">
                                         <span className="tabular-nums">{r.warnings_90d}</span>
                                         {r.warnings_90d >= 3 && (
-                                            <a href={`/admin/stores/${r.store_id}`} className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                                            <a href={`/admin/stores/${r.store_id}`} className="ml-2 rounded-full bg-red-600 px-2 py-0.5 text-xs font-semibold text-white">
                                                 3+ warnings in 90 days — consider suspending
                                             </a>
                                         )}
@@ -154,7 +154,7 @@ const ago = (iso: string) => {
 /** Every open store-handled report the admin is watching: urgent first, then longest without store activity. */
 function MonitoringList({ rows }: { rows: Paginated<MonitoringRow> }) {
     if (rows.data.length === 0) {
-        return <p className="rounded-xl border border-dashed py-10 text-center text-sm text-gray-500">No store-handled reports are open right now.</p>;
+        return <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">No store-handled reports are open right now.</p>;
     }
     return (
         <div className="space-y-2">
@@ -167,13 +167,13 @@ function MonitoringList({ rows }: { rows: Paginated<MonitoringRow> }) {
                         <li key={r.id}>
                             <div role="link" tabIndex={0} onClick={() => router.visit(r.link)} onKeyDown={(e) => e.key === 'Enter' && router.visit(r.link)}
                                 className={cn('flex cursor-pointer flex-col gap-2 rounded-lg border bg-white px-4 py-3 hover:bg-gray-50 sm:flex-row sm:items-center dark:bg-gray-950 dark:hover:bg-gray-900',
-                                    r.is_urgent && 'border-red-300 ring-1 ring-red-200')}>
+                                    r.is_urgent && 'border-red-200 dark:border-red-800 ring-1 ring-red-200')}>
                                 <div className="min-w-0 flex-1 space-y-1">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-semibold">{r.category_label}</span>
                                         <ReportStatusBadges status={r.status} label={r.status_label} urgent={r.is_urgent} />
                                     </div>
-                                    <p className="flex flex-wrap gap-x-3 text-xs text-gray-500">
+                                    <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
                                         {r.store && <span>{r.store.name}</span>}
                                         {r.order_number && <span className="font-mono">{r.order_number}</span>}
                                         <span className={cn(idleHours >= 24 && 'font-semibold text-red-600')}>
@@ -182,7 +182,7 @@ function MonitoringList({ rows }: { rows: Paginated<MonitoringRow> }) {
                                     </p>
                                 </div>
                                 <div className="flex shrink-0 items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                    {r.reminded_at && <span className="text-[11px] text-gray-500">Reminded {ago(r.reminded_at)}</span>}
+                                    {r.reminded_at && <span className="text-xs text-muted-foreground">Reminded {ago(r.reminded_at)}</span>}
                                     <Button size="sm" variant="outline" className="gap-1.5" disabled={reminded}
                                         onClick={() => router.post(`/admin/user-reports/${r.id}/remind-store`, {}, { preserveScroll: true, preserveState: true })}>
                                         <BellRing className="h-3.5 w-3.5" /> Remind the store

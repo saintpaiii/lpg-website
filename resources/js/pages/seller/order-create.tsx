@@ -95,18 +95,18 @@ function CustomerCombobox({
                 <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
                     <div>
                         <span className="font-medium">{selected.name}</span>
-                        {selected.phone && <span className="ml-2 text-gray-400 text-xs">{selected.phone}</span>}
+                        {selected.phone && <span className="ml-2 text-muted-foreground text-xs">{selected.phone}</span>}
                         {(selected.barangay || selected.city) && (
-                            <p className="text-xs text-gray-400 mt-0.5">{[selected.barangay, selected.city].filter(Boolean).join(', ')}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{[selected.barangay, selected.city].filter(Boolean).join(', ')}</p>
                         )}
                     </div>
-                    <button type="button" onClick={clear} className="ml-2 text-gray-400 hover:text-gray-600">
+                    <button type="button" onClick={clear} className="ml-2 text-muted-foreground hover:text-muted-foreground">
                         <X className="h-4 w-4" />
                     </button>
                 </div>
             ) : (
                 <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <input
                         ref={inputRef}
                         type="text"
@@ -119,19 +119,19 @@ function CustomerCombobox({
                 </div>
             )}
             {open && !selected && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border bg-white shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-50 mt-1 w-full rounded-md border bg-card shadow-lg max-h-60 overflow-y-auto">
                     {filtered.length === 0 ? (
-                        <div className="px-3 py-4 text-center text-sm text-gray-400">No customers found</div>
+                        <div className="px-3 py-4 text-center text-sm text-muted-foreground">No customers found</div>
                     ) : (
                         filtered.map((c) => (
                             <button
                                 key={c.id}
                                 type="button"
                                 onMouseDown={() => select(c)}
-                                className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm transition-colors"
+                                className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-sm transition-colors"
                             >
-                                <p className="font-medium text-gray-900">{c.name}</p>
-                                <p className="text-xs text-gray-400">{[c.phone, c.barangay, c.city].filter(Boolean).join(' · ')}</p>
+                                <p className="font-medium text-foreground">{c.name}</p>
+                                <p className="text-xs text-muted-foreground">{[c.phone, c.barangay, c.city].filter(Boolean).join(' · ')}</p>
                             </button>
                         ))
                     )}
@@ -219,8 +219,8 @@ export default function SellerOrderCreate({ customers, products }: Props) {
             <div className="flex flex-1 flex-col gap-6 p-6 max-w-3xl">
 
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">New Order</h1>
-                    <p className="mt-0.5 text-sm text-gray-500">
+                    <h1 className="text-2xl font-bold text-foreground">New Order</h1>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
                         Create a new customer order. Stock is deducted when the order is confirmed.
                     </p>
                 </div>
@@ -250,7 +250,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                                 <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:max-w-md">
                                     {([['delivery', 'Delivery'], ['pickup', 'Pick-up / walk-in']] as const).map(([value, label]) => (
                                         <button key={value} type="button" onClick={() => setData('fulfillment', value)}
-                                            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${data.fulfillment === value ? 'bg-background text-blue-700 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                                            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${data.fulfillment === value ? 'bg-background text-blue-700 dark:text-blue-300 shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
                                             {label}
                                         </button>
                                     ))}
@@ -317,7 +317,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="grid gap-3">
-                            <div className="grid grid-cols-[1fr_96px_100px_32px] gap-2 text-xs font-medium text-gray-500 px-1">
+                            <div className="grid grid-cols-[1fr_96px_100px_32px] gap-2 text-xs font-medium text-muted-foreground px-1">
                                 <span>Product</span>
                                 <span className="text-center">Qty</span>
                                 <span className="text-right">Subtotal</span>
@@ -347,7 +347,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                                                     ))}
                                             </select>
                                             {product && (
-                                                <p className="mt-0.5 px-1 text-[10px] text-gray-400">
+                                                <p className="mt-0.5 px-1 text-xs text-muted-foreground">
                                                     ₱{price.toLocaleString()} each · {product.stock} available
                                                 </p>
                                             )}
@@ -367,7 +367,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                                             onChange={(e) => updateLine(idx, 'quantity', e.target.value)}
                                         />
 
-                                        <div className="flex h-9 items-center justify-end text-sm font-medium text-gray-700">
+                                        <div className="flex h-9 items-center justify-end text-sm font-medium text-foreground/80">
                                             {product ? `₱${subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2 })}` : '—'}
                                         </div>
 
@@ -375,7 +375,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                                             <button
                                                 type="button"
                                                 onClick={() => removeLine(idx)}
-                                                className="flex h-9 w-8 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                                                className="flex h-9 w-8 items-center justify-center rounded text-muted-foreground hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-500 transition-colors"
                                             >
                                                 <X className="h-4 w-4" />
                                             </button>
@@ -389,8 +389,8 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                             {total > 0 && (
                                 <div className="mt-2 flex justify-end border-t pt-3">
                                     <div className="text-right">
-                                        <p className="text-xs text-gray-500">Order Total</p>
-                                        <p className="text-xl font-bold text-blue-700">
+                                        <p className="text-xs text-muted-foreground">Order Total</p>
+                                        <p className="text-xl font-bold text-blue-700 dark:text-blue-300">
                                             ₱{total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </p>
                                     </div>
@@ -402,7 +402,7 @@ export default function SellerOrderCreate({ customers, products }: Props) {
                     </Card>
 
                     {/* Info note */}
-                    <div className="flex items-start gap-2 rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                    <div className="flex items-start gap-2 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
                         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                         <p>
                             Stock will be deducted and an invoice will be generated when the order is <strong>confirmed</strong>.

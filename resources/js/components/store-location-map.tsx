@@ -153,7 +153,7 @@ export default function StoreLocationMap({
                     )}
                 </div>
                 {store && (
-                    <p className="text-[11px] text-muted-foreground">Google Maps may show a longer route if a local shortcut isn't on its map.</p>
+                    <p className="text-xs text-muted-foreground">Google Maps may show a longer route if a local shortcut isn't on its map.</p>
                 )}
             </div>
         </div>

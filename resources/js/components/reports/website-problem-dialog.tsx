@@ -71,7 +71,7 @@ export default function WebsiteProblemDialog({ open, onOpenChange, portal }: {
                             <button key={key} type="button" role="radio" aria-checked={form.data.category === key} onClick={() => form.setData('category', key)}
                                 className={cn('w-full rounded-lg border px-3 py-2 text-left', form.data.category === key ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500 dark:bg-blue-900/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800')}>
                                 <span className="block text-sm font-medium">{c.label}</span>
-                                <span className="block text-xs text-gray-500">{c.hint}</span>
+                                <span className="block text-xs text-muted-foreground">{c.hint}</span>
                             </button>
                         ))}
                         {errors.category && <p className="text-xs text-red-600">{errors.category}</p>}
@@ -115,7 +115,7 @@ export default function WebsiteProblemDialog({ open, onOpenChange, portal }: {
                             ))}
                             {form.data.screenshots.length < 5 && (
                                 <button type="button" onClick={() => fileRef.current?.click()}
-                                    className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-dashed text-[10px] text-gray-500 hover:bg-gray-50">
+                                    className="flex h-16 w-16 flex-col items-center justify-center rounded-md border border-dashed text-xs text-muted-foreground hover:bg-muted">
                                     <Paperclip className="h-4 w-4" /> Add
                                 </button>
                             )}

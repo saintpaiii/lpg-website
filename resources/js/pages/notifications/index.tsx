@@ -26,7 +26,7 @@ function typeIcon(type: string) {
         case 'order_update':    return <Package className="h-4 w-4 text-blue-500" />;
         case 'delivery_update': return <Truck className="h-4 w-4 text-orange-500" />;
         case 'payment':         return <span className="flex h-4 w-4 items-center justify-center text-xs font-bold text-green-500">₱</span>;
-        default:                return <Settings className="h-4 w-4 text-gray-400" />;
+        default:                return <Settings className="h-4 w-4 text-muted-foreground" />;
     }
 }
 
@@ -63,7 +63,7 @@ export default function NotificationsIndex({ notifications }: Props) {
                         <Bell className="h-5 w-5 text-muted-foreground" />
                         <h1 className="text-xl font-semibold">Notifications</h1>
                         {unreadNotifications > 0 && (
-                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
                                 {unreadNotifications > 99 ? '99+' : unreadNotifications}
                             </span>
                         )}
@@ -90,7 +90,7 @@ export default function NotificationsIndex({ notifications }: Props) {
                         >
                             {t}
                             {t === 'unread' && unreadNotifications > 0 && (
-                                <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                                <span className="ml-1.5 rounded-full bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">
                                     {unreadNotifications}
                                 </span>
                             )}
@@ -125,7 +125,7 @@ export default function NotificationsIndex({ notifications }: Props) {
                                 {/* Content */}
                                 <div className="min-w-0 flex-1">
                                     <div className="mb-1 flex flex-wrap items-center gap-2">
-                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                                        <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                                             {TYPE_LABELS[n.type] ?? n.type}
                                         </span>
                                         <span className="text-xs text-muted-foreground">{n.created_at}</span>

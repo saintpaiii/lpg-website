@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../css/app.css';
 import { initializeTheme } from '@/hooks/use-appearance';
+import { initResponsiveTables } from '@/lib/responsive-tables';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 
@@ -30,3 +31,6 @@ createInertiaApp({
 
 // This will set light / dark mode on load...
 initializeTheme();
+
+// J10: wide tables (class rt-cards) become card lists on phones
+initResponsiveTables();

@@ -146,7 +146,7 @@ export function AddressFields({
                 <Input
                     value="Cavite"
                     disabled
-                    className="h-11 bg-gray-50 text-gray-500 cursor-not-allowed dark:bg-gray-800"
+                    className="h-11 bg-gray-50 text-muted-foreground cursor-not-allowed dark:bg-gray-800"
                 />
             </div>
         </div>

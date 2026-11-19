@@ -44,8 +44,8 @@ export default function NotFound() {
             </div>
 
             <div className="flex items-center gap-3 mb-6">
-                <SearchX className="h-10 w-10 text-gray-300" />
-                <span className="text-7xl font-black text-gray-200 dark:text-gray-700">404</span>
+                <SearchX className="h-10 w-10 text-muted-foreground" />
+                <span className="text-7xl font-black text-blue-600/80 dark:text-blue-400">404</span>
             </div>
 
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
@@ -67,7 +67,7 @@ export default function NotFound() {
                 </Button>
             </div>
 
-            <p className="mt-12 text-xs text-gray-400 dark:text-gray-600">
+            <p className="mt-12 text-xs text-muted-foreground">
                 LPG Distribution Management System &bull; Cavite
             </p>
         </div>

@@ -28,20 +28,20 @@ export default function ReportStatusBadges({ status, label, verdict, urgent, esc
     return (
         <span className={cn('inline-flex flex-wrap items-center gap-1.5', className)}>
             {urgent && open && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
                     <AlertTriangle className="h-3 w-3" /> Urgent
                 </span>
             )}
-            <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', STATUS_STYLE[status] ?? STATUS_STYLE.dismissed)}>
+            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLE[status] ?? STATUS_STYLE.dismissed)}>
                 {label}{!open && verdict ? ` · ${verdict}` : ''}
             </span>
             {escalated && open && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/30 dark:text-orange-300">
                     <ShieldAlert className="h-3 w-3" /> With admin
                 </span>
             )}
             {showRoute && route && (
-                <span className="rounded-full border px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-300">{ROUTE_LABEL[route] ?? route}</span>
+                <span className="rounded-full border px-2 py-0.5 text-xs text-gray-600 dark:text-gray-300">{ROUTE_LABEL[route] ?? route}</span>
             )}
         </span>
     );

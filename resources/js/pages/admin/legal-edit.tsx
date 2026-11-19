@@ -182,7 +182,7 @@ export default function LegalEdit({ type, label, public_url, has_draft, next_ver
                                 <Send className="h-4 w-4" /> Publish
                             </Button>
                             {has_draft && (
-                                <Button type="button" variant="ghost" onClick={() => setConfirmDiscard(true)} disabled={processing} className="gap-1.5 text-red-600 hover:text-red-700">
+                                <Button type="button" variant="ghost" onClick={() => setConfirmDiscard(true)} disabled={processing} className="gap-1.5 text-red-600 hover:text-red-700 dark:hover:text-red-300">
                                     <Trash2 className="h-4 w-4" /> Discard draft
                                 </Button>
                             )}
@@ -215,7 +215,7 @@ export default function LegalEdit({ type, label, public_url, has_draft, next_ver
                                             <tr key={v.id}>
                                                 <td className="py-2 pr-3 font-medium">
                                                     {v.version}
-                                                    {v.is_current && <span className="ml-1.5 rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-800 dark:bg-green-900/50 dark:text-green-300">Current</span>}
+                                                    {v.is_current && <span className="ml-1.5 rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-900/50 dark:text-green-300">Current</span>}
                                                 </td>
                                                 <td className="py-2 pr-3 whitespace-nowrap">{v.published_date}</td>
                                                 <td className="py-2 pr-3">{v.published_by}</td>

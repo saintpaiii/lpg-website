@@ -49,11 +49,11 @@ type FormState = {
 };
 
 const STATE_STYLES: Record<CouponRow['state'], string> = {
-    active:    'bg-green-100 text-green-800',
-    scheduled: 'bg-blue-100 text-blue-800',
-    expired:   'bg-gray-100 text-gray-600',
-    used_up:   'bg-amber-100 text-amber-800',
-    inactive:  'bg-gray-100 text-gray-500',
+    active:    'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300',
+    scheduled: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
+    expired:   'bg-muted text-muted-foreground',
+    used_up:   'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300',
+    inactive:  'bg-muted text-muted-foreground',
 };
 
 const STATE_LABELS: Record<CouponRow['state'], string> = {
@@ -172,7 +172,7 @@ export function CouponManager({ coupons, filters, basePath, suggestedCode, codeP
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-muted-foreground">
                                         <th className="px-4 py-2.5 font-medium">Code</th>
@@ -415,14 +415,14 @@ function LivePreview({ form }: { form: FormState }) {
                 <Line label="Items" value={peso(product)} />
                 <Line label="Delivery fee" value={peso(shipping)} />
                 {!qualifies ? (
-                    <p className="py-1 text-xs font-medium text-amber-700">Coupon not applied — below the {peso(minOrder)} minimum order.</p>
+                    <p className="py-1 text-xs font-medium text-amber-700 dark:text-amber-300">Coupon not applied — below the {peso(minOrder)} minimum order.</p>
                 ) : (
                     <>
                         <Line label="Discount" value={`−${peso(d.total)}`} className="font-semibold text-red-600" />
                         {form.scope === 'both' && (
-                            <p className="text-[11px] text-muted-foreground">{peso(d.product)} on items · {peso(d.shipping)} on delivery</p>
+                            <p className="text-xs text-muted-foreground">{peso(d.product)} on items · {peso(d.shipping)} on delivery</p>
                         )}
-                        {capped && <p className="text-[11px] text-amber-700">Capped at {peso(Number(form.max_discount_amount))}</p>}
+                        {capped && <p className="text-xs text-amber-700 dark:text-amber-300">Capped at {peso(Number(form.max_discount_amount))}</p>}
                     </>
                 )}
                 <div className="mt-1 border-t pt-1.5">
@@ -481,7 +481,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
     return (
         <button type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}
             className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${checked ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}>
-            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-card shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </button>
     );
 }

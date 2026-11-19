@@ -6,6 +6,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { UserInfo } from '@/components/user-info';
 import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
 import { edit } from '@/routes/profile';
@@ -53,6 +54,12 @@ export function UserMenuContent({ user, onLogoutRequest }: Props) {
                     </DropdownMenuItem>
                 )}
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            {/* J10: Light / Dark / System */}
+            <div className="px-1 py-1">
+                <p className="px-1 pb-1 text-xs text-muted-foreground">Theme</p>
+                <ThemeToggle />
+            </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem
                 className="cursor-pointer"

@@ -103,7 +103,7 @@ export function BatchesDialog({ open, onClose, productId, productName, batches, 
                                         <Input value={form.batch_code} placeholder="auto" maxLength={40} onChange={(e) => setForm((f) => ({ ...f, batch_code: e.target.value }))} />
                                     </label>
                                     {Object.values(errors).map((e) => <p key={e} className="text-xs text-red-600 sm:col-span-2">{e}</p>)}
-                                    <p className="text-[11px] text-muted-foreground sm:col-span-2">No stock numbers change — this only records the date on the collar.</p>
+                                    <p className="text-xs text-muted-foreground sm:col-span-2">No stock numbers change — this only records the date on the collar.</p>
                                     <div className="flex justify-end gap-2 sm:col-span-2">
                                         <Button size="sm" variant="outline" onClick={() => setDating(false)}>Cancel</Button>
                                         <Button size="sm" disabled={busy} onClick={saveDating}>{busy ? 'Saving…' : 'Save dates'}</Button>
@@ -112,7 +112,7 @@ export function BatchesDialog({ open, onClose, productId, productName, batches, 
                             )}
                         </div>
                     )}
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead className="text-xs text-muted-foreground"><tr className="border-b">
                             <th className="px-3 py-2 text-left">Batch</th>{th('remaining', 'Left')}{th('requalification_due_on', 'Requalification')}{th('received_on', 'Received')}
                             <th className="px-3 py-2 text-left">Supplier</th><th className="px-3 py-2" />
@@ -121,7 +121,7 @@ export function BatchesDialog({ open, onClose, productId, productName, batches, 
                             {rows.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">No batches with stock.{undated > 0 ? ' The undated stock above still sells.' : ''}</td></tr>}
                             {rows.map((b) => (
                                 <tr key={b.id} className={b.expired ? 'bg-red-50 dark:bg-red-950/30' : ''}>
-                                    <td className="px-3 py-2 font-mono text-xs">{b.batch_code}<span className="block text-[10px] text-muted-foreground">{b.source}</span></td>
+                                    <td className="px-3 py-2 font-mono text-xs">{b.batch_code}<span className="block text-xs text-muted-foreground">{b.source}</span></td>
                                     <td className="px-3 py-2 tabular-nums">{b.remaining}/{b.received}</td>
                                     <td className="px-3 py-2">{b.requalification_due_on ?? '—'}
                                         {b.days_left !== null && <span className={`ml-1 text-xs ${b.expired ? 'font-semibold text-red-600' : b.days_left <= 30 ? 'text-amber-600' : 'text-muted-foreground'}`}>
@@ -222,13 +222,13 @@ export function HeldCylindersCard({ incidents, suppliers }: { incidents: Inciden
         <Card data-testid="held-cylinders">
             <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-4 w-4 text-red-600" /> Damaged / expired cylinders</CardTitle></CardHeader>
             <CardContent className="space-y-3 overflow-x-auto p-0">
-                <table className="w-full text-sm">
+                <table className="rt-cards w-full text-sm">
                     <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2" /><th className="px-4 py-2">Cylinder</th><th className="px-4 py-2 text-right">Qty</th><th className="px-4 py-2">Reason</th><th className="px-4 py-2">Batch / supplier</th><th className="px-4 py-2">Status</th><th /></tr></thead>
                     <tbody className="divide-y">
                         {incidents.map((i) => (
                             <tr key={i.id}>
                                 <td className="px-4 py-2">{i.status === 'held' && <input type="checkbox" aria-label={`Select ${i.product}`} checked={picked.includes(i.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, i.id] : p.filter((x) => x !== i.id)))} />}</td>
-                                <td className="px-4 py-2">{i.product}{i.was_empty && <span className="ml-1 text-xs text-muted-foreground">(empty)</span>}<span className="block text-[11px] text-muted-foreground">{i.created_at}{i.note ? ` · ${i.note}` : ''}</span></td>
+                                <td className="px-4 py-2">{i.product}{i.was_empty && <span className="ml-1 text-xs text-muted-foreground">(empty)</span>}<span className="block text-xs text-muted-foreground">{i.created_at}{i.note ? ` · ${i.note}` : ''}</span></td>
                                 <td className="px-4 py-2 text-right tabular-nums">{i.quantity}</td>
                                 <td className="px-4 py-2">{i.reason}{i.photo_url && <a href={i.photo_url} target="_blank" rel="noopener noreferrer" className="ml-1 text-xs text-blue-600 underline">photo</a>}</td>
                                 <td className="px-4 py-2 text-xs">{i.batch ?? '—'}{i.supplier ? ` · ${i.supplier}` : ''}</td>
@@ -290,18 +290,18 @@ export function ReturnsCard({ returns }: { returns: ReturnRow[] }) {
         <Card data-testid="supplier-returns">
             <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><Truck className="h-4 w-4" /> Supplier returns</CardTitle></CardHeader>
             <CardContent className="overflow-x-auto p-0">
-                <table className="w-full text-sm">
+                <table className="rt-cards w-full text-sm">
                     <tbody className="divide-y">
                         {returns.map((r) => (
                             <tr key={r.id}>
-                                <td className="px-4 py-2 font-mono text-xs">{r.return_number}<span className="block font-sans text-[11px] text-muted-foreground">{r.created_at}</span></td>
+                                <td className="px-4 py-2 font-mono text-xs">{r.return_number}<span className="block font-sans text-xs text-muted-foreground">{r.created_at}</span></td>
                                 <td className="px-4 py-2">{r.supplier}</td>
                                 <td className="px-4 py-2 text-right tabular-nums">{r.quantity} cyl.</td>
                                 <td className="px-4 py-2">
                                     <span className="capitalize">{r.status}</span>{r.credited_amount !== null && ` · ${peso(r.credited_amount)}`}
                                     {/* K6: the credit lowers the supplier balance (recorded on the oldest unpaid POs) */}
                                     {r.credited_amount !== null && r.credited_amount > 0 && (
-                                        <span className="block text-[11px] text-muted-foreground" data-testid="credit-applied">
+                                        <span className="block text-xs text-muted-foreground" data-testid="credit-applied">
                                             {(r.credit_applied ?? 0) >= r.credited_amount - 0.005
                                                 ? 'Applied to unpaid purchase orders'
                                                 : (r.credit_applied ?? 0) > 0

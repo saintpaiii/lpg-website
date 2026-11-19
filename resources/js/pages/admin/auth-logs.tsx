@@ -147,24 +147,24 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
 
                     {/* Today's summary */}
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 text-sm">
+                        <div className="flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 px-3 py-2 text-sm">
                             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                            <span className="font-semibold text-emerald-700">{successToday}</span>
+                            <span className="font-semibold text-emerald-700 dark:text-emerald-300">{successToday}</span>
                             <span className="text-emerald-600">logins today</span>
                         </div>
-                        <div className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm ${failedToday > 10 ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200'}`}>
-                            <XCircle className={`h-4 w-4 ${failedToday > 10 ? 'text-red-600' : 'text-gray-400'}`} />
-                            <span className={`font-semibold ${failedToday > 10 ? 'text-red-700' : 'text-gray-700'}`}>{failedToday}</span>
-                            <span className={failedToday > 10 ? 'text-red-600' : 'text-gray-500'}>failed today</span>
+                        <div className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm ${failedToday > 10 ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800' : 'bg-muted border-border'}`}>
+                            <XCircle className={`h-4 w-4 ${failedToday > 10 ? 'text-red-600' : 'text-muted-foreground'}`} />
+                            <span className={`font-semibold ${failedToday > 10 ? 'text-red-700 dark:text-red-300' : 'text-foreground/80'}`}>{failedToday}</span>
+                            <span className={failedToday > 10 ? 'text-red-600' : 'text-muted-foreground'}>failed today</span>
                         </div>
                     </div>
                 </div>
 
                 {/* High failed attempts warning */}
                 {failedToday > 10 && (
-                    <div className="flex items-center gap-3 rounded-xl border border-red-300 bg-red-50 px-4 py-3">
+                    <div className="flex items-center gap-3 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-3">
                         <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
-                        <p className="text-sm text-red-700 font-medium">
+                        <p className="text-sm text-red-700 dark:text-red-300 font-medium">
                             High number of failed login attempts today ({failedToday}). Review the logs below for suspicious activity.
                         </p>
                     </div>
@@ -175,16 +175,16 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                     <div className="space-y-2">
                         {suspiciousIps.map((ip) => (
                             <div key={ip.ip_address}
-                                className="flex items-center gap-3 rounded-xl border border-orange-300 bg-orange-50 px-4 py-3">
+                                className="flex items-center gap-3 rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 px-4 py-3">
                                 <ShieldAlert className="h-5 w-5 text-orange-600 shrink-0" />
-                                <p className="text-sm text-orange-800">
+                                <p className="text-sm text-orange-800 dark:text-orange-300">
                                     <span className="font-bold">⚠ {ip.attempts} failed attempts</span> from IP{' '}
-                                    <code className="font-mono bg-orange-100 px-1.5 py-0.5 rounded text-orange-900">{ip.ip_address}</code>{' '}
+                                    <code className="font-mono bg-orange-100 dark:bg-orange-900/40 px-1.5 py-0.5 rounded text-orange-900 dark:text-orange-300">{ip.ip_address}</code>{' '}
                                     in the last hour.
                                 </p>
                                 <button
                                     onClick={() => setSearch(ip.ip_address)}
-                                    className="ml-auto text-xs text-orange-700 underline hover:no-underline shrink-0">
+                                    className="ml-auto text-xs text-orange-700 dark:text-orange-300 underline hover:no-underline shrink-0">
                                     Filter by IP
                                 </button>
                             </div>
@@ -247,7 +247,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                 <Card>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30">
                                         <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Date / Time</th>
@@ -267,7 +267,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                                             </td>
                                         </tr>
                                     ) : logs.data.map((log) => {
-                                        const cfg = ACTION_CONFIG[log.action] ?? { label: log.action, icon: ShieldAlert, color: 'text-gray-500' };
+                                        const cfg = ACTION_CONFIG[log.action] ?? { label: log.action, icon: ShieldAlert, color: 'text-muted-foreground' };
                                         const ActionIcon = cfg.icon;
                                         const isSuccess = log.status === 'success';
                                         const isSuspicious = suspiciousIps.some((s) => s.ip_address === log.ip_address);
@@ -275,7 +275,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                                         return (
                                             <tr key={log.id}
                                                 className={`border-b last:border-0 transition-colors ${
-                                                    isSuspicious ? 'bg-orange-50/60 hover:bg-orange-50' : 'hover:bg-muted/20'
+                                                    isSuspicious ? 'bg-orange-50/60 hover:bg-orange-50 dark:hover:bg-orange-950/40' : 'hover:bg-muted/20'
                                                 }`}
                                             >
                                                 {/* Date */}
@@ -303,10 +303,10 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
                                                 <td className="px-4 py-3 text-center">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
                                                         isSuccess
-                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
                                                             : log.action === 'account_locked'
-                                                                ? 'bg-orange-100 text-orange-700'
-                                                                : 'bg-red-100 text-red-700'
+                                                                ? 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300'
+                                                                : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300'
                                                     }`}>
                                                         {isSuccess ? 'Success' : log.action === 'account_locked' ? 'Locked' : 'Failed'}
                                                     </span>
@@ -314,7 +314,7 @@ export default function AuthLogs({ logs, successToday, failedToday, suspiciousIp
 
                                                 {/* IP */}
                                                 <td className="px-4 py-3 hidden md:table-cell">
-                                                    <span className={`font-mono text-xs ${isSuspicious ? 'text-orange-700 font-semibold' : 'text-muted-foreground'}`}>
+                                                    <span className={`font-mono text-xs ${isSuspicious ? 'text-orange-700 dark:text-orange-300 font-semibold' : 'text-muted-foreground'}`}>
                                                         {log.ip_address}
                                                         {isSuspicious && ' ⚠'}
                                                     </span>

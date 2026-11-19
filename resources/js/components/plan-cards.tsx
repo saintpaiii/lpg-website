@@ -39,7 +39,7 @@ export function PlanCards({ catalog, currentKey, renderAction, className }: {
                             </span>
                         )}
                         {current && (
-                            <span className="absolute right-3 top-3 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            <span className="absolute right-3 top-3 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                                 Current plan
                             </span>
                         )}
@@ -71,7 +71,7 @@ export function PlanCards({ catalog, currentKey, renderAction, className }: {
                                     <li key={key} className={cn('flex items-start gap-2', !has && 'text-muted-foreground')}>
                                         {has
                                             ? <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                                            : <X className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />}
+                                            : <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />}
                                         <span className={cn(!has && 'line-through decoration-gray-300')}>{label}</span>
                                     </li>
                                 );

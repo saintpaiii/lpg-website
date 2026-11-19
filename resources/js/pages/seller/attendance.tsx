@@ -98,13 +98,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, string> = {
-    present:     'bg-emerald-100 text-emerald-700',
-    late:        'bg-yellow-100 text-yellow-700',
-    absent:      'bg-red-100 text-red-700',
-    half_day:    'bg-orange-100 text-orange-700',
-    day_off:     'bg-gray-100 text-gray-500',
-    undertime:   'bg-rose-100 text-rose-700',
-    no_schedule: 'bg-gray-100 text-gray-400',
+    present:     'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    late:        'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+    absent:      'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+    half_day:    'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+    day_off:     'bg-muted text-muted-foreground',
+    undertime:   'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300',
+    no_schedule: 'bg-muted text-muted-foreground',
 };
 
 const SUB_ROLE_LABELS: Record<string, string> = {
@@ -115,10 +115,10 @@ const SUB_ROLE_LABELS: Record<string, string> = {
 };
 
 const SUB_ROLE_STYLES: Record<string, string> = {
-    cashier:   'bg-emerald-100 text-emerald-700',
-    warehouse: 'bg-amber-100 text-amber-700',
-    rider:     'bg-blue-100 text-blue-700',
-    hr:        'bg-purple-100 text-purple-700',
+    cashier:   'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+    warehouse: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+    rider:     'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+    hr:        'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ function liveHoursWorked(clockInStr: string): number {
 
 function StatusBadge({ status }: { status: string }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status] ?? 'bg-gray-100 text-gray-500'}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[status] ?? 'bg-muted text-muted-foreground'}`}>
             {STATUS_LABEL[status] ?? status}
         </span>
     );
@@ -170,7 +170,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function RoleBadge({ role, names }: { role: string; names?: string[] }) {
     return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-gray-100 text-gray-600'}`}>
+        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${SUB_ROLE_STYLES[role] ?? 'bg-muted text-muted-foreground'}`}>
             {names?.length ? names.join(', ') : (SUB_ROLE_LABELS[role] ?? role)}
         </span>
     );
@@ -180,7 +180,7 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
     return (
         <Card>
             <CardHeader className="pb-1 pt-4 px-4">
-                <CardTitle className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</CardTitle>
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</CardTitle>
             </CardHeader>
             <CardContent className="pb-4 px-4">
                 <p className={`text-2xl font-bold ${color}`}>{value}</p>
@@ -257,7 +257,7 @@ function SetClockOutDialog({ row, date, onClose }: { row: AttendanceRow; date: s
                     <DialogTitle>Set Clock-Out for {row.name}</DialogTitle>
                 </DialogHeader>
                 <div className="grid gap-3 py-2">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-muted-foreground">
                         This staff member has no clock-out for <strong>{date}</strong>. Enter the correct clock-out time.
                     </p>
                     <div className="grid gap-1.5">
@@ -312,14 +312,14 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                 {/* Header */}
                 <div className="flex items-start justify-between flex-wrap gap-3">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                             <CalendarDays className="h-6 w-6 text-blue-600" />
                             Attendance
                         </h1>
-                        <p className="mt-0.5 text-sm text-gray-500">Track staff clock-in and clock-out for your store.</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Track staff clock-in and clock-out for your store.</p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <label className="text-sm font-medium text-gray-600">Date</label>
+                        <label className="text-sm font-medium text-muted-foreground">Date</label>
                         <input
                             type="date"
                             value={date}
@@ -340,12 +340,12 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
 
                 {/* Summary cards */}
                 <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-                    <SummaryCard label="Total Staff" value={summary.total}    color="text-gray-800" />
+                    <SummaryCard label="Total Staff" value={summary.total}    color="text-foreground" />
                     <SummaryCard label="Present"     value={summary.present}  color="text-emerald-600" />
-                    <SummaryCard label="Late"        value={summary.late}     color="text-yellow-600" />
+                    <SummaryCard label="Late"        value={summary.late}     color="text-amber-700 dark:text-amber-300" />
                     <SummaryCard label="Absent"      value={summary.absent}   color="text-red-600" />
                     <SummaryCard label="Half Day"    value={summary.half_day} color="text-orange-600" />
-                    <SummaryCard label="Day Off"     value={summary.day_off}  color="text-gray-400" />
+                    <SummaryCard label="Day Off"     value={summary.day_off}  color="text-muted-foreground" />
                 </div>
 
                 {/* Table */}
@@ -354,20 +354,20 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                         <CardTitle className="text-base flex items-center gap-2">
                             <Users className="h-4 w-4 text-blue-600" />
                             Staff Attendance
-                            <span className="ml-auto text-sm font-normal text-gray-400">{summary.total} staff</span>
+                            <span className="ml-auto text-sm font-normal text-muted-foreground">{summary.total} staff</span>
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
                         {rows.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                                 <Users className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No active staff found</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                        <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Staff</th>
                                             <th className="px-4 py-3">Schedule</th>
                                             <th className="px-4 py-3 text-center">Clock In</th>
@@ -378,22 +378,22 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                             {canManage && <th className="px-4 py-3 text-right">Actions</th>}
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-border">
                                         {rows.map((row) => (
-                                            <tr key={row.user_id} className="hover:bg-gray-50/60">
+                                            <tr key={row.user_id} className="hover:bg-muted/60">
                                                 <td className="px-4 py-3">
-                                                    <p className="font-medium text-gray-900">{row.name}</p>
+                                                    <p className="font-medium text-foreground">{row.name}</p>
                                                     <div className="mt-0.5">
                                                         <RoleBadge role={row.sub_role} names={row.role_names} />
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                                                <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                                                     {fmtSchedule(row.schedule_start, row.schedule_end)}
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm font-mono">
                                                     {row.clock_in ? (
                                                         <div className="flex flex-col items-center gap-0.5">
-                                                            <span className="text-emerald-700 font-medium">{row.clock_in}</span>
+                                                            <span className="text-emerald-700 dark:text-emerald-300 font-medium">{row.clock_in}</span>
                                                             {row.clock_in_manual && (
                                                                 <span title="Manual clock-in (no photo)" className="flex items-center gap-0.5 text-xs text-amber-600 font-normal font-sans">
                                                                     <MapPin className="h-3 w-3" /> Manual
@@ -415,32 +415,32 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <span className="text-gray-300">—</span>
+                                                        <span className="text-muted-foreground">—</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center text-sm font-mono">
                                                     {row.clock_out ? (
                                                         <div className="flex flex-col items-center gap-0.5">
-                                                            <span className="text-blue-700 font-medium">{row.clock_out}</span>
+                                                            <span className="text-blue-700 dark:text-blue-300 font-medium">{row.clock_out}</span>
                                                             <RecordedBy name={row.clock_out_recorded_by} />
                                                             <AttendancePhoto url={row.clock_out_photo_url} label="Clock-out" />
                                                         </div>
                                                     ) : (
-                                                        <span className="text-gray-300">—</span>
+                                                        <span className="text-muted-foreground">—</span>
                                                     )}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     <div className="flex flex-col items-center gap-0.5">
                                                         <StatusBadge status={row.status} />
                                                         {row.is_extra_day && (
-                                                            <span title="Clocked in on a day off — paid like any worked day" className="ml-1 inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">Extra day</span>
+                                                            <span title="Clocked in on a day off — paid like any worked day" className="ml-1 inline-flex items-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:text-indigo-300">Extra day</span>
                                                         )}
                                                         {row.is_late && row.status !== 'late' && (
-                                                            <span className="text-xs text-yellow-600 font-medium">Late arrival</span>
+                                                            <span className="text-xs text-amber-700 dark:text-amber-300 font-medium">Late arrival</span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-3 text-center text-xs text-gray-600">
+                                                <td className="px-4 py-3 text-center text-xs text-muted-foreground">
                                                     {row.clock_in && !row.clock_out && isToday
                                                         ? <span className="text-amber-600 font-medium">{fmtHours(liveHoursWorked(row.clock_in))}~</span>
                                                         : <span>{fmtHours(row.hours_worked, !!row.clock_out)}</span>
@@ -450,7 +450,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                     {row.overtime_hours > 0 ? (
                                                         <span className="text-orange-600 font-medium">{fmtHours(row.overtime_hours)}</span>
                                                     ) : (
-                                                        <span className="text-gray-300">—</span>
+                                                        <span className="text-muted-foreground">—</span>
                                                     )}
                                                 </td>
                                                 {canManage && (
@@ -460,14 +460,14 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                                 <ClockInButton row={row} date={date} vehicles={rider_vehicles} />
                                                             )}
                                                             {isToday && !row.clock_in && (!row.schedule_start || !row.schedule_end) && (
-                                                                <span className="text-xs text-gray-400 italic">No schedule</span>
+                                                                <span className="text-xs text-muted-foreground italic">No schedule</span>
                                                             )}
                                                             {isToday && row.clock_in && !row.clock_out && !row.missing_clock_out && (
                                                                 <ClockOutButton row={row} date={date} />
                                                             )}
                                                             {row.missing_clock_out && (
                                                                 <>
-                                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 text-red-700 text-xs font-medium px-2 py-0.5">
+                                                                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 text-xs font-medium px-2 py-0.5">
                                                                         <AlertTriangle className="h-3 w-3" />
                                                                         Missing Clock Out
                                                                     </span>
@@ -482,7 +482,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                                                                 </>
                                                             )}
                                                             {row.clock_in && row.clock_out && (
-                                                                <span className="text-xs text-gray-400 italic">Done</span>
+                                                                <span className="text-xs text-muted-foreground italic">Done</span>
                                                             )}
                                                         </div>
                                                     </td>
@@ -496,13 +496,13 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                     </CardContent>
                 </Card>
 
-                <p className="-mt-3 text-xs text-gray-400">
+                <p className="-mt-3 text-xs text-muted-foreground">
                     Hours shown are clock-in to clock-out. Payroll subtracts the 60-min unpaid meal break.
                 </p>
 
                 {/* Missing Clock Out note */}
                 {canManage && (
-                    <p className="text-xs text-gray-400 italic text-center">
+                    <p className="text-xs text-muted-foreground italic text-center">
                         Staff who forget to clock out will show a "Missing Clock Out" badge 1 hour after their scheduled end. The owner/HR must set their clock-out time manually.
                     </p>
                 )}

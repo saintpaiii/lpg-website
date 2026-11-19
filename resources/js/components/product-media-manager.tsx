@@ -163,13 +163,13 @@ export default function ProductMediaManager({ items, onChange, serverErrors }: {
                         )}
                         {item.kind === 'video' && !item.preparing && (
                             <span className="absolute inset-0 flex items-center justify-center">
-                                <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-white">
+                                <span className="flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
                                     <Play className="h-3 w-3 fill-white" /> {formatDuration(item.duration)}
                                 </span>
                             </span>
                         )}
                         {item.key === coverKey && (
-                            <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">Cover</span>
+                            <span className="absolute left-1 top-1 rounded bg-blue-600 px-1.5 py-0.5 text-xs font-semibold text-white">Cover</span>
                         )}
 
                         <button type="button" onClick={() => remove(item.key)} aria-label="Remove"

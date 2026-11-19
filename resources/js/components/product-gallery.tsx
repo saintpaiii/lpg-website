@@ -266,7 +266,7 @@ export default function ProductGallery({ media, name, outOfStock }: { media: Gal
                         <div className="absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/25 px-2 py-1.5 backdrop-blur-sm">
                             {media.map((m, i) => (
                                 <button key={m.id} type="button" onClick={() => go(i)} aria-label={`Go to item ${i + 1}`}
-                                    className={cn('h-1.5 rounded-full bg-white transition-[width,opacity] duration-300', i === active ? 'w-5 opacity-100' : 'w-1.5 opacity-60')} />
+                                    className={cn('h-1.5 rounded-full bg-card transition-[width,opacity] duration-300', i === active ? 'w-5 opacity-100' : 'w-1.5 opacity-60')} />
                             ))}
                         </div>
                     </>
@@ -283,7 +283,7 @@ export default function ProductGallery({ media, name, outOfStock }: { media: Gal
                                 <img src={(m.type === 'image' ? m.url : m.poster_url) as string} alt="" loading="lazy" className="h-full w-full object-cover" />
                             )}
                             {m.type === 'video' && (
-                                <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-black/55 py-0.5 text-[10px] text-white">
+                                <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-0.5 bg-black/55 py-0.5 text-xs text-white">
                                     <Play className="h-2.5 w-2.5 fill-white" /> {formatDuration(m.duration)}
                                 </span>
                             )}
@@ -302,7 +302,7 @@ export default function ProductGallery({ media, name, outOfStock }: { media: Gal
 function OutOfStock() {
     return (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-black/40">
-            <span className="rounded-full bg-white px-4 py-2 text-sm font-bold text-gray-800">Out of Stock</span>
+            <span className="rounded-full bg-card px-4 py-2 text-sm font-bold text-foreground">Out of Stock</span>
         </div>
     );
 }
