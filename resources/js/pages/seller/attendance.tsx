@@ -178,14 +178,11 @@ function RoleBadge({ role, names }: { role: string; names?: string[] }) {
 
 function SummaryCard({ label, value, color }: { label: string; value: number; color: string }) {
     return (
-        <Card>
-            <CardHeader className="pb-1 pt-4 px-4">
-                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</CardTitle>
-            </CardHeader>
-            <CardContent className="pb-4 px-4">
-                <p className={`text-2xl font-bold ${color}`}>{value}</p>
-            </CardContent>
-        </Card>
+        // K11: a compact tile (label + number) — six Cards filled a whole phone screen before the staff list
+        <div className="rounded-xl border bg-card px-3 py-2.5 shadow-sm sm:px-4 sm:py-3">
+            <p className="truncate text-[11px] font-medium uppercase tracking-wide text-muted-foreground sm:text-xs">{label}</p>
+            <p className={`mt-0.5 text-xl font-bold tabular-nums sm:text-2xl ${color}`}>{value}</p>
+        </div>
     );
 }
 
@@ -340,7 +337,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                 </div>
 
                 {/* Summary cards */}
-                <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-6">
                     <SummaryCard label="Total Staff" value={summary.total}    color="text-foreground" />
                     <SummaryCard label="Present"     value={summary.present}  color="text-emerald-600" />
                     <SummaryCard label="Late"        value={summary.late}     color="text-amber-700 dark:text-amber-300" />
@@ -360,7 +357,7 @@ export default function AttendancePage({ rows, date, summary, store_location, ri
                     </CardHeader>
                     <CardContent className="p-0">
                         {rows.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                                 <Users className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No active staff found</p>
                             </div>

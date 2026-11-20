@@ -103,7 +103,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                     {s.chart.length === 0 ? (
                         <p className="py-10 text-center text-sm text-muted-foreground">No sales yet for this selection.</p>
                     ) : (
-                        <div className="overflow-x-auto" data-testid="seasonal-chart">
+                        <div className="overflow-x-auto" data-testid="seasonal-chart" data-audit-scroll-ok>
                             <div className="min-w-[640px]">
                                 <ResponsiveContainer width="100%" height={260}>
                                     <ComposedChart data={s.chart} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
@@ -141,7 +141,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Seasonal pattern — {s.label}</CardTitle></CardHeader>
                     <CardContent className="overflow-x-auto p-0">
-                        <table className="w-full text-sm" data-testid="seasonal-pattern">
+                        <table className="rt-cards w-full text-sm" data-testid="seasonal-pattern">
                             <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Month</th><th className="px-4 py-2 text-right">Index</th><th className="px-4 py-2 text-right">vs average</th><th className="px-4 py-2" /></tr></thead>
                             <tbody className="divide-y">
                                 {MONTHS.map((m, i) => {
@@ -205,7 +205,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm">Next 30 / 90 days per product</CardTitle></CardHeader>
                     <CardContent className="overflow-x-auto p-0">
-                        <table className="w-full text-sm" data-testid="seasonal-products">
+                        <table className="rt-cards w-full text-sm" data-testid="seasonal-products">
                             <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Product</th><th className="px-4 py-2 text-right">Next 30 days</th><th className="px-4 py-2 text-right">Next 90 days</th><th className="px-4 py-2">Peak / low</th><th className="px-4 py-2">History</th></tr></thead>
                             <tbody className="divide-y">
                                 {products.map((p) => {
@@ -237,7 +237,7 @@ export function SeasonalSection({ data, imports, can }: { data: Seasonal; import
                         {imports.length === 0 ? (
                             <p className="px-4 py-4 text-sm text-muted-foreground">No imports yet. Moving from a notebook or Excel? Import your past sales to see seasonal patterns sooner.</p>
                         ) : (
-                            <table className="w-full text-sm" data-testid="sales-imports">
+                            <table className="rt-cards w-full text-sm" data-testid="sales-imports">
                                 <thead><tr className="border-y text-left text-xs text-muted-foreground"><th className="px-4 py-2">Imported</th><th className="px-4 py-2 text-right">Rows</th><th className="px-4 py-2">Period</th><th className="px-4 py-2">By</th><th /></tr></thead>
                                 <tbody className="divide-y">
                                     {imports.map((im) => (
@@ -367,7 +367,7 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
                                 </p>
                             )}
                             <div className="overflow-x-auto rounded border">
-                                <table className="w-full text-xs">
+                                <table className="rt-cards w-full text-xs">
                                     <thead><tr className="border-b text-left text-muted-foreground"><th className="px-2 py-1">Row</th><th className="px-2 py-1">Date</th><th className="px-2 py-1">Product</th><th className="px-2 py-1 text-right">Qty</th><th className="px-2 py-1">Status</th></tr></thead>
                                     <tbody className="divide-y">
                                         {preview.preview.map((r) => (

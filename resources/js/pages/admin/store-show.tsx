@@ -276,16 +276,17 @@ export default function StoreShow({
             <div className="p-6 space-y-6 max-w-5xl">
                 {/* Header */}
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-start gap-3 sm:items-center">
                         <Link href="/admin/stores">
                             <Button variant="ghost" size="icon" className="h-8 w-8">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
                         </Link>
-                        <div>
-                            <div className="flex items-center gap-3">
+                        <div className="min-w-0">
+                            {/* K11: phones — avatar + badges on one line, the name under it (2 lines max, smaller) */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                 <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={40} />
-                                <h1 className="text-2xl font-bold tracking-tight">{store.store_name}</h1>
+                                <h1 className="order-last line-clamp-2 basis-full text-xl font-bold tracking-tight sm:order-none sm:basis-auto sm:text-2xl" title={store.store_name}>{store.store_name}</h1>
                                 {store.branch_of && <Link href={`/admin/stores/${store.branch_of.id}`} className="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:underline dark:bg-indigo-900/40 dark:text-indigo-300" data-testid="branch-of">Branch of {store.branch_of.name}</Link>}
                                 <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${STATUS_BADGE[store.status] ?? 'bg-muted text-foreground/80'}`}>
                                     {store.status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
@@ -616,7 +617,7 @@ export default function StoreShow({
                             )}
                             {subscription.payments.length > 0 ? (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="rt-cards w-full text-sm">
                                         <thead>
                                             <tr className="border-b text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                 <th className="py-2 pr-4">Receipt #</th>
@@ -710,7 +711,7 @@ export default function StoreShow({
                             <p className="py-4 text-center text-sm text-muted-foreground">No renewed or extra documents uploaded yet.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b text-left text-muted-foreground">
                                             <th className="pb-2 pr-3 font-medium">Document</th>

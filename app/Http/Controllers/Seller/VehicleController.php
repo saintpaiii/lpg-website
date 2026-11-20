@@ -28,12 +28,18 @@ class VehicleController extends Controller
         $store = $request->attributes->get('seller_store');
 
         $busy = SubscriptionService::busyVehicleIds($store->id);
+        // K11: who is using each vehicle right now (a rider clocked in with it — same rule as RiderLoadService::takeVehicle)
+        $onShift = \App\Models\Attendance::with('user:id,name')->whereNotNull('vehicle_id')
+            ->whereNotNull('clock_in')->whereNull('clock_out')
+            ->whereIn('date', [now()->toDateString(), now()->subDay()->toDateString()])
+            ->get()->keyBy('vehicle_id');
         $vehicles = Vehicle::withTrashed()
             ->where('store_id', $store->id)
             ->with('assignedRider:id,name')
             ->orderByRaw("deleted_at IS NOT NULL, status = 'retired', status = 'maintenance', id ASC")
             ->get()
             ->map(fn ($v) => [
+                'in_use_by'         => ($u = $onShift->get($v->id)?->user) ? ['id' => $u->id, 'name' => $u->name] : null,
                 'id'                => $v->id,
                 'vehicle_type'      => $v->vehicle_type,
                 'plate_number'      => $v->plate_number,

@@ -20,12 +20,14 @@ import { fmtDate } from '@/lib/utils';
 import CustomerLayout from '@/layouts/customer-layout';
 import { ReasonPicker } from '@/components/reason-picker';
 import { orderStatusLabel } from '@/lib/order-status';
+import { storeMainName } from '@/components/store-name';
 
 type Order = {
     id: number;
     seen?: SeenFlags;
     order_number: string;
     store_name: string;
+    store_branch?: string | null;
     status: string;
     fulfillment?: string;
     total_amount: number;
@@ -276,20 +278,19 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                 <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                            <th className="px-4 py-3">Order #</th>
-                                            <th className="px-4 py-3">Store</th>
-                                            <th className="px-4 py-3">Date</th>
-                                            <th className="px-4 py-3">Items</th>
-                                            <th className="px-4 py-3 text-right">Total</th>
-                                            <th className="px-4 py-3">Status</th>
-                                            <th className="px-4 py-3">Payment</th>
-                                            <th className="px-4 py-3 text-right">Actions</th>
+                                            <th className="px-3 py-3">Order</th>
+                                            <th className="px-3 py-3">Store</th>
+                                            <th className="px-3 py-3">Date</th>
+                                            <th className="px-3 py-3 text-right">Total</th>
+                                            <th className="px-3 py-3">Status</th>
+                                            <th className="px-3 py-3">Payment</th>
+                                            <th className="px-3 py-3 text-right">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                                         {orders.data.map((order, i) => (
                                             <tr key={order.id} className={`transition-colors hover:bg-blue-50/40 dark:hover:bg-blue-900/10 ${seenRowClass(seen.get(order.id)) || (i % 2 === 1 ? 'bg-gray-50/50 dark:bg-gray-800/20' : '')}`}>
-                                                <td className="px-4 py-3">
+                                                <td className="px-3 py-3">
                                                     <Link
                                                         href={`/customer/orders/${order.id}`}
                                                         className="whitespace-nowrap font-mono text-blue-600 hover:underline text-xs font-semibold"
@@ -297,17 +298,19 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                         {order.order_number}
                                                     </Link>
                                                     <SeenPill flags={seen.get(order.id)} className="ml-1.5" />
+                                                    {/* K11: the items sit under the order number (was its own column — the table did not fit at 1366) */}
+                                                    <p className="mt-0.5 max-w-44 truncate text-xs text-muted-foreground" title={order.items_summary}>
+                                                        {order.items_count} item{order.items_count !== 1 ? 's' : ''}{order.items_summary ? ` · ${order.items_summary}` : ''}
+                                                    </p>
                                                 </td>
-                                                <td className="min-w-32 px-4 py-3 text-xs text-foreground/80 font-medium">{order.store_name}</td>
-                                                <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(order.created_at)}</td>
-                                                <td className="px-4 py-3">
-                                                    <p className="text-xs text-muted-foreground">{order.items_count} item{order.items_count !== 1 ? 's' : ''}</p>
-                                                    <p className="text-xs text-muted-foreground truncate max-w-[160px]">{order.items_summary}</p>
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">
+                                                <td className="px-3 py-3 text-xs text-foreground/80 font-medium"><span className="line-clamp-2 min-w-28 max-w-44" title={order.store_name}>
+                                                        {order.store_branch ? <><span className="font-semibold">{order.store_branch}</span> · {storeMainName(order.store_name, order.store_branch)}</> : order.store_name}
+                                                    </span></td>
+                                                <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(order.created_at)}</td>
+                                                <td className="whitespace-nowrap px-3 py-3 text-right font-semibold tabular-nums text-gray-900 dark:text-white">
                                                     ₱{order.grand_total.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-3 py-3">
                                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-muted text-muted-foreground'}`}>
                                                         {orderStatusLabel(order.status, order.fulfillment)}
                                                     </span>
@@ -317,7 +320,7 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                         </p>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-3 py-3">
                                                     {awaitingPayment(order) ? (
                                                         <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300 whitespace-nowrap">
                                                             Waiting for payment
@@ -341,9 +344,9 @@ export default function Orders({ orders, date_from, date_to, status }: Props) {
                                                         </p>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3">
-                                                    {/* K10: the buttons wrap (two lines) instead of widening the table past its card */}
-                                                    <div className="flex flex-wrap items-center justify-end gap-1">
+                                                <td className="px-3 py-3">
+                                                    {/* K11: on wide screens the buttons stack (View / Pay now / Cancel) so the column stays narrow */}
+                                                    <div className="flex flex-wrap items-center justify-end gap-1 sm:flex-col sm:flex-nowrap sm:items-end">
                                                         <Link href={`/customer/orders/${order.id}`}>
                                                             <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
                                                                 View

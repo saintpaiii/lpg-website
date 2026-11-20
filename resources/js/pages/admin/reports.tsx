@@ -1,4 +1,5 @@
 import { Head, router } from '@inertiajs/react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
     Bar,
     BarChart,
@@ -138,7 +139,11 @@ function EmptyChart({ message }: { message: string }) {
 
 // ── Tab 1: Store Sales ─────────────────────────────────────────────────────────
 
+/** K11: phone x-axis label — "Dec 2025" → "Dec", "Nov 03, 2026" → "Nov 03" */
+const shortTick = (v: unknown) => String(v).replace(/,? \d{4}$/, '');
+
 function SalesTab({ data }: { data: SalesData }) {
+    const phone = useIsMobile();   // K11: thinner, shorter x-axis labels on phones
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
@@ -160,7 +165,7 @@ function SalesTab({ data }: { data: SalesData }) {
                         <ResponsiveContainer width="100%" height={260}>
                             <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={phone ? 'preserveStartEnd' : 0} minTickGap={phone ? 6 : 0} tickFormatter={phone ? shortTick : undefined} />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip formatter={(v: number | undefined) => [fmt(v ?? 0), 'GMV']} contentStyle={{ fontSize: 12 }} />
                                 <Bar dataKey="gmv" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -179,10 +184,10 @@ function SalesTab({ data }: { data: SalesData }) {
                         <p className="px-4 py-8 text-center text-sm text-muted-foreground">No store sales in this period.</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3" data-rt-title>Store</th>
                                         <th className="px-4 py-3">City</th>
                                         <th className="px-4 py-3 text-right">Orders</th>
                                         <th className="px-4 py-3 text-right">GMV</th>
@@ -210,6 +215,7 @@ function SalesTab({ data }: { data: SalesData }) {
 // ── Tab: Subscriptions ─────────────────────────────────────────────────────────
 
 function SubscriptionsTab({ data }: { data: SubscriptionsData }) {
+    const phone = useIsMobile();   // K11: thinner, shorter x-axis labels on phones
     const c = data.plan_counts;
     return (
         <div className="space-y-6">
@@ -236,7 +242,7 @@ function SubscriptionsTab({ data }: { data: SubscriptionsData }) {
                         <ResponsiveContainer width="100%" height={260}>
                             <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={phone ? 'preserveStartEnd' : 0} minTickGap={phone ? 6 : 0} tickFormatter={phone ? shortTick : undefined} />
                                 <YAxis tick={{ fontSize: 11 }} />
                                 <Tooltip formatter={(v: number | undefined) => [fmt(v ?? 0), 'Income']} contentStyle={{ fontSize: 12 }} />
                                 <Bar dataKey="income" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
@@ -255,11 +261,11 @@ function SubscriptionsTab({ data }: { data: SubscriptionsData }) {
                         <p className="px-4 py-8 text-center text-sm text-muted-foreground">No plan payments in this period.</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-3">Receipt #</th>
-                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3" data-rt-title>Store</th>
                                         <th className="px-4 py-3">Plan</th>
                                         <th className="px-4 py-3">Method</th>
                                         <th className="px-4 py-3">Period</th>
@@ -292,6 +298,7 @@ function SubscriptionsTab({ data }: { data: SubscriptionsData }) {
 // ── Tab 2: Users───────────────────────────────────────────────────────────────
 
 function UsersTab({ data }: { data: UsersData }) {
+    const phone = useIsMobile();   // K11: thinner, shorter x-axis labels on phones
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -313,7 +320,7 @@ function UsersTab({ data }: { data: UsersData }) {
                     <ResponsiveContainer width="100%" height={240}>
                         <BarChart data={data.weekly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                            <XAxis dataKey="week" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                            <XAxis dataKey="week" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={phone ? 'preserveStartEnd' : 0} minTickGap={phone ? 6 : 0} tickFormatter={phone ? shortTick : undefined} />
                             <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                             <Tooltip contentStyle={{ fontSize: 12 }} />
                             <Legend verticalAlign="top" />
@@ -406,11 +413,11 @@ function StoresTab({ data }: { data: StoresData }) {
                         <p className="px-4 py-8 text-center text-sm text-muted-foreground">No store data available.</p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-3">#</th>
-                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3" data-rt-title>Store</th>
                                         <th className="px-4 py-3">Status</th>
                                         <th className="px-4 py-3 text-right">Orders</th>
                                         <th className="px-4 py-3 text-right">GMV</th>
@@ -446,6 +453,7 @@ function StoresTab({ data }: { data: StoresData }) {
 // ── Tab 4: Orders ──────────────────────────────────────────────────────────────
 
 function OrdersTab({ data }: { data: OrdersData }) {
+    const phone = useIsMobile();   // K11: thinner, shorter x-axis labels on phones
     return (
         <div className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-1">
@@ -516,7 +524,7 @@ function OrdersTab({ data }: { data: OrdersData }) {
                         <ResponsiveContainer width="100%" height={220}>
                             <LineChart data={data.daily_trend} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={0} />
+                                <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" interval={phone ? 'preserveStartEnd' : 0} minTickGap={phone ? 6 : 0} tickFormatter={phone ? shortTick : undefined} />
                                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                 <Tooltip formatter={(v: number) => [v, 'Orders']} contentStyle={{ fontSize: 12 }} />
                                 <Line dataKey="orders" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
@@ -532,6 +540,7 @@ function OrdersTab({ data }: { data: OrdersData }) {
 // ── Tab 5: Ratings ─────────────────────────────────────────────────────────────
 
 function RatingsTab({ data }: { data: RatingsData }) {
+    const phone = useIsMobile();   // K11: thinner, shorter x-axis labels on phones
     const total = data.total_reviews;
 
     return (
@@ -543,7 +552,7 @@ function RatingsTab({ data }: { data: RatingsData }) {
                         {total > 0 ? (
                             <>
                                 <div className="flex items-baseline gap-2 mt-1">
-                                    <span className="text-3xl font-bold text-amber-500">{data.platform_avg.toFixed(2)}</span>
+                                    <span className="text-3xl font-bold text-amber-600 dark:text-amber-400">{data.platform_avg.toFixed(2)}</span>
                                     <span className="text-muted-foreground text-sm">/ 5</span>
                                 </div>
                                 <div className="flex gap-px mt-1">
@@ -569,7 +578,7 @@ function RatingsTab({ data }: { data: RatingsData }) {
                             const pct   = total > 0 ? Math.round((count / total) * 100) : 0;
                             return (
                                 <div key={star} className="flex items-center gap-2 text-sm">
-                                    <span className="w-4 text-right text-amber-500 font-semibold">{star}</span>
+                                    <span className="w-4 text-right text-amber-600 dark:text-amber-400 font-semibold">{star}</span>
                                     <span className="text-amber-600 dark:text-amber-400 text-xs">★</span>
                                     <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2 overflow-hidden">
                                         <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${pct}%` }} />
@@ -597,7 +606,7 @@ function RatingsTab({ data }: { data: RatingsData }) {
                         <ResponsiveContainer width="100%" height={240}>
                             <BarChart data={data.monthly_chart} margin={{ top: 4, right: 10, left: 0, bottom: 40 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
+                                <XAxis dataKey="month" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={phone ? 'preserveStartEnd' : 0} minTickGap={phone ? 6 : 0} tickFormatter={phone ? shortTick : undefined} />
                                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                                 <Tooltip formatter={(v: number) => [v, 'Reviews']} contentStyle={{ fontSize: 12 }} />
                                 <Bar dataKey="count" name="Reviews" fill="#f59e0b" radius={[4, 4, 0, 0]} />
@@ -619,11 +628,11 @@ function RatingsTab({ data }: { data: RatingsData }) {
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                            <table className="rt-cards w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-muted/30 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                         <th className="px-4 py-3">#</th>
-                                        <th className="px-4 py-3">Store</th>
+                                        <th className="px-4 py-3" data-rt-title>Store</th>
                                         <th className="px-4 py-3">Rating</th>
                                         <th className="px-4 py-3 text-right">Reviews</th>
                                     </tr>

@@ -30,3 +30,17 @@ export function mapsUrl(lat: number | null | undefined, lng: number | null | und
     if (address) return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     return null;
 }
+
+// K11 — payment / invoice status labels ("unpaid" → "Unpaid", "to_refund" → "To Refund") — one helper for every pill
+const PAYMENT_LABELS: Record<string, string> = {
+    unpaid: 'Unpaid',
+    paid: 'Paid',
+    partial: 'Partial',
+    to_refund: 'To Refund',
+    refunded: 'Refunded',
+};
+
+export function paymentStatusLabel(status: string | null | undefined): string {
+    if (!status) return '—';
+    return PAYMENT_LABELS[status] ?? status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}

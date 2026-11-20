@@ -76,7 +76,7 @@ export default function MyPayslipsPage({ payslips, is_rider }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {payslips.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                                 <ClipboardList className="mb-3 h-10 w-10" />
                                 <p className="font-medium">No payslips yet</p>
                                 <p className="mt-1 text-sm">Your salary records will appear here once released.</p>

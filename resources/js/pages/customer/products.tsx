@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import StoreName from '@/components/store-name';
 import { FeaturedBadge } from '@/components/featured-badge';
 import { ChevronLeft, ChevronRight, Eye, EyeOff, Filter, ImageIcon, Navigation, Pencil, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
 import { AccessoryBadge, ACCESSORY_CATEGORIES } from '@/components/accessory-badge';
@@ -48,6 +49,7 @@ type Product = {
     limit_resets_at?: string | null;
     store_id: number;
     store_name: string;
+    store_branch?: string | null;
     store_featured?: boolean;
     store_logo_url: string | null;
     store_city: string;
@@ -489,12 +491,12 @@ export default function ProductsPage({ products, filters, cities, brands, weight
                                     <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground mb-1.5" title={`${p.store_name} · ${formatCity(p.store_city)}`}>
                                         <StoreAvatar name={p.store_name} logoUrl={p.store_logo_url} size={18} />
                                         <button
-                                            className="min-w-0 truncate hover:text-blue-600 hover:underline transition-colors text-left"
+                                            className="flex min-w-0 hover:text-blue-600 hover:underline transition-colors text-left"
                                             onClick={(e) => { e.stopPropagation(); router.visit(`/customer/store/${p.store_id}`); }}
                                         >
-                                            {p.store_name}
+                                            <StoreName name={p.store_name} branch={p.store_branch} />
                                         </button>
-                                        <span className="shrink-0 whitespace-nowrap">· {formatCity(p.store_city)}</span>
+                                        <span className={`whitespace-nowrap ${p.store_branch ? "min-w-0 truncate" : "shrink-0"}`}>· {formatCity(p.store_city)}</span>
                                     </div>
                                     {p.store_featured && <FeaturedBadge className="mb-1.5" />}
                                     <div className="mb-2">

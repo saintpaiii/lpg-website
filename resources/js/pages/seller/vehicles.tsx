@@ -64,6 +64,8 @@ type Vehicle = {
     /** On an active delivery (can't be paused) */
     busy: boolean;
     assigned_rider: { id: number; name: string } | null;
+    /** K11: the rider clocked in with this vehicle right now */
+    in_use_by?: { id: number; name: string } | null;
     deleted_at: string | null;
 };
 
@@ -274,7 +276,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                     </CardHeader>
                     <CardContent className="p-0">
                         {active.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                                 <Car className="h-10 w-10 mb-3 opacity-30" />
                                 <p className="font-medium">No vehicles yet</p>
                                 <p className="text-sm mt-1">Add your first delivery vehicle to get started.</p>
@@ -287,7 +289,7 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                             <th className="px-4 py-3">Type</th>
                                             <th className="px-4 py-3">Plate</th>
                                             <th className="px-4 py-3 hidden sm:table-cell">Capacity</th>
-                                            <th className="px-4 py-3 hidden md:table-cell">Assigned Rider</th>
+                                            <th className="px-4 py-3 hidden md:table-cell">Rider</th>
                                             <th className="px-4 py-3 text-center">Status</th>
                                             <th className="px-4 py-3 text-right">Actions</th>
                                         </tr>
@@ -307,7 +309,11 @@ export default function VehiclesPage({ vehicles, riders, planLimit, rates = [], 
                                                     {v.tank_limits_label && <span className="block text-xs" data-testid="tank-limits-label">{v.tank_limits_label}</span>}
                                                 </td>
                                                 <td className="px-4 py-3 hidden md:table-cell text-sm">
-                                                    {v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
+                                                    {v.in_use_by ? (
+                                                        <span>In use by {v.in_use_by.name} <span className="text-muted-foreground">(on shift)</span>
+                                                            {v.assigned_rider && v.assigned_rider.id !== v.in_use_by.id && <span className="block text-xs text-muted-foreground">Default: {v.assigned_rider.name}</span>}
+                                                        </span>
+                                                    ) : v.assigned_rider?.name ?? <span className="text-muted-foreground italic">Unassigned</span>}
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     {v.paused_by_plan ? (

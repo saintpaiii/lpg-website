@@ -775,9 +775,9 @@ function PlatformInsightsSection({ data, salesTrend, customerGrowth }: {
 
     // Order completion insight
     const orderInsight = (() => {
-        if (data.order_success_rate === null) return { level: 'info', text: 'No orders recorded in the last 30 days to compute a completion rate.' };
+        if (data.order_success_rate === null) return { level: 'info', text: 'No orders were delivered or cancelled in the last 30 days, so there is no completion rate yet.' };
         const r = data.order_success_rate;
-        if (r >= 90) return { level: 'success', text: `Excellent platform order completion rate of ${r}% in the last 30 days. Sellers and riders are performing well.` };
+        if (r >= 90) return { level: 'success', text: `Excellent platform order completion rate of ${r}% in the last 30 days (delivered ÷ delivered + cancelled). Sellers and riders are performing well.` };
         if (r >= 75) return { level: 'info',    text: `Order completion rate is ${r}% across the platform. Room for improvement — review cancelled and failed orders.` };
         return { level: 'warning', text: `Low platform completion rate of ${r}%. High cancellation or delivery failures across stores — investigate root causes.` };
     })();

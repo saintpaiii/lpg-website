@@ -4,7 +4,7 @@ import {
     BarChart3,
     Crown,
     Package,
-    PhilippinePeso,
+    Receipt,
     ShoppingCart,
     TrendingUp,
 } from 'lucide-react';
@@ -28,6 +28,8 @@ type Stats = {
     revenueAllTime: number;
     deliveredThisMonth: number;
     averageOrderValue: number;
+    unpaidInvoices: number;
+    unpaidInvoicesAmount: number;
 };
 
 type ChartPoint = { date: string; short: string; orders: number; revenue: number };
@@ -98,13 +100,14 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
             href:  canOrders ? '/seller/orders' : null,
         },
         {
-            label: 'Revenue This Month',
-            value: fmt(stats.revenueThisMonth),
-            sub:   `${fmt(stats.revenueAllTime)} all time`,
-            icon:  PhilippinePeso,
-            color: 'text-emerald-600',
-            bg:    'bg-emerald-50 dark:bg-emerald-900/20',
-            href:  null as string | null,
+            // K11: was a second "Revenue This Month" (the same number as the card above)
+            label: 'Unpaid Invoices',
+            value: stats.unpaidInvoices,
+            sub:   stats.unpaidInvoices > 0 ? `${fmt(stats.unpaidInvoicesAmount)} still to collect` : 'Everything is paid',
+            icon:  Receipt,
+            color: stats.unpaidInvoices > 0 ? 'text-amber-600' : 'text-emerald-600',
+            bg:    stats.unpaidInvoices > 0 ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-emerald-50 dark:bg-emerald-900/20',
+            href:  (canOpen('/seller/invoices') ? '/seller/invoices' : null) as string | null,
         },
         {
             label: 'Low Stock Alerts',
@@ -172,14 +175,14 @@ export default function SellerDashboard({ stats, ordersChart, recentOrders, lowS
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Delivered Orders (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-blue-600">{stats.deliveredThisMonth.toLocaleString()}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Completed deliveries</p>
+                            <p className="text-xs text-muted-foreground mt-1">Delivered and paid</p>
                         </CardContent>
                     </Card>
                     <Card className="hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 border-l-4 border-l-violet-500">
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Average Order Value (This Month)</p>
                             <p className="text-2xl font-bold mt-1 text-violet-600">{fmt(stats.averageOrderValue)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Revenue ÷ delivered orders</p>
+                            <p className="text-xs text-muted-foreground mt-1">Revenue ÷ delivered and paid orders</p>
                         </CardContent>
                     </Card>
                 </div>

@@ -48,6 +48,7 @@ class CartController extends Controller
                 $stores[$storeId] = [
                     'store_id'     => $storeId,
                     'store_name'   => $store->store_name,
+                    'store_branch' => $store->parent_store_id ? $store->branch_name : null,   // K11
                     'store_logo_url' => $store->logo ? \Illuminate\Support\Facades\Storage::url($store->logo) : null,
                     // "Delivery from ₱40" (null = no delivery), pick-up only (no rider / vehicle), opening status — J4
                     ...collect($store->customerFacts())->only(['delivery_from', 'allow_pickup', 'pickup_only', 'can_deliver', 'hours'])->all(),

@@ -264,7 +264,7 @@ export default function BannersPage({ banners, activeCount }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {activeBanners.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center px-6 py-12 text-center text-muted-foreground">
                                 <Image className="mb-3 h-9 w-9" />
                                 <p className="font-medium">No active banners</p>
                                 <p className="text-sm mt-1">Create a banner and activate it to show on the browse page.</p>

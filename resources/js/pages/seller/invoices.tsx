@@ -1,3 +1,4 @@
+import { paymentStatusLabel } from '@/lib/order-status';
 import { Head, Link, router } from '@inertiajs/react';
 import { ExportLink } from '@/components/export-link';
 import { Eye, FileDown, Printer, Receipt, Search } from 'lucide-react';
@@ -185,7 +186,7 @@ export default function SellerInvoices({ invoices, counts, tab, search, date_fro
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PAY_COLORS[inv.payment_status] ?? 'bg-muted text-muted-foreground'}`}>
-                                                    {inv.payment_status}
+                                                    {paymentStatusLabel(inv.payment_status)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden lg:table-cell">

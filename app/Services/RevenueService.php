@@ -73,4 +73,21 @@ class RevenueService
 
         return $out;
     }
+
+    /**
+     * K11 — per day for ONE store: "Y-m-d" → {sales, orders}. orders = the number of delivered + paid orders (the
+     * same definition as the sales), so revenue ÷ orders is a real average order value.
+     *
+     * @return array<string, array{sales: float, orders: int}>
+     */
+    public static function dailyFor(int $storeId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $out = [];
+        foreach (static::query($storeId, $from, $to)->groupBy(DB::raw('DATE(' . self::SALE_DATE . ')'))
+            ->selectRaw('DATE(' . self::SALE_DATE . ') AS d, SUM(' . self::AMOUNT . ') AS s, COUNT(*) AS n')->get() as $r) {
+            $out[substr((string) $r->d, 0, 10)] = ['sales' => round((float) $r->s, 2), 'orders' => (int) $r->n];
+        }
+
+        return $out;
+    }
 }

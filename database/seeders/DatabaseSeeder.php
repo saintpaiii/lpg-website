@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
             BranchDemoSeeder::class,        // J9: seller1 on paid Premium + "Imus Branch" (Branch Manager, rider, orders)
         ]);
 
+        // K11: the demo accounts are created with `name` only — give them first / last name too (profile forms)
+        \App\Models\User::backfillNameParts();
+
         // J8: 2 years of GENERATED demo sales history per demo store (sales_history only — no orders / invoices),
         // so the Seller DSS "Seasonal" tab has a meaningful chart. Seeding only runs on local / demo databases.
         foreach (\App\Models\Store::mainStores()->get() as $store) {   // J9: not branches (a new outlet has no 2-year history)

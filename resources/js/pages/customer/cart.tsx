@@ -1,4 +1,5 @@
 import { limitLabel, maxQty, overLimitText, type LimitPeriod } from '@/lib/order-limits';
+import StoreName from '@/components/store-name';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertCircle, Minus, Plus, ShieldCheck, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useState } from 'react';
@@ -50,6 +51,7 @@ type CartItem = {
 type StoreGroup = {
     store_id: number;
     store_name: string;
+    store_branch?: string | null;
     store_logo_url?: string | null;
     /** Cheapest delivery option ("Delivery from ₱40"); null = no delivery. Final fee at checkout. */
     delivery_from: number | null;
@@ -246,7 +248,7 @@ export default function CartPage({ cart }: Props) {
                                                 This store is not available right now
                                             </p>
                                         )}
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                                             <input
                                                 type="checkbox"
                                                 disabled={!available}
@@ -255,9 +257,9 @@ export default function CartPage({ cart }: Props) {
                                                 onChange={() => toggleStore(sg)}
                                                 className="h-4 w-4 rounded border-border text-blue-600 cursor-pointer"
                                             />
-                                            <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
+                                            <CardTitle className="text-sm flex min-w-0 max-w-[calc(100%-2rem)] items-center gap-2 text-gray-900 dark:text-white">
                                                 <StoreAvatar name={sg.store_name} logoUrl={sg.store_logo_url} size={24} />
-                                                {sg.store_name}
+                                                <StoreName name={sg.store_name} branch={sg.store_branch} />
                                             </CardTitle>
                                             {sg.pickup_only ? (
                                                 <PickupOnlyBadge short className="ml-auto" />

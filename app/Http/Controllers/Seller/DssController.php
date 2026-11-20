@@ -267,7 +267,9 @@ class DssController extends Controller
         $totalDel    = $deliveries->count();
         $successDel  = $deliveries->where('status', 'delivered')->count();
         $failedDel   = $deliveries->where('status', 'failed')->count();
-        $successRate = $totalDel > 0 ? (int) round(($successDel / $totalDel) * 100) : null;
+        // K11: delivered ÷ (delivered + failed) — deliveries still on the way are not failures
+        $inProgressDel = $totalDel - $successDel - $failedDel;
+        $successRate   = \App\Support\SuccessRate::of($successDel, $failedDel);
 
         $completed = $deliveries->filter(
             fn ($d) => $d->status === 'delivered' && $d->assigned_at && $d->delivered_at
@@ -304,7 +306,7 @@ class DssController extends Controller
         if ($repeatRate < 30 && $thisMoCustomers >= 5) {
             $recs[] = ['type' => 'info', 'text' => "Only {$repeatRate}% of customers reordered this month. Introduce loyalty perks or follow-up messages to improve retention."];
         }
-        if ($successRate !== null && $successRate < 85 && $totalDel >= 3) {
+        if ($successRate !== null && $successRate < 85 && $successDel + $failedDel >= 3) {
             $recs[] = ['type' => 'warning', 'text' => "Delivery success rate is {$successRate}%. Review failed deliveries and improve rider-to-area assignments."];
         }
         if ($busiestDay) {
@@ -335,6 +337,8 @@ class DssController extends Controller
             'avg_delivery_hours'    => $avgDeliveryHours,
             'total_deliveries'      => $totalDel,
             'failed_deliveries'     => $failedDel,
+            'delivered_deliveries'  => $successDel,
+            'in_progress_deliveries' => $inProgressDel,
             'low_stock_count'       => $lowStockCount,
             'recommendations'       => $recs,
         ];

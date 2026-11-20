@@ -272,7 +272,8 @@ export default function Stores({ stores, counts, tab, search, kind = 'all' }: Pr
                                             </td>
                                             <td className="px-4 py-3 hidden md:table-cell">
                                                 <p className="text-sm">{store.plan ?? '—'}</p>
-                                                {store.plan_status && (
+                                                {/* K11: no second "No plan" pill under the "No plan" text */}
+                                                {store.plan_status && store.plan_status !== 'none' && (
                                                     <span className={`rounded-full px-1.5 py-0.5 text-xs font-semibold ${ADMIN_PLAN_STATUS[store.plan_status]?.cls}`}>
                                                         {ADMIN_PLAN_STATUS[store.plan_status]?.label}
                                                     </span>

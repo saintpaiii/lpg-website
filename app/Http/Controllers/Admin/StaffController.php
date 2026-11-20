@@ -45,9 +45,9 @@ class StaffController extends Controller
             ->through(fn ($u) => [
                 'id'               => $u->id,
                 'name'             => $u->name,
-                'first_name'       => $u->first_name,
+                'first_name'       => $u->nameParts()['first_name'],   // K11: split from name when empty
                 'middle_name'      => $u->middle_name,
-                'last_name'        => $u->last_name,
+                'last_name'        => $u->nameParts()['last_name'],
                 'suffix'           => $u->suffix,
                 'email'            => $u->email,
                 'phone'            => $u->phone,
@@ -162,9 +162,9 @@ class StaffController extends Controller
             'staff' => [
                 'id'                  => $user->id,
                 'name'                => $user->name,
-                'first_name'          => $user->first_name,
+                'first_name'          => $user->nameParts()['first_name'],   // K11
                 'middle_name'         => $user->middle_name,
-                'last_name'           => $user->last_name,
+                'last_name'           => $user->nameParts()['last_name'],
                 'suffix'              => $user->suffix,
                 'email'               => $user->email,
                 'phone'               => $user->phone,

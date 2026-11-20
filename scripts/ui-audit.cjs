@@ -15,6 +15,9 @@
  *              is a deliberate "…" (text-overflow: ellipsis) or a sideways scroller
  *   midword    a single word broken over 3+ lines in a narrow box ("Deliv / ery")
  *   overlap    sibling labels in a row / stepper whose boxes overlap
+ *   hscroll    (K11) a box with overflow-x auto / scroll whose content is wider than it (scrollWidth > clientWidth + 2) —
+ *              a table cut off at the card edge counts here, not as "clipped". Deliberate sideways chip / tab bars
+ *              (nav, role=tablist, .scrollbar-none, [data-audit-scroll-ok], a one-row bar without a table) are not reported.
  * Dialog sweep: on each page, non-destructive buttons (Add / New / Create / Assign / Edit / Record / Receive …) are clicked;
  * an opened dialog is checked the same way, then closed with Escape.
  * --seed runs `migrate:fresh --seed` on THAT test database first (only names containing test / audit / throwaway), then
@@ -38,7 +41,7 @@ const ONLY = args.only ? String(args.only) : null;
 const SIZES = String(args.sizes || '375,1366').split(',').map(Number).filter(Boolean);
 const DIALOGS = !args['no-dialogs'];
 const CHROME = args.chrome || process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const KINDS = ['contrast', 'wide', 'offscreen', 'clipped', 'midword', 'overlap'];
+const KINDS = ['contrast', 'wide', 'offscreen', 'clipped', 'midword', 'overlap', 'hscroll'];
 
 // ── Safety: never the real database ─────────────────────────────────────────
 const envDb = (() => {
@@ -68,14 +71,15 @@ if (args.seed) {
 
 const PAGES = {
     guest: ['/', '/login', '/register', '/seller/register', '/terms', '/seller-terms', '/privacy', '/this-page-does-not-exist'],
-    customer: ['/customer/products', '/customer/products/1', '/customer/store/1', '/customer/cart', '/customer/checkout', '/customer/orders',
+    customer: ['/customer/products', '/customer/products/1', '/customer/store/1', '/customer/store/4', '/customer/cart', '/customer/profile', '/customer/checkout', '/customer/orders',
         '@first:/customer/orders:/customer/orders/', '/customer/messages', '/customer/refunds', '/settings/profile', '/settings/password', '/settings/appearance'],
     seller: ['/seller/dashboard', '/seller/main-dashboard', '/seller/products', '/seller/orders', '@first:/seller/orders:/seller/orders/', '@row:/seller/orders:Preparing', '/seller/deliveries',
         '/seller/vehicles', '/seller/invoices', '/seller/inventory', '/seller/suppliers', '/seller/purchase-orders', '/seller/staff', '/seller/attendance',
-        '/seller/payroll', '/seller/plan', '/seller/revenue', '/seller/refunds', '/seller/reports', '@tabs:/seller/dss', '/seller/settings', '/seller/branches',
+        '/seller/payroll', '/seller/plan', '/seller/revenue', '/seller/refunds', '/seller/reports', '@tabs:/seller/dss', '/seller/settings', '/seller/branches', '/seller/branches/create',
         '/seller/messages', '/seller/coupons'],
     rider: ['/rider/deliveries', '/rider/documents', '/rider/my-payslips', '/rider/history'],
-    admin: ['/admin/dashboard', '/admin/stores', '/admin/stores/1', '/admin/users', '/admin/subscriptions', '/admin/settings', '/admin/reports',
+    admin: ['/admin/dashboard', '/admin/stores', '/admin/stores/1', '/admin/stores/4', '/admin/users', '/admin/subscriptions', '/admin/settings', '/admin/reports', '/admin/reports?tab=users', '/admin/reports?tab=stores', '/admin/reports?tab=orders',
+        '/admin/reports?tab=ratings', '/admin/reports?tab=subscriptions',
         '/admin/verifications', '/admin/customers', '/admin/dss'],
 };
 const USERS = {
@@ -189,7 +193,7 @@ async function auditInPage(rootSelector) {
     // Inside a dialog sweep only the dialog counts; a page audit ignores open dialogs / popovers
     const inScope = (el) => (rootSelector ? root.contains(el) : !el.closest('[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper]'));
 
-    const out = { contrast: [], wide: null, offscreen: [], clipped: [], midword: [], overlap: [] };
+    const out = { contrast: [], wide: null, offscreen: [], clipped: [], midword: [], overlap: [], hscroll: [] };
     const texts = [];
     const seen = new Set();
     const positions = [];
@@ -305,6 +309,19 @@ async function auditInPage(rootSelector) {
         }
     }
 
+    // (f) K11 — sideways scrollers whose content does not fit (a table wider than its card)
+    for (const e of root.querySelectorAll('*')) {
+        if (!inScope(e) || skip(e) || !visible(e)) continue;
+        const ox = getComputedStyle(e).overflowX;
+        if (ox !== 'auto' && ox !== 'scroll') continue;
+        if (e.scrollWidth <= e.clientWidth + 2 || e.clientWidth === 0) continue;
+        if (e.matches('nav, [role=tablist], .scrollbar-none, [data-audit-scroll-ok]') || e.closest('nav, [role=tablist], [data-audit-scroll-ok]')) continue;
+        if (e.tagName === 'HTML' || e.tagName === 'BODY') continue;   // the page itself is "wide"
+        if (!e.querySelector('table') && e.clientHeight < 80) continue;   // a one-row chip / filter bar that scrolls sideways on purpose
+        const heads = [...e.querySelectorAll('th')].map((th) => th.innerText.replace(/\s+/g, ' ').trim()).filter(Boolean).slice(0, 4);
+        out.hscroll.push({ el: describe(e), over: e.scrollWidth - e.clientWidth, heads: heads.join(' | ') || (e.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 40) });
+    }
+
     // (e) page width + off-screen action buttons (page audit only)
     if (!rootSelector) {
         const vw = innerWidth;
@@ -408,6 +425,7 @@ function print(head, res) {
     for (const c of res.clipped.slice(0, 8)) console.log(`   clipped by ${c.over}px "${c.text}"  ${c.el}  (by ${c.by})`);
     for (const c of res.midword.slice(0, 8)) console.log(`   mid-word "${c.text}" ${c.lines} lines in ${c.width}px  ${c.el}`);
     for (const c of res.overlap.slice(0, 8)) console.log(`   overlap "${c.a}" × "${c.b}"  ${c.el}`);
+    for (const h of (res.hscroll || []).slice(0, 8)) console.log(`   hscroll +${h.over}px  [${h.heads}]  ${h.el}`);
     for (const o of res.offscreen.slice(0, 8)) console.log(`   off-screen "${o.text}" ${o.el} (${o.left}…${o.right}px)`);
 }
 

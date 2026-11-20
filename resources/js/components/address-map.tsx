@@ -116,13 +116,13 @@ export default function AddressMap({ latitude, longitude, onLocationChange, heig
                     {children}
                     <ServiceAreaLimit outline />
                 </MapContainer>
-
-                {!hasPin && !disabled && (
-                    <div className="pointer-events-none absolute inset-x-3 top-3 z-[400] rounded-md bg-white/95 px-3 py-2 text-center text-xs text-gray-700 shadow dark:bg-gray-900/90 dark:text-gray-200">
-                        Select your city and barangay to auto-pin your location, or click the map to place a pin.
-                    </div>
-                )}
             </div>
+            {/* K11: the hint is plain text under the map (as an overlay the zoom control covered its first words) */}
+            {!hasPin && !disabled && (
+                <p className="text-xs text-muted-foreground">
+                    Select your city and barangay to auto-pin your location, or click the map to place a pin.
+                </p>
+            )}
             {hasPin && !disabled && (
                 <p className="text-xs text-muted-foreground">
                     {clickMoves ? 'Drag the pin or tap the map to set your exact delivery location.' : 'Drag the pin to adjust your exact delivery location.'}

@@ -28,6 +28,7 @@ import { ExchangePolicyView, type ExchangePolicyData } from '@/components/exchan
 type StoreInfo = {
     id: number;
     store_name: string;
+    store_branch?: string | null;
     /** J9: "Branch of …" (null for a main store) */
     branch_of?: string | null;
     is_featured?: boolean;
@@ -184,7 +185,8 @@ export default function StorePage({ store, products, recent_reviews, search: ini
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <StoreAvatar name={store.store_name} logoUrl={store.logo_url} size={48} />
-                                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{store.store_name}</h1>
+                                    {/* K11: a branch shows its own name first; the "Branch of …" chip names the main store */}
+                                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{store.store_branch ?? store.store_name}</h1>
                                     {store.branch_of && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" data-testid="branch-of">{store.branch_of}</span>}
                                     {store.is_featured && <FeaturedBadge />}
                                     <MessageButton portal="customer" params={{ store_id: store.id }} label="Message store" className="gap-1.5" />

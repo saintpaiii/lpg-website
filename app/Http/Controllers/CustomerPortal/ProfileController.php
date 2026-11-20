@@ -30,10 +30,8 @@ class ProfileController extends Controller
 
         return Inertia::render('customer/profile', [
             'profile' => [
-                'first_name'  => $user->first_name ?? '',
-                'middle_name' => $user->middle_name ?? '',
-                'last_name'   => $user->last_name ?? '',
-                'suffix'      => $user->suffix ?? '',
+                // K11: older accounts with only `name` get it split, so the boxes are never empty
+                ...$user->nameParts(),
                 'email'       => $user->email,
                 'phone'       => $customer?->phone ?? $user->phone,
                 'address'     => $customer?->address ?? '',

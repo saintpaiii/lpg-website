@@ -11,7 +11,7 @@ import {
     XAxis,
     YAxis,
 } from 'recharts';
-import { FileDown, Filter, LineChart as LineChartIcon, PhilippinePeso, ShoppingCart, TrendingUp } from 'lucide-react';
+import { CheckCircle2, Filter, LineChart as LineChartIcon, PhilippinePeso, ShoppingCart, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,12 +25,14 @@ const breadcrumbs: BreadcrumbItem[] = [
 type ChartRow = {
     date: string;
     orders: number;
+    delivered: number;
     gross: number;
 };
 
 type Summary = {
     gross_revenue: number;
     total_orders: number;
+    delivered_orders: number;
     average_order_value: number;
 };
 
@@ -149,14 +151,14 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                 </Card>
 
                 {/* Summary cards */}
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <p className="text-sm text-muted-foreground">Gross Revenue</p>
                                     <p className="text-2xl font-bold mt-1 text-emerald-600">{fmt(summary.gross_revenue)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Orders that were not cancelled</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Delivered and paid orders (items + delivery fee)</p>
                                 </div>
                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0">
                                     <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -168,12 +170,12 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                         <CardContent className="pt-6">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Orders</p>
-                                    <p className="text-2xl font-bold mt-1 text-blue-600">{summary.total_orders}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">In this period</p>
+                                    <p className="text-sm text-muted-foreground">Delivered &amp; Paid Orders</p>
+                                    <p className="text-2xl font-bold mt-1 text-emerald-600">{summary.delivered_orders}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">The orders counted in the revenue</p>
                                 </div>
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 shrink-0">
-                                    <ShoppingCart className="h-5 w-5 text-blue-600" />
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20 shrink-0">
+                                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                                 </div>
                             </div>
                         </CardContent>
@@ -184,10 +186,24 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                 <div>
                                     <p className="text-sm text-muted-foreground">Average Order Value</p>
                                     <p className="text-2xl font-bold mt-1 text-violet-600">{fmt(summary.average_order_value)}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">Revenue ÷ orders</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Revenue ÷ delivered and paid orders</p>
                                 </div>
                                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 dark:bg-violet-900/20 shrink-0">
                                     <PhilippinePeso className="h-5 w-5 text-violet-600" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Orders Placed</p>
+                                    <p className="text-2xl font-bold mt-1 text-blue-600">{summary.total_orders}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Placed in this period (not cancelled)</p>
+                                </div>
+                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-900/20 shrink-0">
+                                    <ShoppingCart className="h-5 w-5 text-blue-600" />
                                 </div>
                             </div>
                         </CardContent>
@@ -244,11 +260,12 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No data for this period.</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="rt-cards w-full text-sm">
                                     <thead>
                                         <tr className="border-b bg-muted text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                             <th className="px-4 py-3">Date</th>
-                                            <th className="px-4 py-3 text-right">Orders</th>
+                                            <th className="px-4 py-3 text-right">Orders placed</th>
+                                            <th className="px-4 py-3 text-right">Delivered &amp; paid</th>
                                             <th className="px-4 py-3 text-right">Revenue</th>
                                         </tr>
                                     </thead>
@@ -257,6 +274,7 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                             <tr key={row.date} className="hover:bg-muted/60">
                                                 <td className="px-4 py-2.5 text-foreground/80">{row.date}</td>
                                                 <td className="px-4 py-2.5 text-right tabular-nums">{row.orders}</td>
+                                                <td className="px-4 py-2.5 text-right tabular-nums">{row.delivered}</td>
                                                 <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300 font-medium">{fmt(row.gross)}</td>
                                             </tr>
                                         ))}
@@ -264,7 +282,8 @@ export default function SellerReports({ date_from, date_to, summary, chart }: Pr
                                     <tfoot>
                                         <tr className="border-t-2 border-border bg-muted font-semibold">
                                             <td className="px-4 py-2.5">Total</td>
-                                            <td className="px-4 py-2.5 text-right tabular-nums">{summary.total_orders}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums"><span className="font-normal text-muted-foreground sm:hidden">Placed </span>{summary.total_orders}</td>
+                                            <td className="px-4 py-2.5 text-right tabular-nums"><span className="font-normal text-muted-foreground sm:hidden">Delivered &amp; paid </span>{summary.delivered_orders}</td>
                                             <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700 dark:text-emerald-300">{fmt(summary.gross_revenue)}</td>
                                         </tr>
                                     </tfoot>

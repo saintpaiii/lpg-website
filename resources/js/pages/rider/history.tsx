@@ -227,7 +227,7 @@ export default function RiderHistory({ deliveries, totals }: Props) {
                 {/* List */}
                 {deliveries.data.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                        <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                             <History className="mb-3 h-10 w-10" />
                             <p className="font-medium">No delivery history yet</p>
                             <p className="mt-1 text-sm">Completed and failed deliveries will appear here.</p>

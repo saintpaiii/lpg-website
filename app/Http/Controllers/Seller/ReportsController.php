@@ -34,20 +34,22 @@ class ReportsController extends Controller
 
         $chart = $this->dailyRows($store->id, $from, $to)->map(fn ($r) => [
             'date'   => $r->date,
-            'orders' => (int) $r->orders_count,
-            'gross'  => (float) $r->gross_revenue,
+            'orders'    => (int) $r->orders_count,
+            'delivered' => (int) $r->delivered_count,
+            'gross'     => (float) $r->gross_revenue,
         ])->values()->all();
 
-        $totalGross  = collect($chart)->sum('gross');
-        $totalOrders = collect($chart)->sum('orders');
+        // K11: AOV = revenue ÷ delivered-and-paid orders — both from RevenueService, the Store Dashboard's definition
+        $sum = \App\Services\RevenueService::summary($store->id, $from, $to);
 
         return Inertia::render('seller/reports', [
             'date_from' => $from->toDateString(),
             'date_to'   => $to->toDateString(),
             'summary' => [
-                'gross_revenue'       => round($totalGross, 2),
-                'total_orders'        => $totalOrders,
-                'average_order_value' => $totalOrders > 0 ? round($totalGross / $totalOrders, 2) : 0,
+                'gross_revenue'       => $sum['sales'],
+                'total_orders'        => collect($chart)->sum('orders'),
+                'delivered_orders'    => $sum['orders'],
+                'average_order_value' => $sum['orders'] > 0 ? round($sum['sales'] / $sum['orders'], 2) : 0,
             ],
             'chart' => $chart,
         ]);
@@ -65,13 +67,14 @@ class ReportsController extends Controller
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('date')
             ->pluck('orders_count', 'date');
-        $sales = \App\Services\RevenueService::byDay($storeId, $from, $to);
+        $sales = \App\Services\RevenueService::dailyFor($storeId, $from, $to);
         $dates = collect(array_keys($sales))->merge($orders->keys()->map(fn ($d) => substr((string) $d, 0, 10)))->unique()->sort()->values();
 
         return $dates->map(fn ($d) => (object) [
-            'date'          => $d,
-            'orders_count'  => (int) ($orders[$d] ?? 0),
-            'gross_revenue' => (float) ($sales[$d][$storeId] ?? 0),
+            'date'            => $d,
+            'orders_count'    => (int) ($orders[$d] ?? 0),
+            'delivered_count' => (int) ($sales[$d]['orders'] ?? 0),
+            'gross_revenue'   => (float) ($sales[$d]['sales'] ?? 0),
         ]);
     }
 
@@ -83,18 +86,22 @@ class ReportsController extends Controller
 
         $rows = $this->dailyRows($store->id, $from, $to)->map(fn ($r) => [
             'date'   => Carbon::parse($r->date)->format('M d, Y'),
-            'orders' => (int) $r->orders_count,
-            'gross'  => (float) $r->gross_revenue,
+            'orders'    => (int) $r->orders_count,
+            'delivered' => (int) $r->delivered_count,
+            'gross'     => (float) $r->gross_revenue,
         ])->values()->all();
 
-        $totalGross  = collect($rows)->sum('gross');
-        $totalOrders = collect($rows)->sum('orders');
+        $totalGross     = collect($rows)->sum('gross');
+        $totalOrders    = collect($rows)->sum('orders');
+        $totalDelivered = collect($rows)->sum('delivered');
+        $aov            = $totalDelivered > 0 ? round($totalGross / $totalDelivered, 2) : 0;
         $filename = $this->exportFilename('revenue_report', $store->store_name, $from->toDateString(), $to->toDateString(), $format);
 
         if ($format === 'pdf') {
             $columns = [
                 ['key' => 'date',      'label' => 'Date'],
-                ['key' => 'orders',    'label' => 'Orders'],
+                ['key' => 'orders',    'label' => 'Orders placed'],
+                ['key' => 'delivered', 'label' => 'Delivered & paid'],
                 ['key' => 'gross_fmt', 'label' => 'Revenue', 'align' => 'right'],
             ];
             $pdfRows = array_map(fn ($r) => array_merge($r, ['gross_fmt' => $this->peso($r['gross'])]), $rows);
@@ -104,18 +111,20 @@ class ReportsController extends Controller
                 'orgSub'       => $store->city ?? 'Cavite, Philippines',
                 'dateRange'    => $from->format('M d, Y') . ' – ' . $to->format('M d, Y'),
                 'summaryItems' => [
-                    ['label' => 'Revenue',      'value' => $this->peso($totalGross)],
-                    ['label' => 'Total Orders', 'value' => $totalOrders],
+                    ['label' => 'Revenue (delivered + paid)', 'value' => $this->peso($totalGross)],
+                    ['label' => 'Delivered & paid orders',    'value' => $totalDelivered],
+                    ['label' => 'Average order value',        'value' => $this->peso($aov)],
+                    ['label' => 'Orders placed',              'value' => $totalOrders],
                 ],
                 'columns'      => $columns,
                 'rows'         => $pdfRows,
-                'totalsRow'    => ['date' => 'TOTAL', 'orders' => $totalOrders, 'gross_fmt' => $this->peso($totalGross)],
+                'totalsRow'    => ['date' => 'TOTAL', 'orders' => $totalOrders, 'delivered' => $totalDelivered, 'gross_fmt' => $this->peso($totalGross)],
             ]);
         }
 
-        $headings  = ['Date', 'Orders', 'Revenue'];
-        $csvRows   = array_map(fn ($r) => [$r['date'], $r['orders'], number_format($r['gross'], 2)], $rows);
-        $csvRows[] = ['TOTAL', $totalOrders, number_format($totalGross, 2)];
+        $headings  = ['Date', 'Orders placed', 'Delivered & paid', 'Revenue'];
+        $csvRows   = array_map(fn ($r) => [$r['date'], $r['orders'], $r['delivered'], number_format($r['gross'], 2)], $rows);
+        $csvRows[] = ['TOTAL', $totalOrders, $totalDelivered, number_format($totalGross, 2)];
         return $this->csvResponse($filename, $headings, $csvRows);
     }
 }

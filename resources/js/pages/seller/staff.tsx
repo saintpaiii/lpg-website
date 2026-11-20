@@ -774,7 +774,7 @@ export default function SellerStaff({ staff, tab, archivedCount, pausedCount = 0
                     </CardHeader>
                     <CardContent className="p-0">
                         {staff.data.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                            <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                                 <Users className="mb-3 h-10 w-10" />
                                 <p className="font-medium">{isArchived ? 'No archived staff' : 'No staff members yet'}</p>
                                 {!isArchived && <p className="mt-1 text-sm">Click "Add Staff" to create the first account.</p>}

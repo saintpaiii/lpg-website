@@ -86,6 +86,7 @@ class StoreController extends Controller
             'store' => [
                 'id'            => $store->id,
                 'store_name'    => $store->store_name,
+                'store_branch'  => $store->parent_store_id ? $store->branch_name : null,   // K11
                 // J9: 'Branch of Bonifacio LPG Center' (null for a main store)
                 'branch_of'     => $store->branchOfLabel(),
                 'is_featured'   => (bool) $store->is_featured,

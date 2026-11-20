@@ -97,6 +97,78 @@ class User extends Authenticatable implements MustVerifyEmail
         ))));
     }
 
+    /**
+     * K11 — split a full name for accounts that only have `name` (older / seeded accounts): a trailing suffix
+     * ("Jr.") is taken off, the LAST word is the last name, everything before it the first name.
+     *
+     * @return array{first_name: string, last_name: string, suffix: string}
+     */
+    public static function splitName(?string $name): array
+    {
+        $words = preg_split('/\s+/', trim((string) $name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $suffix = '';
+        if (count($words) > 2) {
+            $last = rtrim(end($words), '.,');
+            foreach (static::SUFFIXES as $s) {
+                if (strcasecmp(rtrim($s, '.'), $last) === 0) {
+                    $suffix = $s;
+                    array_pop($words);
+                    break;
+                }
+            }
+        }
+        if (count($words) < 2) {
+            return ['first_name' => $words[0] ?? '', 'last_name' => '', 'suffix' => $suffix];
+        }
+        $lastName = array_pop($words);
+
+        return ['first_name' => rtrim(implode(' ', $words), ','), 'last_name' => $lastName, 'suffix' => $suffix];
+    }
+
+    /**
+     * The name parts for a form: the stored ones, or — when first AND last name are empty — split from `name`, so
+     * the person only has to confirm them (K11).
+     *
+     * @return array{first_name: string, middle_name: string, last_name: string, suffix: string}
+     */
+    public function nameParts(): array
+    {
+        if (trim((string) $this->first_name) !== '' || trim((string) $this->last_name) !== '') {
+            return ['first_name' => (string) $this->first_name, 'middle_name' => (string) $this->middle_name,
+                'last_name' => (string) $this->last_name, 'suffix' => (string) $this->suffix];
+        }
+        $split = static::splitName($this->name);
+
+        return ['first_name' => $split['first_name'], 'middle_name' => (string) $this->middle_name,
+            'last_name' => $split['last_name'], 'suffix' => (string) ($this->suffix ?: $split['suffix'])];
+    }
+
+    /**
+     * K11 — fill first_name / last_name from `name` where BOTH are empty. Safe to run again and on live data: it
+     * never touches a row that already has a first or last name. Returns how many rows were filled.
+     */
+    public static function backfillNameParts(): int
+    {
+        $n = 0;
+        static::withTrashed()->where(fn ($q) => $q->whereNull('first_name')->orWhere('first_name', ''))
+            ->where(fn ($q) => $q->whereNull('last_name')->orWhere('last_name', ''))
+            ->whereNotNull('name')->where('name', '!=', '')
+            ->select(['id', 'name', 'suffix'])->chunkById(200, function ($users) use (&$n) {
+                foreach ($users as $u) {
+                    $p = static::splitName($u->name);
+                    // a plain query update: no model events, updated_at untouched, `name` not recomputed
+                    static::withTrashed()->whereKey($u->id)->toBase()->update(array_filter([
+                        'first_name' => $p['first_name'] ?: null,
+                        'last_name'  => $p['last_name'] ?: null,
+                        'suffix'     => $u->suffix ?: ($p['suffix'] ?: null),
+                    ], fn ($v) => $v !== null));
+                    $n++;
+                }
+            });
+
+        return $n;
+    }
+
     /** The name without the suffix — the ID name check uses it (an ID may or may not print "JR"). */
     public function nameWithoutSuffix(): string
     {

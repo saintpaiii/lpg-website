@@ -1,3 +1,4 @@
+import { paymentStatusLabel } from '@/lib/order-status';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, FileDown, Printer } from 'lucide-react';
 import { useState } from 'react';
@@ -175,7 +176,7 @@ export default function SellerInvoiceShow({ invoice, doc, receipts = [] }: Props
                                     <span className="text-muted-foreground">Status</span>
                                     <span className={`font-medium capitalize ${invoice.payment_status === 'paid' ? 'text-emerald-600' : invoice.payment_status === 'unpaid' ? 'text-red-600' : ''}`}>
                                         {invoice.payment_status === 'paid' && <CheckCircle2 className="inline h-3.5 w-3.5 mr-0.5 mb-0.5" />}
-                                        {invoice.payment_status}
+                                        {paymentStatusLabel(invoice.payment_status)}
                                     </span>
                                 </div>
 

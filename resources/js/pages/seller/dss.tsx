@@ -122,6 +122,8 @@ type Insights = {
     avg_delivery_hours: number | null;
     total_deliveries: number;
     failed_deliveries: number;
+    delivered_deliveries: number;
+    in_progress_deliveries: number;
     low_stock_count: number;
     recommendations: Recommendation[];
 };
@@ -386,7 +388,7 @@ function TopProductsSection({ products }: { products: TopProduct[] }) {
         <Card>
             <CardContent className="p-0">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead>
                             <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                 <th className="px-4 py-2.5">#</th>
@@ -476,7 +478,7 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
                             <p className="px-4 py-8 text-center text-sm text-muted-foreground">No data</p>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
+                                <table className="rt-cards w-full text-xs">
                                     <thead>
                                         <tr className="border-b bg-gray-50 dark:bg-gray-800/50 text-left text-xs font-semibold uppercase text-muted-foreground">
                                             <th className="px-3 py-2">Product</th>
@@ -492,7 +494,7 @@ function DemandForecastSection({ data }: { data: DemandForecast }) {
                                                 <td className="px-3 py-2">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="inline-block h-2 w-2 rounded-full shrink-0" style={{ background: FORECAST_COLORS[i % FORECAST_COLORS.length] }} />
-                                                        <span className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[80px]">{p.name}</span>
+                                                        <span className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[80px] max-sm:max-w-none max-sm:whitespace-normal" title={p.name}>{p.name}</span>
                                                     </div>
                                                 </td>
                                                 {data.day_columns.map((c) => (
@@ -601,11 +603,15 @@ function InsightsSection({ data, reorderAlerts }: { data: Insights; reorderAlert
 
     const deliveryInsight = (() => {
         if (data.total_deliveries === 0) return { level: 'info', text: 'No deliveries recorded in the last 30 days.' };
-        const rate = data.delivery_success_rate ?? 0;
-        const timeText = data.avg_delivery_hours !== null ? ` Avg time: ${data.avg_delivery_hours}h.` : '';
-        if (rate >= 95) return { level: 'success', text: `Excellent! ${rate}% delivery success in 30 days.${timeText}` };
-        if (rate >= 85) return { level: 'info',    text: `Good — ${rate}% delivery success rate.${timeText} ${data.failed_deliveries} failed.` };
-        return { level: 'warning', text: `${rate}% success rate — ${data.failed_deliveries} of ${data.total_deliveries} failed.${timeText} Review rider assignments.` };
+        // K11: rate = delivered ÷ (delivered + failed); deliveries still on the way are shown on their own
+        const onWay = data.in_progress_deliveries > 0 ? `, ${data.in_progress_deliveries} still on the way` : '';
+        const counts = `${data.delivered_deliveries} delivered, ${data.failed_deliveries} failed${onWay}.`;
+        const timeText = data.avg_delivery_hours !== null ? ` Avg time ${data.avg_delivery_hours}h.` : '';
+        const rate = data.delivery_success_rate;
+        if (rate === null) return { level: 'info', text: `No finished deliveries yet — ${data.in_progress_deliveries} on the way.` };
+        if (rate >= 95) return { level: 'success', text: `${rate}% success rate — ${counts}${timeText}` };
+        if (rate >= 85) return { level: 'info',    text: `${rate}% success rate — ${counts}${timeText}` };
+        return { level: 'warning', text: `${rate}% success rate — ${counts}${timeText} Review rider assignments.` };
     })();
 
     const LEVEL_STYLE = {
@@ -973,7 +979,7 @@ function FleetSection({ fleet }: { fleet: Fleet }) {
             <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Per vehicle</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto p-0">
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead><tr className="border-b text-left text-xs text-muted-foreground"><th className="px-4 py-2">Vehicle</th><th className="px-4 py-2 text-right">Trips</th><th className="px-4 py-2 text-right">kg carried</th><th className="px-4 py-2 text-right">Capacity used</th></tr></thead>
                         <tbody className="divide-y">
                             {fleet.per_vehicle.length === 0 && <tr><td colSpan={4} className="px-4 py-4 text-center text-muted-foreground">No vehicles yet.</td></tr>}
@@ -1015,7 +1021,7 @@ function SupplierSection({ data }: { data: SupplierDss }) {
             <Card>
                 <CardHeader className="pb-2"><CardTitle className="text-sm">Suppliers — last {data.days} days</CardTitle></CardHeader>
                 <CardContent className="overflow-x-auto p-0">
-                    <table className="w-full text-sm">
+                    <table className="rt-cards w-full text-sm">
                         <thead><tr className="border-b text-left text-xs text-muted-foreground">
                             <th className="px-4 py-2">Supplier</th><th className="px-4 py-2 text-right">Received</th><th className="px-4 py-2 text-right">Damaged / expired</th>
                             <th className="px-4 py-2 text-right">Damage rate</th><th className="px-4 py-2 text-right">Avg delay</th><th className="px-4 py-2 text-right">On time</th>

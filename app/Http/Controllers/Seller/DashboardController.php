@@ -30,6 +30,11 @@ class DashboardController extends Controller
         $deliveredCount     = $month['orders'];
         $averageOrderValue  = $deliveredCount > 0 ? round($revenueThisMonth / $deliveredCount, 2) : 0;
 
+        // K11: unpaid / partly paid invoices (replaces the duplicate "Revenue This Month" tile)
+        $unpaid = $store->invoices()->where('invoices.payment_status', '!=', 'paid')
+            ->whereHas('order', fn ($q) => $q->where('status', '!=', 'cancelled'))
+            ->selectRaw('COUNT(*) AS n, COALESCE(SUM(' . \App\Models\Invoice::DISPLAY_TOTAL_SQL . ' - COALESCE(invoices.paid_amount, 0)), 0) AS due')->first();
+
         $revenueAllTime = \App\Services\RevenueService::salesFor($store->id);
         $byDay = \App\Services\RevenueService::byDay($store->id, Carbon::today()->subDays(29), Carbon::today()->endOfDay());
 
@@ -91,6 +96,8 @@ class DashboardController extends Controller
                 'revenueAllTime'      => $revenueAllTime,
                 'deliveredThisMonth'  => $deliveredCount,
                 'averageOrderValue'   => $averageOrderValue,
+                'unpaidInvoices'      => (int) ($unpaid->n ?? 0),
+                'unpaidInvoicesAmount' => round((float) ($unpaid->due ?? 0), 2),
             ],
             'ordersChart'  => $ordersChart,
             'recentOrders' => $recentOrders,

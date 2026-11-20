@@ -1128,7 +1128,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                 {deliveries.data.length === 0 ? (
                     <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                        <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center text-muted-foreground">
                             <Truck className="mb-3 h-10 w-10" />
                             <p className="font-medium">
                                 {isHistory ? 'No delivery history yet' : 'No active deliveries'}
@@ -1146,7 +1146,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                         {deliveries.data.map((d) => (
                             <Card key={d.id} className="overflow-hidden">
                                 <div
-                                    className={`flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/60 ${seenRowClass(seen.get(d.id))}`}
+                                    className={`flex cursor-pointer flex-wrap items-start gap-3 p-4 hover:bg-muted/60 sm:flex-nowrap ${seenRowClass(seen.get(d.id))}`}
                                     onClick={() => setExpanded(expanded === d.id ? null : d.id)}
                                 >
                                     {/* Status icon */}
@@ -1166,11 +1166,15 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                     {/* Main info */}
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-mono text-sm font-semibold text-blue-600">
+                                            <span className="whitespace-nowrap font-mono text-sm font-semibold text-blue-600">
                                                 {d.order?.order_number ?? '—'}
                                             </span>
                                             <SeenPill flags={seen.get(d.id)} />
                                             <StatusBadge status={d.status} />
+                                            {/* K11: phones — the amount sits in the top row (the right column moves under the card) */}
+                                            <span className="ml-auto font-semibold tabular-nums text-foreground sm:hidden">
+                                                ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+                                            </span>
                                         </div>
                                         <p className="mt-0.5 font-medium text-foreground">
                                             {d.order?.customer?.name ?? '—'}
@@ -1210,9 +1214,9 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
                                         )}
                                     </div>
 
-                                    {/* Amount + actions */}
-                                    <div className="flex shrink-0 flex-col items-end gap-2">
-                                        <span className="font-semibold tabular-nums text-foreground">
+                                    {/* Amount + actions — K11: on phones a full-width row under the details (was a column taking ~60%) */}
+                                    <div className="flex w-full flex-row flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:flex-col sm:items-end sm:pl-0">
+                                        <span className="hidden font-semibold tabular-nums text-foreground sm:inline">
                                             ₱{(d.order?.grand_total ?? 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
                                         </span>
 
@@ -1225,7 +1229,7 @@ export default function RiderDeliveries({ deliveries, tab, counts, filters, rout
 
                                         {/* COD: amount to collect + Payment Collected */}
                                         {d.order && d.order.amount_to_collect > 0 && (
-                                            <div className="flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex flex-col items-start gap-1 sm:items-end" onClick={(e) => e.stopPropagation()}>
                                                 <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
                                                     Collect ₱{d.order.amount_to_collect.toLocaleString('en-PH', { minimumFractionDigits: 2 })} cash
                                                     {d.order.payment_mode === 'half' && ' (half already paid online)'}

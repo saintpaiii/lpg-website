@@ -66,6 +66,7 @@ class OrderController extends Controller
                     'id'                => $o->id,
                     'order_number'      => $o->order_number,
                     'store_name'        => $o->store?->store_name ?? '—',
+                    'store_branch'      => $o->store?->parent_store_id ? $o->store->branch_name : null,   // K11: branch first
                     'status'            => $o->status,
                     'fulfillment'       => $o->fulfillment ?? 'delivery',
                     'total_amount'      => (float) $o->total_amount,

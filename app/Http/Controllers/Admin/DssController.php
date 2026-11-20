@@ -377,17 +377,17 @@ class DssController extends Controller
             ->where('created_at', '>=', $now->copy()->startOfWeek())
             ->count();
 
-        // Platform-wide order success rate (delivered vs total last 30 days)
-        $totalOrders30d = Order::whereNull('deleted_at')
-            ->where('created_at', '>=', $now->copy()->subDays(30))
-            ->count();
+        // Platform-wide order completion rate, last 30 days — K11: delivered ÷ (delivered + cancelled); orders still
+        // pending / being prepared / on the way are not failures (App\Support\SuccessRate, same as the seller DSS)
         $deliveredOrders30d = Order::whereNull('deleted_at')
             ->where('status', 'delivered')
             ->where('created_at', '>=', $now->copy()->subDays(30))
             ->count();
-        $orderSuccessRate = $totalOrders30d > 0
-            ? (int) round(($deliveredOrders30d / $totalOrders30d) * 100)
-            : null;
+        $cancelledOrders30d = Order::whereNull('deleted_at')
+            ->where('status', 'cancelled')
+            ->where('created_at', '>=', $now->copy()->subDays(30))
+            ->count();
+        $orderSuccessRate = \App\Support\SuccessRate::of($deliveredOrders30d, $cancelledOrders30d);
 
         // Recommendations
         $recs = [];

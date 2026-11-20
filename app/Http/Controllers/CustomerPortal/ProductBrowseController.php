@@ -108,6 +108,7 @@ class ProductBrowseController extends Controller
             'stock'          => \App\Services\StockService::sellable($p),   // K6: expired batches never count
             'store_id'       => $p->store_id,
             'store_name'     => $p->store?->store_name ?? '',
+            'store_branch'   => $p->store?->parent_store_id ? $p->store->branch_name : null,   // K11: show the branch first
             'store_featured' => (bool) $p->store?->is_featured,
             'store_logo_url' => $p->store?->logo ? Storage::url($p->store->logo) : null,
             'store_city'     => $p->store?->city ?? '',
@@ -285,6 +286,7 @@ class ProductBrowseController extends Controller
                 'stock'          => \App\Services\StockService::sellable($product),   // K6
                 'store_id'       => $product->store_id,
                 'store_name'     => $product->store?->store_name ?? '',
+                'store_branch'   => $product->store?->parent_store_id ? $product->store->branch_name : null,
                 'store_featured' => (bool) $product->store?->is_featured,
                 'store_logo_url' => $product->store?->logo ? Storage::url($product->store->logo) : null,
                 'store_city'     => $product->store?->city ?? '',
@@ -322,6 +324,7 @@ class ProductBrowseController extends Controller
             ...$p->cardMedia(),
             'stock'          => \App\Services\StockService::sellable($p),   // K6: expired batches never count
             'store_name'     => $p->store?->store_name ?? '',
+            'store_branch'   => $p->store?->parent_store_id ? $p->store->branch_name : null,   // K11: show the branch first
             'store_featured' => (bool) $p->store?->is_featured,
             'store_id'       => $p->store_id,
             'avg_rating'     => round((float) ($p->ratings_avg_rating ?? 0), 1),

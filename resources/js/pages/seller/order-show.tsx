@@ -342,6 +342,12 @@ export default function SellerOrderShow({ order, riders, breakdown, loyalty, rec
                         ))}
                     </div>
                 )}
+                {/* K11: phones show only the numbered dots — say which step this is */}
+                {order.status !== 'cancelled' && stepIndex >= 0 && (
+                    <p className="-mt-3 text-xs font-medium text-blue-600 dark:text-blue-400 sm:hidden" data-testid="step-label">
+                        Step {stepIndex + 1} of {STATUS_STEPS.length} · {orderStatusLabel(order.status, order.fulfillment)}
+                    </p>
+                )}
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     {/* Order items */}

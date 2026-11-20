@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import CustomerLayout from '@/layouts/customer-layout';
 import TrackingCard from '@/components/tracking-card';
-import { orderStatusLabel } from '@/lib/order-status';
+import { orderStatusLabel, paymentStatusLabel } from '@/lib/order-status';
 import StoreLocationMap from '@/components/store-location-map';
 import { PriceBreakdownRows, type PriceBreakdown } from '@/components/price-breakdown';
 import { PaymentReceiptsCard, type PaymentReceiptRow } from '@/components/payment-receipts-card';
@@ -145,13 +145,14 @@ const ORDER_STEPS = [
     { key: 'delivered',        label: 'Delivered' },
 ];
 
+// K11: the same colours as the orders list
 const STATUS_STYLES: Record<string, string> = {
-    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-300',
-    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300',
-    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300',
-    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-300',
-    delivered:        'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-300',
-    cancelled:        'bg-muted text-muted-foreground',
+    pending:          'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800',
+    confirmed:        'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800',
+    preparing:        'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+    out_for_delivery: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800',
+    delivered:        'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    cancelled:        'bg-muted text-muted-foreground border-border',
 };
 
 const PAY_STYLES: Record<string, string> = {
@@ -241,6 +242,8 @@ function DeliveryTimeline({ proofs }: { proofs: NonNullable<Order['delivery']>['
 function StatusStepper({ status, order }: { status: string; order: Order }) {
     const isCancelled = status === 'cancelled';
     const currentIdx  = ORDER_STEPS.findIndex((s) => s.key === status);
+    // K11: the last step (delivered / picked up) is DONE, not "in progress"
+    const finished    = currentIdx === ORDER_STEPS.length - 1;
 
     if (isCancelled) {
         return (
@@ -274,8 +277,8 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
         {/* K10: phones — a vertical list (dot + label on one line), so long labels never overlap */}
         <ol className="space-y-0 sm:hidden" data-testid="stepper-vertical">
             {ORDER_STEPS.map((step, idx) => {
-                const done    = idx < currentIdx;
-                const current = idx === currentIdx;
+                const done    = idx < currentIdx || (finished && idx === currentIdx);
+                const current = !finished && idx === currentIdx;
                 return (
                     <li key={step.key} className="flex gap-3">
                         <div className="flex flex-col items-center">
@@ -295,8 +298,8 @@ function StatusStepper({ status, order }: { status: string; order: Order }) {
         </ol>
         <div className="hidden w-full items-center overflow-x-auto pb-2 sm:flex">
             {ORDER_STEPS.map((step, idx) => {
-                const done    = idx < currentIdx;
-                const current = idx === currentIdx;
+                const done    = idx < currentIdx || (finished && idx === currentIdx);
+                const current = !finished && idx === currentIdx;
                 return (
                     <div key={step.key} className="flex items-center flex-1 last:flex-none min-w-0">
                         <div className="flex flex-col items-center shrink-0">
@@ -609,8 +612,8 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                             </Button>
                         </Link>
                         <h1 className="whitespace-nowrap text-xl font-bold text-foreground font-mono">{order.order_number}</h1>
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_STYLES[order.status] ?? 'bg-muted'}`}>
-                            {order.status.replace('_', ' ')}
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[order.status] ?? 'bg-muted text-muted-foreground'}`}>
+                            {orderStatusLabel(order.status, order.fulfillment)}
                         </span>
                         {awaitingPayment && (
                             <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
@@ -958,7 +961,7 @@ export default function OrderShow({ order, breakdown, receipts = [] }: Props & {
                                         {order.payment_status === 'to_refund' ? 'To Refund' :
                                          order.payment_status === 'refunded'  ? 'Refunded' :
                                          order.payment_status === 'partial'   ? (isHalf ? 'Half Paid' : 'Down Paid') :
-                                         order.payment_status}
+                                         paymentStatusLabel(order.payment_status)}
                                     </span>
                                 </div>
 
